@@ -1,4 +1,4 @@
-﻿plugins {
+plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
@@ -8,11 +8,11 @@
 }
 
 android {
-    namespace = "com.ovi.nearby"
+    namespace = "com.ovi.where"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.ovi.nearby"
+        applicationId = "com.ovi.where"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -31,14 +31,12 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-    kotlinOptions {
-        jvmTarget = "11"
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -63,10 +61,10 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.messaging)
-    implementation(libs.firebase.storage)
 
-    implementation(libs.play.services.maps)
     implementation(libs.play.services.location)
+
+    implementation(libs.maplibre.compose)
 
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)

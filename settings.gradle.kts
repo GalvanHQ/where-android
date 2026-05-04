@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "NearBy"
+rootProject.name = "Where"
 include(":app")
  

@@ -1,3 +1,190 @@
 <resources>
-    <string name="app_name">NearBy</string>
+    <string name="app_name">Where</string>
+    <string name="app_tagline">Share your location with friends</string>
+    <string name="app_version">Where v1.0.0</string>
+
+    <!-- Content Descriptions -->
+    <string name="cd_back">Back</string>
+    <string name="cd_my_location">My Location</string>
+    <string name="cd_share_location">Share Location</string>
+    <string name="cd_stop_sharing">Stop Sharing</string>
+    <string name="cd_create_group">Create Group</string>
+    <string name="cd_join_group">Join Group</string>
+    <string name="cd_settings">Settings</string>
+    <string name="cd_view_map">View Map</string>
+    <string name="cd_more_options">More</string>
+    <string name="cd_copy">Copy</string>
+    <string name="cd_hide_password">Hide password</string>
+    <string name="cd_show_password">Show password</string>
+
+    <!-- Screen Titles -->
+    <string name="title_settings">Settings</string>
+    <string name="title_group_map">Group Map</string>
+    <string name="title_my_groups">My Groups</string>
+    <string name="title_create_group">Create Group</string>
+    <string name="title_join_group">Join Group</string>
+    <string name="title_group_details">Group Details</string>
+    <string name="title_create_account">Create Account</string>
+    <string name="title_profile">Profile</string>
+    <string name="title_invite_code">Invite Code</string>
+    <string name="title_share_duration">Share Location Duration</string>
+
+    <!-- Action Labels -->
+    <string name="action_sign_in">Sign In</string>
+    <string name="action_sign_out">Sign Out</string>
+    <string name="action_sign_up">Sign Up</string>
+    <string name="action_create_account">Create Account</string>
+    <string name="action_create_group">Create Group</string>
+    <string name="action_join_group">Join Group</string>
+    <string name="action_start_sharing">Start Sharing</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_continue_with_google">Continue with Google</string>
+    <string name="action_copy_invite_code">Copy Invite Code</string>
+    <string name="action_share_invite_code">Share Invite Code</string>
+    <string name="action_leave_group">Leave Group</string>
+    <string name="action_share">Share</string>
+
+    <!-- Labels -->
+    <string name="label_email">Email</string>
+    <string name="label_password">Password</string>
+    <string name="label_confirm_password">Confirm Password</string>
+    <string name="label_name">Name</string>
+    <string name="label_group_name">Group Name</string>
+    <string name="label_description_optional">Description (optional)</string>
+    <string name="label_invite_code">Invite Code</string>
+    <string name="label_or">or</string>
+    <string name="label_google_logo">G</string>
+
+    <!-- Messages / Instructions -->
+    <string name="msg_join_where">Join Where</string>
+    <string name="msg_create_account_subtitle">Create an account to start sharing your location</string>
+    <string name="msg_create_group_title">Create a New Group</string>
+    <string name="msg_create_group_subtitle">Groups let you share your location with friends and family</string>
+    <string name="msg_enter_invite_code">Enter Invite Code</string>
+    <string name="msg_invite_code_instruction">Ask the group admin for the 8-character code</string>
+    <string name="msg_share_invite_instruction">Share this code with friends so they can join your group</string>
+    <string name="msg_share_duration_instruction">Select how long to share your location:</string>
+    <string name="msg_no_groups_title">No groups yet</string>
+    <string name="msg_no_groups_subtitle">Create a group to start sharing your location</string>
+    <string name="msg_location_not_available">Location not available</string>
+    <string name="msg_already_have_account">Don\'t have an account?</string>
+    <string name="msg_have_account_sign_in">Already have an account? Sign In</string>
+    <string name="msg_share_group_invite">Join my group \'%1$s\' on Where!\nInvite code: %2$s</string>
+    <string name="msg_members_count">Members (%1$d)</string>
+    <string name="msg_default_action">Action</string>
+    <string name="msg_oops">Oops!</string>
+
+    <!-- Settings -->
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_notifications_subtitle">Manage notification preferences</string>
+    <string name="settings_location">Location</string>
+    <string name="settings_location_granted">Permission granted</string>
+    <string name="settings_location_required">Permission required</string>
+    <string name="settings_battery_optimization">Battery Optimization</string>
+    <string name="settings_battery_subtitle">Disable for better location sharing</string>
+    <string name="settings_privacy">Privacy</string>
+    <string name="settings_privacy_subtitle">Privacy and security settings</string>
+
+    <!-- Status Text -->
+    <string name="status_sharing">Sharing</string>
+    <string name="status_not_sharing">Not Sharing</string>
+    <string name="status_admin">Admin</string>
+    <string name="status_member">Member</string>
+    <string name="status_user_fallback">User</string>
+
+    <!-- Time/Duration -->
+    <string name="time_just_now">Just now</string>
+    <string name="time_minutes_ago">%1$d min ago</string>
+    <string name="time_hours_ago">%1$dh ago</string>
+    <string name="time_days_ago">%1$dd ago</string>
+    <string name="duration_minutes">%1$d minutes</string>
+    <string name="duration_one_hour">1 hour</string>
+    <string name="duration_hours">%1$d hours</string>
+    <string name="duration_hours_minutes">%1$dh %2$dm</string>
+
+    <!-- Plurals -->
+    <plurals name="member_count">
+        <item quantity="one">%d member</item>
+        <item quantity="other">%d members</item>
+    </plurals>
+
+    <!-- Error Messages -->
+    <string name="error_email_required">Email is required</string>
+    <string name="error_invalid_email">Invalid email format</string>
+    <string name="error_password_required">Password is required</string>
+    <string name="error_password_too_short">Password must be at least 6 characters</string>
+    <string name="error_name_required">Name is required</string>
+    <string name="error_name_too_short">Name must be at least 2 characters</string>
+    <string name="error_confirm_password_required">Please confirm your password</string>
+    <string name="error_passwords_mismatch">Passwords do not match</string>
+    <string name="error_group_name_required">Group name is required</string>
+    <string name="error_group_name_too_short">Name must be at least 3 characters</string>
+    <string name="error_unknown">Unknown error</string>
+    <string name="error_loading_groups">Error loading groups</string>
+    <string name="error_loading_group">Error loading group</string>
+    <string name="error_failed_start_sharing">Failed to start sharing</string>
+    <string name="error_failed_stop_sharing">Failed to stop sharing</string>
+    <string name="error_failed_create_group">Failed to create group</string>
+
+    <!-- Toast Messages -->
+    <string name="toast_location_denied">Location permission denied</string>
+    <string name="toast_invite_code_copied">Invite code copied</string>
+    <string name="toast_location_settings">Location permission managed in app settings</string>
+    <string name="toast_privacy_coming_soon">Privacy settings coming soon</string>
+
+    <!-- Notification -->
+    <string name="notification_sharing_title">Where - Location Sharing</string>
+    <string name="notification_sharing_body">Sharing your location with the group</string>
+    <string name="notification_channel_location_updates">Location Updates</string>
+    <string name="notification_channel_location_updates_desc">Notifications when group members share their location</string>
+    <string name="notification_channel_group_activity">Group Activity</string>
+    <string name="notification_channel_group_activity_desc">Notifications about group membership changes</string>
+    <string name="notification_channel_general">General</string>
+    <string name="notification_channel_general_desc">General notifications</string>
+
+    <!-- DateTimeUtils -->
+    <string name="time_expired">Expired</string>
+    <string name="time_seconds_remaining">%1$ds remaining</string>
+    <string name="time_minutes_remaining">%1$dm remaining</string>
+    <string name="time_minutes_seconds_remaining">%1$dm %2$ds remaining</string>
+    <string name="time_hours_remaining">%1$dh remaining</string>
+    <string name="time_hours_minutes_remaining">%1$dh %2$dm remaining</string>
+    <string name="time_days_remaining">%1$dd remaining</string>
+    <string name="time_days_hours_remaining">%1$dd %2$dh remaining</string>
+
+    <!-- LocationUtils -->
+    <string name="distance_meters">%1$d m</string>
+    <string name="distance_km_decimal">%1$.1f km</string>
+    <string name="distance_km">%1$d km</string>
+    <string name="eta_less_than_one_min">&lt; 1 min</string>
+    <string name="eta_minutes">%1$d min</string>
+    <string name="eta_hours_minutes">%1$dh %2$dm</string>
+    <string name="eta_hours">%1$dh</string>
+
+    <!-- Duration format (DateTimeUtils) -->
+    <plurals name="duration_format_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    <plurals name="duration_format_hours">
+        <item quantity="one">%d hour</item>
+        <item quantity="other">%d hours</item>
+    </plurals>
+    <plurals name="duration_format_days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <plurals name="time_ago_minutes">
+        <item quantity="one">%d minute ago</item>
+        <item quantity="other">%d minutes ago</item>
+    </plurals>
+    <plurals name="time_ago_hours">
+        <item quantity="one">%d hour ago</item>
+        <item quantity="other">%d hours ago</item>
+    </plurals>
+    <plurals name="time_ago_days">
+        <item quantity="one">%d day ago</item>
+        <item quantity="other">%d days ago</item>
+    </plurals>
 </resources>

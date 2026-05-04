@@ -1,6 +1,6 @@
 package com.ovi.where.presentation.group.details
 
-import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,26 +14,34 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.CopyAll
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PersonRemove
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -47,19 +55,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.ClipboardManager
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ovi.where.R
+import com.ovi.where.core.common.UiEvent
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.theme.LocationActive
-import com.ovi.where.core.theme.LocationInactive
 import com.ovi.where.core.utils.IntentUtils
 import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.model.GroupMemberUiModel
@@ -70,26 +79,74 @@ fun GroupDetailsScreen(
     groupId: String,
     onNavigateBack: () -> Unit,
     onNavigateToMap: () -> Unit,
+    onNavigateToEditGroup: () -> Unit = {},
     viewModel: GroupDetailsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
     var showMenu by remember { mutableStateOf(false) }
-    
+    var showLeaveDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(groupId) {
         viewModel.loadGroupDetails(groupId)
         viewModel.observeMembers(groupId)
     }
 
-    val inviteCodeCopiedText = stringResource(R.string.toast_invite_code_copied)
+    LaunchedEffect(Unit) {
+        viewModel.uiEvent.collect { event ->
+            when (event) {
+                is UiEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message.asString(context))
+                is UiEvent.NavigateBack -> onNavigateBack()
+                else -> Unit
+            }
+        }
+    }
+
     val shareTitle = stringResource(R.string.action_share_invite_code)
     val shareMessage = stringResource(R.string.msg_share_group_invite, uiState.groupName, uiState.inviteCode)
+    val inviteCodeCopied = stringResource(R.string.toast_invite_code_copied)
+
+    // Confirmation dialogs
+    if (showLeaveDialog) {
+        AlertDialog(
+            onDismissRequest = { showLeaveDialog = false },
+            title = { Text(stringResource(R.string.action_leave_group)) },
+            text = { Text(stringResource(R.string.msg_confirm_leave_group)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLeaveDialog = false
+                    viewModel.leaveGroup(groupId)
+                }) { Text(stringResource(R.string.action_confirm), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLeaveDialog = false }) { Text(stringResource(R.string.action_cancel)) }
+            }
+        )
+    }
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text(stringResource(R.string.action_delete_group)) },
+            text = { Text(stringResource(R.string.msg_confirm_delete_group)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    viewModel.deleteGroup(groupId)
+                }) { Text(stringResource(R.string.action_confirm), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.action_cancel)) }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     Text(
                         text = uiState.group?.name ?: stringResource(R.string.title_group_details),
                         maxLines = 1,
@@ -98,41 +155,27 @@ fun GroupDetailsScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.cd_back)
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = onNavigateToMap) {
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = stringResource(R.string.cd_view_map)
-                        )
+                        Icon(Icons.Default.LocationOn, contentDescription = stringResource(R.string.cd_view_map))
                     }
                     Box {
                         IconButton(onClick = { showMenu = true }) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = stringResource(R.string.cd_more_options)
-                            )
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.cd_more_options))
                         }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false }
-                        ) {
+                        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                             if (uiState.inviteCode.isNotEmpty()) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.action_copy_invite_code)) },
                                     onClick = {
                                         clipboardManager.setText(AnnotatedString(uiState.inviteCode))
-                                        context.showToast(inviteCodeCopiedText)
+                                        context.showToast(inviteCodeCopied)
                                         showMenu = false
                                     },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.ContentCopy, contentDescription = null)
-                                    }
+                                    leadingIcon = { Icon(Icons.Default.ContentCopy, null) }
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.action_share_invite_code)) },
@@ -140,200 +183,280 @@ fun GroupDetailsScreen(
                                         context.startActivity(IntentUtils.createShareIntent(context, shareTitle, shareMessage))
                                         showMenu = false
                                     },
-                                    leadingIcon = {
-                                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null)
-                                    }
+                                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.Send, null) }
                                 )
                             }
+                            if (uiState.isCurrentUserAdmin) {
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.action_edit_group)) },
+                                    onClick = { showMenu = false; onNavigateToEditGroup() },
+                                    leadingIcon = { Icon(Icons.Default.Edit, null) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.action_delete_group), color = MaterialTheme.colorScheme.error) },
+                                    onClick = { showMenu = false; showDeleteDialog = true },
+                                    leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
+                                )
+                            }
+                            HorizontalDivider()
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.action_leave_group)) },
-                                onClick = {
-                                    viewModel.leaveGroup(groupId)
-                                    showMenu = false
-                                    onNavigateBack()
-                                }
+                                text = { Text(stringResource(R.string.action_leave_group), color = MaterialTheme.colorScheme.error) },
+                                onClick = { showMenu = false; showLeaveDialog = true },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = MaterialTheme.colorScheme.error) }
                             )
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         when {
             uiState.isLoading -> {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
+                    modifier = Modifier.fillMaxSize().padding(paddingValues),
                     contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
+                ) { CircularProgressIndicator() }
             }
-            
+
             uiState.error != null -> {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
+                    modifier = Modifier.fillMaxSize().padding(paddingValues),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = stringResource(R.string.error_loading_group),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.error
                         )
-                        Spacer(modifier = Modifier.height(Dimens.spaceMedium))
+                        Spacer(Modifier.height(Dimens.spaceMedium))
                         TextButton(onClick = { viewModel.loadGroupDetails(groupId) }) {
                             Text(stringResource(R.string.action_retry))
                         }
                     }
                 }
             }
-            
+
             uiState.group != null -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(paddingValues),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
                 ) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(Dimens.spaceMedium),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    ) {
-                        Column(
+                    // Invite code card
+                    item {
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(Dimens.spaceLarge)
+                                .padding(Dimens.spaceLarge),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                            ),
+                            shape = MaterialTheme.shapes.large
                         ) {
-                            Text(
-                                text = stringResource(R.string.title_invite_code),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Spacer(modifier = Modifier.height(Dimens.spaceSmall))
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLarge)
                             ) {
                                 Text(
-                                    text = uiState.inviteCode,
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    color = MaterialTheme.colorScheme.primary
+                                    text = stringResource(R.string.title_invite_code),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
-                                Spacer(modifier = Modifier.width(Dimens.spaceMedium))
-                                IconButton(
-                                    onClick = {
-                                        clipboardManager.setText(AnnotatedString(uiState.inviteCode))
-                                        context.showToast(inviteCodeCopiedText)
-                                    }
+                                Spacer(Modifier.height(Dimens.spaceSmall))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ContentCopy,
-                                        contentDescription = stringResource(R.string.cd_copy),
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                    Text(
+                                        text = uiState.inviteCode,
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
                                     )
+                                    Row {
+                                        IconButton(onClick = {
+                                            clipboardManager.setText(AnnotatedString(uiState.inviteCode))
+                                            context.showToast(inviteCodeCopied)
+                                        }) {
+                                            Icon(
+                                                Icons.Default.ContentCopy,
+                                                contentDescription = stringResource(R.string.cd_copy),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        IconButton(onClick = {
+                                            context.startActivity(IntentUtils.createShareIntent(context, shareTitle, shareMessage))
+                                        }) {
+                                            Icon(
+                                                Icons.AutoMirrored.Filled.Send,
+                                                contentDescription = stringResource(R.string.action_share),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
                                 }
+                                Text(
+                                    text = stringResource(R.string.msg_share_invite_instruction),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                )
                             }
                         }
                     }
-                    
-                    Text(
-                        text = stringResource(R.string.msg_members_count, uiState.members.size),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium)
-                    )
-                    
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
-                    ) {
-                        items(
-                            items = uiState.members,
-                            key = { it.id }
-                        ) { member ->
-                            MemberItem(
-                                member = member,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
+
+                    // Members header
+                    item {
+                        Text(
+                            text = stringResource(R.string.msg_members_count, uiState.members.size),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall)
+                        )
                     }
+
+                    // Member items
+                    items(items = uiState.members, key = { it.id }) { member ->
+                        MemberItem(
+                            member = member,
+                            isCurrentUser = member.userId == viewModel.currentUserId,
+                            isCurrentUserAdmin = uiState.isCurrentUserAdmin,
+                            onKick = { viewModel.kickMember(groupId, member.userId) },
+                            onPromote = { viewModel.promoteMember(groupId, member.userId) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Dimens.spaceLarge)
+                        )
+                    }
+
+                    item { Spacer(Modifier.height(Dimens.spaceLarge)) }
                 }
             }
         }
     }
 }
 
+private val memberColors = listOf(
+    Color(0xFF1E88E5), Color(0xFF00ACC1), Color(0xFF7C4DFF),
+    Color(0xFF43A047), Color(0xFFE53935), Color(0xFFFF9800)
+)
+
 @Composable
 fun MemberItem(
     member: GroupMemberUiModel,
+    isCurrentUser: Boolean,
+    isCurrentUserAdmin: Boolean,
+    onKick: () -> Unit,
+    onPromote: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val color = memberColors[member.userId.hashCode().and(0x7FFFFFFF) % memberColors.size]
+    var showMenu by remember { mutableStateOf(false) }
+    var showKickDialog by remember { mutableStateOf(false) }
+
+    if (showKickDialog) {
+        AlertDialog(
+            onDismissRequest = { showKickDialog = false },
+            title = { Text(stringResource(R.string.action_kick_member)) },
+            text = { Text(stringResource(R.string.msg_confirm_kick_member, member.displayName)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showKickDialog = false
+                    onKick()
+                }) { Text(stringResource(R.string.action_confirm), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showKickDialog = false }) { Text(stringResource(R.string.action_cancel)) }
+            }
+        )
+    }
+
     Card(
         modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = MaterialTheme.shapes.medium
     ) {
         ListItem(
             headlineContent = {
-                Text(
-                    text = member.displayName,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (isCurrentUser) "${member.displayName} (you)" else member.displayName,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             },
             supportingContent = {
-                Text(
-                    text = member.roleText,
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (member.isAdmin) {
+                        Icon(
+                            Icons.Default.AdminPanelSettings, null,
+                            modifier = Modifier.size(12.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    Text(
+                        text = member.roleText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (member.isAdmin) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             },
             leadingContent = {
                 Box(
                     modifier = Modifier
-                        .size(Dimens.avatarSizeMedium),
+                        .size(Dimens.avatarSizeMedium)
+                        .clip(CircleShape)
+                        .background(color),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(Dimens.iconSizeLarge),
-                        tint = MaterialTheme.colorScheme.primary
+                    Text(
+                        text = member.displayName.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
                 }
             },
             trailingContent = {
-                if (member.isSharingLocation) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(Dimens.spaceSmall + Dimens.spaceXSmall)
-                                .padding(Dimens.spaceXSmall)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(Dimens.spaceSmall)
-                            )
-                        }
-                        Text(
-                            text = stringResource(R.string.status_sharing),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = LocationActive
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (member.isSharingLocation) {
+                        Icon(
+                            Icons.Default.LocationOn, null,
+                            modifier = Modifier.size(16.dp),
+                            tint = LocationActive
                         )
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    if (isCurrentUserAdmin && !isCurrentUser) {
+                        Box {
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(Icons.Default.MoreVert, null)
+                            }
+                            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                                if (!member.isAdmin) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.action_promote_admin)) },
+                                        onClick = { showMenu = false; onPromote() },
+                                        leadingIcon = { Icon(Icons.Default.AdminPanelSettings, null) }
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.action_kick_member), color = MaterialTheme.colorScheme.error) },
+                                    onClick = { showMenu = false; showKickDialog = true },
+                                    leadingIcon = { Icon(Icons.Default.PersonRemove, null, tint = MaterialTheme.colorScheme.error) }
+                                )
+                            }
+                        }
                     }
                 }
-            }
+            },
+            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface)
         )
     }
 }

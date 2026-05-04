@@ -3,20 +3,28 @@ package com.ovi.where.di
 import com.ovi.where.domain.repository.AuthRepository
 import com.ovi.where.domain.repository.GroupRepository
 import com.ovi.where.domain.repository.LocationRepository
+import com.ovi.where.domain.repository.UserRepository
 import com.ovi.where.domain.usecase.auth.GoogleSignInUseCase
 import com.ovi.where.domain.usecase.auth.ObserveCurrentUserUseCase
 import com.ovi.where.domain.usecase.auth.RegisterUseCase
+import com.ovi.where.domain.usecase.auth.ResetPasswordUseCase
 import com.ovi.where.domain.usecase.auth.SignInUseCase
 import com.ovi.where.domain.usecase.auth.SignOutUseCase
+import com.ovi.where.domain.usecase.auth.UpdateProfileUseCase
 import com.ovi.where.domain.usecase.group.CreateGroupUseCase
+import com.ovi.where.domain.usecase.group.DeleteGroupUseCase
 import com.ovi.where.domain.usecase.group.GetGroupUseCase
 import com.ovi.where.domain.usecase.group.GetUserGroupsUseCase
 import com.ovi.where.domain.usecase.group.JoinGroupUseCase
+import com.ovi.where.domain.usecase.group.KickMemberUseCase
 import com.ovi.where.domain.usecase.group.LeaveGroupUseCase
 import com.ovi.where.domain.usecase.group.ObserveGroupMembersUseCase
+import com.ovi.where.domain.usecase.group.PromoteMemberUseCase
+import com.ovi.where.domain.usecase.group.UpdateGroupUseCase
 import com.ovi.where.domain.usecase.location.ObserveGroupLocationsUseCase
 import com.ovi.where.domain.usecase.location.StartLocationSharingUseCase
 import com.ovi.where.domain.usecase.location.StopLocationSharingUseCase
+import com.ovi.where.domain.usecase.user.GetUsersUseCase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -42,6 +50,12 @@ object UseCaseModule {
     fun provideGoogleSignInUseCase(authRepository: AuthRepository) = GoogleSignInUseCase(authRepository)
 
     @Provides
+    fun provideResetPasswordUseCase(authRepository: AuthRepository) = ResetPasswordUseCase(authRepository)
+
+    @Provides
+    fun provideUpdateProfileUseCase(authRepository: AuthRepository) = UpdateProfileUseCase(authRepository)
+
+    @Provides
     fun provideCreateGroupUseCase(groupRepository: GroupRepository) = CreateGroupUseCase(groupRepository)
 
     @Provides
@@ -60,6 +74,18 @@ object UseCaseModule {
     fun provideObserveGroupMembersUseCase(groupRepository: GroupRepository) = ObserveGroupMembersUseCase(groupRepository)
 
     @Provides
+    fun provideKickMemberUseCase(groupRepository: GroupRepository) = KickMemberUseCase(groupRepository)
+
+    @Provides
+    fun providePromoteMemberUseCase(groupRepository: GroupRepository) = PromoteMemberUseCase(groupRepository)
+
+    @Provides
+    fun provideDeleteGroupUseCase(groupRepository: GroupRepository) = DeleteGroupUseCase(groupRepository)
+
+    @Provides
+    fun provideUpdateGroupUseCase(groupRepository: GroupRepository) = UpdateGroupUseCase(groupRepository)
+
+    @Provides
     fun provideStartLocationSharingUseCase(locationRepository: LocationRepository) = StartLocationSharingUseCase(locationRepository)
 
     @Provides
@@ -67,4 +93,7 @@ object UseCaseModule {
 
     @Provides
     fun provideObserveGroupLocationsUseCase(locationRepository: LocationRepository) = ObserveGroupLocationsUseCase(locationRepository)
+
+    @Provides
+    fun provideGetUsersUseCase(userRepository: UserRepository) = GetUsersUseCase(userRepository)
 }

@@ -39,31 +39,32 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(
+    onNavigateToOnboarding: () -> Unit,
     onNavigateToLogin: () -> Unit,
     onNavigateToHome: () -> Unit,
     viewModel: SplashViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showLogo by remember { mutableStateOf(false) }
-    
+
     val scale by animateFloatAsState(
         targetValue = if (showLogo) 1f else 0.5f,
         animationSpec = tween(durationMillis = 800),
         label = "scale"
     )
-    
+
     LaunchedEffect(Unit) {
         delay(200)
         showLogo = true
         viewModel.checkAuthStatus()
     }
 
-    LaunchedEffect(uiState.isLoading, uiState.isLoggedIn) {
+    LaunchedEffect(uiState.isLoading, uiState.isLoggedIn, uiState.onboardingComplete) {
         if (!uiState.isLoading) {
-            if (uiState.isLoggedIn) {
-                onNavigateToHome()
-            } else {
-                onNavigateToLogin()
+            when {
+                uiState.isLoggedIn -> onNavigateToHome()
+                !uiState.onboardingComplete -> onNavigateToOnboarding()
+                else -> onNavigateToLogin()
             }
         }
     }
@@ -86,24 +87,18 @@ fun SplashScreen(
                 Icon(
                     imageVector = Icons.Default.LocationOn,
                     contentDescription = null,
-                    modifier = Modifier
-                        .size(100.dp)
-                        .scale(scale),
+                    modifier = Modifier.size(100.dp).scale(scale),
                     tint = Primary
                 )
             }
-            
             Spacer(modifier = Modifier.height(Dimens.spaceLarge))
-            
             Text(
                 text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.displayMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
-            
             Spacer(modifier = Modifier.height(Dimens.spaceSmall))
-            
             Text(
                 text = stringResource(R.string.app_tagline),
                 style = MaterialTheme.typography.bodyLarge,

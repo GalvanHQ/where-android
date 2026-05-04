@@ -58,7 +58,7 @@ class AuthRepositoryImpl @Inject constructor(
                 ?: return Resource.Error("User data not found")
             Resource.Success(user)
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Unknown error occurred")
+            Resource.Error(mapFirebaseError(e))
         }
     }
 
@@ -78,7 +78,7 @@ class AuthRepositoryImpl @Inject constructor(
                 .await()
             Resource.Success(user)
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Registration failed")
+            Resource.Error(mapFirebaseError(e))
         }
     }
 
@@ -153,6 +153,27 @@ class AuthRepositoryImpl @Inject constructor(
             Resource.Success(user)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to update profile")
+        }
+    }
+
+    private fun mapFirebaseError(e: Exception): String {
+        val message = e.message ?: ""
+        return when {
+            message.contains("INVALID_LOGIN_CREDENTIALS") || message.contains("WRONG_PASSWORD") ||
+            message.contains("wrong-password") -> "Incorrect password. Please try again."
+            message.contains("USER_NOT_FOUND") || message.contains("user-not-found") ->
+                "No account found with this email."
+            message.contains("EMAIL_ALREADY_IN_USE") || message.contains("email-already-in-use") ->
+                "This email is already registered."
+            message.contains("NETWORK_ERROR") || message.contains("network-request-failed") ->
+                "No internet connection. Please check your network."
+            message.contains("TOO_MANY_REQUESTS") || message.contains("too-many-requests") ->
+                "Too many attempts. Please wait before trying again."
+            message.contains("WEAK_PASSWORD") || message.contains("weak-password") ->
+                "Password is too weak. Use at least 6 characters."
+            message.contains("INVALID_EMAIL") || message.contains("invalid-email") ->
+                "Invalid email format."
+            else -> "Something went wrong. Please try again."
         }
     }
 }

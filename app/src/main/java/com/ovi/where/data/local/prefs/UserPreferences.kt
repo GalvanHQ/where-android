@@ -22,6 +22,7 @@ class UserPreferences @Inject constructor(
         val LAST_LOCATION_UPDATE = longPreferencesKey("last_location_update")
         val LOCATION_SHARING_ENABLED = booleanPreferencesKey("location_sharing_enabled")
         val BATTERY_SAVER_MODE = booleanPreferencesKey("battery_saver_mode")
+        val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
     }
 
     val userId: Flow<String?> = dataStore.data.map { preferences ->
@@ -42,6 +43,10 @@ class UserPreferences @Inject constructor(
 
     val isBatterySaverMode: Flow<Boolean> = dataStore.data.map { preferences ->
         preferences[Keys.BATTERY_SAVER_MODE] ?: false
+    }
+
+    val isOnboardingComplete: Flow<Boolean> = dataStore.data.map { preferences ->
+        preferences[Keys.ONBOARDING_COMPLETE] ?: false
     }
 
     suspend fun saveUserId(userId: String) {
@@ -77,6 +82,12 @@ class UserPreferences @Inject constructor(
     suspend fun setBatterySaverMode(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[Keys.BATTERY_SAVER_MODE] = enabled
+        }
+    }
+
+    suspend fun setOnboardingComplete(complete: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[Keys.ONBOARDING_COMPLETE] = complete
         }
     }
 

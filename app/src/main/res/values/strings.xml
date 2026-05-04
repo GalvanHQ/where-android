@@ -12,11 +12,16 @@
     <string name="cd_create_group">Create Group</string>
     <string name="cd_join_group">Join Group</string>
     <string name="cd_settings">Settings</string>
+    <string name="cd_profile">Profile</string>
     <string name="cd_view_map">View Map</string>
     <string name="cd_more_options">More</string>
     <string name="cd_copy">Copy</string>
     <string name="cd_hide_password">Hide password</string>
     <string name="cd_show_password">Show password</string>
+    <string name="cd_profile_photo">Profile photo</string>
+    <string name="cd_change_photo">Change profile photo</string>
+    <string name="cd_location_marker">Location marker</string>
+    <string name="cd_fit_all">Fit all members</string>
 
     <!-- Screen Titles -->
     <string name="title_settings">Settings</string>
@@ -27,8 +32,14 @@
     <string name="title_group_details">Group Details</string>
     <string name="title_create_account">Create Account</string>
     <string name="title_profile">Profile</string>
+    <string name="title_edit_profile">Edit Profile</string>
     <string name="title_invite_code">Invite Code</string>
     <string name="title_share_duration">Share Location Duration</string>
+    <string name="title_forgot_password">Forgot Password</string>
+    <string name="title_onboarding">Welcome to Where</string>
+    <string name="title_edit_group">Edit Group</string>
+    <string name="title_members">Members</string>
+    <string name="title_map">Map</string>
 
     <!-- Action Labels -->
     <string name="action_sign_in">Sign In</string>
@@ -45,6 +56,18 @@
     <string name="action_share_invite_code">Share Invite Code</string>
     <string name="action_leave_group">Leave Group</string>
     <string name="action_share">Share</string>
+    <string name="action_send_reset_email">Send Reset Email</string>
+    <string name="action_get_started">Get Started</string>
+    <string name="action_next">Next</string>
+    <string name="action_skip">Skip</string>
+    <string name="action_save">Save</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_delete_group">Delete Group</string>
+    <string name="action_kick_member">Remove Member</string>
+    <string name="action_promote_admin">Make Admin</string>
+    <string name="action_confirm">Confirm</string>
+    <string name="action_fit_all">Fit All</string>
+    <string name="action_edit_group">Edit Group</string>
 
     <!-- Labels -->
     <string name="label_email">Email</string>
@@ -56,6 +79,21 @@
     <string name="label_invite_code">Invite Code</string>
     <string name="label_or">or</string>
     <string name="label_google_logo">G</string>
+    <string name="label_forgot_password">Forgot Password?</string>
+    <string name="label_display_name">Display Name</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_slide1_title">Share Your Location</string>
+    <string name="onboarding_slide1_desc">Let friends and family know where you are in real time — safely and privately.</string>
+    <string name="onboarding_slide2_title">Create or Join Groups</string>
+    <string name="onboarding_slide2_desc">Create groups for family, friends, or events. Invite anyone with a simple 8-character code.</string>
+    <string name="onboarding_slide3_title">Stay Connected</string>
+    <string name="onboarding_slide3_desc">See everyone\'s location on a live map, get ETAs, and feel closer to the people you care about.</string>
+
+    <!-- Forgot Password -->
+    <string name="msg_forgot_password_subtitle">Enter your email address and we\'ll send you a link to reset your password.</string>
+    <string name="msg_reset_email_sent">Reset email sent! Check your inbox.</string>
+    <string name="error_reset_email_failed">Failed to send reset email</string>
 
     <!-- Messages / Instructions -->
     <string name="msg_join_where">Join Where</string>
@@ -67,7 +105,7 @@
     <string name="msg_share_invite_instruction">Share this code with friends so they can join your group</string>
     <string name="msg_share_duration_instruction">Select how long to share your location:</string>
     <string name="msg_no_groups_title">No groups yet</string>
-    <string name="msg_no_groups_subtitle">Create a group to start sharing your location</string>
+    <string name="msg_no_groups_subtitle">Create or join a group to start sharing your location with others</string>
     <string name="msg_location_not_available">Location not available</string>
     <string name="msg_already_have_account">Don\'t have an account?</string>
     <string name="msg_have_account_sign_in">Already have an account? Sign In</string>
@@ -75,17 +113,28 @@
     <string name="msg_members_count">Members (%1$d)</string>
     <string name="msg_default_action">Action</string>
     <string name="msg_oops">Oops!</string>
+    <string name="msg_sharing_active">Sharing location for %1$s</string>
+    <string name="msg_confirm_leave_group">Are you sure you want to leave this group?</string>
+    <string name="msg_confirm_delete_group">Delete this group? This cannot be undone.</string>
+    <string name="msg_confirm_kick_member">Remove %1$s from the group?</string>
+    <string name="msg_profile_updated">Profile updated successfully</string>
+    <string name="msg_photo_uploading">Uploading photo…</string>
+    <string name="msg_no_members_sharing">No members are sharing their location</string>
+    <string name="msg_tap_to_locate">Tap to locate members on the map</string>
+    <string name="msg_group_updated">Group updated</string>
 
     <!-- Settings -->
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_subtitle">Manage notification preferences</string>
     <string name="settings_location">Location</string>
     <string name="settings_location_granted">Permission granted</string>
-    <string name="settings_location_required">Permission required</string>
+    <string name="settings_location_required">Permission required — tap to open settings</string>
     <string name="settings_battery_optimization">Battery Optimization</string>
-    <string name="settings_battery_subtitle">Disable for better location sharing</string>
+    <string name="settings_battery_subtitle">Disable for uninterrupted location sharing</string>
     <string name="settings_privacy">Privacy</string>
     <string name="settings_privacy_subtitle">Privacy and security settings</string>
+    <string name="settings_app_section">App</string>
+    <string name="settings_account_section">Account</string>
 
     <!-- Status Text -->
     <string name="status_sharing">Sharing</string>
@@ -93,6 +142,8 @@
     <string name="status_admin">Admin</string>
     <string name="status_member">Member</string>
     <string name="status_user_fallback">User</string>
+    <string name="status_online">Online</string>
+    <string name="status_offline">Offline</string>
 
     <!-- Time/Duration -->
     <string name="time_just_now">Just now</string>
@@ -109,6 +160,10 @@
         <item quantity="one">%d member</item>
         <item quantity="other">%d members</item>
     </plurals>
+    <plurals name="sharing_count">
+        <item quantity="one">%d sharing</item>
+        <item quantity="other">%d sharing</item>
+    </plurals>
 
     <!-- Error Messages -->
     <string name="error_email_required">Email is required</string>
@@ -121,20 +176,38 @@
     <string name="error_passwords_mismatch">Passwords do not match</string>
     <string name="error_group_name_required">Group name is required</string>
     <string name="error_group_name_too_short">Name must be at least 3 characters</string>
-    <string name="error_unknown">Unknown error</string>
+    <string name="error_unknown">Something went wrong. Please try again.</string>
     <string name="error_google_sign_in_cancelled">Google Sign-In was cancelled</string>
-    <string name="error_google_sign_in_failed">Google Sign-In failed</string>
-    <string name="error_loading_groups">Error loading groups</string>
-    <string name="error_loading_group">Error loading group</string>
+    <string name="error_google_sign_in_failed">Google Sign-In failed. Please try again.</string>
+    <string name="error_loading_groups">Couldn\'t load groups</string>
+    <string name="error_loading_group">Couldn\'t load group details</string>
     <string name="error_failed_start_sharing">Failed to start sharing</string>
     <string name="error_failed_stop_sharing">Failed to stop sharing</string>
     <string name="error_failed_create_group">Failed to create group</string>
+    <string name="error_wrong_password">Incorrect password. Please try again.</string>
+    <string name="error_user_not_found">No account found with this email.</string>
+    <string name="error_email_already_in_use">This email is already registered.</string>
+    <string name="error_network">No internet connection. Please check your network.</string>
+    <string name="error_too_many_requests">Too many attempts. Please wait before trying again.</string>
+    <string name="error_weak_password">Password is too weak. Use at least 6 characters.</string>
+    <string name="error_invalid_invite_code">Invalid invite code. Please check and try again.</string>
+    <string name="error_already_in_group">You are already a member of this group.</string>
+    <string name="error_profile_update_failed">Failed to update profile</string>
+    <string name="error_photo_upload_failed">Failed to upload photo</string>
+    <string name="error_delete_group_failed">Failed to delete group</string>
+    <string name="error_kick_member_failed">Failed to remove member</string>
 
     <!-- Toast Messages -->
     <string name="toast_location_denied">Location permission denied</string>
-    <string name="toast_invite_code_copied">Invite code copied</string>
-    <string name="toast_location_settings">Location permission managed in app settings</string>
+    <string name="toast_invite_code_copied">Invite code copied!</string>
+    <string name="toast_location_settings">Open Settings to manage location permission</string>
     <string name="toast_privacy_coming_soon">Privacy settings coming soon</string>
+    <string name="toast_sharing_started">Location sharing started</string>
+    <string name="toast_sharing_stopped">Location sharing stopped</string>
+    <string name="toast_group_deleted">Group deleted</string>
+    <string name="toast_member_removed">Member removed</string>
+    <string name="toast_member_promoted">Member promoted to admin</string>
+    <string name="toast_left_group">You left the group</string>
 
     <!-- Notification -->
     <string name="notification_sharing_title">Where - Location Sharing</string>

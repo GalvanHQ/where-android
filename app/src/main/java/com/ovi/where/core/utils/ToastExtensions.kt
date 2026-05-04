@@ -19,3 +19,10 @@ fun Context.showLongToast(message: String) {
 fun Context.showLongToast(uiText: UiText) {
     Toast.makeText(this, uiText.asString(this), Toast.LENGTH_LONG).show()
 }
+
+fun UiText.resolve(context: Context? = null): String {
+    return when (this) {
+        is UiText.DynamicString -> value
+        is UiText.StringResource -> context?.getString(resId, *args) ?: ""
+    }
+}

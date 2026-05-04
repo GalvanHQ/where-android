@@ -3,18 +3,27 @@ package com.ovi.where.presentation.group.details
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
 import com.ovi.where.R
 import com.ovi.where.core.common.Resource
+import com.ovi.where.core.common.UiEvent
+import com.ovi.where.core.common.UiText
+import com.ovi.where.domain.usecase.group.DeleteGroupUseCase
 import com.ovi.where.domain.usecase.group.GetGroupUseCase
+import com.ovi.where.domain.usecase.group.KickMemberUseCase
 import com.ovi.where.domain.usecase.group.LeaveGroupUseCase
 import com.ovi.where.domain.usecase.group.ObserveGroupMembersUseCase
+import com.ovi.where.domain.usecase.group.PromoteMemberUseCase
+import com.ovi.where.domain.usecase.user.GetUsersUseCase
 import com.ovi.where.presentation.model.GroupMemberUiModel
 import com.ovi.where.presentation.model.GroupUiModel
 import com.ovi.where.presentation.model.toUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -23,11 +32,21 @@ class GroupDetailsViewModel @Inject constructor(
     application: Application,
     private val getGroupUseCase: GetGroupUseCase,
     private val observeGroupMembersUseCase: ObserveGroupMembersUseCase,
-    private val leaveGroupUseCase: LeaveGroupUseCase
+    private val leaveGroupUseCase: LeaveGroupUseCase,
+    private val kickMemberUseCase: KickMemberUseCase,
+    private val promoteMemberUseCase: PromoteMemberUseCase,
+    private val deleteGroupUseCase: DeleteGroupUseCase,
+    private val getUsersUseCase: GetUsersUseCase,
+    private val firebaseAuth: FirebaseAuth
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(GroupDetailsUiState())
     val uiState: StateFlow<GroupDetailsUiState> = _uiState.asStateFlow()
+
+    private val _uiEvent = Channel<UiEvent>()
+    val uiEvent = _uiEvent.receiveAsFlow()
+
+    val currentUserId: String? get() = firebaseAuth.currentUser?.uid
 
     fun loadGroupDetails(groupId: String) {
         viewModelScope.launch {
@@ -36,29 +55,24 @@ class GroupDetailsViewModel @Inject constructor(
                 is Resource.Success -> {
                     val group = result.data
                     val resources = getApplication<Application>().resources
+                    val isAdmin = group?.createdBy == currentUserId
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         group = group?.toUiModel(
                             memberCountText = resources.getQuantityString(
-                                R.plurals.member_count,
-                                group.memberCount,
-                                group.memberCount
+                                R.plurals.member_count, group.memberCount, group.memberCount
                             )
                         ),
                         inviteCode = group?.inviteCode ?: "",
                         groupName = group?.name ?: "",
+                        isCurrentUserAdmin = isAdmin,
                         error = null
                     )
                 }
                 is Resource.Error -> {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = result.message
-                    )
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = result.message)
                 }
-                is Resource.Loading -> {
-                    _uiState.value = _uiState.value.copy(isLoading = true)
-                }
+                is Resource.Loading -> _uiState.value = _uiState.value.copy(isLoading = true)
             }
         }
     }
@@ -68,19 +82,95 @@ class GroupDetailsViewModel @Inject constructor(
             val adminText = getApplication<Application>().getString(R.string.status_admin)
             val memberText = getApplication<Application>().getString(R.string.status_member)
             observeGroupMembersUseCase(groupId).collect { members ->
+                // Fetch display names
+                val userIds = members.map { it.userId }
+                val userNames = mutableMapOf<String, String>()
+                if (userIds.isNotEmpty()) {
+                    when (val usersResult = getUsersUseCase(userIds)) {
+                        is Resource.Success -> usersResult.data?.forEach { user ->
+                            userNames[user.id] = user.displayName
+                        }
+                        else -> {}
+                    }
+                }
+                val adminId = currentUserId
                 _uiState.value = _uiState.value.copy(
-                    members = members.map { it.toUiModel(adminText = adminText, memberText = memberText) }
+                    members = members.map { member ->
+                        member.toUiModel(
+                            displayName = userNames[member.userId] ?: member.userId,
+                            adminText = adminText,
+                            memberText = memberText
+                        )
+                    },
+                    isCurrentUserAdmin = members.any { it.userId == adminId && it.isAdmin() }
                 )
             }
         }
     }
-    
+
     fun leaveGroup(groupId: String) {
         viewModelScope.launch {
-            leaveGroupUseCase(groupId)
+            when (leaveGroupUseCase(groupId)) {
+                is Resource.Success -> {
+                    _uiEvent.send(UiEvent.ShowSnackbar(
+                        UiText.StringResource(R.string.toast_left_group)
+                    ))
+                    _uiEvent.send(UiEvent.NavigateBack)
+                }
+                is Resource.Error -> _uiEvent.send(UiEvent.ShowSnackbar(
+                    UiText.StringResource(R.string.error_unknown)
+                ))
+                else -> {}
+            }
+        }
+    }
+
+    fun kickMember(groupId: String, userId: String) {
+        viewModelScope.launch {
+            when (kickMemberUseCase(groupId, userId)) {
+                is Resource.Success -> _uiEvent.send(UiEvent.ShowSnackbar(
+                    UiText.StringResource(R.string.toast_member_removed)
+                ))
+                is Resource.Error -> _uiEvent.send(UiEvent.ShowSnackbar(
+                    UiText.StringResource(R.string.error_kick_member_failed)
+                ))
+                else -> {}
+            }
+        }
+    }
+
+    fun promoteMember(groupId: String, userId: String) {
+        viewModelScope.launch {
+            when (promoteMemberUseCase(groupId, userId)) {
+                is Resource.Success -> _uiEvent.send(UiEvent.ShowSnackbar(
+                    UiText.StringResource(R.string.toast_member_promoted)
+                ))
+                is Resource.Error -> _uiEvent.send(UiEvent.ShowSnackbar(
+                    UiText.StringResource(R.string.error_unknown)
+                ))
+                else -> {}
+            }
+        }
+    }
+
+    fun deleteGroup(groupId: String) {
+        viewModelScope.launch {
+            when (deleteGroupUseCase(groupId)) {
+                is Resource.Success -> {
+                    _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.toast_group_deleted)))
+                    _uiEvent.send(UiEvent.NavigateBack)
+                }
+                is Resource.Error -> _uiEvent.send(UiEvent.ShowSnackbar(
+                    UiText.StringResource(R.string.error_delete_group_failed)
+                ))
+                else -> {}
+            }
         }
     }
 }
+
+private fun com.ovi.where.domain.model.GroupMember.isAdmin() =
+    role == com.ovi.where.domain.model.MemberRole.ADMIN
 
 data class GroupDetailsUiState(
     val group: GroupUiModel? = null,
@@ -88,5 +178,6 @@ data class GroupDetailsUiState(
     val inviteCode: String = "",
     val groupName: String = "",
     val isLoading: Boolean = false,
+    val isCurrentUserAdmin: Boolean = false,
     val error: String? = null
 )

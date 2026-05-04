@@ -1,5 +1,9 @@
 package com.ovi.where.presentation.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -7,15 +11,19 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.ovi.where.presentation.auth.forgotpassword.ForgotPasswordScreen
 import com.ovi.where.presentation.auth.login.LoginScreen
 import com.ovi.where.presentation.auth.register.RegisterScreen
 import com.ovi.where.presentation.group.JoinGroupScreen
 import com.ovi.where.presentation.group.create.CreateGroupScreen
 import com.ovi.where.presentation.group.details.GroupDetailsScreen
-import com.ovi.where.presentation.home.HomeScreen
+import com.ovi.where.presentation.group.edit.EditGroupScreen
 import com.ovi.where.presentation.map.MapScreen
-import com.ovi.where.presentation.settings.SettingsScreen
+import com.ovi.where.presentation.onboarding.OnboardingScreen
+import com.ovi.where.presentation.profile.ProfileScreen
 import com.ovi.where.presentation.splash.SplashScreen
+
+private const val NAV_ANIM_DURATION = 300
 
 @Composable
 fun AppNavGraph(
@@ -26,18 +34,65 @@ fun AppNavGraph(
     NavHost(
         navController = navController,
         startDestination = startDestination,
-        modifier = modifier
+        modifier = modifier,
+        enterTransition = {
+            slideIntoContainer(
+                AnimatedContentTransitionScope.SlideDirection.Start,
+                tween(NAV_ANIM_DURATION)
+            )
+        },
+        exitTransition = {
+            slideOutOfContainer(
+                AnimatedContentTransitionScope.SlideDirection.Start,
+                tween(NAV_ANIM_DURATION)
+            )
+        },
+        popEnterTransition = {
+            slideIntoContainer(
+                AnimatedContentTransitionScope.SlideDirection.End,
+                tween(NAV_ANIM_DURATION)
+            )
+        },
+        popExitTransition = {
+            slideOutOfContainer(
+                AnimatedContentTransitionScope.SlideDirection.End,
+                tween(NAV_ANIM_DURATION)
+            )
+        }
     ) {
-        composable(Screen.Splash.route) {
+        composable(
+            Screen.Splash.route,
+            enterTransition = { fadeIn(tween(500)) },
+            exitTransition = { fadeOut(tween(300)) }
+        ) {
             SplashScreen(
+                onNavigateToOnboarding = {
+                    navController.navigate(Screen.Onboarding.route) {
+                        popUpTo(Screen.Splash.route) { inclusive = true }
+                    }
+                },
                 onNavigateToLogin = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Splash.route) { inclusive = true }
                     }
                 },
                 onNavigateToHome = {
-                    navController.navigate(Screen.Home.route) {
+                    navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Splash.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(
+            Screen.Onboarding.route,
+            enterTransition = { fadeIn(tween(400)) },
+            exitTransition = { fadeOut(tween(300)) }
+        ) {
+            OnboardingScreen(
+                onFinish = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
                 }
             )
@@ -45,46 +100,50 @@ fun AppNavGraph(
 
         composable(Screen.Login.route) {
             LoginScreen(
-                onNavigateToRegister = {
-                    navController.navigate(Screen.Register.route)
-                },
+                onNavigateToRegister = { navController.navigate(Screen.Register.route) },
                 onLoginSuccess = {
-                    navController.navigate(Screen.Home.route) {
+                    navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
-                }
+                },
+                onNavigateToForgotPassword = { navController.navigate(Screen.ForgotPassword.route) }
             )
         }
 
         composable(Screen.Register.route) {
             RegisterScreen(
-                onNavigateToLogin = {
-                    navController.popBackStack()
-                },
+                onNavigateToLogin = { navController.popBackStack() },
                 onRegisterSuccess = {
-                    navController.navigate(Screen.Home.route) {
+                    navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Register.route) { inclusive = true }
                     }
                 }
             )
         }
 
-        composable(Screen.Home.route) {
-            HomeScreen(
+        composable(Screen.ForgotPassword.route) {
+            ForgotPasswordScreen(onNavigateBack = { navController.popBackStack() })
+        }
+
+        // Main scaffold with bottom nav
+        composable(
+            Screen.Main.route,
+            enterTransition = { fadeIn(tween(400)) },
+            exitTransition = { fadeOut(tween(300)) }
+        ) {
+            MainScaffold(
                 onNavigateToMap = { groupId ->
                     navController.navigate(Screen.Map.createRoute(groupId))
                 },
-                onNavigateToCreateGroup = {
-                    navController.navigate(Screen.CreateGroup.route)
-                },
-                onNavigateToSettings = {
-                    navController.navigate(Screen.Settings.route)
-                },
-                onNavigateToJoinGroup = {
-                    navController.navigate(Screen.JoinGroup.route)
-                },
+                onNavigateToCreateGroup = { navController.navigate(Screen.CreateGroup.route) },
+                onNavigateToJoinGroup = { navController.navigate(Screen.JoinGroup.route) },
                 onNavigateToGroupDetails = { groupId ->
                     navController.navigate(Screen.GroupDetails.createRoute(groupId))
+                },
+                onLogout = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
                 }
             )
         }
@@ -96,9 +155,7 @@ fun AppNavGraph(
             val groupId = backStackEntry.arguments?.getString("groupId") ?: return@composable
             MapScreen(
                 groupId = groupId,
-                onNavigateBack = {
-                    navController.popBackStack()
-                }
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
@@ -109,44 +166,44 @@ fun AppNavGraph(
             val groupId = backStackEntry.arguments?.getString("groupId") ?: return@composable
             GroupDetailsScreen(
                 groupId = groupId,
-                onNavigateBack = {
-                    navController.popBackStack()
-                },
-                onNavigateToMap = {
-                    navController.navigate(Screen.Map.createRoute(groupId))
-                }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToMap = { navController.navigate(Screen.Map.createRoute(groupId)) },
+                onNavigateToEditGroup = { navController.navigate(Screen.EditGroup.createRoute(groupId)) }
             )
         }
 
         composable(Screen.CreateGroup.route) {
             CreateGroupScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
-                },
-                onGroupCreated = {
-                    navController.popBackStack()
-                }
+                onNavigateBack = { navController.popBackStack() },
+                onGroupCreated = { navController.popBackStack() }
             )
         }
 
         composable(Screen.JoinGroup.route) {
             JoinGroupScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
-                },
+                onNavigateBack = { navController.popBackStack() },
                 onGroupJoined = { groupId ->
                     navController.navigate(Screen.Map.createRoute(groupId)) {
-                        popUpTo(Screen.Home.route)
+                        popUpTo(Screen.Main.route)
                     }
                 }
             )
         }
 
+        composable(
+            route = Screen.EditGroup.route,
+            arguments = listOf(navArgument("groupId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val groupId = backStackEntry.arguments?.getString("groupId") ?: return@composable
+            EditGroupScreen(
+                groupId = groupId,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
         composable(Screen.Settings.route) {
-            SettingsScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
-                },
+            ProfileScreen(
+                onNavigateBack = { navController.popBackStack() },
                 onLogout = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }

@@ -105,13 +105,13 @@ fun OnboardingScreen(
                 repeat(pages.size) { index ->
                     val isSelected = pagerState.currentPage == index
                     val width by animateDpAsState(
-                        targetValue = if (isSelected) 24.dp else 8.dp,
+                        targetValue = if (isSelected) Dimens.indicatorWidthSelected else Dimens.indicatorWidthIdle,
                         animationSpec = tween(300),
                         label = "indicator_width"
                     )
                     Box(
                         modifier = Modifier
-                            .height(8.dp)
+                            .height(Dimens.indicatorHeight)
                             .width(width)
                             .clip(CircleShape)
                             .background(
@@ -138,8 +138,10 @@ fun OnboardingScreen(
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
                         colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor   = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     ) {
                         Text(
@@ -151,15 +153,15 @@ fun OnboardingScreen(
                     FilledTonalButton(
                         onClick = ::finish,
                         modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
                         colors = ButtonDefaults.filledTonalButtonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
+                            contentColor   = MaterialTheme.colorScheme.onPrimary
                         )
                     ) {
                         Text(
                             text = stringResource(R.string.action_get_started),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold
+                            style = MaterialTheme.typography.labelLarge
                         )
                     }
                 }
@@ -181,15 +183,15 @@ private fun OnboardingPageContent(page: OnboardingPage) {
     ) {
         Box(
             modifier = Modifier
-                .size(140.dp)
-                .clip(CircleShape)
+                .size(Dimens.avatarCircle)
+                .clip(MaterialTheme.shapes.extraLarge)
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = page.icon,
                 contentDescription = null,
-                modifier = Modifier.size(72.dp),
+                modifier = Modifier.size(Dimens.iconSizeXXLarge),
                 tint = MaterialTheme.colorScheme.primary
             )
         }
@@ -199,7 +201,6 @@ private fun OnboardingPageContent(page: OnboardingPage) {
         Text(
             text = stringResource(page.titleRes),
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onBackground
         )

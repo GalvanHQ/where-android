@@ -23,7 +23,9 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+// TopBar map icon → Icons.Default.Map (more accurate)
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material3.AlertDialog
@@ -44,8 +46,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -63,14 +63,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ovi.where.R
 import com.ovi.where.core.common.UiEvent
+import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.core.theme.LocationActive
 import com.ovi.where.core.utils.IntentUtils
 import com.ovi.where.core.utils.showToast
+import com.ovi.where.presentation.common.WhereTopAppBar
 import com.ovi.where.presentation.model.GroupMemberUiModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -145,22 +145,12 @@ fun GroupDetailsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = uiState.group?.name ?: stringResource(R.string.title_group_details),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
-                    }
-                },
+            WhereTopAppBar(
+                title = uiState.group?.name ?: stringResource(R.string.title_group_details),
+                onNavigateBack = onNavigateBack,
                 actions = {
                     IconButton(onClick = onNavigateToMap) {
-                        Icon(Icons.Default.LocationOn, contentDescription = stringResource(R.string.cd_view_map))
+                        Icon(Icons.Default.Map, contentDescription = stringResource(R.string.cd_view_map))
                     }
                     Box {
                         IconButton(onClick = { showMenu = true }) {
@@ -207,8 +197,7 @@ fun GroupDetailsScreen(
                             )
                         }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+                }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -273,7 +262,6 @@ fun GroupDetailsScreen(
                                     Text(
                                         text = uiState.inviteCode,
                                         style = MaterialTheme.typography.headlineMedium,
-                                        fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Row {
@@ -312,7 +300,6 @@ fun GroupDetailsScreen(
                         Text(
                             text = stringResource(R.string.msg_members_count, uiState.members.size),
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall)
                         )
                     }
@@ -338,10 +325,7 @@ fun GroupDetailsScreen(
     }
 }
 
-private val memberColors = listOf(
-    Color(0xFF1E88E5), Color(0xFF00ACC1), Color(0xFF7C4DFF),
-    Color(0xFF43A047), Color(0xFFE53935), Color(0xFFFF9800)
-)
+private val memberColors = AvatarColors
 
 @Composable
 fun MemberItem(
@@ -375,8 +359,8 @@ fun MemberItem(
 
     Card(
         modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        shape = MaterialTheme.shapes.medium
+        elevation = CardDefaults.cardElevation(Dimens.cardElevationSubtle),
+        shape     = MaterialTheme.shapes.medium
     ) {
         ListItem(
             headlineContent = {
@@ -394,10 +378,10 @@ fun MemberItem(
                     if (member.isAdmin) {
                         Icon(
                             Icons.Default.AdminPanelSettings, null,
-                            modifier = Modifier.size(12.dp),
+                            modifier = Modifier.size(Dimens.iconSizeXSmall),
                             tint = MaterialTheme.colorScheme.primary
                         )
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(Dimens.spaceSmall))
                     }
                     Text(
                         text = member.roleText,
@@ -418,8 +402,7 @@ fun MemberItem(
                     Text(
                         text = member.displayName.take(1).uppercase(),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.surface  // on-colour for avatar
                     )
                 }
             },
@@ -428,10 +411,10 @@ fun MemberItem(
                     if (member.isSharingLocation) {
                         Icon(
                             Icons.Default.LocationOn, null,
-                            modifier = Modifier.size(16.dp),
-                            tint = LocationActive
+                            modifier = Modifier.size(Dimens.iconSizeSmall),
+                            tint = MaterialTheme.colorScheme.tertiary
                         )
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(Dimens.spaceSmall))
                     }
                     if (isCurrentUserAdmin && !isCurrentUser) {
                         Box {

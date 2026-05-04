@@ -29,12 +29,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ovi.where.R
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.core.theme.Primary
 import kotlinx.coroutines.delay
 
 @Composable
@@ -87,15 +84,14 @@ fun SplashScreen(
                 Icon(
                     imageVector = Icons.Default.LocationOn,
                     contentDescription = null,
-                    modifier = Modifier.size(100.dp).scale(scale),
-                    tint = Primary
+                    modifier = Modifier.size(Dimens.splashIconSize).scale(scale),
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
             Spacer(modifier = Modifier.height(Dimens.spaceLarge))
             Text(
                 text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(Dimens.spaceSmall))

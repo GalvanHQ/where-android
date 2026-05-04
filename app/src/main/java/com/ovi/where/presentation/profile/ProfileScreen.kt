@@ -44,13 +44,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -74,6 +73,7 @@ import com.ovi.where.R
 import com.ovi.where.core.common.UiEvent
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.BatteryOptimizationUtils
+import com.ovi.where.presentation.common.WhereTopAppBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -115,16 +115,9 @@ fun ProfileScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.title_profile)) },
-                navigationIcon = {
-                    if (onNavigateBack != {}) {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+            WhereTopAppBar(
+                title = stringResource(R.string.title_profile),
+                onNavigateBack = onNavigateBack.takeIf { it != {} }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -142,7 +135,7 @@ fun ProfileScreen(
                 // Profile card
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(2.dp),
+                    elevation = CardDefaults.cardElevation(Dimens.cardElevation),
                     shape = MaterialTheme.shapes.large
                 ) {
                     Column(
@@ -168,13 +161,15 @@ fun ProfileScreen(
                                         .background(MaterialTheme.colorScheme.primaryContainer),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    if (uiState.isUploadingPhoto) {
-                                        CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                            if (uiState.isUploadingPhoto) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(Dimens.avatarSizeSmall),
+                                    strokeWidth = Dimens.strokeWidthThin
+                                )
                                     } else {
                                         Text(
                                             text = uiState.profile?.displayName?.take(1)?.uppercase() ?: "?",
                                             style = MaterialTheme.typography.headlineLarge,
-                                            fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
                                         )
                                     }
@@ -183,7 +178,7 @@ fun ProfileScreen(
                             // Camera button
                             Box(
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(Dimens.avatarSizeSmall)
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.primary)
                                     .clickable { photoPickerLauncher.launch("image/*") },
@@ -191,7 +186,7 @@ fun ProfileScreen(
                             ) {
                                 Icon(
                                     Icons.Default.CameraAlt, null,
-                                    modifier = Modifier.size(18.dp),
+                                    modifier = Modifier.size(Dimens.badgeIconSize),
                                     tint = MaterialTheme.colorScheme.onPrimary
                                 )
                             }
@@ -206,14 +201,24 @@ fun ProfileScreen(
                                 onValueChange = viewModel::onDisplayNameChange,
                                 label = { Text(stringResource(R.string.label_display_name)) },
                                 isError = uiState.displayNameError != null,
-                                supportingText = uiState.displayNameError?.let { { Text(it) } },
+                                supportingText = uiState.displayNameError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.medium,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor   = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                    errorBorderColor     = MaterialTheme.colorScheme.error
+                                ),
                                 trailingIcon = {
                                     Row {
-                                        IconButton(onClick = viewModel::onSaveProfile) {
-                                            if (uiState.isSaving) CircularProgressIndicator(Modifier.size(20.dp))
-                                            else Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                        IconButton(onClick = viewModel::onSaveProfile) {
+                                if (uiState.isSaving)
+                                    CircularProgressIndicator(
+                                        Modifier.size(Dimens.iconSizeMedium),
+                                        strokeWidth = Dimens.strokeWidthThin
+                                    )
+                                else Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
                                         }
                                         IconButton(onClick = { viewModel.setEditingName(false) }) {
                                             Icon(Icons.Default.Close, null)
@@ -228,20 +233,19 @@ fun ProfileScreen(
                             ) {
                                 Text(
                                     text = uiState.profile?.displayName ?: stringResource(R.string.status_user_fallback),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.SemiBold
+                                    style = MaterialTheme.typography.titleLarge
                                 )
                                 Spacer(Modifier.width(Dimens.spaceSmall))
-                                IconButton(
-                                    onClick = { viewModel.setEditingName(true) },
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.Edit, null,
-                                        modifier = Modifier.size(18.dp),
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
+                    IconButton(
+                        onClick = { viewModel.setEditingName(true) },
+                        modifier = Modifier.size(Dimens.avatarSizeSmall)
+                    ) {
+                        Icon(
+                            Icons.Default.Edit, null,
+                            modifier = Modifier.size(Dimens.badgeIconSize),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                             }
                         }
 
@@ -265,7 +269,7 @@ fun ProfileScreen(
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(1.dp),
+                    elevation = CardDefaults.cardElevation(Dimens.cardElevationSubtle),
                     shape = MaterialTheme.shapes.large
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -353,14 +357,14 @@ private fun SettingRow(
     ) {
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(Dimens.settingIconContainer)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon, contentDescription = null,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(Dimens.iconSizeMedium),
                 tint = MaterialTheme.colorScheme.primary
             )
         }

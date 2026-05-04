@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.LocationOn
@@ -56,9 +57,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ovi.where.R
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.core.theme.LocationActive
-import com.ovi.where.core.theme.LocationInactive
-import com.ovi.where.core.theme.Primary
 import com.ovi.where.presentation.common.ShimmerGroupList
 import com.ovi.where.presentation.model.GroupUiModel
 
@@ -81,7 +79,8 @@ fun HomeScreen(
             FloatingActionButton(
                 onClick = onNavigateToCreateGroup,
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = MaterialTheme.shapes.large
             ) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cd_create_group))
             }
@@ -112,7 +111,6 @@ fun HomeScreen(
                     Text(
                         text = stringResource(R.string.title_my_groups),
                         style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     IconButton(onClick = onNavigateToJoinGroup) {
@@ -129,6 +127,7 @@ fun HomeScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall),
+                        shape = MaterialTheme.shapes.medium,
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer
                         )
@@ -165,7 +164,7 @@ fun HomeScreen(
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(
                                     Icons.Default.Group, null,
-                                    modifier = Modifier.size(64.dp),
+                                    modifier = Modifier.size(Dimens.iconSizeXLarge),
                                     tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
                                 )
                                 Spacer(Modifier.height(Dimens.spaceMedium))
@@ -193,14 +192,14 @@ fun HomeScreen(
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(120.dp)
+                                        .size(Dimens.avatarCircle)
                                         .clip(CircleShape)
                                         .background(MaterialTheme.colorScheme.primaryContainer),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         Icons.Default.Group, null,
-                                        modifier = Modifier.size(60.dp),
+                                        modifier = Modifier.size(Dimens.iconSizeXLarge),
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                 }
@@ -208,7 +207,6 @@ fun HomeScreen(
                                 Text(
                                     text = stringResource(R.string.msg_no_groups_title),
                                     style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                                 Spacer(Modifier.height(Dimens.spaceSmall))
@@ -259,7 +257,7 @@ fun GroupCard(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = Dimens.cardElevation),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
@@ -280,7 +278,6 @@ fun GroupCard(
                 Text(
                     text = group.name.take(1).uppercase(),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
@@ -291,7 +288,6 @@ fun GroupCard(
                 Text(
                     text = group.name,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -322,10 +318,9 @@ fun GroupCard(
 
             Spacer(Modifier.width(Dimens.spaceSmall))
 
-            // Details button
             IconButton(onClick = onDetailsClick) {
                 Icon(
-                    Icons.Default.Group,
+                    Icons.Default.ChevronRight,
                     contentDescription = stringResource(R.string.title_group_details),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(Dimens.iconSizeMedium)

@@ -27,8 +27,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FitScreen
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.NearMe
+import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -46,8 +48,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import com.ovi.where.presentation.common.WhereTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -76,10 +77,10 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ovi.where.R
+import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.core.theme.LocationActive
-import com.ovi.where.core.theme.Primary
 import com.ovi.where.core.utils.showToast
+import com.ovi.where.presentation.common.WhereTopAppBar
 import com.ovi.where.presentation.model.MemberLocationUiModel
 import kotlinx.coroutines.launch
 import org.maplibre.compose.camera.CameraPosition
@@ -157,20 +158,9 @@ fun MapScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.title_group_map),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+            WhereTopAppBar(
+                title = stringResource(R.string.title_group_map),
+                onNavigateBack = onNavigateBack
             )
         },
         floatingActionButton = {
@@ -200,7 +190,7 @@ fun MapScreen(
                     },
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
                 ) {
-                    Icon(Icons.Default.FitScreen, contentDescription = stringResource(R.string.cd_fit_all))
+                    Icon(Icons.Default.CenterFocusStrong, contentDescription = stringResource(R.string.cd_fit_all))
                 }
                 Spacer(Modifier.height(Dimens.spaceSmall))
                 SmallFloatingActionButton(
@@ -230,10 +220,10 @@ fun MapScreen(
                 } else {
                     FloatingActionButton(
                         onClick = { showDurationDialog = true },
-                        containerColor = Primary
+                        containerColor = MaterialTheme.colorScheme.primary
                     ) {
-                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.cd_share_location),
-                            tint = Color.White)
+                        Icon(Icons.Default.NearMe, contentDescription = stringResource(R.string.cd_share_location),
+                            tint = MaterialTheme.colorScheme.onPrimary)
                     }
                 }
             }
@@ -273,8 +263,9 @@ fun MapScreen(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium),
+                    shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(
-                        containerColor = LocationActive.copy(alpha = 0.9f)
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
                     )
                 ) {
                     Row(
@@ -282,12 +273,13 @@ fun MapScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(Icons.Default.LocationOn, null,
-                            modifier = Modifier.size(14.dp), tint = Color.White)
+                            modifier = Modifier.size(Dimens.iconSizeSmall),
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer)
                         Spacer(Modifier.width(Dimens.spaceSmall))
                         Text(
                             "Sharing location",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
                         )
                     }
                 }
@@ -300,6 +292,7 @@ fun MapScreen(
             uiState.error?.let { error ->
                 Card(
                     modifier = Modifier.align(Alignment.TopCenter).padding(Dimens.spaceMedium),
+                    shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
                 ) {
                     Text(
@@ -317,7 +310,8 @@ fun MapScreen(
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .padding(Dimens.spaceMedium),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = Dimens.cardElevationHigh),
+                    shape = MaterialTheme.shapes.large,
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(modifier = Modifier.padding(Dimens.spaceMedium)) {
@@ -328,7 +322,7 @@ fun MapScreen(
                         )
                         Spacer(Modifier.height(Dimens.spaceSmall))
                         LazyColumn(
-                            modifier = Modifier.fillMaxWidth().height(160.dp),
+                            modifier = Modifier.fillMaxWidth().height(Dimens.memberListHeight),
                             verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
                         ) {
                             items(items = uiState.locations, key = { it.id }) { location ->
@@ -374,13 +368,6 @@ private fun latLngToPixel(
     return Offset(x, y)
 }
 
-// Distinct colors for member markers
-private val markerColors = listOf(
-    Color(0xFF1E88E5), Color(0xFF00ACC1), Color(0xFF7C4DFF),
-    Color(0xFF43A047), Color(0xFFE53935), Color(0xFFFF9800),
-    Color(0xFF8D6E63), Color(0xFF546E7A)
-)
-
 @Composable
 private fun MemberMarkersOverlay(
     locations: List<MemberLocationUiModel>,
@@ -389,21 +376,23 @@ private fun MemberMarkersOverlay(
 ) {
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
+    // Capture theme colours in composition scope (cannot access MaterialTheme inside DrawScope)
+    val shadowColor      = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
+    val borderColor      = MaterialTheme.colorScheme.surface
+    val markerTextColor  = MaterialTheme.colorScheme.onPrimary  // white on coloured avatars
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val widthPx = with(density) { maxWidth.toPx() }
+        val widthPx  = with(density) { maxWidth.toPx() }
         val heightPx = with(density) { maxHeight.toPx() }
-        val zoom = cameraPosition.zoom
+        val zoom     = cameraPosition.zoom
         val centerLat = cameraPosition.target.latitude
         val centerLng = cameraPosition.target.longitude
-        val markerRadiusPx = with(density) { 20.dp.toPx() }
+        val markerRadiusPx = with(density) { Dimens.markerRadius.toPx() }
 
         locations.forEachIndexed { index, location ->
-            val pos = latLngToPixel(
-                location.latitude, location.longitude,
-                centerLat, centerLng, zoom, widthPx, heightPx
-            )
-            val color = markerColors[index % markerColors.size]
+            val pos   = latLngToPixel(location.latitude, location.longitude,
+                            centerLat, centerLng, zoom, widthPx, heightPx)
+            val color = AvatarColors[index % AvatarColors.size]
             val initial = location.displayName.take(1).uppercase()
 
             Canvas(
@@ -411,25 +400,20 @@ private fun MemberMarkersOverlay(
                     .fillMaxSize()
                     .clickable { onMarkerClick(location) }
             ) {
-                // Shadow
-                drawCircle(
-                    color = Color.Black.copy(alpha = 0.2f),
-                    radius = markerRadiusPx + 2f,
-                    center = pos.copy(y = pos.y + 2f)
-                )
-                // Filled circle
+                // drop shadow
+                drawCircle(color = shadowColor, radius = markerRadiusPx + 2f,
+                    center = pos.copy(y = pos.y + 2f))
+                // fill
                 drawCircle(color = color, radius = markerRadiusPx, center = pos)
-                // White border
-                drawCircle(
-                    color = Color.White, radius = markerRadiusPx,
-                    center = pos, style = Stroke(width = 3f)
-                )
-                // Initial text
+                // border
+                drawCircle(color = borderColor, radius = markerRadiusPx,
+                    center = pos, style = Stroke(width = 3f))
+                // initial — use captured onPrimary; 14.sp is intentional (Canvas TextStyle)
                 val measured = textMeasurer.measure(
                     initial,
                     style = TextStyle(
-                        color = Color.White,
-                        fontSize = 14.sp,
+                        color      = markerTextColor,
+                        fontSize   = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
                 )
@@ -472,8 +456,7 @@ private fun DurationPickerDialog(
                 Text(
                     text = formatDuration(context, currentDuration.toLong()),
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         },
@@ -507,7 +490,7 @@ fun MemberLocationItem(
             .padding(vertical = Dimens.spaceSmall),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val color = markerColors[location.userId.hashCode().and(0x7FFFFFFF) % markerColors.size]
+        val color = AvatarColors[location.userId.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
         Box(
             modifier = Modifier
                 .size(Dimens.avatarSizeSmall)
@@ -518,8 +501,7 @@ fun MemberLocationItem(
             Text(
                 text = location.displayName.take(1).uppercase(),
                 style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = MaterialTheme.colorScheme.surface  // on-colour for avatar background
             )
         }
 
@@ -544,7 +526,7 @@ fun MemberLocationItem(
         if (location.isActive) {
             Icon(
                 Icons.Default.LocationOn, null,
-                tint = LocationActive,
+                tint = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.size(Dimens.iconSizeSmall)
             )
         }

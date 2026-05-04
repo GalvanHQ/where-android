@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.LocationOn
@@ -33,8 +32,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -54,6 +51,7 @@ import com.ovi.where.R
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.BatteryOptimizationUtils
 import com.ovi.where.core.utils.showToast
+import com.ovi.where.presentation.common.WhereTopAppBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,19 +93,9 @@ fun SettingsScreen(
     
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.title_settings)) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.cd_back)
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+            WhereTopAppBar(
+                title = stringResource(R.string.title_settings),
+                onNavigateBack = onNavigateBack
             )
         }
     ) { paddingValues ->
@@ -124,7 +112,8 @@ fun SettingsScreen(
             ) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    shape = MaterialTheme.shapes.large,
+                    elevation = CardDefaults.cardElevation(defaultElevation = Dimens.cardElevation)
                 ) {
                     Column(
                         modifier = Modifier
@@ -175,7 +164,8 @@ fun SettingsScreen(
                 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    shape = MaterialTheme.shapes.large,
+                    elevation = CardDefaults.cardElevation(defaultElevation = Dimens.cardElevation)
                 ) {
                     Column(
                         modifier = Modifier
@@ -226,7 +216,8 @@ fun SettingsScreen(
                 
                 OutlinedButton(
                     onClick = viewModel::onLogout,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ExitToApp,

@@ -1,8 +1,5 @@
 package com.ovi.where.presentation.common
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -23,14 +20,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
@@ -42,6 +36,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,22 +46,22 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -79,13 +74,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import com.ovi.where.R
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.core.theme.Error
-import com.ovi.where.core.theme.Info
-import com.ovi.where.core.theme.Success
-import com.ovi.where.core.theme.Warning
+import com.ovi.where.core.theme.GoogleBlue
+
+// ── Loading ───────────────────────────────────────────────────────────────────
 
 @Composable
 fun LoadingIndicator(
@@ -99,7 +92,8 @@ fun LoadingIndicator(
     ) {
         CircularProgressIndicator(
             modifier = Modifier.size(Dimens.iconSizeXLarge),
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.primary,
+            strokeWidth = Dimens.strokeWidthThin
         )
         message?.let {
             Spacer(modifier = Modifier.height(Dimens.spaceLarge))
@@ -111,6 +105,8 @@ fun LoadingIndicator(
         }
     }
 }
+
+// ── Empty state ───────────────────────────────────────────────────────────────
 
 @Composable
 fun EmptyState(
@@ -131,7 +127,7 @@ fun EmptyState(
             Icon(
                 imageVector = it,
                 contentDescription = null,
-                modifier = Modifier.size(64.dp),
+                modifier = Modifier.size(Dimens.iconSizeXLarge),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(Dimens.spaceLarge))
@@ -151,6 +147,8 @@ fun EmptyState(
         }
     }
 }
+
+// ── Error view ────────────────────────────────────────────────────────────────
 
 @Composable
 fun ErrorView(
@@ -179,13 +177,12 @@ fun ErrorView(
         )
         onRetry?.let {
             Spacer(modifier = Modifier.height(Dimens.spaceLarge))
-            PrimaryButton(
-                text = stringResource(R.string.action_retry),
-                onClick = it
-            )
+            PrimaryButton(text = stringResource(R.string.action_retry), onClick = it)
         }
     }
 }
+
+// ── Buttons ───────────────────────────────────────────────────────────────────
 
 @Composable
 fun PrimaryButton(
@@ -205,21 +202,18 @@ fun PrimaryButton(
         enabled = enabled && !isLoading,
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
-            contentColor = contentColor
+            contentColor   = contentColor
         ),
         shape = MaterialTheme.shapes.medium
     ) {
         if (isLoading) {
             CircularProgressIndicator(
-                modifier = Modifier.size(Dimens.iconSizeMedium),
-                color = contentColor,
-                strokeWidth = 2.dp
+                modifier  = Modifier.size(Dimens.iconSizeMedium),
+                color     = contentColor,
+                strokeWidth = Dimens.strokeWidthThin
             )
         } else {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge
-            )
+            Text(text = text, style = MaterialTheme.typography.labelLarge)
         }
     }
 }
@@ -233,23 +227,18 @@ fun SecondaryButton(
     isLoading: Boolean = false
 ) {
     ElevatedButton(
-        onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .height(Dimens.buttonHeight),
-        enabled = enabled && !isLoading,
-        shape = MaterialTheme.shapes.medium
+        onClick   = onClick,
+        modifier  = modifier.fillMaxWidth().height(Dimens.buttonHeight),
+        enabled   = enabled && !isLoading,
+        shape     = MaterialTheme.shapes.medium
     ) {
         if (isLoading) {
             CircularProgressIndicator(
-                modifier = Modifier.size(Dimens.iconSizeMedium),
-                strokeWidth = 2.dp
+                modifier    = Modifier.size(Dimens.iconSizeMedium),
+                strokeWidth = Dimens.strokeWidthThin
             )
         } else {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge
-            )
+            Text(text = text, style = MaterialTheme.typography.labelLarge)
         }
     }
 }
@@ -263,21 +252,18 @@ fun TonalButton(
     isLoading: Boolean = false
 ) {
     FilledTonalButton(
-        onClick = onClick,
+        onClick  = onClick,
         modifier = modifier.height(Dimens.buttonHeightSmall),
-        enabled = enabled && !isLoading,
-        shape = MaterialTheme.shapes.medium
+        enabled  = enabled && !isLoading,
+        shape    = MaterialTheme.shapes.medium
     ) {
         if (isLoading) {
             CircularProgressIndicator(
-                modifier = Modifier.size(Dimens.iconSizeSmall),
-                strokeWidth = 2.dp
+                modifier    = Modifier.size(Dimens.iconSizeSmall),
+                strokeWidth = Dimens.strokeWidthThin
             )
         } else {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelMedium
-            )
+            Text(text = text, style = MaterialTheme.typography.labelMedium)
         }
     }
 }
@@ -289,15 +275,8 @@ fun TextActionButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    TextButton(
-        onClick = onClick,
-        modifier = modifier,
-        enabled = enabled
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge
-        )
+    TextButton(onClick = onClick, modifier = modifier, enabled = enabled) {
+        Text(text = text, style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -309,38 +288,37 @@ fun GoogleSignInButton(
     enabled: Boolean = true
 ) {
     ElevatedButton(
-        onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .height(Dimens.buttonHeight),
-        enabled = enabled && !isLoading,
-        shape = MaterialTheme.shapes.medium
+        onClick   = onClick,
+        modifier  = modifier.fillMaxWidth().height(Dimens.buttonHeight),
+        enabled   = enabled && !isLoading,
+        shape     = MaterialTheme.shapes.medium
     ) {
         if (isLoading) {
             CircularProgressIndicator(
-                modifier = Modifier.size(Dimens.iconSizeMedium),
-                strokeWidth = 2.dp
+                modifier    = Modifier.size(Dimens.iconSizeMedium),
+                strokeWidth = Dimens.strokeWidthThin
             )
         } else {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = stringResource(R.string.label_google_logo),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF4285F4)
+                    text       = stringResource(R.string.label_google_logo),
+                    style      = MaterialTheme.typography.titleLarge,
+                    color      = GoogleBlue   // intentional brand colour
                 )
                 Spacer(modifier = Modifier.width(Dimens.spaceMedium))
                 Text(
-                    text = stringResource(R.string.action_continue_with_google),
+                    text  = stringResource(R.string.action_continue_with_google),
                     style = MaterialTheme.typography.labelLarge
                 )
             }
         }
     }
 }
+
+// ── Text fields ───────────────────────────────────────────────────────────────
 
 @Composable
 fun WhereTextField(
@@ -364,53 +342,56 @@ fun WhereTextField(
     capitalization: KeyboardCapitalization = KeyboardCapitalization.None
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
-    
+
     Column(modifier = modifier) {
         OutlinedTextField(
-            value = value,
+            value         = value,
             onValueChange = onValueChange,
-            label = { Text(label) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = Dimens.textFieldHeight),
+            label         = { Text(label) },
+            modifier      = Modifier.fillMaxWidth().heightIn(min = Dimens.buttonHeight),
             keyboardOptions = KeyboardOptions(
-                keyboardType = keyboardType,
-                imeAction = imeAction,
+                keyboardType   = keyboardType,
+                imeAction      = imeAction,
                 capitalization = capitalization
             ),
             keyboardActions = keyboardActions,
-            visualTransformation = if (isPassword && !passwordVisible) {
+            visualTransformation = if (isPassword && !passwordVisible)
                 PasswordVisualTransformation()
-            } else {
-                VisualTransformation.None
-            },
+            else
+                VisualTransformation.None,
             leadingIcon = leadingIcon,
             trailingIcon = if (isPassword) {
                 {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
-                            imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (passwordVisible) stringResource(R.string.cd_hide_password) else stringResource(R.string.cd_show_password)
+                            imageVector = if (passwordVisible)
+                                Icons.Default.VisibilityOff
+                            else
+                                Icons.Default.Visibility,
+                            contentDescription = if (passwordVisible)
+                                stringResource(R.string.cd_hide_password)
+                            else
+                                stringResource(R.string.cd_show_password)
                         )
                     }
                 }
             } else trailingIcon,
-            enabled = enabled && !readOnly,
-            readOnly = readOnly,
+            enabled   = enabled && !readOnly,
+            readOnly  = readOnly,
             singleLine = singleLine,
-            maxLines = maxLines,
-            minLines = minLines,
-            isError = isError || errorMessage != null,
-            shape = MaterialTheme.shapes.medium,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
+            maxLines  = maxLines,
+            minLines  = minLines,
+            isError   = isError || errorMessage != null,
+            shape     = MaterialTheme.shapes.medium,
+            colors    = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor   = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                errorBorderColor = MaterialTheme.colorScheme.error
+                errorBorderColor     = MaterialTheme.colorScheme.error
             )
         )
         errorMessage?.let {
             Text(
-                text = it,
+                text  = it,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(start = Dimens.spaceLarge, top = Dimens.spaceSmall)
@@ -431,21 +412,19 @@ fun EmailTextField(
     imeAction: ImeAction = ImeAction.Next
 ) {
     WhereTextField(
-        value = value,
+        value         = value,
         onValueChange = onValueChange,
-        label = stringResource(R.string.label_email),
-        modifier = modifier,
-        keyboardType = KeyboardType.Email,
-        enabled = enabled,
-        isError = isError,
-        errorMessage = errorMessage,
+        label         = stringResource(R.string.label_email),
+        modifier      = modifier,
+        keyboardType  = KeyboardType.Email,
+        enabled       = enabled,
+        isError       = isError,
+        errorMessage  = errorMessage,
         keyboardActions = keyboardActions,
-        imeAction = imeAction,
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Default.Email,
-                contentDescription = null
-            )
+        imeAction     = imeAction,
+        leadingIcon   = {
+            Icon(Icons.Default.Email, contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     )
 }
@@ -463,22 +442,20 @@ fun PasswordTextField(
     imeAction: ImeAction = ImeAction.Done
 ) {
     WhereTextField(
-        value = value,
+        value         = value,
         onValueChange = onValueChange,
-        label = label,
-        modifier = modifier,
-        keyboardType = KeyboardType.Password,
-        isPassword = true,
-        enabled = enabled,
-        isError = isError,
-        errorMessage = errorMessage,
+        label         = label,
+        modifier      = modifier,
+        keyboardType  = KeyboardType.Password,
+        isPassword    = true,
+        enabled       = enabled,
+        isError       = isError,
+        errorMessage  = errorMessage,
         keyboardActions = keyboardActions,
-        imeAction = imeAction,
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Default.Lock,
-                contentDescription = null
-            )
+        imeAction     = imeAction,
+        leadingIcon   = {
+            Icon(Icons.Default.Lock, contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     )
 }
@@ -496,25 +473,25 @@ fun NameTextField(
     imeAction: ImeAction = ImeAction.Next
 ) {
     WhereTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = label,
-        modifier = modifier,
-        keyboardType = KeyboardType.Text,
-        enabled = enabled,
-        isError = isError,
-        errorMessage = errorMessage,
+        value          = value,
+        onValueChange  = onValueChange,
+        label          = label,
+        modifier       = modifier,
+        keyboardType   = KeyboardType.Text,
+        enabled        = enabled,
+        isError        = isError,
+        errorMessage   = errorMessage,
         keyboardActions = keyboardActions,
-        imeAction = imeAction,
+        imeAction      = imeAction,
         capitalization = KeyboardCapitalization.Words,
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Default.Person,
-                contentDescription = null
-            )
+        leadingIcon    = {
+            Icon(Icons.Default.Person, contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     )
 }
+
+// ── Status indicators ─────────────────────────────────────────────────────────
 
 @Composable
 fun OnlineIndicator(
@@ -526,7 +503,10 @@ fun OnlineIndicator(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
-            .background(if (isOnline) Success else MaterialTheme.colorScheme.outline)
+            .background(
+                if (isOnline) MaterialTheme.colorScheme.tertiary
+                else MaterialTheme.colorScheme.outline
+            )
     )
 }
 
@@ -537,17 +517,33 @@ fun SharingStatusBadge(
 ) {
     Surface(
         modifier = modifier,
-        shape = MaterialTheme.shapes.small,
-        color = if (isSharing) Success.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant
+        shape    = MaterialTheme.shapes.small,
+        color    = if (isSharing)
+            MaterialTheme.colorScheme.tertiaryContainer
+        else
+            MaterialTheme.colorScheme.surfaceVariant
     ) {
         Text(
-            text = if (isSharing) stringResource(R.string.status_sharing) else stringResource(R.string.status_not_sharing),
-            modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = Dimens.spaceSmall),
+            text = if (isSharing)
+                stringResource(R.string.status_sharing)
+            else
+                stringResource(R.string.status_not_sharing),
+            modifier = Modifier.padding(
+                horizontal = Dimens.spaceMedium,
+                vertical   = Dimens.spaceSmall
+            ),
             style = MaterialTheme.typography.labelSmall,
-            color = if (isSharing) Success else MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (isSharing)
+                MaterialTheme.colorScheme.onTertiaryContainer
+            else
+                MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
+
+// ── Info card ─────────────────────────────────────────────────────────────────
+
+enum class InfoCardType { SUCCESS, WARNING, ERROR, INFO }
 
 @Composable
 fun InfoCard(
@@ -557,60 +553,42 @@ fun InfoCard(
     icon: ImageVector? = null,
     type: InfoCardType = InfoCardType.INFO
 ) {
-    val backgroundColor = when (type) {
-        InfoCardType.SUCCESS -> Success.copy(alpha = 0.1f)
-        InfoCardType.WARNING -> Warning.copy(alpha = 0.1f)
-        InfoCardType.ERROR -> Error.copy(alpha = 0.1f)
-        InfoCardType.INFO -> Info.copy(alpha = 0.1f)
+    // Map to M3 colour roles — adapts to both light and dark themes
+    val containerColor = when (type) {
+        InfoCardType.SUCCESS -> MaterialTheme.colorScheme.secondaryContainer
+        InfoCardType.WARNING -> MaterialTheme.colorScheme.tertiaryContainer
+        InfoCardType.ERROR   -> MaterialTheme.colorScheme.errorContainer
+        InfoCardType.INFO    -> MaterialTheme.colorScheme.primaryContainer
     }
-    
     val contentColor = when (type) {
-        InfoCardType.SUCCESS -> Success
-        InfoCardType.WARNING -> Warning
-        InfoCardType.ERROR -> Error
-        InfoCardType.INFO -> Info
+        InfoCardType.SUCCESS -> MaterialTheme.colorScheme.onSecondaryContainer
+        InfoCardType.WARNING -> MaterialTheme.colorScheme.onTertiaryContainer
+        InfoCardType.ERROR   -> MaterialTheme.colorScheme.onErrorContainer
+        InfoCardType.INFO    -> MaterialTheme.colorScheme.onPrimaryContainer
     }
-    
+
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = backgroundColor
-        ),
-        shape = MaterialTheme.shapes.medium
+        colors   = CardDefaults.cardColors(containerColor = containerColor),
+        shape    = MaterialTheme.shapes.medium
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Dimens.spaceLarge),
+            modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLarge),
             verticalAlignment = Alignment.CenterVertically
         ) {
             icon?.let {
-                Icon(
-                    imageVector = it,
-                    contentDescription = null,
-                    tint = contentColor
-                )
+                Icon(imageVector = it, contentDescription = null, tint = contentColor)
                 Spacer(modifier = Modifier.width(Dimens.spaceMedium))
             }
             Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = contentColor
-                )
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = contentColor
-                )
+                Text(text = title,   style = MaterialTheme.typography.titleSmall, color = contentColor)
+                Text(text = message, style = MaterialTheme.typography.bodySmall,  color = contentColor)
             }
         }
     }
 }
 
-enum class InfoCardType {
-    SUCCESS, WARNING, ERROR, INFO
-}
+// ── Divider with text ─────────────────────────────────────────────────────────
 
 @Composable
 fun DividerText(
@@ -624,23 +602,25 @@ fun DividerText(
         Box(
             modifier = Modifier
                 .weight(1f)
-                .height(1.dp)
+                .height(Dimens.dividerThickness)
                 .background(MaterialTheme.colorScheme.outlineVariant)
         )
         Text(
-            text = text,
+            text     = text,
             modifier = Modifier.padding(horizontal = Dimens.spaceLarge),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style    = MaterialTheme.typography.bodySmall,
+            color    = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Box(
             modifier = Modifier
                 .weight(1f)
-                .height(1.dp)
+                .height(Dimens.dividerThickness)
                 .background(MaterialTheme.colorScheme.outlineVariant)
         )
     }
 }
+
+// ── Annotated clickable text ──────────────────────────────────────────────────
 
 @Composable
 fun AnnotatedClickableText(
@@ -659,13 +639,11 @@ fun AnnotatedClickableText(
                 append(" ")
                 withStyle(
                     style = SpanStyle(
-                        color = MaterialTheme.colorScheme.primary,
+                        color          = MaterialTheme.colorScheme.primary,
                         textDecoration = TextDecoration.Underline,
-                        fontWeight = FontWeight.Medium
+                        fontWeight     = FontWeight.SemiBold
                     )
-                ) {
-                    append(clickableText)
-                }
+                ) { append(clickableText) }
             },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -673,35 +651,33 @@ fun AnnotatedClickableText(
     }
 }
 
-// ── Shimmer ──────────────────────────────────────────────────────────────────
+// ── Shimmer loading placeholders ──────────────────────────────────────────────
 
 @Composable
 fun shimmerBrush(showShimmer: Boolean = true, targetValue: Float = 1000f): Brush {
     return if (showShimmer) {
         val shimmerColors = listOf(
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
         )
         val transition = rememberInfiniteTransition(label = "shimmer")
         val translateAnimation by transition.animateFloat(
             initialValue = 0f,
-            targetValue = targetValue,
+            targetValue  = targetValue,
             animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 800, easing = LinearEasing),
+                animation  = tween(durationMillis = 900, easing = LinearEasing),
                 repeatMode = RepeatMode.Restart
             ),
             label = "shimmer_translate"
         )
         Brush.linearGradient(
             colors = shimmerColors,
-            start = Offset.Zero,
-            end = Offset(x = translateAnimation, y = translateAnimation)
+            start  = Offset.Zero,
+            end    = Offset(x = translateAnimation, y = translateAnimation)
         )
     } else {
-        Brush.linearGradient(
-            colors = listOf(Color.Transparent, Color.Transparent)
-        )
+        Brush.linearGradient(colors = listOf(Color.Transparent, Color.Transparent))
     }
 }
 
@@ -722,12 +698,13 @@ fun ShimmerGroupList(modifier: Modifier = Modifier) {
 private fun ShimmerGroupCard() {
     val brush = shimmerBrush()
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(2.dp),
-        shape = MaterialTheme.shapes.large
+        modifier  = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(Dimens.cardElevation),
+        shape     = MaterialTheme.shapes.large,
+        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLarge),
+            modifier          = Modifier.fillMaxWidth().padding(Dimens.spaceLarge),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -741,16 +718,16 @@ private fun ShimmerGroupCard() {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.6f)
-                        .height(16.dp)
-                        .clip(RoundedCornerShape(4.dp))
+                        .height(Dimens.shimmerBarHeightL)
+                        .clip(MaterialTheme.shapes.extraSmall)
                         .background(brush)
                 )
                 Spacer(Modifier.height(Dimens.spaceSmall))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.4f)
-                        .height(12.dp)
-                        .clip(RoundedCornerShape(4.dp))
+                        .height(Dimens.shimmerBarHeightS)
+                        .clip(MaterialTheme.shapes.extraSmall)
                         .background(brush)
                 )
             }
@@ -758,7 +735,7 @@ private fun ShimmerGroupCard() {
     }
 }
 
-// ── WhereTextField (generic) ──────────────────────────────────────────────────
+// ── Generic outlined text field ───────────────────────────────────────────────
 
 @Composable
 fun WhereTextField(
@@ -774,17 +751,67 @@ fun WhereTextField(
     keyboardActions: KeyboardActions = KeyboardActions.Default
 ) {
     OutlinedTextField(
-        value = value,
+        value         = value,
         onValueChange = onValueChange,
-        label = { Text(label) },
-        modifier = modifier,
-        enabled = enabled,
-        singleLine = singleLine,
-        maxLines = maxLines,
-        isError = errorMessage != null,
-        supportingText = errorMessage?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+        label         = { Text(label) },
+        modifier      = modifier,
+        enabled       = enabled,
+        singleLine    = singleLine,
+        maxLines      = maxLines,
+        isError       = errorMessage != null,
+        supportingText = errorMessage?.let {
+            { Text(it, color = MaterialTheme.colorScheme.error) }
+        },
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
-        shape = MaterialTheme.shapes.medium
+        shape           = MaterialTheme.shapes.medium,
+        colors          = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor   = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+            errorBorderColor     = MaterialTheme.colorScheme.error
+        )
+    )
+}
+
+// ── Consistent top app bar ─────────────────────────────────────────────────────
+// All screens share the same surface-coloured bar with correct content colours.
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WhereTopAppBar(
+    title: String,
+    onNavigateBack: (() -> Unit)? = null,
+    actions: @Composable () -> Unit = {},
+    scrollBehavior: TopAppBarScrollBehavior? = null
+) {
+    TopAppBar(
+        title = {
+            Text(
+                text  = title,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+        },
+        navigationIcon = {
+            if (onNavigateBack != null) {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(
+                        imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint               = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        },
+        actions = { actions() },
+        scrollBehavior = scrollBehavior,
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor              = MaterialTheme.colorScheme.surface,
+            titleContentColor           = MaterialTheme.colorScheme.onSurface,
+            navigationIconContentColor  = MaterialTheme.colorScheme.onSurface,
+            actionIconContentColor      = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     )
 }

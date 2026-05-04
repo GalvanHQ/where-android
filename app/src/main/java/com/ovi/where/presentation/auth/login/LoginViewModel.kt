@@ -7,6 +7,7 @@ import com.ovi.where.R
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.common.UiEvent
 import com.ovi.where.core.common.UiText
+import com.ovi.where.domain.usecase.auth.GoogleSignInUseCase
 import com.ovi.where.domain.usecase.auth.SignInUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
@@ -20,7 +21,8 @@ import javax.inject.Inject
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     application: Application,
-    private val signInUseCase: SignInUseCase
+    private val signInUseCase: SignInUseCase,
+    private val googleSignInUseCase: GoogleSignInUseCase
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(LoginUiState())
@@ -44,12 +46,37 @@ class LoginViewModel @Inject constructor(
     }
     
     fun onGoogleSignIn() {
+        _uiEvent.trySend(UiEvent.LaunchGoogleSignIn)
+    }
+    
+    fun onGoogleSignInResult(idToken: String?) {
+        if (idToken == null) {
+            viewModelScope.launch {
+                _uiEvent.send(UiEvent.ShowSnackbar(
+                    UiText.StringResource(R.string.error_google_sign_in_cancelled)
+                ))
+            }
+            return
+        }
+        
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isGoogleLoading = true)
-            _uiEvent.send(UiEvent.ShowSnackbar(
-                UiText.DynamicString(getApplication<Application>().getString(R.string.error_unknown))
-            ))
-            _uiState.value = _uiState.value.copy(isGoogleLoading = false)
+            
+            when (val result = googleSignInUseCase(idToken)) {
+                is Resource.Success -> {
+                    _uiState.value = _uiState.value.copy(isGoogleLoading = false)
+                    _uiEvent.send(UiEvent.Navigate("home"))
+                }
+                is Resource.Error -> {
+                    _uiState.value = _uiState.value.copy(isGoogleLoading = false)
+                    _uiEvent.send(UiEvent.ShowSnackbar(
+                        UiText.DynamicString(result.message ?: getApplication<Application>().getString(R.string.error_unknown))
+                    ))
+                }
+                is Resource.Loading -> {
+                    _uiState.value = _uiState.value.copy(isGoogleLoading = true)
+                }
+            }
         }
     }
 

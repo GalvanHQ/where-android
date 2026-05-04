@@ -10,7 +10,7 @@ interface AuthRepository {
 
     suspend fun signInWithEmail(email: String, password: String): Resource<User>
     suspend fun registerWithEmail(name: String, email: String, password: String): Resource<User>
-    suspend fun signInWithGoogle(): Resource<User>
+    suspend fun signInWithGoogle(idToken: String): Resource<User>
     suspend fun signOut()
     fun resetPassword(email: String): Flow<Resource<Unit>>
     suspend fun updateProfile(displayName: String, photoUrl: String?): Resource<User>

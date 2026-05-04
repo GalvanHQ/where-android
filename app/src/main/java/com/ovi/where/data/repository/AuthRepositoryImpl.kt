@@ -1,6 +1,7 @@
 package com.ovi.where.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.ovi.where.core.common.Resource
@@ -81,8 +82,39 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun signInWithGoogle(): Resource<User> {
-        return Resource.Error("Google Sign-In not implemented yet")
+    override suspend fun signInWithGoogle(idToken: String): Resource<User> {
+        return try {
+            val credential = GoogleAuthProvider.getCredential(idToken, null)
+            val result = firebaseAuth.signInWithCredential(credential).await()
+            val userId = result.user?.uid ?: return Resource.Error("User ID not found")
+            
+            val userDoc = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                .document(userId)
+                .get()
+                .await()
+            
+            if (userDoc.exists()) {
+                val user = userDoc.toObject(User::class.java)
+                    ?: return Resource.Error("User data not found")
+                Resource.Success(user)
+            } else {
+                val firebaseUser = result.user!!
+                val user = User(
+                    id = userId,
+                    displayName = firebaseUser.displayName ?: "",
+                    email = firebaseUser.email ?: "",
+                    photoUrl = firebaseUser.photoUrl?.toString(),
+                    createdAt = System.currentTimeMillis()
+                )
+                firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                    .document(userId)
+                    .set(user)
+                    .await()
+                Resource.Success(user)
+            }
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Google Sign-In failed")
+        }
     }
 
     override suspend fun signOut() {

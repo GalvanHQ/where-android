@@ -3,6 +3,7 @@ package com.ovi.where.di
 import com.ovi.where.domain.repository.AuthRepository
 import com.ovi.where.domain.repository.GroupRepository
 import com.ovi.where.domain.repository.LocationRepository
+import com.ovi.where.domain.usecase.auth.GoogleSignInUseCase
 import com.ovi.where.domain.usecase.auth.ObserveCurrentUserUseCase
 import com.ovi.where.domain.usecase.auth.RegisterUseCase
 import com.ovi.where.domain.usecase.auth.SignInUseCase
@@ -36,6 +37,9 @@ object UseCaseModule {
 
     @Provides
     fun provideSignOutUseCase(authRepository: AuthRepository) = SignOutUseCase(authRepository)
+
+    @Provides
+    fun provideGoogleSignInUseCase(authRepository: AuthRepository) = GoogleSignInUseCase(authRepository)
 
     @Provides
     fun provideCreateGroupUseCase(groupRepository: GroupRepository) = CreateGroupUseCase(groupRepository)

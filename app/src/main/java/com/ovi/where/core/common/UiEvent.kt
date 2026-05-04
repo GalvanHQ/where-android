@@ -11,4 +11,5 @@ sealed class UiEvent {
     data class PermissionRequired(val permissions: List<String>) : UiEvent()
     data class OpenUrl(val url: String) : UiEvent()
     data class ShareContent(val title: String, val content: String) : UiEvent()
+    object LaunchGoogleSignIn : UiEvent()
 }

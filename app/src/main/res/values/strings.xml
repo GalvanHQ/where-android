@@ -2,6 +2,7 @@
     <string name="app_name">Where</string>
     <string name="app_tagline">Share your location with friends</string>
     <string name="app_version">Where v1.0.0</string>
+    <string name="default_web_client_id" translatable="false">1025951597272-abcdefg.apps.googleusercontent.com</string>
 
     <!-- Content Descriptions -->
     <string name="cd_back">Back</string>
@@ -121,6 +122,8 @@
     <string name="error_group_name_required">Group name is required</string>
     <string name="error_group_name_too_short">Name must be at least 3 characters</string>
     <string name="error_unknown">Unknown error</string>
+    <string name="error_google_sign_in_cancelled">Google Sign-In was cancelled</string>
+    <string name="error_google_sign_in_failed">Google Sign-In failed</string>
     <string name="error_loading_groups">Error loading groups</string>
     <string name="error_loading_group">Error loading group</string>
     <string name="error_failed_start_sharing">Failed to start sharing</string>

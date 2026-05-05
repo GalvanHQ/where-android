@@ -10,7 +10,9 @@ import kotlinx.coroutines.flow.Flow
 interface FriendshipRepository {
     suspend fun sendFriendRequest(receiverId: String): Resource<Unit>
     suspend fun acceptFriendRequest(friendshipId: String): Resource<Unit>
+    suspend fun acceptFriendRequestByUserId(userId: String): Resource<Unit>
     suspend fun declineFriendRequest(friendshipId: String): Resource<Unit>
+    suspend fun declineFriendRequestByUserId(userId: String): Resource<Unit>
     suspend fun removeFriend(userId: String): Resource<Unit>
     fun observeFriends(): Flow<List<User>>
     fun observeFriendRequests(): Flow<List<Friendship>>

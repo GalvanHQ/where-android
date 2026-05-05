@@ -212,6 +212,10 @@
     <!-- Notification -->
     <string name="notification_sharing_title">Where - Location Sharing</string>
     <string name="notification_sharing_body">Sharing your location with the group</string>
+    <string name="notification_channel_messages">Messages</string>
+    <string name="notification_channel_messages_desc">New chat messages from friends and groups</string>
+    <string name="notification_channel_social">Friends &amp; Social</string>
+    <string name="notification_channel_social_desc">Friend requests and social activity</string>
     <string name="notification_channel_location_updates">Location Updates</string>
     <string name="notification_channel_location_updates_desc">Notifications when group members share their location</string>
     <string name="notification_channel_group_activity">Group Activity</string>

@@ -20,4 +20,8 @@ interface LocationRepository {
     fun observeUserLocation(userId: String, groupId: String): Flow<SharedLocation?>
     fun isSharingLocation(groupId: String): Boolean
     fun getSharingExpiryTime(groupId: String): Long?
+
+    /** Checks Firestore for an active sharing session and restores in-memory state.
+     *  Returns true if the user is currently sharing in this group. */
+    suspend fun checkSharingStatus(groupId: String): Boolean
 }

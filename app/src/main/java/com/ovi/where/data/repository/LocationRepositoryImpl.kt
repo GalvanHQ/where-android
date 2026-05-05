@@ -158,4 +158,31 @@ class LocationRepositoryImpl @Inject constructor(
     override fun getSharingExpiryTime(groupId: String): Long? {
         return activeSharingSessions[groupId]
     }
+
+    override suspend fun checkSharingStatus(groupId: String): Boolean {
+        return try {
+            val uid = currentUid ?: return false
+            val doc = firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
+                .document(groupId)
+                .collection(AppConstants.FIRESTORE_COLLECTION_LOCATIONS)
+                .document(uid)
+                .get()
+                .await()
+
+            val isActive = doc.getBoolean("isSharingActive") ?: false
+            val expiresAt = doc.getLong("sharingExpiresAt") ?: 0L
+            val now = System.currentTimeMillis()
+            val stillActive = isActive && (expiresAt == Long.MAX_VALUE || now < expiresAt)
+
+            if (stillActive) {
+                // Restore in-memory state so isSharingLocation() works correctly
+                activeSharingSessions[groupId] = expiresAt
+            } else {
+                activeSharingSessions.remove(groupId)
+            }
+            stillActive
+        } catch (e: Exception) {
+            false
+        }
+    }
 }

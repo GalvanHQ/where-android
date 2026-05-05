@@ -4,19 +4,16 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,13 +21,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.FitScreen
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -39,16 +33,14 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import com.ovi.where.presentation.common.WhereTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -60,20 +52,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ovi.where.R
@@ -88,12 +70,6 @@ import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.spatialk.geojson.Position
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.ln
-import kotlin.math.pow
-import kotlin.math.sin
-import kotlin.math.tan
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -168,27 +144,29 @@ fun MapScreen(
                 SmallFloatingActionButton(
                     onClick = {
                         if (uiState.locations.isNotEmpty()) {
-                            val validLocations = uiState.locations.filter { it.hasValidLocation }
-                            if (validLocations.size == 1) {
+                            val valid = uiState.locations.filter { it.hasValidLocation }
+                            if (valid.size == 1) {
                                 scope.launch {
                                     cameraState.position = CameraPosition(
-                                        target = Position(validLocations[0].longitude, validLocations[0].latitude),
+                                        target = Position(valid[0].longitude, valid[0].latitude),
                                         zoom = 14.0
                                     )
                                 }
-                            } else if (validLocations.size > 1) {
-                                val centerLat = validLocations.map { it.latitude }.average()
-                                val centerLng = validLocations.map { it.longitude }.average()
+                            } else if (valid.size > 1) {
                                 scope.launch {
                                     cameraState.position = CameraPosition(
-                                        target = Position(centerLng, centerLat),
+                                        target = Position(
+                                            valid.map { it.longitude }.average(),
+                                            valid.map { it.latitude }.average()
+                                        ),
                                         zoom = 11.0
                                     )
                                 }
                             }
                         }
                     },
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = MaterialTheme.shapes.medium
                 ) {
                     Icon(Icons.Default.CenterFocusStrong, contentDescription = stringResource(R.string.cd_fit_all))
                 }
@@ -199,12 +177,12 @@ fun MapScreen(
                             context, Manifest.permission.ACCESS_FINE_LOCATION
                         ) == PackageManager.PERMISSION_GRANTED
                         if (hasPermission) viewModel.locateMe()
-                        else permissionLauncher.launch(arrayOf(
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
-                        ))
+                        else permissionLauncher.launch(
+                            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                        )
                     },
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = MaterialTheme.shapes.medium
                 ) {
                     Icon(Icons.Default.MyLocation, contentDescription = stringResource(R.string.cd_my_location))
                 }
@@ -212,46 +190,73 @@ fun MapScreen(
                 if (uiState.isSharing) {
                     FloatingActionButton(
                         onClick = { viewModel.onStopSharing(groupId) },
-                        containerColor = MaterialTheme.colorScheme.errorContainer
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        shape = MaterialTheme.shapes.large
                     ) {
-                        Icon(Icons.Default.Stop, contentDescription = stringResource(R.string.cd_stop_sharing),
-                            tint = MaterialTheme.colorScheme.onErrorContainer)
+                        Icon(
+                            Icons.Default.Stop,
+                            contentDescription = stringResource(R.string.cd_stop_sharing),
+                            tint = MaterialTheme.colorScheme.onErrorContainer
+                        )
                     }
                 } else {
                     FloatingActionButton(
                         onClick = { showDurationDialog = true },
-                        containerColor = MaterialTheme.colorScheme.primary
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        shape = MaterialTheme.shapes.large
                     ) {
-                        Icon(Icons.Default.NearMe, contentDescription = stringResource(R.string.cd_share_location),
-                            tint = MaterialTheme.colorScheme.onPrimary)
+                        Icon(
+                            Icons.Default.NearMe,
+                            contentDescription = stringResource(R.string.cd_share_location),
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
                     }
                 }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        Box(
-            modifier = Modifier.fillMaxSize().padding(paddingValues)
-        ) {
-            // Map
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+
             MaplibreMap(
                 modifier = Modifier.fillMaxSize(),
                 baseStyle = BaseStyle.Uri("https://tiles.openfreemap.org/styles/liberty"),
                 cameraState = cameraState
             )
 
-            // Member markers overlay
+            // Member markers overlay — uses shared AvatarMarkersOverlay from MapUtils
             val validLocations = uiState.locations.filter { it.hasValidLocation }
             if (validLocations.isNotEmpty()) {
-                MemberMarkersOverlay(
-                    locations = validLocations,
+                val shadowColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
+                val borderColor = MaterialTheme.colorScheme.surface
+                val textColor   = MaterialTheme.colorScheme.onPrimary
+                val pulseColor  = MaterialTheme.colorScheme.tertiary
+
+                AvatarMarkersOverlay(
+                    markers = validLocations.map { loc ->
+                        MapMarker(
+                            id = loc.id,
+                            userId = loc.userId,
+                            label = loc.displayName.take(1).uppercase(),
+                            latitude = loc.latitude,
+                            longitude = loc.longitude,
+                            isPulsing = loc.isActive
+                        )
+                    },
                     cameraPosition = cameraState.position,
-                    onMarkerClick = { location ->
-                        scope.launch {
-                            cameraState.position = CameraPosition(
-                                target = Position(location.longitude, location.latitude),
-                                zoom = 15.0
-                            )
+                    shadowColor = shadowColor,
+                    borderColor = borderColor,
+                    textColor = textColor,
+                    pulseColor = pulseColor,
+                    onMarkerClick = { marker ->
+                        val loc = validLocations.firstOrNull { it.id == marker.id }
+                        if (loc != null) {
+                            scope.launch {
+                                cameraState.position = CameraPosition(
+                                    target = Position(loc.longitude, loc.latitude),
+                                    zoom = 15.0
+                                )
+                            }
                         }
                     }
                 )
@@ -269,12 +274,14 @@ fun MapScreen(
                     )
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = Dimens.spaceSmall),
+                        modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.LocationOn, null,
+                        Icon(
+                            Icons.Default.LocationOn, null,
                             modifier = Modifier.size(Dimens.iconSizeSmall),
-                            tint = MaterialTheme.colorScheme.onTertiaryContainer)
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
                         Spacer(Modifier.width(Dimens.spaceSmall))
                         Text(
                             "Sharing location",
@@ -349,86 +356,6 @@ fun MapScreen(
     }
 }
 
-// Converts lat/lng to screen pixel position using Web Mercator projection
-private fun latLngToPixel(
-    lat: Double, lng: Double,
-    centerLat: Double, centerLng: Double,
-    zoom: Double, screenWidthPx: Float, screenHeightPx: Float
-): Offset {
-    fun mercatorX(lon: Double) = (lon + 180.0) / 360.0
-    fun mercatorY(latDeg: Double): Double {
-        val latRad = latDeg * PI / 180.0
-        return (1.0 - ln(tan(latRad) + 1.0 / cos(latRad)) / PI) / 2.0
-    }
-    val scale = 256.0 * 2.0.pow(zoom)
-    val cx = mercatorX(centerLng) * scale
-    val cy = mercatorY(centerLat) * scale
-    val x = ((mercatorX(lng) * scale - cx) + screenWidthPx / 2).toFloat()
-    val y = ((mercatorY(lat) * scale - cy) + screenHeightPx / 2).toFloat()
-    return Offset(x, y)
-}
-
-@Composable
-private fun MemberMarkersOverlay(
-    locations: List<MemberLocationUiModel>,
-    cameraPosition: CameraPosition,
-    onMarkerClick: (MemberLocationUiModel) -> Unit
-) {
-    val textMeasurer = rememberTextMeasurer()
-    val density = LocalDensity.current
-    // Capture theme colours in composition scope (cannot access MaterialTheme inside DrawScope)
-    val shadowColor      = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
-    val borderColor      = MaterialTheme.colorScheme.surface
-    val markerTextColor  = MaterialTheme.colorScheme.onPrimary  // white on coloured avatars
-
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val widthPx  = with(density) { maxWidth.toPx() }
-        val heightPx = with(density) { maxHeight.toPx() }
-        val zoom     = cameraPosition.zoom
-        val centerLat = cameraPosition.target.latitude
-        val centerLng = cameraPosition.target.longitude
-        val markerRadiusPx = with(density) { Dimens.markerRadius.toPx() }
-
-        locations.forEachIndexed { index, location ->
-            val pos   = latLngToPixel(location.latitude, location.longitude,
-                            centerLat, centerLng, zoom, widthPx, heightPx)
-            val color = AvatarColors[index % AvatarColors.size]
-            val initial = location.displayName.take(1).uppercase()
-
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable { onMarkerClick(location) }
-            ) {
-                // drop shadow
-                drawCircle(color = shadowColor, radius = markerRadiusPx + 2f,
-                    center = pos.copy(y = pos.y + 2f))
-                // fill
-                drawCircle(color = color, radius = markerRadiusPx, center = pos)
-                // border
-                drawCircle(color = borderColor, radius = markerRadiusPx,
-                    center = pos, style = Stroke(width = 3f))
-                // initial — use captured onPrimary; 14.sp is intentional (Canvas TextStyle)
-                val measured = textMeasurer.measure(
-                    initial,
-                    style = TextStyle(
-                        color      = markerTextColor,
-                        fontSize   = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-                drawText(
-                    measured,
-                    topLeft = Offset(
-                        pos.x - measured.size.width / 2f,
-                        pos.y - measured.size.height / 2f
-                    )
-                )
-            }
-        }
-    }
-}
-
 @Composable
 private fun DurationPickerDialog(
     currentDuration: Float,
@@ -471,10 +398,10 @@ private fun DurationPickerDialog(
 
 private fun formatDuration(context: android.content.Context, minutes: Long): String {
     return when {
-        minutes < 60 -> context.getString(R.string.duration_minutes, minutes)
-        minutes == 60L -> context.getString(R.string.duration_one_hour)
+        minutes < 60       -> context.getString(R.string.duration_minutes, minutes)
+        minutes == 60L     -> context.getString(R.string.duration_one_hour)
         minutes % 60 == 0L -> context.getString(R.string.duration_hours, minutes / 60)
-        else -> context.getString(R.string.duration_hours_minutes, minutes / 60, minutes % 60)
+        else               -> context.getString(R.string.duration_hours_minutes, minutes / 60, minutes % 60)
     }
 }
 
@@ -501,7 +428,7 @@ fun MemberLocationItem(
             Text(
                 text = location.displayName.take(1).uppercase(),
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.surface  // on-colour for avatar background
+                color = MaterialTheme.colorScheme.surface
             )
         }
 

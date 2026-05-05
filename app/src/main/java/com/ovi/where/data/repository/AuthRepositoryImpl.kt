@@ -80,7 +80,16 @@ class AuthRepositoryImpl @Inject constructor(
 
             // Try Firestore first; fall back to Firebase Auth data if Firestore is offline.
             val user = fetchUserWithFallback(userId, email, firebaseUser.displayName)
-            Resource.Success(user)
+            
+            // If the user document was never created, let's create it
+            if (user.createdAt == 0L) {
+                val newUser = user.copy(createdAt = System.currentTimeMillis())
+                firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                    .document(userId).set(newUser).await()
+                return Resource.Success(newUser)
+            }
+
+            return Resource.Success(user)
         } catch (e: Exception) {
             Resource.Error(mapFirebaseError(e))
         }
@@ -112,21 +121,11 @@ class AuthRepositoryImpl @Inject constructor(
                 createdAt   = System.currentTimeMillis()
             )
 
-            // ② Write to Firestore in the background — do NOT block or fail registration
-            bgScope.launch {
-                try {
-                    firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
-                        .document(userId)
-                        .set(user)
-                        .await()
-                    Timber.d("User profile saved to Firestore: $userId")
-                } catch (e: Exception) {
-                    // Non-fatal — the user is already authenticated. The profile write will
-                    // be retried next time they open the app (Firestore offline persistence
-                    // will queue and send the write once connectivity is restored).
-                    Timber.w(e, "Could not save profile to Firestore (will retry): $userId")
-                }
-            }
+            // Write to Firestore and wait for it
+            firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                .document(userId)
+                .set(user)
+                .await()
 
             Resource.Success(user)
         } catch (e: Exception) {
@@ -153,14 +152,9 @@ class AuthRepositoryImpl @Inject constructor(
                     photoUrl  = firebaseUser.photoUrl?.toString(),
                     createdAt = System.currentTimeMillis()
                 )
-                bgScope.launch {
-                    try {
-                        firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
-                            .document(userId).set(newUser).await()
-                    } catch (e: Exception) {
-                        Timber.w(e, "Could not save Google user profile (will retry)")
-                    }
-                }
+                // Write directly
+                firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                    .document(userId).set(newUser).await()
                 Resource.Success(newUser)
             } else {
                 Resource.Success(user.copy(

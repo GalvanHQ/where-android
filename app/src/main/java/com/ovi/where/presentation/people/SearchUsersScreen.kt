@@ -37,8 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.domain.model.FriendshipStatus
-import com.ovi.where.domain.model.User
+import com.ovi.where.presentation.model.FriendshipActionUiModel
+import com.ovi.where.presentation.model.SearchUserUiModel
 import com.ovi.where.presentation.common.WhereTopAppBar
 
 @androidx.compose.material3.ExperimentalMaterial3Api
@@ -97,12 +97,11 @@ fun SearchUsersScreen(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Dimens.spaceLarge),
                     verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
                 ) {
-                    items(items = uiState.results, key = { it.id }) { user ->
+                    items(items = uiState.results, key = { it.userId }) { user ->
                         SearchUserRow(
-                            user = user,
-                            status = uiState.friendshipStatuses[user.id],
-                            onAddFriend = { viewModel.sendFriendRequest(user.id) },
-                            onTap = { onNavigateToUserProfile(user.id) }
+                            user        = user,
+                            onAddFriend = { viewModel.sendFriendRequest(user.userId) },
+                            onTap = { onNavigateToUserProfile(user.userId) }
                         )
                     }
                 }
@@ -113,18 +112,14 @@ fun SearchUsersScreen(
 
 @Composable
 private fun SearchUserRow(
-    user: User,
-    status: FriendshipStatus?,
+    user: SearchUserUiModel,
     onAddFriend: () -> Unit,
     onTap: () -> Unit
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = Dimens.spaceMedium),
+        modifier = Modifier.fillMaxWidth().padding(vertical = Dimens.spaceMedium),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar
         if (!user.photoUrl.isNullOrEmpty()) {
             AsyncImage(
                 model = user.photoUrl,
@@ -140,7 +135,7 @@ private fun SearchUserRow(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = user.displayName.take(1).uppercase(),
+                    text  = user.avatarInitial,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -150,48 +145,28 @@ private fun SearchUserRow(
         Spacer(Modifier.width(Dimens.spaceLarge))
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = user.displayName,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Text(text = user.displayName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (user.username.isNotEmpty()) {
-                Text(
-                    text = "@${user.username}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text(text = "@${user.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
-        // Action button based on friendship status
-        when (status) {
-            FriendshipStatus.ACCEPTED -> {
-                FilledTonalButton(
-                    onClick = {},
-                    shape = MaterialTheme.shapes.medium,
-                    enabled = false
-                ) {
+        // Action button driven by pre-computed FriendshipActionUiModel — no domain enum in composable
+        when (user.friendshipAction) {
+            FriendshipActionUiModel.FRIENDS -> {
+                FilledTonalButton(onClick = {}, shape = MaterialTheme.shapes.medium, enabled = false) {
                     Text("Friends", style = MaterialTheme.typography.labelSmall)
                 }
             }
-            FriendshipStatus.PENDING -> {
-                FilledTonalButton(
-                    onClick = {},
-                    shape = MaterialTheme.shapes.medium,
-                    enabled = false
-                ) {
+            FriendshipActionUiModel.PENDING -> {
+                FilledTonalButton(onClick = {}, shape = MaterialTheme.shapes.medium, enabled = false) {
                     Icon(Icons.Default.Schedule, null, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Pending", style = MaterialTheme.typography.labelSmall)
                 }
             }
-            else -> {
-                Button(
-                    onClick = onAddFriend,
-                    shape = MaterialTheme.shapes.medium
-                ) {
+            FriendshipActionUiModel.ADD -> {
+                Button(onClick = onAddFriend, shape = MaterialTheme.shapes.medium) {
                     Icon(Icons.Default.PersonAdd, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Add", style = MaterialTheme.typography.labelSmall)

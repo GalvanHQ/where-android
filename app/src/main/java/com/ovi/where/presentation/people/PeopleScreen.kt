@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.domain.model.User
+import com.ovi.where.presentation.model.FriendUiModel
 
 @Composable
 fun PeopleScreen(
@@ -180,10 +180,10 @@ fun PeopleScreen(
                 }
             }
 
-            items(items = uiState.friends, key = { it.id }) { friend ->
+            items(items = uiState.friends, key = { it.userId }) { friend ->
                 FriendRow(
                     user = friend,
-                    onTap = { onNavigateToUserProfile(friend.id) },
+                    onTap = { onNavigateToUserProfile(friend.userId) },
                     onMessage = { /* TODO: get or create DM conversation */ }
                 )
             }
@@ -195,7 +195,7 @@ fun PeopleScreen(
 
 @Composable
 private fun FriendRow(
-    user: User,
+    user: FriendUiModel,
     onTap: () -> Unit,
     onMessage: () -> Unit
 ) {
@@ -206,15 +206,12 @@ private fun FriendRow(
             .padding(vertical = Dimens.spaceMedium),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar
         if (!user.photoUrl.isNullOrEmpty()) {
             AsyncImage(
                 model = user.photoUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(Dimens.avatarSizeMedium)
-                    .clip(CircleShape)
+                modifier = Modifier.size(Dimens.avatarSizeMedium).clip(CircleShape)
             )
         } else {
             Box(
@@ -225,7 +222,7 @@ private fun FriendRow(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = user.displayName.take(1).uppercase(),
+                    text  = user.avatarInitial,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -236,21 +233,20 @@ private fun FriendRow(
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = user.displayName,
-                style = MaterialTheme.typography.titleSmall,
+                text     = user.displayName,
+                style    = MaterialTheme.typography.titleSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             if (user.username.isNotEmpty()) {
                 Text(
-                    text = "@${user.username}",
+                    text  = "@${user.username}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
-        // Online dot
         if (user.isOnline) {
             Box(
                 modifier = Modifier
@@ -261,7 +257,6 @@ private fun FriendRow(
             Spacer(Modifier.width(Dimens.spaceMedium))
         }
 
-        // Message button
         IconButton(onClick = onMessage) {
             Icon(
                 Icons.Default.ChatBubbleOutline,

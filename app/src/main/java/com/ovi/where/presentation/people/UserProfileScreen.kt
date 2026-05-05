@@ -32,7 +32,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.domain.model.FriendshipStatus
+import com.ovi.where.presentation.model.ProfileFriendshipAction
 import com.ovi.where.presentation.common.WhereTopAppBar
 
 @androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,7 +50,7 @@ fun UserProfileScreen(
     Scaffold(
         topBar = {
             WhereTopAppBar(
-                title = uiState.user?.displayName ?: "Profile",
+                title = uiState.profile?.displayName ?: "Profile",
                 onNavigateBack = onNavigateBack
             )
         }
@@ -61,7 +61,7 @@ fun UserProfileScreen(
                 contentAlignment = Alignment.Center
             ) { CircularProgressIndicator() }
         } else {
-            val user = uiState.user ?: return@Scaffold
+            val profile = uiState.profile ?: return@Scaffold
 
             Column(
                 modifier = Modifier
@@ -72,15 +72,13 @@ fun UserProfileScreen(
             ) {
                 Spacer(Modifier.height(Dimens.spaceLarge))
 
-                // Avatar
-                if (!user.photoUrl.isNullOrEmpty()) {
+                // Avatar — uses pre-computed avatarInitial from OtherUserProfileUiModel
+                if (!profile.photoUrl.isNullOrEmpty()) {
                     AsyncImage(
-                        model = user.photoUrl,
+                        model = profile.photoUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(Dimens.avatarSizeXLarge)
-                            .clip(CircleShape)
+                        modifier = Modifier.size(Dimens.avatarSizeXLarge).clip(CircleShape)
                     )
                 } else {
                     Box(
@@ -91,7 +89,7 @@ fun UserProfileScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = user.displayName.take(1).uppercase(),
+                            text  = profile.avatarInitial,
                             style = MaterialTheme.typography.displaySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -100,70 +98,66 @@ fun UserProfileScreen(
 
                 Spacer(Modifier.height(Dimens.spaceLarge))
 
-                // Name
-                Text(
-                    text = user.displayName,
-                    style = MaterialTheme.typography.headlineSmall
-                )
+                Text(text = profile.displayName, style = MaterialTheme.typography.headlineSmall)
 
-                // Username
-                if (user.username.isNotEmpty()) {
+                if (profile.username.isNotEmpty()) {
                     Text(
-                        text = "@${user.username}",
+                        text  = "@${profile.username}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                // Bio
-                if (user.bio.isNotEmpty()) {
+                if (profile.bio.isNotEmpty()) {
                     Spacer(Modifier.height(Dimens.spaceMedium))
                     Text(
-                        text = user.bio,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text      = profile.bio,
+                        style     = MaterialTheme.typography.bodyMedium,
+                        color     = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
                 }
 
                 Spacer(Modifier.height(Dimens.spaceXLarge))
 
-                // Action buttons
+                // Action buttons driven by sealed ProfileFriendshipAction — no raw domain enum
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium, Alignment.CenterHorizontally)
                 ) {
-                    when (uiState.friendshipStatus) {
-                        FriendshipStatus.ACCEPTED -> {
+                    when (profile.friendshipAction) {
+                        is ProfileFriendshipAction.AlreadyFriends -> {
                             Button(
-                                onClick = { /* TODO: open or create DM */ },
-                                shape = MaterialTheme.shapes.medium
-                            ) {
-                                Text("Message")
-                            }
+                                onClick = { /* TODO: open/create DM */ },
+                                shape   = MaterialTheme.shapes.medium
+                            ) { Text("Message") }
                             OutlinedButton(
                                 onClick = { viewModel.removeFriend(userId) },
-                                shape = MaterialTheme.shapes.medium
-                            ) {
-                                Text("Unfriend")
-                            }
+                                shape   = MaterialTheme.shapes.medium
+                            ) { Text("Unfriend") }
                         }
-                        FriendshipStatus.PENDING -> {
+                        is ProfileFriendshipAction.RequestSent -> {
                             FilledTonalButton(
-                                onClick = {},
-                                enabled = false,
-                                shape = MaterialTheme.shapes.medium
-                            ) {
-                                Text("Request Sent")
-                            }
+                                onClick  = {},
+                                enabled  = false,
+                                shape    = MaterialTheme.shapes.medium
+                            ) { Text("Request Sent") }
                         }
-                        else -> {
+                        is ProfileFriendshipAction.RequestReceived -> {
+                            Button(
+                                onClick = { /* TODO: accept */ },
+                                shape   = MaterialTheme.shapes.medium
+                            ) { Text("Accept Request") }
+                            OutlinedButton(
+                                onClick = { /* TODO: decline */ },
+                                shape   = MaterialTheme.shapes.medium
+                            ) { Text("Decline") }
+                        }
+                        is ProfileFriendshipAction.AddFriend -> {
                             Button(
                                 onClick = { viewModel.sendFriendRequest(userId) },
-                                shape = MaterialTheme.shapes.medium
-                            ) {
-                                Text("Add Friend")
-                            }
+                                shape   = MaterialTheme.shapes.medium
+                            ) { Text("Add Friend") }
                         }
                     }
                 }

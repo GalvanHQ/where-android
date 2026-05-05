@@ -1,15 +1,17 @@
 package com.ovi.where.presentation.people
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ovi.where.core.common.Resource
 import com.ovi.where.domain.model.FriendshipStatus
-import com.ovi.where.domain.model.User
 import com.ovi.where.domain.repository.UserRepository
 import com.ovi.where.domain.usecase.friend.GetFriendshipStatusUseCase
 import com.ovi.where.domain.usecase.friend.RemoveFriendUseCase
 import com.ovi.where.domain.usecase.friend.SendFriendRequestUseCase
+import com.ovi.where.presentation.model.OtherUserProfileUiModel
+import com.ovi.where.presentation.model.ProfileFriendshipAction
+import com.ovi.where.presentation.model.toOtherProfileUiModel
+import com.ovi.where.presentation.model.toProfileAction
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,10 +35,11 @@ class UserProfileViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true)
             when (val result = userRepository.getUser(userId)) {
                 is Resource.Success -> {
+                    val user   = result.data ?: return@launch
                     val status = getFriendshipStatusUseCase(userId)
+                    // Map domain User + FriendshipStatus → OtherUserProfileUiModel
                     _uiState.value = _uiState.value.copy(
-                        user = result.data,
-                        friendshipStatus = status,
+                        profile   = user.toOtherProfileUiModel(status),
                         isLoading = false
                     )
                 }
@@ -51,21 +54,29 @@ class UserProfileViewModel @Inject constructor(
     fun sendFriendRequest(userId: String) {
         viewModelScope.launch {
             sendFriendRequestUseCase(userId)
-            _uiState.value = _uiState.value.copy(friendshipStatus = FriendshipStatus.PENDING)
+            // Optimistically update the action — no raw FriendshipStatus exposed to UI
+            _uiState.value = _uiState.value.copy(
+                profile = _uiState.value.profile?.copy(
+                    friendshipAction = ProfileFriendshipAction.RequestSent
+                )
+            )
         }
     }
 
     fun removeFriend(userId: String) {
         viewModelScope.launch {
             removeFriendUseCase(userId)
-            _uiState.value = _uiState.value.copy(friendshipStatus = null)
+            _uiState.value = _uiState.value.copy(
+                profile = _uiState.value.profile?.copy(
+                    friendshipAction = ProfileFriendshipAction.AddFriend
+                )
+            )
         }
     }
 }
 
 data class UserProfileUiState(
-    val user: User? = null,
-    val friendshipStatus: FriendshipStatus? = null,
+    val profile: OtherUserProfileUiModel? = null,
     val isLoading: Boolean = false,
     val error: String? = null
 )

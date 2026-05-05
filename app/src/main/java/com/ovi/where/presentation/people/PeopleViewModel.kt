@@ -2,11 +2,11 @@ package com.ovi.where.presentation.people
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.ovi.where.domain.model.Friendship
-import com.ovi.where.domain.model.User
 import com.ovi.where.domain.usecase.friend.ObserveFriendRequestsUseCase
 import com.ovi.where.domain.usecase.friend.ObserveFriendsUseCase
 import com.ovi.where.domain.usecase.friend.RemoveFriendUseCase
+import com.ovi.where.presentation.model.FriendUiModel
+import com.ovi.where.presentation.model.toFriendUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,7 +33,9 @@ class PeopleViewModel @Inject constructor(
         viewModelScope.launch {
             observeFriendsUseCase().collect { friends ->
                 _uiState.value = _uiState.value.copy(
-                    friends = friends.sortedBy { it.displayName.lowercase() },
+                    friends = friends
+                        .map { it.toFriendUiModel() }
+                        .sortedBy { it.displayName.lowercase() },
                     isLoading = false
                 )
             }
@@ -43,22 +45,18 @@ class PeopleViewModel @Inject constructor(
     private fun observeRequests() {
         viewModelScope.launch {
             observeFriendRequestsUseCase().collect { requests ->
-                _uiState.value = _uiState.value.copy(
-                    pendingRequestCount = requests.size
-                )
+                _uiState.value = _uiState.value.copy(pendingRequestCount = requests.size)
             }
         }
     }
 
     fun removeFriend(userId: String) {
-        viewModelScope.launch {
-            removeFriendUseCase(userId)
-        }
+        viewModelScope.launch { removeFriendUseCase(userId) }
     }
 }
 
 data class PeopleUiState(
-    val friends: List<User> = emptyList(),
+    val friends: List<FriendUiModel> = emptyList(),
     val pendingRequestCount: Int = 0,
     val isLoading: Boolean = true
 )

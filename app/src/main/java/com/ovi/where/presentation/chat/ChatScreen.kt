@@ -57,8 +57,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.domain.model.Message
-import com.ovi.where.domain.model.MessageType
+import com.ovi.where.presentation.model.BubbleDirection
+import com.ovi.where.presentation.model.MessageUiModel
 import com.ovi.where.presentation.common.WhereTopAppBar
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -97,7 +97,7 @@ fun ChatScreen(
     Scaffold(
         topBar = {
             WhereTopAppBar(
-                title = uiState.conversation?.name ?: "Chat",
+                title = uiState.conversation?.title ?: "Chat",
                 onNavigateBack = onNavigateBack,
                 actions = {
                     val groupId = uiState.conversation?.groupId
@@ -135,20 +135,17 @@ fun ChatScreen(
                         ),
                         verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
                     ) {
-                        // Group messages by date
-                        val grouped = uiState.messages.groupBy { msg ->
-                            SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(msg.timestamp))
-                        }
-                        grouped.forEach { (date, messages) ->
+                        // Group messages by pre-computed dateKey from MessageUiModel
+                        val grouped = uiState.messages.groupBy { it.dateKey }
+                        grouped.forEach { (_, messages) ->
                             item {
-                                DateSeparator(date = formatDateHeader(messages.first().timestamp))
+                                DateSeparator(date = formatDateHeader(messages.first().dateKey))
                             }
                             items(items = messages, key = { it.id }) { message ->
-                                val isSent = message.senderId == currentUserId
                                 MessageBubble(
                                     message = message,
-                                    isSent = isSent,
-                                    showAvatar = !isSent && uiState.conversation?.groupId != null,
+                                    showAvatar = message.direction == BubbleDirection.RECEIVED
+                                            && uiState.conversation?.groupId != null,
                                     maxWidth = screenWidth * 0.75f,
                                     onLocationTap = {
                                         val gId = uiState.conversation?.groupId
@@ -190,12 +187,12 @@ fun ChatScreen(
 
 @Composable
 private fun MessageBubble(
-    message: Message,
-    isSent: Boolean,
+    message: MessageUiModel,
     showAvatar: Boolean,
     maxWidth: androidx.compose.ui.unit.Dp,
     onLocationTap: () -> Unit
 ) {
+    val isSent = message.direction == BubbleDirection.SENT
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isSent) Arrangement.End else Arrangement.Start,
@@ -219,7 +216,7 @@ private fun MessageBubble(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = message.senderName.take(1).uppercase(),
+                        text  = message.senderName.take(1).uppercase(),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -233,84 +230,64 @@ private fun MessageBubble(
         Column(
             horizontalAlignment = if (isSent) Alignment.End else Alignment.Start
         ) {
-            // Sender name for group chat received messages
             if (!isSent && showAvatar) {
                 Text(
-                    text = message.senderName,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    text     = message.senderName,
+                    style    = MaterialTheme.typography.labelSmall,
+                    color    = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(start = Dimens.spaceSmall, bottom = 2.dp)
                 )
             }
 
-            if (message.type == MessageType.LOCATION) {
-                // Location message bubble
+            if (message.isLocation) {
                 Surface(
-                    shape = bubbleShape(isSent),
-                    color = if (isSent) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier
-                        .widthIn(max = maxWidth)
-                        .clip(bubbleShape(isSent))
-                        .run {
-                            clickableIf(true) { onLocationTap() }
-                        }
+                    shape    = bubbleShape(isSent),
+                    color    = if (isSent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.widthIn(max = maxWidth).clip(bubbleShape(isSent)).clickableIf(true) { onLocationTap() }
                 ) {
-                    Row(
-                        modifier = Modifier.padding(Dimens.spaceLarge),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(modifier = Modifier.padding(Dimens.spaceLarge), verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Default.LocationOn, null,
                             modifier = Modifier.size(Dimens.iconSizeMedium),
-                            tint = if (isSent) MaterialTheme.colorScheme.onPrimary
-                                   else MaterialTheme.colorScheme.primary
+                            tint = if (isSent) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
                         )
                         Spacer(Modifier.width(Dimens.spaceSmall))
                         Column {
                             Text(
-                                text = "Shared a location",
+                                text  = message.text,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (isSent) MaterialTheme.colorScheme.onPrimary
-                                        else MaterialTheme.colorScheme.onSurface
+                                color = if (isSent) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                             )
-                            if (message.latitude != null && message.longitude != null) {
+                            if (message.locationLabel != null) {
                                 Text(
-                                    text = "%.4f, %.4f".format(message.latitude, message.longitude),
+                                    text  = message.locationLabel,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (isSent) MaterialTheme.colorScheme.onPrimary.copy(0.7f)
-                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (isSent) MaterialTheme.colorScheme.onPrimary.copy(0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
                 }
             } else {
-                // Text message bubble
                 Surface(
-                    shape = bubbleShape(isSent),
-                    color = if (isSent) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceVariant,
+                    shape    = bubbleShape(isSent),
+                    color    = if (isSent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.widthIn(max = maxWidth)
                 ) {
                     Text(
-                        text = message.text,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (isSent) MaterialTheme.colorScheme.onPrimary
-                                else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(
-                            horizontal = Dimens.spaceLarge,
-                            vertical = Dimens.spaceMedium
-                        )
+                        text     = message.text,
+                        style    = MaterialTheme.typography.bodyMedium,
+                        color    = if (isSent) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium)
                     )
                 }
             }
 
-            // Timestamp
+            // Pre-computed time from MessageUiModel — no formatting in the composable
             Text(
-                text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.timestamp)),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text     = message.formattedTime,
+                style    = MaterialTheme.typography.labelSmall,
+                color    = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = 2.dp)
             )
         }
@@ -422,12 +399,22 @@ private fun InputBar(
     }
 }
 
-private fun formatDateHeader(timestamp: Long): String {
-    val sdf = SimpleDateFormat("EEEE, d MMM", Locale.getDefault())
-    return when {
-        isToday(timestamp) -> "Today"
-        isYesterday(timestamp) -> "Yesterday"
-        else -> sdf.format(Date(timestamp))
+/**
+ * Converts a yyyy-MM-dd dateKey (pre-computed in [MessageUiModel]) to a
+ * human-readable header like "Today", "Yesterday", or "Monday, 3 Jun".
+ */
+private fun formatDateHeader(dateKey: String): String {
+    return try {
+        val sdf    = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val date   = sdf.parse(dateKey) ?: return dateKey
+        val millis = date.time
+        when {
+            isToday(millis)     -> "Today"
+            isYesterday(millis) -> "Yesterday"
+            else                -> SimpleDateFormat("EEEE, d MMM", Locale.getDefault()).format(date)
+        }
+    } catch (e: Exception) {
+        dateKey
     }
 }
 

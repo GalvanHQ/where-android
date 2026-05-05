@@ -31,8 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.domain.model.Friendship
-import com.ovi.where.domain.model.User
+import com.ovi.where.presentation.model.FriendRequestUiModel
 import com.ovi.where.presentation.common.WhereTopAppBar
 
 @androidx.compose.material3.ExperimentalMaterial3Api
@@ -68,13 +67,11 @@ fun FriendRequestsScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(Dimens.spaceLarge),
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
             ) {
-                items(items = uiState.requests, key = { it.id }) { request ->
-                    val user = uiState.requestUsers[request.requesterId]
+                items(items = uiState.requests, key = { it.friendshipId }) { request ->
                     FriendRequestRow(
-                        friendship = request,
-                        user = user,
-                        onAccept = { viewModel.acceptRequest(request.id) },
-                        onDecline = { viewModel.declineRequest(request.id) }
+                        request   = request,
+                        onAccept  = { viewModel.acceptRequest(request.friendshipId) },
+                        onDecline = { viewModel.declineRequest(request.friendshipId) }
                     )
                 }
             }
@@ -84,8 +81,7 @@ fun FriendRequestsScreen(
 
 @Composable
 private fun FriendRequestRow(
-    friendship: Friendship,
-    user: User?,
+    request: FriendRequestUiModel,
     onAccept: () -> Unit,
     onDecline: () -> Unit
 ) {
@@ -93,10 +89,9 @@ private fun FriendRequestRow(
         modifier = Modifier.fillMaxWidth().padding(vertical = Dimens.spaceSmall),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar
-        if (!user?.photoUrl.isNullOrEmpty()) {
+        if (!request.photoUrl.isNullOrEmpty()) {
             AsyncImage(
-                model = user?.photoUrl,
+                model = request.photoUrl,
                 contentDescription = null,
                 modifier = Modifier.size(Dimens.avatarSizeMedium).clip(CircleShape)
             )
@@ -109,7 +104,7 @@ private fun FriendRequestRow(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = (user?.displayName ?: "?").take(1).uppercase(),
+                    text  = request.avatarInitial,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -120,21 +115,20 @@ private fun FriendRequestRow(
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = user?.displayName ?: "Unknown",
-                style = MaterialTheme.typography.titleSmall,
+                text     = request.displayName,
+                style    = MaterialTheme.typography.titleSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            if (!user?.username.isNullOrEmpty()) {
+            if (request.username.isNotEmpty()) {
                 Text(
-                    text = "@${user?.username}",
+                    text  = "@${request.username}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
-        // Accept / Decline buttons
         Button(
             onClick = onAccept,
             modifier = Modifier.height(Dimens.buttonHeightSmall),

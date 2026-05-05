@@ -8,18 +8,21 @@ import com.ovi.where.core.common.Resource
 import com.ovi.where.data.remote.chat.ChatWebSocketClient
 import com.ovi.where.data.remote.chat.ServerFrame
 import com.ovi.where.data.repository.MessageRepositoryImpl
-import com.ovi.where.domain.model.Conversation
-import com.ovi.where.domain.model.Message
 import com.ovi.where.domain.usecase.chat.MarkConversationReadUseCase
+import com.ovi.where.domain.usecase.chat.ObserveConversationsUseCase
 import com.ovi.where.domain.usecase.chat.ObserveMessagesUseCase
 import com.ovi.where.domain.usecase.chat.SendLocationMessageUseCase
 import com.ovi.where.domain.usecase.chat.SendMessageUseCase
-import com.ovi.where.domain.usecase.chat.ObserveConversationsUseCase
+import com.ovi.where.presentation.model.ConversationUiModel
+import com.ovi.where.presentation.model.MessageUiModel
+import com.ovi.where.presentation.model.formatConversationTimestamp
+import com.ovi.where.presentation.model.formatMessageDateKey
+import com.ovi.where.presentation.model.formatMessageTime
+import com.ovi.where.presentation.model.toUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -51,10 +54,13 @@ class ChatViewModel @Inject constructor(
 
     private fun loadConversation(conversationId: String) {
         viewModelScope.launch {
+            val uid = currentUserId ?: ""
             observeConversationsUseCase().collect { conversations ->
                 val conv = conversations.firstOrNull { it.id == conversationId }
                 if (conv != null) {
-                    _uiState.value = _uiState.value.copy(conversation = conv)
+                    _uiState.value = _uiState.value.copy(
+                        conversation = conv.toUiModel(uid, ::formatConversationTimestamp)
+                    )
                 }
             }
         }
@@ -62,11 +68,19 @@ class ChatViewModel @Inject constructor(
 
     private fun loadMessages(conversationId: String) {
         viewModelScope.launch {
-            // Seed from server history
             messageRepositoryImpl.loadHistory(conversationId)
-            // Observe real-time stream
+            val uid = currentUserId ?: ""
             observeMessagesUseCase(conversationId).collect { messages ->
-                _uiState.value = _uiState.value.copy(messages = messages, isLoading = false)
+                _uiState.value = _uiState.value.copy(
+                    messages = messages.map {
+                        it.toUiModel(
+                            currentUserId   = uid,
+                            timeFormatter   = ::formatMessageTime,
+                            dateKeyFormatter = ::formatMessageDateKey
+                        )
+                    },
+                    isLoading = false
+                )
             }
         }
     }
@@ -84,7 +98,7 @@ class ChatViewModel @Inject constructor(
             wsClient.incomingFrames.collect { frame ->
                 if (frame is ServerFrame.UserTyping) {
                     _uiState.value = _uiState.value.copy(
-                        typingUserId = if (frame.isTyping) frame.userId else null,
+                        typingUserId   = if (frame.isTyping) frame.userId   else null,
                         typingUserName = if (frame.isTyping) frame.userName else null
                     )
                 }
@@ -94,32 +108,25 @@ class ChatViewModel @Inject constructor(
 
     fun onInputChange(text: String) {
         _uiState.value = _uiState.value.copy(inputText = text)
-        viewModelScope.launch {
-            wsClient.sendTyping(text.isNotEmpty())
-        }
+        viewModelScope.launch { wsClient.sendTyping(text.isNotEmpty()) }
     }
 
     fun sendMessage() {
-        val text = _uiState.value.inputText.trim()
+        val text  = _uiState.value.inputText.trim()
         if (text.isEmpty()) return
         val convId = _uiState.value.conversationId ?: return
-
         _uiState.value = _uiState.value.copy(inputText = "", isSending = false)
-        viewModelScope.launch {
-            sendMessageUseCase(convId, text)
-        }
+        viewModelScope.launch { sendMessageUseCase(convId, text) }
     }
 
     fun sendLocation(latitude: Double, longitude: Double) {
         val convId = _uiState.value.conversationId ?: return
-        viewModelScope.launch {
-            sendLocationMessageUseCase(convId, latitude, longitude)
-        }
+        viewModelScope.launch { sendLocationMessageUseCase(convId, latitude, longitude) }
     }
 
     fun markRead() {
         val convId = _uiState.value.conversationId ?: return
-        val uid = currentUserId ?: return
+        val uid    = currentUserId ?: return
         viewModelScope.launch {
             markConversationReadUseCase(convId, uid)
             wsClient.sendRead()
@@ -134,8 +141,8 @@ class ChatViewModel @Inject constructor(
 
 data class ChatUiState(
     val conversationId: String? = null,
-    val conversation: Conversation? = null,
-    val messages: List<Message> = emptyList(),
+    val conversation: ConversationUiModel? = null,
+    val messages: List<MessageUiModel> = emptyList(),
     val inputText: String = "",
     val isSending: Boolean = false,
     val isLoading: Boolean = true,

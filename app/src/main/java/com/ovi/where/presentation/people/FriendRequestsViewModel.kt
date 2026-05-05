@@ -3,12 +3,12 @@ package com.ovi.where.presentation.people
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ovi.where.core.common.Resource
-import com.ovi.where.domain.model.Friendship
-import com.ovi.where.domain.model.User
 import com.ovi.where.domain.usecase.friend.AcceptFriendRequestUseCase
 import com.ovi.where.domain.usecase.friend.DeclineFriendRequestUseCase
 import com.ovi.where.domain.usecase.friend.ObserveFriendRequestsUseCase
 import com.ovi.where.domain.usecase.user.GetUsersUseCase
+import com.ovi.where.presentation.model.FriendRequestUiModel
+import com.ovi.where.presentation.model.toUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,18 +32,20 @@ class FriendRequestsViewModel @Inject constructor(
     private fun observeRequests() {
         viewModelScope.launch {
             observeFriendRequestsUseCase().collect { requests ->
-                // Fetch requester user data
-                val userIds = requests.map { it.requesterId }
-                val usersMap = mutableMapOf<String, User>()
-                if (userIds.isNotEmpty()) {
+                // Batch-fetch requester profiles
+                val userIds = requests.map { it.requesterId }.distinct()
+                val usersById = if (userIds.isNotEmpty()) {
                     when (val result = getUsersUseCase(userIds)) {
-                        is Resource.Success -> result.data?.forEach { usersMap[it.id] = it }
-                        else -> {}
+                        is Resource.Success -> result.data?.associateBy { it.id } ?: emptyMap()
+                        else               -> emptyMap()
                     }
-                }
+                } else emptyMap()
+
+                // Map domain Friendship + User → FriendRequestUiModel
                 _uiState.value = _uiState.value.copy(
-                    requests = requests,
-                    requestUsers = usersMap,
+                    requests  = requests.map { friendship ->
+                        friendship.toUiModel(requester = usersById[friendship.requesterId])
+                    },
                     isLoading = false
                 )
             }
@@ -60,7 +62,6 @@ class FriendRequestsViewModel @Inject constructor(
 }
 
 data class FriendRequestsUiState(
-    val requests: List<Friendship> = emptyList(),
-    val requestUsers: Map<String, User> = emptyMap(),
+    val requests: List<FriendRequestUiModel> = emptyList(),
     val isLoading: Boolean = true
 )

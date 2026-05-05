@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -44,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.domain.model.Conversation
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,7 +55,6 @@ fun ChatsScreen(
     viewModel: ChatsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val currentUserId = viewModel.currentUserId
 
     Scaffold(
         floatingActionButton = {
@@ -141,7 +138,6 @@ fun ChatsScreen(
                         items(items = uiState.conversations, key = { it.id }) { conv ->
                             ConversationRow(
                                 conversation = conv,
-                                currentUserId = currentUserId,
                                 onClick = { onNavigateToChat(conv.id) }
                             )
                             HorizontalDivider(
@@ -159,12 +155,10 @@ fun ChatsScreen(
 
 @Composable
 private fun ConversationRow(
-    conversation: Conversation,
-    currentUserId: String?,
+    conversation: com.ovi.where.presentation.model.ConversationUiModel,
     onClick: () -> Unit
 ) {
-    val unread = conversation.unreadCounts[currentUserId] ?: 0
-    val hasUnread = unread > 0
+    val hasUnread = conversation.unreadCount > 0
 
     Row(
         modifier = Modifier
@@ -173,14 +167,7 @@ private fun ConversationRow(
             .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar
-        BadgedBox(
-            badge = {
-                // Online indicator placeholder (green dot)
-            }
-        ) {
-            ConversationAvatar(conversation = conversation)
-        }
+        ConversationAvatar(conversation = conversation)
 
         Spacer(Modifier.width(Dimens.spaceLarge))
 
@@ -191,7 +178,7 @@ private fun ConversationRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = conversation.name,
+                    text = conversation.title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.Normal,
                     maxLines = 1,
@@ -200,7 +187,7 @@ private fun ConversationRow(
                 )
                 Spacer(Modifier.width(Dimens.spaceMedium))
                 Text(
-                    text = formatConversationTime(conversation.lastMessageTimestamp),
+                    text = conversation.lastMessageTime,
                     style = MaterialTheme.typography.labelSmall,
                     color = if (hasUnread) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant
@@ -215,7 +202,7 @@ private fun ConversationRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = conversation.lastMessageText.ifEmpty { "No messages yet" },
+                    text = conversation.lastMessageText,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (hasUnread) MaterialTheme.colorScheme.onBackground
                             else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -228,10 +215,10 @@ private fun ConversationRow(
                     Spacer(Modifier.width(Dimens.spaceMedium))
                     Badge(
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        contentColor   = MaterialTheme.colorScheme.onPrimary
                     ) {
                         Text(
-                            text = if (unread > 99) "99+" else "$unread",
+                            text  = if (conversation.unreadCount > 99) "99+" else "${conversation.unreadCount}",
                             style = MaterialTheme.typography.labelSmall
                         )
                     }
@@ -242,15 +229,15 @@ private fun ConversationRow(
 }
 
 @Composable
-private fun ConversationAvatar(conversation: Conversation) {
+private fun ConversationAvatar(
+    conversation: com.ovi.where.presentation.model.ConversationUiModel
+) {
     if (!conversation.photoUrl.isNullOrEmpty()) {
         AsyncImage(
             model = conversation.photoUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(Dimens.avatarSizeMedium)
-                .clip(CircleShape)
+            modifier = Modifier.size(Dimens.avatarSizeMedium).clip(CircleShape)
         )
     } else {
         Box(
@@ -261,7 +248,7 @@ private fun ConversationAvatar(conversation: Conversation) {
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = conversation.name.take(1).uppercase(),
+                text  = conversation.title.take(1).uppercase(),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
             )

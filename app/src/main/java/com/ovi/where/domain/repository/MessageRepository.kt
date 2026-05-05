@@ -8,4 +8,5 @@ interface MessageRepository {
     fun observeMessages(conversationId: String): Flow<List<Message>>
     suspend fun sendMessage(conversationId: String, text: String): Resource<Message>
     suspend fun sendLocationMessage(conversationId: String, latitude: Double, longitude: Double): Resource<Message>
+    suspend fun loadHistory(conversationId: String)
 }

@@ -89,7 +89,7 @@ class MapViewModel @Inject constructor(
             when (val result = startLocationSharingUseCase(groupId, durationMinutes)) {
                 is Resource.Success -> {
                     _uiState.value = _uiState.value.copy(isSharing = true, isLoading = false)
-                    startLocationService(groupId)
+                    startLocationService(groupId, durationMinutes)
                     _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.toast_sharing_started)))
                 }
                 is Resource.Error -> {
@@ -130,9 +130,9 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    private fun startLocationService(groupId: String) {
+    private fun startLocationService(groupId: String, durationMinutes: Long) {
         val ctx = getApplication<Application>()
-        ctx.startForegroundService(LocationTrackingService.createStartIntent(ctx, groupId))
+        ctx.startForegroundService(LocationTrackingService.createStartIntent(ctx, groupId, durationMinutes))
     }
 
     private fun stopLocationService() {

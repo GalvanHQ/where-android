@@ -116,6 +116,10 @@ class GroupRepositoryImpl @Inject constructor(
             val group = groupDoc.toObject(Group::class.java)
                 ?: return Resource.Error("Group not found")
             
+            if (group.memberIds.contains(uid)) {
+                return Resource.Success(group)
+            }
+            
             val batch = firestore.batch()
             
             val member = GroupMember(
@@ -171,10 +175,31 @@ class GroupRepositoryImpl @Inject constructor(
 
     override suspend fun deleteGroup(groupId: String): Resource<Unit> {
         return try {
-            firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
+            val batch = firestore.batch()
+            
+            val membersSnapshot = firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
                 .document(groupId)
-                .delete()
+                .collection(AppConstants.FIRESTORE_COLLECTION_MEMBERS)
+                .get()
                 .await()
+            for (doc in membersSnapshot.documents) {
+                batch.delete(doc.reference)
+            }
+            
+            val locationsSnapshot = firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
+                .document(groupId)
+                .collection(AppConstants.FIRESTORE_COLLECTION_LOCATIONS)
+                .get()
+                .await()
+            for (doc in locationsSnapshot.documents) {
+                batch.delete(doc.reference)
+            }
+            
+            val groupRef = firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
+                .document(groupId)
+            batch.delete(groupRef)
+            
+            batch.commit().await()
             Resource.Success(Unit)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to delete group")

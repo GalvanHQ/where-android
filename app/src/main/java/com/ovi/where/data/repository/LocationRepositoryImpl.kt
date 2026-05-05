@@ -127,7 +127,12 @@ class LocationRepositoryImpl @Inject constructor(
                 }
                 val locations = snapshot?.documents?.mapNotNull { doc ->
                     val location = doc.toObject(SharedLocation::class.java)
-                    location?.copy(id = doc.id)
+                    if (location != null) {
+                        val now = System.currentTimeMillis()
+                        val stillActive = location.isSharingActive && 
+                            (location.sharingExpiresAt == 0L || location.sharingExpiresAt == Long.MAX_VALUE || now < location.sharingExpiresAt)
+                        location.copy(id = doc.id, isSharingActive = stillActive)
+                    } else null
                 } ?: emptyList()
                 trySend(locations).isSuccess
             }
@@ -145,7 +150,13 @@ class LocationRepositoryImpl @Inject constructor(
                     return@addSnapshotListener
                 }
                 val location = snapshot?.toObject(SharedLocation::class.java)
-                trySend(location?.copy(id = snapshot.id)).isSuccess
+                val resolvedLocation = if (location != null) {
+                    val now = System.currentTimeMillis()
+                    val stillActive = location.isSharingActive && 
+                        (location.sharingExpiresAt == 0L || location.sharingExpiresAt == Long.MAX_VALUE || now < location.sharingExpiresAt)
+                    location.copy(id = snapshot.id, isSharingActive = stillActive)
+                } else null
+                trySend(resolvedLocation).isSuccess
             }
         awaitClose { listener.remove() }
     }

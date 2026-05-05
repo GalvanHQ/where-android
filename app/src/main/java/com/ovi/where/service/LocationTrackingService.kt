@@ -36,6 +36,7 @@ class LocationTrackingService : Service() {
     lateinit var locationRepository: LocationRepository
     
     private var currentGroupId: String? = null
+    private var expiresAt: Long? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -46,6 +47,10 @@ class LocationTrackingService : Service() {
         when (intent?.action) {
             ACTION_START -> {
                 currentGroupId = intent.getStringExtra(EXTRA_GROUP_ID)
+                val duration = intent.getLongExtra(EXTRA_DURATION_MINUTES, -1L)
+                if (duration != -1L) {
+                    expiresAt = System.currentTimeMillis() + duration * 60_000
+                }
                 startForegroundService()
             }
             ACTION_STOP -> stopSelf()
@@ -69,6 +74,16 @@ class LocationTrackingService : Service() {
                     Timber.e(e, "Location updates failed")
                 }
                 .collect { location ->
+                    val currentExpiry = expiresAt
+                    if (currentExpiry != null && System.currentTimeMillis() > currentExpiry) {
+                        Timber.d("Location tracking session expired")
+                        serviceScope.launch {
+                            locationRepository.stopLocationSharing(groupId)
+                        }
+                        stopSelf()
+                        return@collect
+                    }
+
                     Timber.d("Location update: lat=${location.latitude}, lng=${location.longitude}")
                     
                     locationRepository.updateLocation(
@@ -124,11 +139,13 @@ class LocationTrackingService : Service() {
         const val ACTION_START = "ACTION_START"
         const val ACTION_STOP = "ACTION_STOP"
         const val EXTRA_GROUP_ID = "EXTRA_GROUP_ID"
+        const val EXTRA_DURATION_MINUTES = "EXTRA_DURATION_MINUTES"
         
-        fun createStartIntent(context: Context, groupId: String): Intent {
+        fun createStartIntent(context: Context, groupId: String, durationMinutes: Long): Intent {
             return Intent(context, LocationTrackingService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_GROUP_ID, groupId)
+                putExtra(EXTRA_DURATION_MINUTES, durationMinutes)
             }
         }
         

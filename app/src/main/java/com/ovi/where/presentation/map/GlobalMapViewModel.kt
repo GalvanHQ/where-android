@@ -240,7 +240,7 @@ class GlobalMapViewModel @Inject constructor(
                         sharingGroupId = groupId,
                         isLoading = false
                     )
-                    startLocationService(groupId)
+                    startLocationService(groupId, durationMinutes)
                     _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.toast_sharing_started)))
                 }
                 is Resource.Error -> {
@@ -282,9 +282,9 @@ class GlobalMapViewModel @Inject constructor(
         }
     }
 
-    private fun startLocationService(groupId: String) {
+    private fun startLocationService(groupId: String, durationMinutes: Long) {
         val ctx = getApplication<Application>()
-        ctx.startForegroundService(LocationTrackingService.createStartIntent(ctx, groupId))
+        ctx.startForegroundService(LocationTrackingService.createStartIntent(ctx, groupId, durationMinutes))
     }
 
     private fun stopLocationService() {

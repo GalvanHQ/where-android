@@ -257,7 +257,7 @@ class AuthRepositoryImpl @Inject constructor(
         return try {
             val doc = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
                 .document(userId)
-                .get(Source.SERVER)   // explicit server fetch; no stale cache confusion
+                .get()   // explicit server fetch; no stale cache confusion
                 .await()
             doc.toObject(User::class.java)
                 ?: User(id = userId, displayName = displayName ?: "", email = email)
@@ -282,7 +282,8 @@ class AuthRepositoryImpl @Inject constructor(
             // ── Firestore offline / unavailable ──────────────────────────────
             message.contains("client is offline", ignoreCase = true) ||
             message.contains("UNAVAILABLE", ignoreCase = true) ||
-            e is FirebaseNetworkException ->
+            e is FirebaseNetworkException ||
+            e is java.io.IOException ->
                 "Cannot reach the server. Please check your internet connection and try again."
 
             // ── Auth errors ──────────────────────────────────────────────────
@@ -311,7 +312,7 @@ class AuthRepositoryImpl @Inject constructor(
             message.contains("CREDENTIAL_TOO_OLD") || message.contains("requires-recent-login") ->
                 "Please sign in again to continue."
 
-            else -> "Something went wrong. Please try again. (${e.javaClass.simpleName})"
+            else -> "Something went wrong. Please try again."
         }
     }
 }

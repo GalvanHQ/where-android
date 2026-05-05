@@ -65,6 +65,7 @@ class GroupDetailsViewModel @Inject constructor(
                         ),
                         inviteCode = group?.inviteCode ?: "",
                         groupName = group?.name ?: "",
+                        groupConversationId = group?.conversationId,
                         isCurrentUserAdmin = isAdmin,
                         error = null
                     )
@@ -177,6 +178,7 @@ data class GroupDetailsUiState(
     val members: List<GroupMemberUiModel> = emptyList(),
     val inviteCode: String = "",
     val groupName: String = "",
+    val groupConversationId: String? = null,
     val isLoading: Boolean = false,
     val isCurrentUserAdmin: Boolean = false,
     val error: String? = null

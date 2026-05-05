@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.services)
@@ -17,8 +18,11 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Chat server URLs — override in local.properties for production
+        buildConfigField("String", "CHAT_SERVER_HTTP_URL", "\"http://10.0.2.2:8080\"")
+        buildConfigField("String", "CHAT_SERVER_WS_URL",   "\"ws://10.0.2.2:8080\"")
     }
 
     buildTypes {
@@ -28,6 +32,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Override with your production server URL
+            buildConfigField("String", "CHAT_SERVER_HTTP_URL", "\"https://your-server.com\"")
+            buildConfigField("String", "CHAT_SERVER_WS_URL",   "\"wss://your-server.com\"")
         }
     }
     compileOptions {
@@ -37,6 +44,13 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/INDEX.LIST"
+            excludes += "/META-INF/io.netty.versions.properties"
+        }
     }
 }
 
@@ -50,7 +64,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
-
     implementation(libs.androidx.navigation.compose)
 
     implementation(libs.hilt.android)
@@ -81,6 +94,15 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.play.services)
+
+    // ── Ktor client (HTTP + WebSocket) ─────────────────────────────────────
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.android)
+    implementation(libs.ktor.client.websockets)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.client.logging)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

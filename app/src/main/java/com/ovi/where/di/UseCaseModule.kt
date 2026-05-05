@@ -1,8 +1,11 @@
 package com.ovi.where.di
 
 import com.ovi.where.domain.repository.AuthRepository
+import com.ovi.where.domain.repository.ConversationRepository
+import com.ovi.where.domain.repository.FriendshipRepository
 import com.ovi.where.domain.repository.GroupRepository
 import com.ovi.where.domain.repository.LocationRepository
+import com.ovi.where.domain.repository.MessageRepository
 import com.ovi.where.domain.repository.UserRepository
 import com.ovi.where.domain.usecase.auth.GoogleSignInUseCase
 import com.ovi.where.domain.usecase.auth.ObserveCurrentUserUseCase
@@ -11,6 +14,21 @@ import com.ovi.where.domain.usecase.auth.ResetPasswordUseCase
 import com.ovi.where.domain.usecase.auth.SignInUseCase
 import com.ovi.where.domain.usecase.auth.SignOutUseCase
 import com.ovi.where.domain.usecase.auth.UpdateProfileUseCase
+import com.ovi.where.domain.usecase.chat.CreateGroupConversationUseCase
+import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
+import com.ovi.where.domain.usecase.chat.MarkConversationReadUseCase
+import com.ovi.where.domain.usecase.chat.ObserveConversationsUseCase
+import com.ovi.where.domain.usecase.chat.ObserveMessagesUseCase
+import com.ovi.where.domain.usecase.chat.SendLocationMessageUseCase
+import com.ovi.where.domain.usecase.chat.SendMessageUseCase
+import com.ovi.where.domain.usecase.friend.AcceptFriendRequestUseCase
+import com.ovi.where.domain.usecase.friend.DeclineFriendRequestUseCase
+import com.ovi.where.domain.usecase.friend.GetFriendshipStatusUseCase
+import com.ovi.where.domain.usecase.friend.ObserveAllFriendLocationsUseCase
+import com.ovi.where.domain.usecase.friend.ObserveFriendRequestsUseCase
+import com.ovi.where.domain.usecase.friend.ObserveFriendsUseCase
+import com.ovi.where.domain.usecase.friend.RemoveFriendUseCase
+import com.ovi.where.domain.usecase.friend.SendFriendRequestUseCase
 import com.ovi.where.domain.usecase.group.CreateGroupUseCase
 import com.ovi.where.domain.usecase.group.DeleteGroupUseCase
 import com.ovi.where.domain.usecase.group.GetGroupUseCase
@@ -34,66 +52,51 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 object UseCaseModule {
 
-    @Provides
-    fun provideSignInUseCase(authRepository: AuthRepository) = SignInUseCase(authRepository)
+    // ── Auth ─────────────────────────────────────────────────────────────────
+    @Provides fun provideSignInUseCase(r: AuthRepository) = SignInUseCase(r)
+    @Provides fun provideRegisterUseCase(r: AuthRepository) = RegisterUseCase(r)
+    @Provides fun provideObserveCurrentUserUseCase(r: AuthRepository) = ObserveCurrentUserUseCase(r)
+    @Provides fun provideSignOutUseCase(r: AuthRepository) = SignOutUseCase(r)
+    @Provides fun provideGoogleSignInUseCase(r: AuthRepository) = GoogleSignInUseCase(r)
+    @Provides fun provideResetPasswordUseCase(r: AuthRepository) = ResetPasswordUseCase(r)
+    @Provides fun provideUpdateProfileUseCase(r: AuthRepository) = UpdateProfileUseCase(r)
 
-    @Provides
-    fun provideRegisterUseCase(authRepository: AuthRepository) = RegisterUseCase(authRepository)
+    // ── Group ────────────────────────────────────────────────────────────────
+    @Provides fun provideCreateGroupUseCase(r: GroupRepository) = CreateGroupUseCase(r)
+    @Provides fun provideGetUserGroupsUseCase(r: GroupRepository) = GetUserGroupsUseCase(r)
+    @Provides fun provideGetGroupUseCase(r: GroupRepository) = GetGroupUseCase(r)
+    @Provides fun provideJoinGroupUseCase(r: GroupRepository) = JoinGroupUseCase(r)
+    @Provides fun provideLeaveGroupUseCase(r: GroupRepository) = LeaveGroupUseCase(r)
+    @Provides fun provideObserveGroupMembersUseCase(r: GroupRepository) = ObserveGroupMembersUseCase(r)
+    @Provides fun provideKickMemberUseCase(r: GroupRepository) = KickMemberUseCase(r)
+    @Provides fun providePromoteMemberUseCase(r: GroupRepository) = PromoteMemberUseCase(r)
+    @Provides fun provideDeleteGroupUseCase(r: GroupRepository) = DeleteGroupUseCase(r)
+    @Provides fun provideUpdateGroupUseCase(r: GroupRepository) = UpdateGroupUseCase(r)
 
-    @Provides
-    fun provideObserveCurrentUserUseCase(authRepository: AuthRepository) = ObserveCurrentUserUseCase(authRepository)
+    // ── Location ─────────────────────────────────────────────────────────────
+    @Provides fun provideStartLocationSharingUseCase(r: LocationRepository) = StartLocationSharingUseCase(r)
+    @Provides fun provideStopLocationSharingUseCase(r: LocationRepository) = StopLocationSharingUseCase(r)
+    @Provides fun provideObserveGroupLocationsUseCase(r: LocationRepository) = ObserveGroupLocationsUseCase(r)
 
-    @Provides
-    fun provideSignOutUseCase(authRepository: AuthRepository) = SignOutUseCase(authRepository)
+    // ── User ─────────────────────────────────────────────────────────────────
+    @Provides fun provideGetUsersUseCase(r: UserRepository) = GetUsersUseCase(r)
 
-    @Provides
-    fun provideGoogleSignInUseCase(authRepository: AuthRepository) = GoogleSignInUseCase(authRepository)
+    // ── Friends ──────────────────────────────────────────────────────────────
+    @Provides fun provideSendFriendRequestUseCase(r: FriendshipRepository) = SendFriendRequestUseCase(r)
+    @Provides fun provideAcceptFriendRequestUseCase(r: FriendshipRepository) = AcceptFriendRequestUseCase(r)
+    @Provides fun provideDeclineFriendRequestUseCase(r: FriendshipRepository) = DeclineFriendRequestUseCase(r)
+    @Provides fun provideRemoveFriendUseCase(r: FriendshipRepository) = RemoveFriendUseCase(r)
+    @Provides fun provideObserveFriendsUseCase(r: FriendshipRepository) = ObserveFriendsUseCase(r)
+    @Provides fun provideObserveFriendRequestsUseCase(r: FriendshipRepository) = ObserveFriendRequestsUseCase(r)
+    @Provides fun provideGetFriendshipStatusUseCase(r: FriendshipRepository) = GetFriendshipStatusUseCase(r)
+    @Provides fun provideObserveAllFriendLocationsUseCase(r: FriendshipRepository) = ObserveAllFriendLocationsUseCase(r)
 
-    @Provides
-    fun provideResetPasswordUseCase(authRepository: AuthRepository) = ResetPasswordUseCase(authRepository)
-
-    @Provides
-    fun provideUpdateProfileUseCase(authRepository: AuthRepository) = UpdateProfileUseCase(authRepository)
-
-    @Provides
-    fun provideCreateGroupUseCase(groupRepository: GroupRepository) = CreateGroupUseCase(groupRepository)
-
-    @Provides
-    fun provideGetUserGroupsUseCase(groupRepository: GroupRepository) = GetUserGroupsUseCase(groupRepository)
-
-    @Provides
-    fun provideGetGroupUseCase(groupRepository: GroupRepository) = GetGroupUseCase(groupRepository)
-
-    @Provides
-    fun provideJoinGroupUseCase(groupRepository: GroupRepository) = JoinGroupUseCase(groupRepository)
-
-    @Provides
-    fun provideLeaveGroupUseCase(groupRepository: GroupRepository) = LeaveGroupUseCase(groupRepository)
-
-    @Provides
-    fun provideObserveGroupMembersUseCase(groupRepository: GroupRepository) = ObserveGroupMembersUseCase(groupRepository)
-
-    @Provides
-    fun provideKickMemberUseCase(groupRepository: GroupRepository) = KickMemberUseCase(groupRepository)
-
-    @Provides
-    fun providePromoteMemberUseCase(groupRepository: GroupRepository) = PromoteMemberUseCase(groupRepository)
-
-    @Provides
-    fun provideDeleteGroupUseCase(groupRepository: GroupRepository) = DeleteGroupUseCase(groupRepository)
-
-    @Provides
-    fun provideUpdateGroupUseCase(groupRepository: GroupRepository) = UpdateGroupUseCase(groupRepository)
-
-    @Provides
-    fun provideStartLocationSharingUseCase(locationRepository: LocationRepository) = StartLocationSharingUseCase(locationRepository)
-
-    @Provides
-    fun provideStopLocationSharingUseCase(locationRepository: LocationRepository) = StopLocationSharingUseCase(locationRepository)
-
-    @Provides
-    fun provideObserveGroupLocationsUseCase(locationRepository: LocationRepository) = ObserveGroupLocationsUseCase(locationRepository)
-
-    @Provides
-    fun provideGetUsersUseCase(userRepository: UserRepository) = GetUsersUseCase(userRepository)
+    // ── Chat ─────────────────────────────────────────────────────────────────
+    @Provides fun provideObserveConversationsUseCase(r: ConversationRepository) = ObserveConversationsUseCase(r)
+    @Provides fun provideObserveMessagesUseCase(r: MessageRepository) = ObserveMessagesUseCase(r)
+    @Provides fun provideGetOrCreateDirectConversationUseCase(r: ConversationRepository) = GetOrCreateDirectConversationUseCase(r)
+    @Provides fun provideCreateGroupConversationUseCase(r: ConversationRepository) = CreateGroupConversationUseCase(r)
+    @Provides fun provideSendMessageUseCase(r: MessageRepository) = SendMessageUseCase(r)
+    @Provides fun provideSendLocationMessageUseCase(r: MessageRepository) = SendLocationMessageUseCase(r)
+    @Provides fun provideMarkConversationReadUseCase(r: ConversationRepository) = MarkConversationReadUseCase(r)
 }

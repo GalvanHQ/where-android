@@ -7,6 +7,7 @@ import com.ovi.where.R
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.common.UiEvent
 import com.ovi.where.core.common.UiText
+import com.ovi.where.domain.usecase.chat.CreateGroupConversationUseCase
 import com.ovi.where.domain.usecase.group.CreateGroupUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
@@ -20,7 +21,8 @@ import javax.inject.Inject
 @HiltViewModel
 class CreateGroupViewModel @Inject constructor(
     application: Application,
-    private val createGroupUseCase: CreateGroupUseCase
+    private val createGroupUseCase: CreateGroupUseCase,
+    private val createGroupConversationUseCase: CreateGroupConversationUseCase
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(CreateGroupUiState())
@@ -50,9 +52,18 @@ class CreateGroupViewModel @Inject constructor(
             
             when (val result = createGroupUseCase(state.name, state.description)) {
                 is Resource.Success -> {
+                    val group = result.data
+                    // Auto-create the group conversation
+                    if (group != null) {
+                        createGroupConversationUseCase(
+                            groupId = group.id,
+                            name = group.name,
+                            memberIds = group.memberIds
+                        )
+                    }
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        inviteCode = result.data?.inviteCode ?: ""
+                        inviteCode = group?.inviteCode ?: ""
                     )
                     _uiEvent.send(UiEvent.NavigateUp)
                 }

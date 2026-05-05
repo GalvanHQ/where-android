@@ -79,6 +79,7 @@ fun GroupDetailsScreen(
     groupId: String,
     onNavigateBack: () -> Unit,
     onNavigateToMap: () -> Unit,
+    onNavigateToChat: (String) -> Unit = {},
     onNavigateToEditGroup: () -> Unit = {},
     viewModel: GroupDetailsViewModel = hiltViewModel()
 ) {
@@ -292,6 +293,29 @@ fun GroupDetailsScreen(
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                                 )
                             }
+                        }
+                    }
+
+                    // Group Chat button
+                    item {
+                        val conversationId = uiState.groupConversationId
+                        androidx.compose.material3.FilledTonalButton(
+                            onClick = {
+                                if (conversationId != null) onNavigateToChat(conversationId)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Dimens.spaceLarge),
+                            shape = MaterialTheme.shapes.medium,
+                            enabled = conversationId != null
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = null,
+                                modifier = Modifier.size(Dimens.iconSizeMedium)
+                            )
+                            Spacer(Modifier.width(Dimens.spaceSmall))
+                            Text("Group Chat")
                         }
                     }
 

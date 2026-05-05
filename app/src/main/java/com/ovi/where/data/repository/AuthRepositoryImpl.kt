@@ -306,7 +306,11 @@ class AuthRepositoryImpl @Inject constructor(
             message.contains("CREDENTIAL_TOO_OLD") || message.contains("requires-recent-login") ->
                 "Please sign in again to continue."
 
-            else -> "Something went wrong. Please try again."
+            message.contains("PERMISSION_DENIED", ignoreCase = true) ||
+            message.contains("permission-denied", ignoreCase = true) ->
+                "Permission denied. Please check your Firestore Security Rules."
+
+            else -> "Something went wrong. Please try again. (${e.message})"
         }
     }
 }

@@ -22,16 +22,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -65,6 +65,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -99,15 +100,13 @@ fun ProfileScreen(
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let { viewModel.onPhotoSelected(it) }
-    }
+    ) { uri -> uri?.let { viewModel.onPhotoSelected(it) } }
 
     LaunchedEffect(Unit) {
         viewModel.uiEvent.collect { event ->
             when (event) {
                 is UiEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message.asString(context))
-                is UiEvent.Navigate -> if (event.route == "login") onLogout()
+                is UiEvent.Navigate     -> if (event.route == "login") onLogout()
                 else -> Unit
             }
         }
@@ -117,125 +116,105 @@ fun ProfileScreen(
         topBar = {
             WhereTopAppBar(
                 title = stringResource(R.string.title_profile),
-                onNavigateBack = onNavigateBack.takeIf { it != {} }
+                onNavigateBack = if (onNavigateBack != {}) onNavigateBack else null
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        Surface(
-            modifier = Modifier.fillMaxSize().padding(paddingValues),
-            color = MaterialTheme.colorScheme.background
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
+                .padding(Dimens.spaceMedium),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(Dimens.spaceMedium)
-            ) {
-                // Profile card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(Dimens.cardElevation),
-                    shape = MaterialTheme.shapes.large
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLarge),
-                        horizontalAlignment = Alignment.CenterHorizontally
+            Spacer(Modifier.height(Dimens.spaceLarge))
+
+            // ── Avatar ────────────────────────────────────────────────────────
+            Box(contentAlignment = Alignment.BottomEnd) {
+                if (!uiState.profile?.photoUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = uiState.profile?.photoUrl,
+                        contentDescription = stringResource(R.string.cd_profile_photo),
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(Dimens.avatarSizeXLarge).clip(CircleShape)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(Dimens.avatarSizeXLarge)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
                     ) {
-                        // Avatar with change button
-                        Box(contentAlignment = Alignment.BottomEnd) {
-                            if (!uiState.profile?.photoUrl.isNullOrEmpty()) {
-                                AsyncImage(
-                                    model = uiState.profile?.photoUrl,
-                                    contentDescription = stringResource(R.string.cd_profile_photo),
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(Dimens.avatarSizeXLarge)
-                                        .clip(CircleShape)
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .size(Dimens.avatarSizeXLarge)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primaryContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                            if (uiState.isUploadingPhoto) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(Dimens.avatarSizeSmall),
-                                    strokeWidth = Dimens.strokeWidthThin
-                                )
-                                    } else {
-                                        Text(
-                                            text = uiState.profile?.displayName?.take(1)?.uppercase() ?: "?",
-                                            style = MaterialTheme.typography.headlineLarge,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                }
-                            }
-                            // Camera button
-                            Box(
-                                modifier = Modifier
-                                    .size(Dimens.avatarSizeSmall)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary)
-                                    .clickable { photoPickerLauncher.launch("image/*") },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.CameraAlt, null,
-                                    modifier = Modifier.size(Dimens.badgeIconSize),
-                                    tint = MaterialTheme.colorScheme.onPrimary
-                                )
-                            }
-                        }
-
-                        Spacer(Modifier.height(Dimens.spaceLarge))
-
-                        // Display name row
-                        if (uiState.isEditingName) {
-                            OutlinedTextField(
-                                value = uiState.displayNameInput,
-                                onValueChange = viewModel::onDisplayNameChange,
-                                label = { Text(stringResource(R.string.label_display_name)) },
-                                isError = uiState.displayNameError != null,
-                                supportingText = uiState.displayNameError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = MaterialTheme.shapes.medium,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor   = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                                    errorBorderColor     = MaterialTheme.colorScheme.error
-                                ),
-                                trailingIcon = {
-                                    Row {
-                        IconButton(onClick = viewModel::onSaveProfile) {
-                                if (uiState.isSaving)
-                                    CircularProgressIndicator(
-                                        Modifier.size(Dimens.iconSizeMedium),
-                                        strokeWidth = Dimens.strokeWidthThin
-                                    )
-                                else Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
-                                        }
-                                        IconButton(onClick = { viewModel.setEditingName(false) }) {
-                                            Icon(Icons.Default.Close, null)
-                                        }
-                                    }
-                                }
+                        if (uiState.isUploadingPhoto) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(Dimens.avatarSizeSmall),
+                                strokeWidth = Dimens.strokeWidthThin
                             )
                         } else {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                Text(
-                                    text = uiState.profile?.displayName ?: stringResource(R.string.status_user_fallback),
-                                    style = MaterialTheme.typography.titleLarge
-                                )
-                                Spacer(Modifier.width(Dimens.spaceSmall))
+                            Text(
+                                text = uiState.profile?.displayName?.take(1)?.uppercase() ?: "?",
+                                style = MaterialTheme.typography.displaySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .size(Dimens.avatarSizeSmall)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                        .clickable { photoPickerLauncher.launch("image/*") },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.CameraAlt, null,
+                        modifier = Modifier.size(Dimens.badgeIconSize),
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(Dimens.spaceLarge))
+
+            // ── Display name ──────────────────────────────────────────────────
+            if (uiState.isEditingName) {
+                OutlinedTextField(
+                    value = uiState.displayNameInput,
+                    onValueChange = viewModel::onDisplayNameChange,
+                    label = { Text(stringResource(R.string.label_display_name)) },
+                    isError = uiState.displayNameError != null,
+                    supportingText = uiState.displayNameError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceXLarge),
+                    shape = MaterialTheme.shapes.medium,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    ),
+                    trailingIcon = {
+                        Row {
+                            IconButton(onClick = viewModel::onSaveDisplayName) {
+                                if (uiState.isSaving)
+                                    CircularProgressIndicator(Modifier.size(Dimens.iconSizeMedium), strokeWidth = Dimens.strokeWidthThin)
+                                else Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                            }
+                            IconButton(onClick = { viewModel.setEditingName(false) }) {
+                                Icon(Icons.Default.Close, null)
+                            }
+                        }
+                    }
+                )
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = uiState.profile?.displayName ?: stringResource(R.string.status_user_fallback),
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Spacer(Modifier.width(Dimens.spaceSmall))
                     IconButton(
                         onClick = { viewModel.setEditingName(true) },
                         modifier = Modifier.size(Dimens.avatarSizeSmall)
@@ -246,98 +225,210 @@ fun ProfileScreen(
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
+                }
+            }
+
+            // ── Username ──────────────────────────────────────────────────────
+            if (uiState.isEditingUsername) {
+                Spacer(Modifier.height(Dimens.spaceSmall))
+                OutlinedTextField(
+                    value = uiState.usernameInput,
+                    onValueChange = viewModel::onUsernameChange,
+                    label = { Text("@username") },
+                    isError = uiState.usernameError != null,
+                    supportingText = uiState.usernameError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceXLarge),
+                    shape = MaterialTheme.shapes.medium,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    ),
+                    trailingIcon = {
+                        Row {
+                            IconButton(onClick = viewModel::onSaveUsername) {
+                                Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                            }
+                            IconButton(onClick = { viewModel.setEditingUsername(false) }) {
+                                Icon(Icons.Default.Close, null)
                             }
                         }
-
-                        Text(
-                            text = uiState.profile?.email ?: "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
-                }
-
-                Spacer(Modifier.height(Dimens.spaceLarge))
-
-                // Settings section
-                Text(
-                    text = stringResource(R.string.settings_app_section),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = Dimens.spaceSmall, vertical = Dimens.spaceSmall)
                 )
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(Dimens.cardElevationSubtle),
-                    shape = MaterialTheme.shapes.large
+            } else {
+                val username = uiState.profile?.username
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { viewModel.setEditingUsername(true) }
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        SettingRow(
-                            icon = Icons.Default.Notifications,
-                            title = stringResource(R.string.settings_notifications),
-                            subtitle = stringResource(R.string.settings_notifications_subtitle),
-                            onClick = { BatteryOptimizationUtils.openNotificationSettings(context) }
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = Dimens.spaceLarge))
-                        SettingRow(
-                            icon = Icons.Default.LocationOn,
-                            title = stringResource(R.string.settings_location),
-                            subtitle = if (hasLocationPermission)
-                                stringResource(R.string.settings_location_granted)
-                            else
-                                stringResource(R.string.settings_location_required),
-                            onClick = { BatteryOptimizationUtils.openAppSettings(context) }
-                        )
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && isBatteryOptimized) {
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = Dimens.spaceLarge))
-                            SettingRow(
-                                icon = Icons.Default.BatteryAlert,
-                                title = stringResource(R.string.settings_battery_optimization),
-                                subtitle = stringResource(R.string.settings_battery_subtitle),
-                                onClick = { BatteryOptimizationUtils.openBatteryOptimizationSettings(context) }
-                            )
-                        }
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = Dimens.spaceLarge))
-                        SettingRow(
-                            icon = Icons.Default.PrivacyTip,
-                            title = stringResource(R.string.settings_privacy),
-                            subtitle = stringResource(R.string.settings_privacy_subtitle),
-                            onClick = {}
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(Dimens.spaceLarge))
-
-                // Sign out
-                Button(
-                    onClick = viewModel::onLogout,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer
-                    ),
-                    shape = MaterialTheme.shapes.large
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ExitToApp, null)
+                    Text(
+                        text = if (!username.isNullOrEmpty()) "@$username" else "Set username",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (!username.isNullOrEmpty())
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        else
+                            MaterialTheme.colorScheme.primary
+                    )
                     Spacer(Modifier.width(Dimens.spaceSmall))
-                    Text(stringResource(R.string.action_sign_out), fontWeight = FontWeight.SemiBold)
+                    Icon(
+                        Icons.Default.Edit, null,
+                        modifier = Modifier.size(12.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f)
+                    )
                 }
-
-                Spacer(Modifier.height(Dimens.spaceMedium))
-
-                Text(
-                    text = stringResource(R.string.app_version),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-
-                Spacer(Modifier.height(Dimens.spaceLarge))
             }
+
+            // ── Bio ───────────────────────────────────────────────────────────
+            Spacer(Modifier.height(Dimens.spaceMedium))
+            if (uiState.isEditingBio) {
+                OutlinedTextField(
+                    value = uiState.bioInput,
+                    onValueChange = viewModel::onBioChange,
+                    label = { Text("Bio") },
+                    placeholder = { Text("Tell people about yourself…") },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceXLarge),
+                    shape = MaterialTheme.shapes.medium,
+                    maxLines = 4,
+                    supportingText = { Text("${uiState.bioInput.length}/${Dimens.settingIconContainer}") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    ),
+                    trailingIcon = {
+                        Column {
+                            IconButton(onClick = viewModel::onSaveBio) {
+                                Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                )
+            } else {
+                val bio = uiState.profile?.bio
+                Text(
+                    text = if (!bio.isNullOrEmpty()) bio else "Add a bio",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (!bio.isNullOrEmpty())
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    else
+                        MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .padding(horizontal = Dimens.spaceXLarge)
+                        .clickable { viewModel.setEditingBio(true) }
+                )
+            }
+
+            // ── Stats row ─────────────────────────────────────────────────────
+            Spacer(Modifier.height(Dimens.spaceLarge))
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceSmall),
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLarge),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    StatItem(
+                        icon = Icons.Default.People,
+                        count = uiState.friendCount,
+                        label = "Friends"
+                    )
+                    StatItem(
+                        icon = Icons.Default.Group,
+                        count = uiState.groupCount,
+                        label = "Groups"
+                    )
+                    StatItem(
+                        icon = Icons.Default.LocationOn,
+                        count = 0,
+                        label = "Sharing"
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(Dimens.spaceLarge))
+
+            // ── Settings card ─────────────────────────────────────────────────
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                elevation = CardDefaults.cardElevation(Dimens.cardElevationSubtle)
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    SettingRow(
+                        icon = Icons.Default.Notifications,
+                        title = stringResource(R.string.settings_notifications),
+                        subtitle = stringResource(R.string.settings_notifications_subtitle),
+                        onClick = { BatteryOptimizationUtils.openNotificationSettings(context) }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = Dimens.spaceLarge))
+                    SettingRow(
+                        icon = Icons.Default.LocationOn,
+                        title = stringResource(R.string.settings_location),
+                        subtitle = if (hasLocationPermission)
+                            stringResource(R.string.settings_location_granted)
+                        else
+                            stringResource(R.string.settings_location_required),
+                        onClick = { BatteryOptimizationUtils.openAppSettings(context) }
+                    )
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && isBatteryOptimized) {
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = Dimens.spaceLarge))
+                        SettingRow(
+                            icon = Icons.Default.BatteryAlert,
+                            title = stringResource(R.string.settings_battery_optimization),
+                            subtitle = stringResource(R.string.settings_battery_subtitle),
+                            onClick = { BatteryOptimizationUtils.openBatteryOptimizationSettings(context) }
+                        )
+                    }
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = Dimens.spaceLarge))
+                    SettingRow(
+                        icon = Icons.Default.PrivacyTip,
+                        title = stringResource(R.string.settings_privacy),
+                        subtitle = stringResource(R.string.settings_privacy_subtitle),
+                        onClick = {}
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(Dimens.spaceLarge))
+
+            // ── Sign out ──────────────────────────────────────────────────────
+            Button(
+                onClick = viewModel::onLogout,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor   = MaterialTheme.colorScheme.onErrorContainer
+                ),
+                shape = MaterialTheme.shapes.large
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ExitToApp, null)
+                Spacer(Modifier.width(Dimens.spaceSmall))
+                Text(stringResource(R.string.action_sign_out), fontWeight = FontWeight.SemiBold)
+            }
+
+            Spacer(Modifier.height(Dimens.spaceMedium))
+
+            Text(
+                text = stringResource(R.string.app_version),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(Modifier.height(Dimens.spaceLarge))
         }
+    }
+}
+
+@Composable
+private fun StatItem(icon: ImageVector, count: Int, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(Dimens.iconSizeMedium))
+        Spacer(Modifier.height(Dimens.spaceSmall))
+        Text(text = "$count", style = MaterialTheme.typography.titleMedium)
+        Text(text = label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -362,11 +453,7 @@ private fun SettingRow(
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = icon, contentDescription = null,
-                modifier = Modifier.size(Dimens.iconSizeMedium),
-                tint = MaterialTheme.colorScheme.primary
-            )
+            Icon(icon, null, modifier = Modifier.size(Dimens.iconSizeMedium), tint = MaterialTheme.colorScheme.primary)
         }
         Spacer(Modifier.width(Dimens.spaceLarge))
         Column(modifier = Modifier.weight(1f)) {

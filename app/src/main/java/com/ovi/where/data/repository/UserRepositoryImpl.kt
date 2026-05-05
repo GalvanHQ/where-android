@@ -26,26 +26,28 @@ class UserRepositoryImpl @Inject constructor(
     override suspend fun getUser(userId: String): Resource<User> {
         return try {
             val doc = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
-                .document(userId)
-                .get()
-                .await()
+                .document(userId).get().await()
             val user = doc.toObject(User::class.java)
-            if (user != null) Resource.Success(user)
-            else Resource.Error("User not found")
+            if (user != null) Resource.Success(user) else Resource.Error("User not found")
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to fetch user")
         }
     }
 
+    /**
+     * Firestore `whereIn` supports a maximum of 10 values.
+     * We chunk the list and merge the results.
+     */
     override suspend fun getUsers(userIds: List<String>): Resource<List<User>> {
         return try {
+            if (userIds.isEmpty()) return Resource.Success(emptyList())
             val users = mutableListOf<User>()
-            if (userIds.isNotEmpty()) {
-                val query = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
-                    .whereIn("id", userIds)
-                    .get()
-                    .await()
-                users.addAll(query.toObjects(User::class.java))
+            // Chunk into batches of 10 (Firestore whereIn limit)
+            for (chunk in userIds.distinct().chunked(10)) {
+                val snapshot = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                    .whereIn("id", chunk)
+                    .get().await()
+                users.addAll(snapshot.toObjects(User::class.java))
             }
             Resource.Success(users)
         } catch (e: Exception) {
@@ -57,12 +59,8 @@ class UserRepositoryImpl @Inject constructor(
         val listener: ListenerRegistration = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
             .document(userId)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                val user = snapshot?.toObject(User::class.java)
-                trySend(user).isSuccess
+                if (error != null) { close(error); return@addSnapshotListener }
+                trySend(snapshot?.toObject(User::class.java)).isSuccess
             }
         awaitClose { listener.remove() }
     }
@@ -70,33 +68,42 @@ class UserRepositoryImpl @Inject constructor(
     override suspend fun updateUserStatus(isOnline: Boolean): Resource<Unit> {
         return try {
             val uid = currentUid ?: return Resource.Error("Not authenticated")
-            
-            val updates = hashMapOf<String, Any>(
-                "isOnline" to isOnline,
-                "lastSeen" to System.currentTimeMillis()
-            )
-            
             firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
                 .document(uid)
-                .update(updates)
-                .await()
-            
+                .update(
+                    "isOnline", isOnline,
+                    "lastSeen", System.currentTimeMillis()
+                ).await()
             Resource.Success(Unit)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to update user status")
         }
     }
 
+    /**
+     * Searches by both displayName prefix and username prefix, merges and deduplicates results.
+     */
     override suspend fun searchUsers(query: String): Resource<List<User>> {
         return try {
-            val results = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
-                .whereGreaterThanOrEqualTo("displayName", query)
-                .whereLessThanOrEqualTo("displayName", query + "\uf8ff")
-                .limit(20)
-                .get()
-                .await()
-                .toObjects(User::class.java)
-            Resource.Success(results)
+            val trimmed = query.trim()
+            if (trimmed.isEmpty()) return Resource.Success(emptyList())
+
+            val byName = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                .whereGreaterThanOrEqualTo("displayName", trimmed)
+                .whereLessThanOrEqualTo("displayName", trimmed + "\uf8ff")
+                .limit(20).get().await().toObjects(User::class.java)
+
+            val byUsername = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                .whereGreaterThanOrEqualTo("username", trimmed.lowercase())
+                .whereLessThanOrEqualTo("username", trimmed.lowercase() + "\uf8ff")
+                .limit(20).get().await().toObjects(User::class.java)
+
+            // Merge + deduplicate, exclude self
+            val uid = currentUid
+            val merged = (byName + byUsername)
+                .distinctBy { it.id }
+                .filter { it.id != uid }
+            Resource.Success(merged)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to search users")
         }

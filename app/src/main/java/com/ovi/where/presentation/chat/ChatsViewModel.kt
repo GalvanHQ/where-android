@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.ovi.where.core.common.Resource
 import com.ovi.where.domain.model.Conversation
-import com.ovi.where.domain.model.ConversationType
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
 import com.ovi.where.domain.usecase.chat.ObserveConversationsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel

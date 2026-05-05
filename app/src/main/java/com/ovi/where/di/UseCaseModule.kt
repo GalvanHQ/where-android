@@ -7,7 +7,10 @@ import com.ovi.where.domain.repository.GroupRepository
 import com.ovi.where.domain.repository.LocationRepository
 import com.ovi.where.domain.repository.MessageRepository
 import com.ovi.where.domain.repository.UserRepository
+import com.ovi.where.domain.usecase.auth.CheckUsernameAvailableUseCase
 import com.ovi.where.domain.usecase.auth.GoogleSignInUseCase
+import com.ovi.where.domain.usecase.auth.UpdateBioUseCase
+import com.ovi.where.domain.usecase.auth.UpdateUsernameUseCase
 import com.ovi.where.domain.usecase.auth.ObserveCurrentUserUseCase
 import com.ovi.where.domain.usecase.auth.RegisterUseCase
 import com.ovi.where.domain.usecase.auth.ResetPasswordUseCase
@@ -60,6 +63,9 @@ object UseCaseModule {
     @Provides fun provideGoogleSignInUseCase(r: AuthRepository) = GoogleSignInUseCase(r)
     @Provides fun provideResetPasswordUseCase(r: AuthRepository) = ResetPasswordUseCase(r)
     @Provides fun provideUpdateProfileUseCase(r: AuthRepository) = UpdateProfileUseCase(r)
+    @Provides fun provideUpdateBioUseCase(r: AuthRepository) = UpdateBioUseCase(r)
+    @Provides fun provideUpdateUsernameUseCase(r: AuthRepository) = UpdateUsernameUseCase(r)
+    @Provides fun provideCheckUsernameAvailableUseCase(r: AuthRepository) = CheckUsernameAvailableUseCase(r)
 
     // ── Group ────────────────────────────────────────────────────────────────
     @Provides fun provideCreateGroupUseCase(r: GroupRepository) = CreateGroupUseCase(r)

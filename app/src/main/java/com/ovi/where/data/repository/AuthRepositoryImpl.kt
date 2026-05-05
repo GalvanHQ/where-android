@@ -51,9 +51,7 @@ class AuthRepositoryImpl @Inject constructor(
             val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
             val userId = result.user?.uid ?: return Resource.Error("User ID not found")
             val userDoc = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
-                .document(userId)
-                .get()
-                .await()
+                .document(userId).get().await()
             val user = userDoc.toObject(User::class.java)
                 ?: return Resource.Error("User data not found")
             Resource.Success(user)
@@ -62,15 +60,25 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun registerWithEmail(name: String, email: String, password: String): Resource<User> {
+    override suspend fun registerWithEmail(
+        name: String,
+        username: String,
+        email: String,
+        password: String
+    ): Resource<User> {
         return try {
+            // Check username availability before creating the account
+            if (username.isNotBlank() && !checkUsernameAvailable(username)) {
+                return Resource.Error("This username is already taken.")
+            }
             val result = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
             val userId = result.user?.uid ?: return Resource.Error("User creation failed")
             val user = User(
-                id = userId,
+                id          = userId,
                 displayName = name,
-                email = email,
-                createdAt = System.currentTimeMillis()
+                username    = username.lowercase(),
+                email       = email,
+                createdAt   = System.currentTimeMillis()
             )
             firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
                 .document(userId)
@@ -87,12 +95,9 @@ class AuthRepositoryImpl @Inject constructor(
             val credential = GoogleAuthProvider.getCredential(idToken, null)
             val result = firebaseAuth.signInWithCredential(credential).await()
             val userId = result.user?.uid ?: return Resource.Error("User ID not found")
-            
             val userDoc = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
-                .document(userId)
-                .get()
-                .await()
-            
+                .document(userId).get().await()
+
             if (userDoc.exists()) {
                 val user = userDoc.toObject(User::class.java)
                     ?: return Resource.Error("User data not found")
@@ -100,16 +105,14 @@ class AuthRepositoryImpl @Inject constructor(
             } else {
                 val firebaseUser = result.user!!
                 val user = User(
-                    id = userId,
+                    id          = userId,
                     displayName = firebaseUser.displayName ?: "",
-                    email = firebaseUser.email ?: "",
-                    photoUrl = firebaseUser.photoUrl?.toString(),
-                    createdAt = System.currentTimeMillis()
+                    email       = firebaseUser.email ?: "",
+                    photoUrl    = firebaseUser.photoUrl?.toString(),
+                    createdAt   = System.currentTimeMillis()
                 )
                 firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
-                    .document(userId)
-                    .set(user)
-                    .await()
+                    .document(userId).set(user).await()
                 Resource.Success(user)
             }
         } catch (e: Exception) {
@@ -134,25 +137,62 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun updateProfile(displayName: String, photoUrl: String?): Resource<User> {
         return try {
             val userId = currentUserId ?: return Resource.Error("Not authenticated")
-            val updates = hashMapOf<String, Any>(
-                "displayName" to displayName
-            )
-            if (photoUrl != null) {
-                updates["photoUrl"] = photoUrl
-            }
+            val updates = hashMapOf<String, Any>("displayName" to displayName)
+            if (photoUrl != null) updates["photoUrl"] = photoUrl
             firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
-                .document(userId)
-                .update(updates)
-                .await()
+                .document(userId).update(updates).await()
             val userDoc = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
-                .document(userId)
-                .get()
-                .await()
+                .document(userId).get().await()
             val user = userDoc.toObject(User::class.java)
                 ?: return Resource.Error("User data not found")
             Resource.Success(user)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to update profile")
+        }
+    }
+
+    override suspend fun updateBio(bio: String): Resource<User> {
+        return try {
+            val userId = currentUserId ?: return Resource.Error("Not authenticated")
+            firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                .document(userId).update("bio", bio).await()
+            val userDoc = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                .document(userId).get().await()
+            val user = userDoc.toObject(User::class.java)
+                ?: return Resource.Error("User data not found")
+            Resource.Success(user)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to update bio")
+        }
+    }
+
+    override suspend fun updateUsername(username: String): Resource<User> {
+        return try {
+            val userId = currentUserId ?: return Resource.Error("Not authenticated")
+            if (!checkUsernameAvailable(username)) {
+                return Resource.Error("This username is already taken.")
+            }
+            firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                .document(userId).update("username", username.lowercase()).await()
+            val userDoc = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                .document(userId).get().await()
+            val user = userDoc.toObject(User::class.java)
+                ?: return Resource.Error("User data not found")
+            Resource.Success(user)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to update username")
+        }
+    }
+
+    override suspend fun checkUsernameAvailable(username: String): Boolean {
+        return try {
+            val query = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                .whereEqualTo("username", username.lowercase())
+                .limit(1)
+                .get().await()
+            query.isEmpty
+        } catch (e: Exception) {
+            true // assume available on error to not block registration
         }
     }
 

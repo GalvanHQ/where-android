@@ -104,46 +104,52 @@ fun ChatsScreen(
             Spacer(Modifier.height(Dimens.spaceSmall))
 
             // ── Conversation list ────────────────────────────────────────────
-            if (uiState.conversations.isEmpty() && !uiState.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(Dimens.spaceXLarge)
+            when {
+                uiState.isLoading -> {
+                    com.ovi.where.presentation.common.ShimmerGroupList()
+                }
+                uiState.conversations.isEmpty() -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Default.Forum, null,
-                            modifier = Modifier.size(Dimens.iconSizeXLarge),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f)
-                        )
-                        Spacer(Modifier.height(Dimens.spaceLarge))
-                        Text(
-                            "No chats yet",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            "Find friends and start a conversation",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f)
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(Dimens.spaceXLarge)
+                        ) {
+                            Icon(
+                                Icons.Default.Forum, null,
+                                modifier = Modifier.size(Dimens.iconSizeXLarge),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f)
+                            )
+                            Spacer(Modifier.height(Dimens.spaceLarge))
+                            Text(
+                                "No chats yet",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                "Find friends and start a conversation",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f)
+                            )
+                        }
                     }
                 }
-            } else {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(items = uiState.conversations, key = { it.id }) { conv ->
-                        ConversationRow(
-                            conversation = conv,
-                            currentUserId = currentUserId,
-                            onClick = { onNavigateToChat(conv.id) }
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 80.dp),
-                            thickness = Dimens.dividerThickness,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                        )
+                else -> {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(items = uiState.conversations, key = { it.id }) { conv ->
+                            ConversationRow(
+                                conversation = conv,
+                                currentUserId = currentUserId,
+                                onClick = { onNavigateToChat(conv.id) }
+                            )
+                            HorizontalDivider(
+                                modifier = Modifier.padding(start = 80.dp),
+                                thickness = Dimens.dividerThickness,
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            )
+                        }
                     }
                 }
             }

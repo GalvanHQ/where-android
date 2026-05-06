@@ -3,10 +3,12 @@ steps:
     args: ['cp', 'gs://where-loc-server-artifacts/server-all.jar', '/workspace/server-all.jar']
 
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server/server:v1', '-f', 'server/Dockerfile', '.']
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server/server:$BUILD_ID', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server/server:latest', '-f', 'server/Dockerfile', '.']
 
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'us-central1-docker.pkg.dev/where-loc/where-chat-server/server:v1']
+    args: ['push', 'us-central1-docker.pkg.dev/where-loc/where-chat-server/server:$BUILD_ID']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/where-loc/where-chat-server/server:latest']
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
@@ -15,7 +17,7 @@ steps:
       - 'deploy'
       - 'where-chat-server'
       - '--image'
-      - 'us-central1-docker.pkg.dev/where-loc/where-chat-server/server:v1'
+      - 'us-central1-docker.pkg.dev/where-loc/where-chat-server/server:latest'
       - '--region'
       - 'us-central1'
       - '--platform'

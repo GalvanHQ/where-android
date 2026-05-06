@@ -36,9 +36,15 @@ object KtorApiClient {
 
     val wsClient: HttpClient by lazy {
         HttpClient(Android) {
-            install(WebSockets)
+            install(WebSockets) {
+                pingInterval = 20_000
+            }
             install(Logging) {
                 level = LogLevel.INFO
+            }
+            engine {
+                connectTimeout = 10_000
+                socketTimeout = 30_000
             }
         }
     }

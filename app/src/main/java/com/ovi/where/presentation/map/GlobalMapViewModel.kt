@@ -13,6 +13,7 @@ import com.ovi.where.domain.model.Group
 import com.ovi.where.domain.model.SharedLocation
 import com.ovi.where.domain.model.User
 import com.ovi.where.domain.repository.LocationRepository
+import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
 import com.ovi.where.domain.usecase.group.GetUserGroupsUseCase
 import com.ovi.where.domain.usecase.location.ObserveGroupLocationsUseCase
 import com.ovi.where.domain.usecase.location.StartLocationSharingUseCase
@@ -66,7 +67,8 @@ class GlobalMapViewModel @Inject constructor(
     private val getUsersUseCase: GetUsersUseCase,
     private val locationRepository: LocationRepository,
     private val locationManager: LocationManager,
-    private val firebaseAuth: FirebaseAuth
+    private val firebaseAuth: FirebaseAuth,
+    private val getOrCreateDirectConversationUseCase: GetOrCreateDirectConversationUseCase
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(GlobalMapUiState())
@@ -74,6 +76,9 @@ class GlobalMapViewModel @Inject constructor(
 
     private val _uiEvent = Channel<UiEvent>()
     val uiEvent = _uiEvent.receiveAsFlow()
+
+    private val _navigateToChat = MutableStateFlow<String?>(null)
+    val navigateToChat: StateFlow<String?> = _navigateToChat.asStateFlow()
 
     // Per-group raw locations (groupId → list of SharedLocation)
     private val rawLocations = MutableStateFlow<Map<String, List<SharedLocation>>>(emptyMap())
@@ -280,6 +285,23 @@ class GlobalMapViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    fun openOrCreateDm(userId: String) {
+        viewModelScope.launch {
+            when (val result = getOrCreateDirectConversationUseCase(userId)) {
+                is Resource.Success -> {
+                    result.data?.id?.let { conversationId ->
+                        _navigateToChat.value = conversationId
+                    }
+                }
+                else -> { /* Handle error if needed */ }
+            }
+        }
+    }
+
+    fun onChatNavigated() {
+        _navigateToChat.value = null
     }
 
     private fun startLocationService(groupId: String, durationMinutes: Long) {

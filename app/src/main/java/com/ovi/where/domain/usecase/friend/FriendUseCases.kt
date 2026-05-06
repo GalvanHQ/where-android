@@ -23,11 +23,25 @@ class AcceptFriendRequestUseCase @Inject constructor(
         friendshipRepository.acceptFriendRequest(friendshipId)
 }
 
+class AcceptFriendRequestByUserIdUseCase @Inject constructor(
+    private val friendshipRepository: FriendshipRepository
+) {
+    suspend operator fun invoke(userId: String): Resource<Unit> =
+        friendshipRepository.acceptFriendRequestByUserId(userId)
+}
+
 class DeclineFriendRequestUseCase @Inject constructor(
     private val friendshipRepository: FriendshipRepository
 ) {
     suspend operator fun invoke(friendshipId: String): Resource<Unit> =
         friendshipRepository.declineFriendRequest(friendshipId)
+}
+
+class DeclineFriendRequestByUserIdUseCase @Inject constructor(
+    private val friendshipRepository: FriendshipRepository
+) {
+    suspend operator fun invoke(userId: String): Resource<Unit> =
+        friendshipRepository.declineFriendRequestByUserId(userId)
 }
 
 class RemoveFriendUseCase @Inject constructor(

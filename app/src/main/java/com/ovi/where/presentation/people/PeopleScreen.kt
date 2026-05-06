@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -54,6 +55,15 @@ fun PeopleScreen(
     viewModel: PeopleViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val navigateToChat by viewModel.navigateToChat.collectAsState()
+
+    // Handle navigation to chat
+    LaunchedEffect(navigateToChat) {
+        navigateToChat?.let { conversationId ->
+            onNavigateToChat(conversationId)
+            viewModel.onChatNavigated()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -184,7 +194,7 @@ fun PeopleScreen(
                 FriendRow(
                     user = friend,
                     onTap = { onNavigateToUserProfile(friend.userId) },
-                    onMessage = { /* TODO: get or create DM conversation */ }
+                    onMessage = { viewModel.openOrCreateDm(friend.userId) }
                 )
             }
 

@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.ovi.where.core.common.Resource
+import com.ovi.where.data.location.LocationManager
 import com.ovi.where.data.remote.chat.ChatWebSocketClient
 import com.ovi.where.data.remote.chat.ServerFrame
 import com.ovi.where.data.repository.MessageRepositoryImpl
@@ -37,7 +38,8 @@ class ChatViewModel @Inject constructor(
     private val observeConversationsUseCase: ObserveConversationsUseCase,
     private val wsClient: ChatWebSocketClient,
     private val messageRepositoryImpl: MessageRepositoryImpl,
-    private val firebaseAuth: FirebaseAuth
+    private val firebaseAuth: FirebaseAuth,
+    private val locationManager: LocationManager
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -122,6 +124,16 @@ class ChatViewModel @Inject constructor(
     fun sendLocation(latitude: Double, longitude: Double) {
         val convId = _uiState.value.conversationId ?: return
         viewModelScope.launch { sendLocationMessageUseCase(convId, latitude, longitude) }
+    }
+
+    @Suppress("MissingPermission")
+    fun requestCurrentLocationAndSend() {
+        viewModelScope.launch {
+            val location = locationManager.getCurrentLocation()
+            if (location != null) {
+                sendLocation(location.latitude, location.longitude)
+            }
+        }
     }
 
     fun markRead() {

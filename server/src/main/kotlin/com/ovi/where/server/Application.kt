@@ -1,6 +1,7 @@
 package com.ovi.where.server
 
 import com.ovi.where.server.plugins.configureCORS
+import com.ovi.where.server.plugins.configureRateLimiting
 import com.ovi.where.server.plugins.configureRouting
 import com.ovi.where.server.plugins.configureSerialization
 import com.ovi.where.server.plugins.configureStatusPages
@@ -23,6 +24,7 @@ fun Application.module() {
     FirebaseAdminService.init()
     configureSerialization()
     configureCORS()
+    configureRateLimiting()
     configureWebSockets()
     configureStatusPages()
     configureRouting()

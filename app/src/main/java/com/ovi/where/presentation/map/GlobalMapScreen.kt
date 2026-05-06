@@ -113,9 +113,18 @@ fun GlobalMapScreen(
     viewModel: GlobalMapViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val navigateToChat by viewModel.navigateToChat.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Handle navigation to chat
+    LaunchedEffect(navigateToChat) {
+        navigateToChat?.let { conversationId ->
+            onNavigateToChat(conversationId)
+            viewModel.onChatNavigated()
+        }
+    }
 
     val cameraState = rememberCameraState(
         firstPosition = CameraPosition(zoom = 2.0, target = Position(0.0, 0.0))
@@ -457,7 +466,7 @@ fun GlobalMapScreen(
         ) {
             FriendDetailSheet(
                 friend = uiState.selectedFriend!!,
-                onNavigateToChat = onNavigateToChat,
+                onMessage = { viewModel.openOrCreateDm(uiState.selectedFriend!!.userId); viewModel.dismissFriendSheet() },
                 onNavigateToUserProfile = onNavigateToUserProfile,
                 onNavigateToGroupMap = onNavigateToGroupMap,
                 onDismiss = { viewModel.dismissFriendSheet() }
@@ -580,7 +589,7 @@ private fun FriendAvatarChip(
 @Composable
 private fun FriendDetailSheet(
     friend: FriendLocationUiModel,
-    onNavigateToChat: (String) -> Unit,
+    onMessage: () -> Unit,
     onNavigateToUserProfile: (String) -> Unit,
     onNavigateToGroupMap: (String) -> Unit,
     onDismiss: () -> Unit
@@ -661,9 +670,9 @@ private fun FriendDetailSheet(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
         ) {
-            // Message button — TODO: wire to getOrCreate DM conversation
+            // Message button
             Button(
-                onClick = { /* TODO: get/create DM */ onDismiss() },
+                onClick = onMessage,
                 modifier = Modifier.weight(1f),
                 shape = MaterialTheme.shapes.medium
             ) {

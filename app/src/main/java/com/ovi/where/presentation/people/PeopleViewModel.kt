@@ -2,6 +2,8 @@ package com.ovi.where.presentation.people
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ovi.where.core.common.Resource
+import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
 import com.ovi.where.domain.usecase.friend.ObserveFriendRequestsUseCase
 import com.ovi.where.domain.usecase.friend.ObserveFriendsUseCase
 import com.ovi.where.domain.usecase.friend.RemoveFriendUseCase
@@ -18,11 +20,15 @@ import javax.inject.Inject
 class PeopleViewModel @Inject constructor(
     private val observeFriendsUseCase: ObserveFriendsUseCase,
     private val observeFriendRequestsUseCase: ObserveFriendRequestsUseCase,
-    private val removeFriendUseCase: RemoveFriendUseCase
+    private val removeFriendUseCase: RemoveFriendUseCase,
+    private val getOrCreateDirectConversationUseCase: GetOrCreateDirectConversationUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PeopleUiState())
     val uiState: StateFlow<PeopleUiState> = _uiState.asStateFlow()
+
+    private val _navigateToChat = MutableStateFlow<String?>(null)
+    val navigateToChat: StateFlow<String?> = _navigateToChat.asStateFlow()
 
     init {
         observeFriends()
@@ -52,6 +58,23 @@ class PeopleViewModel @Inject constructor(
 
     fun removeFriend(userId: String) {
         viewModelScope.launch { removeFriendUseCase(userId) }
+    }
+
+    fun openOrCreateDm(userId: String) {
+        viewModelScope.launch {
+            when (val result = getOrCreateDirectConversationUseCase(userId)) {
+                is Resource.Success -> {
+                    result.data?.id?.let { conversationId ->
+                        _navigateToChat.value = conversationId
+                    }
+                }
+                else -> { /* Handle error if needed */ }
+            }
+        }
+    }
+
+    fun onChatNavigated() {
+        _navigateToChat.value = null
     }
 }
 

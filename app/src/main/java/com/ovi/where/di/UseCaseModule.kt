@@ -24,7 +24,9 @@ import com.ovi.where.domain.usecase.chat.ObserveConversationsUseCase
 import com.ovi.where.domain.usecase.chat.ObserveMessagesUseCase
 import com.ovi.where.domain.usecase.chat.SendLocationMessageUseCase
 import com.ovi.where.domain.usecase.chat.SendMessageUseCase
+import com.ovi.where.domain.usecase.friend.AcceptFriendRequestByUserIdUseCase
 import com.ovi.where.domain.usecase.friend.AcceptFriendRequestUseCase
+import com.ovi.where.domain.usecase.friend.DeclineFriendRequestByUserIdUseCase
 import com.ovi.where.domain.usecase.friend.DeclineFriendRequestUseCase
 import com.ovi.where.domain.usecase.friend.GetFriendshipStatusUseCase
 import com.ovi.where.domain.usecase.friend.ObserveAllFriendLocationsUseCase
@@ -90,7 +92,9 @@ object UseCaseModule {
     // ── Friends ──────────────────────────────────────────────────────────────
     @Provides fun provideSendFriendRequestUseCase(r: FriendshipRepository) = SendFriendRequestUseCase(r)
     @Provides fun provideAcceptFriendRequestUseCase(r: FriendshipRepository) = AcceptFriendRequestUseCase(r)
+    @Provides fun provideAcceptFriendRequestByUserIdUseCase(r: FriendshipRepository) = AcceptFriendRequestByUserIdUseCase(r)
     @Provides fun provideDeclineFriendRequestUseCase(r: FriendshipRepository) = DeclineFriendRequestUseCase(r)
+    @Provides fun provideDeclineFriendRequestByUserIdUseCase(r: FriendshipRepository) = DeclineFriendRequestByUserIdUseCase(r)
     @Provides fun provideRemoveFriendUseCase(r: FriendshipRepository) = RemoveFriendUseCase(r)
     @Provides fun provideObserveFriendsUseCase(r: FriendshipRepository) = ObserveFriendsUseCase(r)
     @Provides fun provideObserveFriendRequestsUseCase(r: FriendshipRepository) = ObserveFriendRequestsUseCase(r)

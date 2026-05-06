@@ -44,8 +44,17 @@ fun UserProfileScreen(
     viewModel: UserProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val navigateToChat by viewModel.navigateToChat.collectAsState()
 
     LaunchedEffect(userId) { viewModel.loadUser(userId) }
+
+    // Handle navigation to chat
+    LaunchedEffect(navigateToChat) {
+        navigateToChat?.let { conversationId ->
+            onNavigateToChat(conversationId)
+            viewModel.onChatNavigated()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -128,7 +137,7 @@ fun UserProfileScreen(
                     when (profile.friendshipAction) {
                         is ProfileFriendshipAction.AlreadyFriends -> {
                             Button(
-                                onClick = { /* TODO: open/create DM */ },
+                                onClick = { viewModel.openOrCreateDm(userId) },
                                 shape   = MaterialTheme.shapes.medium
                             ) { Text("Message") }
                             OutlinedButton(
@@ -145,11 +154,11 @@ fun UserProfileScreen(
                         }
                         is ProfileFriendshipAction.RequestReceived -> {
                             Button(
-                                onClick = { /* TODO: accept */ },
+                                onClick = { viewModel.acceptFriendRequest(userId) },
                                 shape   = MaterialTheme.shapes.medium
                             ) { Text("Accept Request") }
                             OutlinedButton(
-                                onClick = { /* TODO: decline */ },
+                                onClick = { viewModel.declineFriendRequest(userId) },
                                 shape   = MaterialTheme.shapes.medium
                             ) { Text("Decline") }
                         }

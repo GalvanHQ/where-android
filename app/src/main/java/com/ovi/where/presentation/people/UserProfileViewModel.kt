@@ -5,9 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.ovi.where.core.common.Resource
 import com.ovi.where.domain.model.FriendshipStatus
 import com.ovi.where.domain.repository.UserRepository
+import com.ovi.where.domain.usecase.friend.AcceptFriendRequestByUserIdUseCase
+import com.ovi.where.domain.usecase.friend.DeclineFriendRequestByUserIdUseCase
 import com.ovi.where.domain.usecase.friend.GetFriendshipStatusUseCase
 import com.ovi.where.domain.usecase.friend.RemoveFriendUseCase
 import com.ovi.where.domain.usecase.friend.SendFriendRequestUseCase
+import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
 import com.ovi.where.presentation.model.OtherUserProfileUiModel
 import com.ovi.where.presentation.model.ProfileFriendshipAction
 import com.ovi.where.presentation.model.toOtherProfileUiModel
@@ -24,11 +27,17 @@ class UserProfileViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val getFriendshipStatusUseCase: GetFriendshipStatusUseCase,
     private val sendFriendRequestUseCase: SendFriendRequestUseCase,
-    private val removeFriendUseCase: RemoveFriendUseCase
+    private val removeFriendUseCase: RemoveFriendUseCase,
+    private val acceptFriendRequestByUserIdUseCase: AcceptFriendRequestByUserIdUseCase,
+    private val declineFriendRequestByUserIdUseCase: DeclineFriendRequestByUserIdUseCase,
+    private val getOrCreateDirectConversationUseCase: GetOrCreateDirectConversationUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UserProfileUiState())
     val uiState: StateFlow<UserProfileUiState> = _uiState.asStateFlow()
+
+    private val _navigateToChat = MutableStateFlow<String?>(null)
+    val navigateToChat: StateFlow<String?> = _navigateToChat.asStateFlow()
 
     fun loadUser(userId: String) {
         viewModelScope.launch {
@@ -72,6 +81,45 @@ class UserProfileViewModel @Inject constructor(
                 )
             )
         }
+    }
+
+    fun acceptFriendRequest(userId: String) {
+        viewModelScope.launch {
+            acceptFriendRequestByUserIdUseCase(userId)
+            _uiState.value = _uiState.value.copy(
+                profile = _uiState.value.profile?.copy(
+                    friendshipAction = ProfileFriendshipAction.AlreadyFriends
+                )
+            )
+        }
+    }
+
+    fun declineFriendRequest(userId: String) {
+        viewModelScope.launch {
+            declineFriendRequestByUserIdUseCase(userId)
+            _uiState.value = _uiState.value.copy(
+                profile = _uiState.value.profile?.copy(
+                    friendshipAction = ProfileFriendshipAction.AddFriend
+                )
+            )
+        }
+    }
+
+    fun openOrCreateDm(userId: String) {
+        viewModelScope.launch {
+            when (val result = getOrCreateDirectConversationUseCase(userId)) {
+                is Resource.Success -> {
+                    result.data?.id?.let { conversationId ->
+                        _navigateToChat.value = conversationId
+                    }
+                }
+                else -> { /* Handle error if needed */ }
+            }
+        }
+    }
+
+    fun onChatNavigated() {
+        _navigateToChat.value = null
     }
 }
 

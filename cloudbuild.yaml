@@ -2,7 +2,7 @@
 # Deploy to Cloud Run on every push to main branch
 
 steps:
-  # Build the Docker image from project root (context is .)
+  # Build Docker image - context is project root, Dockerfile is in server/
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', 'gcr.io/$PROJECT_ID/where-chat-server:$COMMIT_SHA', '-f', 'server/Dockerfile', '.']
 

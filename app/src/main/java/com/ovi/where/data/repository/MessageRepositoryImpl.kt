@@ -117,7 +117,7 @@ class MessageRepositoryImpl @Inject constructor(
     }
 
     /** Load message history from the server and seed the local cache. */
-    suspend fun loadHistory(conversationId: String) {
+    override suspend fun loadHistory(conversationId: String) {
         try {
             val token = getIdToken()
             val messages = KtorApiClient.httpClient

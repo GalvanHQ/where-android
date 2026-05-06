@@ -131,9 +131,6 @@ override suspend fun acceptFriendRequestByUserId(userId: String): Resource<Unit>
         }
     }
 
-    override suspend fun declineFriendRequestByUserId(userId: String): Resource<Unit> {
-        TODO("Not yet implemented")
-    }
 
     override suspend fun removeFriend(userId: String): Resource<Unit> {
         return try {

@@ -6,6 +6,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.messaging.FirebaseMessaging
 import com.ovi.where.core.constants.AppConstants
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +26,8 @@ class WhereApplication : Application() {
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
+        // Fetch and save FCM token on app start
+        fetchAndSaveFcmToken()
         // Track online status using the process lifecycle
         ProcessLifecycleOwner.get().lifecycle.addObserver(OnlineStatusObserver())
     }
@@ -53,6 +56,25 @@ class WhereApplication : Application() {
                     .await()
             } catch (e: Exception) {
                 Timber.w(e, "Failed to update online status")
+            }
+        }
+    }
+
+    private fun fetchAndSaveFcmToken() {
+        appScope.launch {
+            try {
+                val token = FirebaseMessaging.getInstance().token.await()
+                val uid = FirebaseAuth.getInstance().currentUser?.uid
+                if (uid != null && token != null) {
+                    FirebaseFirestore.getInstance()
+                        .collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                        .document(uid)
+                        .update("fcmToken", token)
+                        .await()
+                    Timber.d("FCM token saved on app start")
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to fetch/save FCM token")
             }
         }
     }

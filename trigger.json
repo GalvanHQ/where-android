@@ -1,0 +1,12 @@
+{
+  "name": "deploy-server",
+  "description": "Deploy server to Cloud Run",
+  "github": {
+    "owner": "NeoTechDev",
+    "name": "where-android",
+    "push": {
+      "branch": "^main$"
+    }
+  },
+  "filename": "cloudbuild.yaml"
+}

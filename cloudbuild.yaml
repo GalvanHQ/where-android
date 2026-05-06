@@ -1,45 +1,16 @@
-# Build Ktor Server via Cloud Build - multi-step approach
+# Cloud Build for Server - uses existing deployment
+# When a working image is created, this will deploy it
 
 steps:
-  # Step 1: Setup Java 21 and Gradle, build JAR
-  - name: 'ubuntu/latest'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        apt-get update && apt-get install -y openjdk-21-jdk wget
-        wget -q https://services.gradle.org/distributions/gradle-8.13-bin.zip -O /tmp/gradle.zip
-        unzip -q /tmp/gradle.zip -d /opt
-        export PATH=/opt/gradle-8.13/bin:$PATH
-        export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
-        cd /workspace
-        gradle :server:shadowJar --no-daemon || echo "Build done"
-
-  # Step 2: Build Docker image with the built JAR
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '-t'
-      - 'gcr.io/where-loc/where-chat-server:v2'
-      - '-f'
-      - 'server/Dockerfile'
-      - '.'
-
-  # Step 3: Push the image
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'gcr.io/where-loc/where-chat-server:v2'
-
-  # Step 4: Deploy to Cloud Run
+  # Just deploy the existing placeholder until fix
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
       - 'run'
       - 'deploy'
       - 'where-chat-server'
-      - '--image'
-      - 'gcr.io/where-loc/where-chat-server:v2'
+      - '--service-account'
+      - '1025951597272-compute@developer.gserviceaccount.com'
       - '--region'
       - 'us-central1'
       - '--platform'
@@ -49,9 +20,9 @@ steps:
       - '512Mi'
       - '--cpu'
       - '1'
-
-images:
-  - 'gcr.io/where-loc/where-chat-server:v2'
+      - '--no-cached'
+      - '--port'
+      - '8080'
 
 options:
   logging: CLOUD_LOGGING_ONLY

@@ -7,11 +7,11 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class ConversationDto(
-    val id: String,
-    val type: String,
-    val participantIds: List<String>,
+    val id: String = "",
+    val type: String = "direct",
+    val participantIds: List<String> = emptyList(),
     val groupId: String? = null,
-    val name: String,
+    val name: String = "",
     val photoUrl: String? = null,
     val lastMessageText: String = "",
     val lastMessageSenderId: String = "",
@@ -22,16 +22,16 @@ data class ConversationDto(
 
 @Serializable
 data class MessageDto(
-    val id: String,
-    val conversationId: String,
-    val senderId: String,
-    val senderName: String,
+    val id: String = "",
+    val conversationId: String = "",
+    val senderId: String = "",
+    val senderName: String = "",
     val senderPhotoUrl: String? = null,
-    val text: String,
-    val messageType: String,
+    val text: String = "",
+    val messageType: String = "TEXT",
     val latitude: Double? = null,
     val longitude: Double? = null,
-    val timestamp: Long,
+    val timestamp: Long = 0L,
     val readBy: List<String> = emptyList()
 )
 

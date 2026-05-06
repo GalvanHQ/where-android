@@ -22,7 +22,7 @@ android {
 
         // Chat server URLs — live server in us-central1
         buildConfigField("String", "CHAT_SERVER_HTTP_URL", "\"https://where-chat-server-zgzelfwe5q-uc.a.run.app\"")
-        buildConfigField("String", "CHAT_SERVER_WS_URL",   "\"wss://where-chat-server-zgzelfwe5q-uc.a.run.app\"")
+        buildConfigField("String", "CHAT_SERVER_WS_URL",   "\"ws://where-chat-server-zgzelfwe5q-uc.a.run.app\"")
     }
 
     signingConfigs {

@@ -98,6 +98,23 @@
     <!-- Messages / Instructions -->
     <string name="msg_join_where">Join Where</string>
     <string name="msg_create_account_subtitle">Create an account to start sharing your location</string>
+
+    <!-- Buttons (for tests) -->
+    <string name="btn_login">Login</string>
+    <string name="btn_register">Register</string>
+    <string name="btn_google_sign_in">Continue with Google</string>
+    <string name="btn_start_sharing">Start Sharing</string>
+    <string name="btn_stop_sharing">Stop Sharing</string>
+    <string name="btn_my_location">My Location</string>
+
+    <!-- Hints (for tests) -->
+    <string name="hint_email">Email</string>
+    <string name="hint_password">Password</string>
+    <string name="hint_name">Name</string>
+
+    <!-- Links (for tests) -->
+    <string name="text_no_account">Don\'t have an account? Register</string>
+    <string name="text_forgot_password">Forgot Password?</string>
     <string name="msg_create_group_title">Create a New Group</string>
     <string name="msg_create_group_subtitle">Groups let you share your location with friends and family</string>
     <string name="msg_enter_invite_code">Enter Invite Code</string>

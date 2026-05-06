@@ -30,6 +30,9 @@ class PeopleViewModel @Inject constructor(
     private val _navigateToChat = MutableStateFlow<String?>(null)
     val navigateToChat: StateFlow<String?> = _navigateToChat.asStateFlow()
 
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
     init {
         observeFriends()
         observeRequests()
@@ -62,13 +65,19 @@ class PeopleViewModel @Inject constructor(
 
     fun openOrCreateDm(userId: String) {
         viewModelScope.launch {
+            println("Opening DM for userId: $userId")
             when (val result = getOrCreateDirectConversationUseCase(userId)) {
                 is Resource.Success -> {
+                    println("Conversation created: ${result.data}")
                     result.data?.id?.let { conversationId ->
                         _navigateToChat.value = conversationId
                     }
                 }
-                else -> { /* Handle error if needed */ }
+                is Resource.Error -> {
+                    println("Error: ${result.message}")
+                    _error.value = result.message
+                }
+                else -> { /* Loading */ }
             }
         }
     }
@@ -76,10 +85,15 @@ class PeopleViewModel @Inject constructor(
     fun onChatNavigated() {
         _navigateToChat.value = null
     }
+
+    fun clearError() {
+        _error.value = null
+    }
 }
 
 data class PeopleUiState(
     val friends: List<FriendUiModel> = emptyList(),
     val pendingRequestCount: Int = 0,
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val error: String? = null
 )

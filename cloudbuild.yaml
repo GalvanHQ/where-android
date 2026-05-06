@@ -33,6 +33,8 @@ steps:
       - '1025951597272-compute@developer.gserviceaccount.com'
       - '--set-env-vars'
       - 'GOOGLE_CLOUD_PROJECT=where-loc'
+      - '--ingress'
+      - 'all'
 
 options:
   logging: CLOUD_LOGGING_ONLY

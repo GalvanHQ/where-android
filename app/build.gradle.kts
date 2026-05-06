@@ -6,7 +6,6 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.services)
-    id("com.google.firebase.crashlytics")
 }
 
 android {
@@ -83,30 +82,40 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 
+
+    // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.storage)
-    implementation(libs.firebase.crashlytics)
+    // TODO: Re-enable after fixing build ID issue
+    // implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.analytics)
 
+    // Play Services
     implementation(libs.play.services.location)
     implementation(libs.play.services.auth)
 
+    // MapLibre
     implementation(libs.maplibre.compose)
 
+    // Room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
+    // DataStore
     implementation(libs.datastore.preferences)
 
+    // Coil
     implementation(libs.coil.compose)
     implementation(libs.androidx.ui.text.google.fonts)
 
+    // Timber
     implementation(libs.timber)
 
+    // Coroutines
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.play.services)
 

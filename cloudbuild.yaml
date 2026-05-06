@@ -1,7 +1,13 @@
-# Google Cloud Build - deploy from pre-built JAR
-# Uses the JAR that already exists from previous local build
+# Build Server in Cloud Build then deploy
+# Don't rely on pre-built JAR
 
 steps:
+  # Build the JAR using gradle
+  - name: 'gradle:8.13-jdk25'
+    args:
+      - 'gradle', ':server:shadowJar', '--no-daemon', '-p', '/workspace'
+
+  # Build Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
@@ -9,12 +15,16 @@ steps:
       - 'gcr.io/where-loc/where-chat-server:latest'
       - '-f'
       - 'server/Dockerfile'
+      - '-c'
+      - '/workspace'
 
+  # Push image
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
       - 'gcr.io/where-loc/where-chat-server:latest'
 
+  # Deploy to Cloud Run  
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:

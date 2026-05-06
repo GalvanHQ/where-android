@@ -24,6 +24,10 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
 
+      - name: Create dummy google-services.json for CI
+        run: |
+          echo '{"project_info":{"project_number":"000000000000","project_id":"dummy","storage_bucket":"dummy.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:dummy","android_client_info":{"package_name":"com.ovi.where"}},"api_key":[{"current_key":"dummy"}]}],"configuration_version":"1"}' > app/google-services.json
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 

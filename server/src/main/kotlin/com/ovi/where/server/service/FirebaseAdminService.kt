@@ -51,8 +51,8 @@ object FirebaseAdminService {
         println("Initializing FirebaseApp with project: $projectId")
         FirebaseApp.initializeApp(options)
 
-        // Use Firestore.getInstance() instead of FirestoreClient
-        db = Firestore.getInstance()
+        // Use FirestoreClient.getFirestore()
+        db = FirestoreClient.getFirestore()
         println("Firebase Admin initialized successfully!")
     }
 

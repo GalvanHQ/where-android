@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import com.google.firebase.firestore.FirebaseFirestore
 import com.ovi.where.core.constants.AppConstants
+import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -103,20 +104,10 @@ class ConversationRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }
 
-    @OptIn(InternalAPI::class)
     override suspend fun getOrCreateDirectConversation(otherUserId: String): Resource<Conversation> {
         return try {
             val token = getIdToken()
             println("Creating conversation with otherUserId: $otherUserId")
-            val response = KtorApiClient.httpClient
-                .post("${KtorApiClient.HTTP_BASE_URL}/api/conversations/direct") {
-                    bearerAuth(token)
-                    contentType(ContentType.Application.Json)
-                    setBody(CreateDirectConversationRequest(otherUserId))
-                }
-            println("Response status: ${response.status}")
-            val raw = response.bodyAsText()
-            println("Raw response: $raw")
             val dto = KtorApiClient.httpClient
                 .post("${KtorApiClient.HTTP_BASE_URL}/api/conversations/direct") {
                     bearerAuth(token)

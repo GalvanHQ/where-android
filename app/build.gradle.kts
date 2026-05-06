@@ -20,9 +20,9 @@ android {
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Chat server URLs — override in local.properties for production
-        buildConfigField("String", "CHAT_SERVER_HTTP_URL", "\"http://10.0.2.2:8080\"")
-        buildConfigField("String", "CHAT_SERVER_WS_URL",   "\"ws://10.0.2.2:8080\"")
+        // Chat server URLs — live server in us-central1
+        buildConfigField("String", "CHAT_SERVER_HTTP_URL", "\"https://where-android-1025951597272.us-central1.run.app\"")
+        buildConfigField("String", "CHAT_SERVER_WS_URL",   "\"wss://where-android-1025951597272.us-central1.run.app\"")
     }
 
     buildTypes {
@@ -32,9 +32,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Override with your production server URL
-            buildConfigField("String", "CHAT_SERVER_HTTP_URL", "\"https://your-server.com\"")
-            buildConfigField("String", "CHAT_SERVER_WS_URL",   "\"wss://your-server.com\"")
         }
     }
     compileOptions {

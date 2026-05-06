@@ -20,10 +20,12 @@ fun main() {
 }
 
 fun Application.module() {
+    println("=== Application.module() starting ===")
     FirebaseAdminService.init()
     configureSerialization()
     configureCORS()
     configureWebSockets()
     configureStatusPages()
     configureRouting()
+    println("=== Application.module() done ===")
 }

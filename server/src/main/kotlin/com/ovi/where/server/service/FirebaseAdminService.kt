@@ -187,7 +187,7 @@ object FirebaseAdminService {
         userId: String
     ) = withContext(Dispatchers.IO) {
         db.collection("conversations").document(conversationId)
-            .update("unreadCounts.$userId", 0)
+            .update(com.google.cloud.firestore.FieldPath.of("unreadCounts", userId), 0)
             .get()
     }
 
@@ -209,39 +209,56 @@ object FirebaseAdminService {
     }
 
     suspend fun saveMessage(message: MessageDto): MessageDto = withContext(Dispatchers.IO) {
-        val msgId = message.id.ifEmpty { UUID.randomUUID().toString() }
-        val msg = message.copy(id = msgId)
+        try {
+            val msgId = message.id.ifEmpty { UUID.randomUUID().toString() }
+            val msg = message.copy(id = msgId)
+            
+            println("Saving message $msgId for conversation ${msg.conversationId}")
 
-        // Save to messages subcollection
-        db.collection("conversations")
-            .document(msg.conversationId)
-            .collection("messages")
-            .document(msgId)
-            .set(msg.toFirestoreMap())
-            .get()
+            // Save to messages subcollection
+            db.collection("conversations")
+                .document(msg.conversationId)
+                .collection("messages")
+                .document(msgId)
+                .set(msg.toFirestoreMap())
+                .get()
 
-        // Update conversation's lastMessage + increment unread for other participants
-        val convDoc = db.collection("conversations")
-            .document(msg.conversationId).get().get()
-        val participantIds = convDoc.get("participantIds") as? List<*> ?: emptyList<String>()
-
-        val updates = mutableMapOf<String, Any>(
-            "lastMessageText" to (if (msg.messageType == "LOCATION") "📍 Location" else msg.text),
-            "lastMessageSenderId" to msg.senderId,
-            "lastMessageTimestamp" to msg.timestamp
-        )
-        // Increment unread count for all participants except the sender
-        participantIds.filterIsInstance<String>()
-            .filter { it != msg.senderId }
-            .forEach { uid ->
-                val current = (convDoc.get("unreadCounts.$uid") as? Long)?.toInt() ?: 0
-                updates["unreadCounts.$uid"] = current + 1
+            // Update conversation's lastMessage + increment unread for other participants
+            val convDocRef = db.collection("conversations").document(msg.conversationId)
+            val convDoc = convDocRef.get().get()
+            
+            if (!convDoc.exists()) {
+                println("WARNING: Conversation ${msg.conversationId} does not exist when saving message!")
+                return@withContext msg
             }
+            
+            val participantIds = convDoc.get("participantIds") as? List<*> ?: emptyList<String>()
 
-        db.collection("conversations").document(msg.conversationId)
-            .update(updates).get()
+            val updates = mutableMapOf<String, Any>(
+                "lastMessageText" to (if (msg.messageType == "LOCATION") "📍 Location" else msg.text),
+                "lastMessageSenderId" to msg.senderId,
+                "lastMessageTimestamp" to msg.timestamp
+            )
+            
+            // Increment unread count safely by modifying the map locally
+            val unreadCountsMap = (convDoc.get("unreadCounts") as? Map<*, *>)?.toMutableMap() ?: mutableMapOf()
+            participantIds.filterIsInstance<String>()
+                .filter { it != msg.senderId }
+                .forEach { uid ->
+                    val current = (unreadCountsMap[uid] as? Long)?.toInt() ?: 0
+                    unreadCountsMap[uid] = current + 1
+                }
+            updates["unreadCounts"] = unreadCountsMap
 
-        msg
+            convDocRef.update(updates).get()
+            println("Message $msgId saved and conversation updated successfully")
+
+            msg
+        } catch (e: Exception) {
+            println("Error saving message to Firestore: ${e.message}")
+            e.printStackTrace()
+            throw e
+        }
     }
 
     suspend fun isParticipant(conversationId: String, userId: String): Boolean =

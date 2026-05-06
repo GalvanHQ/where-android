@@ -75,17 +75,17 @@ sealed class ServerFrame {
 
 @Serializable
 data class ConversationDto(
-    val id: String,
-    val type: String,           // "direct" | "group"
-    val participantIds: List<String>,
+    val id: String = "",
+    val type: String = "direct",
+    val participantIds: List<String> = emptyList(),
     val groupId: String? = null,
-    val name: String,
+    val name: String = "",
     val photoUrl: String? = null,
     val lastMessageText: String = "",
     val lastMessageSenderId: String = "",
     val lastMessageTimestamp: Long = 0L,
     val unreadCount: Int = 0,
-    val createdAt: Long
+    val createdAt: Long = 0L
 )
 
 @Serializable

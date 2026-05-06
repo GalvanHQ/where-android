@@ -69,7 +69,8 @@ fun Route.chatWebSocketRoute() {
                 }
             }
         } catch (e: Exception) {
-            // Connection closed or error
+            println("WebSocket error for user $userId in $conversationId: ${e.message}")
+            e.printStackTrace()
         } finally {
             ChatSessionManager.leave(chatSession)
         }
@@ -88,12 +89,18 @@ private suspend fun DefaultWebSocketServerSession.handleIncomingFrame(
         return
     }
 
-    when (val type = parsed["type"]?.jsonPrimitive?.content) {
-        "message" -> handleTextMessage(parsed, chatSession, conversationId)
-        "location_message" -> handleLocationMessage(parsed, chatSession, conversationId)
-        "typing" -> handleTyping(parsed, chatSession, conversationId)
-        "read" -> handleRead(chatSession, conversationId)
-        else -> ChatSessionManager.sendTo(chatSession, ServerFrame.Error("Unknown frame type: $type"))
+    try {
+        when (val type = parsed["type"]?.jsonPrimitive?.content) {
+            "message" -> handleTextMessage(parsed, chatSession, conversationId)
+            "location_message" -> handleLocationMessage(parsed, chatSession, conversationId)
+            "typing" -> handleTyping(parsed, chatSession, conversationId)
+            "read" -> handleRead(chatSession, conversationId)
+            else -> ChatSessionManager.sendTo(chatSession, ServerFrame.Error("Unknown frame type: $type"))
+        }
+    } catch (e: Exception) {
+        println("Error processing frame: ${e.message}")
+        e.printStackTrace()
+        ChatSessionManager.sendTo(chatSession, ServerFrame.Error("Internal server error processing frame"))
     }
 }
 

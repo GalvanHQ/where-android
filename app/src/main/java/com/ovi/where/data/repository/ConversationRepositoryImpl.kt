@@ -103,9 +103,20 @@ class ConversationRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }
 
+    @OptIn(InternalAPI::class)
     override suspend fun getOrCreateDirectConversation(otherUserId: String): Resource<Conversation> {
         return try {
             val token = getIdToken()
+            println("Creating conversation with otherUserId: $otherUserId")
+            val response = KtorApiClient.httpClient
+                .post("${KtorApiClient.HTTP_BASE_URL}/api/conversations/direct") {
+                    bearerAuth(token)
+                    contentType(ContentType.Application.Json)
+                    setBody(CreateDirectConversationRequest(otherUserId))
+                }
+            println("Response status: ${response.status}")
+            val raw = response.bodyAsText()
+            println("Raw response: $raw")
             val dto = KtorApiClient.httpClient
                 .post("${KtorApiClient.HTTP_BASE_URL}/api/conversations/direct") {
                     bearerAuth(token)
@@ -113,8 +124,10 @@ class ConversationRepositoryImpl @Inject constructor(
                     setBody(CreateDirectConversationRequest(otherUserId))
                 }
                 .body<ConversationDto>()
+            println("Parsed DTO: $dto")
             Resource.Success(dto.toDomain())
         } catch (e: Exception) {
+            println("Error: ${e.message}")
             Resource.Error(e.message ?: "Failed to get or create conversation")
         }
     }

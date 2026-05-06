@@ -69,6 +69,56 @@ class FriendshipRepositoryImpl @Inject constructor(
         }
     }
 
+override suspend fun acceptFriendRequestByUserId(userId: String): Resource<Unit> {
+        return try {
+            val uid = currentUid ?: return Resource.Error("Not authenticated")
+            // Find friendship where current user is receiver and other user is requester
+            val snapshot = firestore.collection(AppConstants.FIRESTORE_COLLECTION_FRIENDSHIPS)
+                .whereEqualTo("requesterId", userId)
+                .whereEqualTo("receiverId", uid)
+                .whereEqualTo("status", FriendshipStatus.PENDING.name)
+                .get()
+                .await()
+            
+            if (snapshot.documents.isEmpty()) {
+                return Resource.Error("Friend request not found")
+            }
+            
+            val friendshipDoc = snapshot.documents.first()
+            friendshipDoc.reference.update(
+                mapOf(
+                    "status" to FriendshipStatus.ACCEPTED.name,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            ).await()
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to accept friend request")
+        }
+    }
+
+    override suspend fun declineFriendRequestByUserId(userId: String): Resource<Unit> {
+        return try {
+            val uid = currentUid ?: return Resource.Error("Not authenticated")
+            // Find friendship where current user is receiver and other user is requester
+            val snapshot = firestore.collection(AppConstants.FIRESTORE_COLLECTION_FRIENDSHIPS)
+                .whereEqualTo("requesterId", userId)
+                .whereEqualTo("receiverId", uid)
+                .whereEqualTo("status", FriendshipStatus.PENDING.name)
+                .get()
+                .await()
+            
+            if (snapshot.documents.isEmpty()) {
+                return Resource.Error("Friend request not found")
+            }
+            
+            snapshot.documents.first().reference.delete().await()
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to decline friend request")
+        }
+    }
+
     override suspend fun declineFriendRequest(friendshipId: String): Resource<Unit> {
         return try {
             firestore.collection(AppConstants.FIRESTORE_COLLECTION_FRIENDSHIPS)
@@ -79,6 +129,10 @@ class FriendshipRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to decline request")
         }
+    }
+
+    override suspend fun declineFriendRequestByUserId(userId: String): Resource<Unit> {
+        TODO("Not yet implemented")
     }
 
     override suspend fun removeFriend(userId: String): Resource<Unit> {

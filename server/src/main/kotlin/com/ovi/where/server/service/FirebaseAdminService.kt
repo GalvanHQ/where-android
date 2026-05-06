@@ -21,11 +21,15 @@ object FirebaseAdminService {
     fun init() {
         if (FirebaseApp.getApps().isNotEmpty()) return
 
+        println("Initializing Firebase Admin...")
+
         // Loads GOOGLE_APPLICATION_CREDENTIALS env var automatically
         // or falls back to the serviceAccount file in the classpath
         val credentials = try {
+            println("Trying default credentials...")
             GoogleCredentials.getApplicationDefault()
         } catch (e: Exception) {
+            println("Default credentials failed: ${e.message}")
             // Fallback for local dev: load from file
             val stream = FirebaseAdminService::class.java.classLoader
                 .getResourceAsStream("serviceAccount.json")
@@ -36,20 +40,28 @@ object FirebaseAdminService {
             GoogleCredentials.fromStream(stream)
         }
 
+        val projectId = System.getenv("GOOGLE_CLOUD_PROJECT") ?: "where-loc"
+        println("Using project ID: $projectId")
+
         val options = FirebaseOptions.builder()
             .setCredentials(credentials)
-            .setProjectId(System.getenv("GOOGLE_CLOUD_PROJECT"))
+            .setProjectId(projectId)
             .build()
 
+        println("Initializing FirebaseApp...")
         FirebaseApp.initializeApp(options)
+        println("Getting Firestore instance...")
         db = FirestoreClient.getFirestore()
+        println("Firebase Admin initialized successfully!")
     }
 
     // ── Auth ─────────────────────────────────────────────────────────────────
 
     fun verifyToken(idToken: String): FirebaseToken? = try {
+        println("Verifying token, length: ${idToken.length}")
         FirebaseAuth.getInstance().verifyIdToken(idToken)
     } catch (e: Exception) {
+        println("Token verification failed: ${e.message}")
         null
     }
 

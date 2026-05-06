@@ -22,7 +22,12 @@ fun Route.conversationRoutes() {
                 ?.removePrefix("Bearer ")
                 ?.trim()
                 ?: throw SecurityException("Missing Authorization header")
-            val firebaseToken = FirebaseAdminService.verifyToken(token)
+            val firebaseToken = try {
+                FirebaseAdminService.verifyToken(token)
+            } catch (e: Exception) {
+                println("Token verification failed: ${e.message}")
+                throw SecurityException("Invalid token: ${e.message}")
+            }
                 ?: throw SecurityException("Invalid or expired token")
             return firebaseToken.uid
         }

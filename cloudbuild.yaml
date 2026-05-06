@@ -1,15 +1,28 @@
-# Google Cloud Build for Ktor Server
-# Deploys from source using Cloud Run's built-in builder
+# Google Cloud Build - deploy from pre-built JAR
+# Uses the JAR that already exists from previous local build
 
 steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/where-loc/where-chat-server:latest'
+      - '-f'
+      - 'server/Dockerfile'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/where-loc/where-chat-server:latest'
+
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
       - 'run'
       - 'deploy'
       - 'where-chat-server'
-      - '--source'
-      - 'server/'
+      - '--image'
+      - 'gcr.io/where-loc/where-chat-server:latest'
       - '--region'
       - 'us-central1'
       - '--platform'
@@ -19,10 +32,9 @@ steps:
       - '512Mi'
       - '--cpu'
       - '1'
-      - '--runtime'
-      - 'java21'
-      - '--env-vars'
-      - 'PORT=8080'
+
+images:
+  - 'gcr.io/where-loc/where-chat-server:latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY

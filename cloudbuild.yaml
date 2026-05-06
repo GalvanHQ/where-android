@@ -1,30 +1,32 @@
-# Build Server in Cloud Build then deploy
-# Don't rely on pre-built JAR
+# Build Server in Cloud Build using Artifact Registry
 
 steps:
-  # Build the JAR using gradle
-  - name: 'gradle:8.13-jdk25'
+  # Build JAR - try alternative build approach
+  - name: 'gcr.io/cloud-builders/docker'
     args:
-      - 'gradle', ':server:shadowJar', '--no-daemon', '-p', '/workspace'
+      - 'run', '--rm',
+      '-v', '/workspace:/workspace',
+      '-w', '/workspace',
+      'gradle:8.13-jdk25',
+      'gradle', ':server:shadowJar', '--no-daemon'
 
-  # Build Docker image
+  # Build Docker using standard builder with workspace volume
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/where-loc/where-chat-server:latest'
+      - 'us-central1-docker.pkg.dev/where-loc/where-chat-server/where-chat-server:latest'
       - '-f'
       - 'server/Dockerfile'
-      - '-c'
-      - '/workspace'
+      - '.'
 
-  # Push image
+  # Push to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/where-loc/where-chat-server:latest'
+      - 'us-central1-docker.pkg.dev/where-loc/where-chat-server/where-chat-server:latest'
 
-  # Deploy to Cloud Run  
+  # Deploy from Artifact Registry
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
@@ -32,7 +34,7 @@ steps:
       - 'deploy'
       - 'where-chat-server'
       - '--image'
-      - 'gcr.io/where-loc/where-chat-server:latest'
+      - 'us-central1-docker.pkg.dev/where-loc/where-chat-server/where-chat-server:latest'
       - '--region'
       - 'us-central1'
       - '--platform'
@@ -44,7 +46,7 @@ steps:
       - '1'
 
 images:
-  - 'gcr.io/where-loc/where-chat-server:latest'
+  - 'us-central1-docker.pkg.dev/where-loc/where-chat-server/where-chat-server:latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY

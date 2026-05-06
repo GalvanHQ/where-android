@@ -1,36 +1,28 @@
-# Simple test build
+# Google Cloud Build for Ktor Server
+# Deploys from source using Cloud Run's built-in builder
 
 steps:
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '-t'
-      - 'gcr.io/where-loc/where-chat-server:test'
-      - '-f'
-      - 'server/Dockerfile'
-      - '.'
-
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'gcr.io/where-loc/where-chat-server:test'
-
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
       - 'run'
       - 'deploy'
       - 'where-chat-server'
-      - '--image'
-      - 'gcr.io/where-loc/where-chat-server:test'
+      - '--source'
+      - 'server/'
       - '--region'
       - 'us-central1'
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
-
-images:
-  - 'gcr.io/where-loc/where-chat-server:test'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--runtime'
+      - 'java21'
+      - '--env-vars'
+      - 'PORT=8080'
 
 options:
   logging: CLOUD_LOGGING_ONLY

@@ -1,16 +1,21 @@
-# Cloud Build for Server - uses existing deployment
-# When a working image is created, this will deploy it
-
 steps:
-  # Just deploy the existing placeholder until fix
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args: ['cp', 'gs://where-loc-server-artifacts/server-all.jar', '/workspace/server-all.jar']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server/server:v1', '-f', 'server/Dockerfile', '.']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/where-loc/where-chat-server/server:v1']
+
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
       - 'run'
       - 'deploy'
       - 'where-chat-server'
-      - '--service-account'
-      - '1025951597272-compute@developer.gserviceaccount.com'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/where-loc/where-chat-server/server:v1'
       - '--region'
       - 'us-central1'
       - '--platform'
@@ -20,7 +25,6 @@ steps:
       - '512Mi'
       - '--cpu'
       - '1'
-      - '--no-cached'
       - '--port'
       - '8080'
 

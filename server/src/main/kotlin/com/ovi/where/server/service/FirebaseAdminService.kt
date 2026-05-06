@@ -19,39 +19,40 @@ object FirebaseAdminService {
     private lateinit var db: Firestore
 
     fun init() {
-        if (FirebaseApp.getApps().isNotEmpty()) return
+        if (FirebaseApp.getApps().isNotEmpty()) {
+            println("Firebase already initialized")
+            return
+        }
 
         println("Initializing Firebase Admin...")
 
-        // Loads GOOGLE_APPLICATION_CREDENTIALS env var automatically
-        // or falls back to the serviceAccount file in the classpath
+        val projectId = System.getenv("GOOGLE_CLOUD_PROJECT") ?: "where-loc"
+        println("Using project ID: $projectId")
+
         val credentials = try {
             println("Trying default credentials...")
             GoogleCredentials.getApplicationDefault()
         } catch (e: Exception) {
             println("Default credentials failed: ${e.message}")
-            // Fallback for local dev: load from file
             val stream = FirebaseAdminService::class.java.classLoader
                 .getResourceAsStream("serviceAccount.json")
             requireNotNull(stream) {
-                "Firebase credentials not found. Set GOOGLE_APPLICATION_CREDENTIALS env var " +
-                        "or place serviceAccount.json in server/src/main/resources/"
+                "Firebase credentials not found"
             }
             GoogleCredentials.fromStream(stream)
         }
 
-        val projectId = System.getenv("GOOGLE_CLOUD_PROJECT") ?: "where-loc"
-        println("Using project ID: $projectId")
-
         val options = FirebaseOptions.builder()
             .setCredentials(credentials)
             .setProjectId(projectId)
+            .setDatabaseUrl("https://$projectId.firebaseio.com")
             .build()
 
-        println("Initializing FirebaseApp...")
+        println("Initializing FirebaseApp with project: $projectId")
         FirebaseApp.initializeApp(options)
-        println("Getting Firestore instance...")
-        db = FirestoreClient.getFirestore()
+
+        // Use Firestore.getInstance() instead of FirestoreClient
+        db = Firestore.getInstance()
         println("Firebase Admin initialized successfully!")
     }
 

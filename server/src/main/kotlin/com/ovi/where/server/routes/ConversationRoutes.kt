@@ -50,8 +50,11 @@ fun Route.conversationRoutes() {
         // ── POST /api/conversations/direct ────────────────────────────────
         post("/conversations/direct") {
             val userId = call.verifiedUserId()
+            println("POST /conversations/direct by user: $userId")
             val body = call.receive<CreateDirectConversationRequest>()
+            println("Creating direct conversation with otherUserId: ${body.otherUserId}")
             val conversation = FirebaseAdminService.getOrCreateDirectConversation(userId, body.otherUserId)
+            println("Created conversation: ${conversation.id}")
             call.respond(HttpStatusCode.Created, conversation)
         }
 

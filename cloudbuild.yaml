@@ -27,6 +27,8 @@ steps:
       - '1'
       - '--port'
       - '8080'
+      - '--service-account'
+      - '1025951597272-compute@developer.gserviceaccount.com'
 
 options:
   logging: CLOUD_LOGGING_ONLY

@@ -38,6 +38,7 @@ object FirebaseAdminService {
 
         val options = FirebaseOptions.builder()
             .setCredentials(credentials)
+            .setProjectId(System.getenv("GOOGLE_CLOUD_PROJECT"))
             .build()
 
         FirebaseApp.initializeApp(options)

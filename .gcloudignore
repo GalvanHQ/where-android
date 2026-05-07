@@ -1,0 +1,13 @@
+# Include these
+server/
+cloudbuild.yaml
+
+# Exclude these
+.git
+.gradle
+.idea
+*.md
+.DS_Store
+app/
+build/
+gradle/

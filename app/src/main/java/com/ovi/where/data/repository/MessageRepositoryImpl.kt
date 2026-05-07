@@ -2,16 +2,13 @@ package com.ovi.where.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
 import com.ovi.where.core.common.Resource
-import com.ovi.where.data.remote.chat.ChatWebSocketClient
-import com.ovi.where.data.remote.chat.KtorApiClient
+import com.ovi.where.data.remote.chat.ChatSocketIoClient
+import com.ovi.where.data.remote.chat.ChatApiClient
 import com.ovi.where.data.remote.chat.MessageDto
 import com.ovi.where.data.remote.chat.ServerFrame
 import com.ovi.where.domain.model.Message
 import com.ovi.where.domain.model.MessageType
 import com.ovi.where.domain.repository.MessageRepository
-import io.ktor.client.call.body
-import io.ktor.client.request.bearerAuth
-import io.ktor.client.request.get
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +23,7 @@ import javax.inject.Singleton
 
 @Singleton
 class MessageRepositoryImpl @Inject constructor(
-    private val wsClient: ChatWebSocketClient,
+    private val wsClient: ChatSocketIoClient,
     private val firebaseAuth: FirebaseAuth
 ) : MessageRepository {
 
@@ -120,11 +117,8 @@ class MessageRepositoryImpl @Inject constructor(
     override suspend fun loadHistory(conversationId: String) {
         try {
             val token = getIdToken()
-            val messages = KtorApiClient.httpClient
-                .get("${KtorApiClient.HTTP_BASE_URL}/api/conversations/$conversationId/messages") {
-                    bearerAuth(token)
-                }
-                .body<List<MessageDto>>()
+            val messages = ChatApiClient.apiService
+                .getMessages("Bearer $token", conversationId)
                 .map { it.toDomain() }
 
             val cache = cacheFor(conversationId)

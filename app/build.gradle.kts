@@ -20,9 +20,9 @@ android {
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Chat server URLs — live server in us-central1
-        buildConfigField("String", "CHAT_SERVER_HTTP_URL", "\"https://where-chat-server-zgzelfwe5q-uc.a.run.app\"")
-        buildConfigField("String", "CHAT_SERVER_WS_URL",   "\"wss://where-chat-server-zgzelfwe5q-uc.a.run.app\"")
+        // Chat server URLs – defaults (overridden per build type below)
+        buildConfigField("String", "CHAT_SERVER_HTTP_URL", "\"http://10.0.2.2:8080\"")
+        buildConfigField("String", "CHAT_SERVER_WS_URL",   "\"http://10.0.2.2:8080\"")
     }
 
     signingConfigs {
@@ -37,6 +37,9 @@ android {
     buildTypes {
         debug {
             isDebuggable = true
+            // Local Node.js dev server (use machine LAN IP for physical device)
+            buildConfigField("String", "CHAT_SERVER_HTTP_URL", "\"http://192.168.31.234:8080\"")
+            buildConfigField("String", "CHAT_SERVER_WS_URL",   "\"http://192.168.31.234:8080\"")
         }
         release {
             isMinifyEnabled = true
@@ -119,14 +122,14 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.play.services)
 
-    // ── Ktor client (HTTP + WebSocket) ─────────────────────────────────────
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.okhttp)
-    implementation(libs.ktor.client.websockets)
-    implementation(libs.ktor.client.content.negotiation)
-    implementation(libs.ktor.client.logging)
-    implementation(libs.ktor.serialization.kotlinx.json)
+    // ── HTTP + WebSocket Clients ─────────────────────────────────────
+    implementation(libs.socketio.client)
+    implementation(libs.retrofit.core)
+    implementation(libs.retrofit.kotlinx.serialization)
     implementation(libs.kotlinx.serialization.json)
+    
+    // OkHttp logging
+    implementation(libs.okhttp.logging)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

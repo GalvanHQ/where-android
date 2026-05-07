@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.ovi.where.core.common.Resource
 import com.ovi.where.data.location.LocationManager
-import com.ovi.where.data.remote.chat.ChatWebSocketClient
+import com.ovi.where.data.remote.chat.ChatSocketIoClient
 import com.ovi.where.data.remote.chat.ServerFrame
 import com.ovi.where.data.repository.MessageRepositoryImpl
 import com.ovi.where.domain.usecase.chat.MarkConversationReadUseCase
@@ -36,7 +36,7 @@ class ChatViewModel @Inject constructor(
     private val sendLocationMessageUseCase: SendLocationMessageUseCase,
     private val markConversationReadUseCase: MarkConversationReadUseCase,
     private val observeConversationsUseCase: ObserveConversationsUseCase,
-    private val wsClient: ChatWebSocketClient,
+    private val wsClient: ChatSocketIoClient,
     private val messageRepositoryImpl: MessageRepositoryImpl,
     private val firebaseAuth: FirebaseAuth,
     private val locationManager: LocationManager

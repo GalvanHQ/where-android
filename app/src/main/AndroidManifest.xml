@@ -56,6 +56,10 @@
 
         </activity>
 
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyDJbR4z0SfSEBqMcCgFTXz2zW2OGFQGUPI" />
+
         <service
             android:name=".service.LocationTrackingService"
             android:enabled="true"

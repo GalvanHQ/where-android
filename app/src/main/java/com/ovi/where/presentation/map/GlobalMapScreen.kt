@@ -95,13 +95,12 @@ import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.showToast
 import kotlinx.coroutines.launch
-import org.maplibre.compose.camera.CameraPosition
-import org.maplibre.compose.camera.rememberCameraState
-import org.maplibre.compose.map.MaplibreMap
-import org.maplibre.compose.style.BaseStyle
-import org.maplibre.spatialk.geojson.Position
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.rememberCameraPositionState
 
-private const val MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty"
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -126,9 +125,9 @@ fun GlobalMapScreen(
         }
     }
 
-    val cameraState = rememberCameraState(
-        firstPosition = CameraPosition(zoom = 2.0, target = Position(0.0, 0.0))
-    )
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(LatLng(0.0, 0.0), 2.0f)
+    }
 
     // ── Permission launcher ───────────────────────────────────────────────────
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -143,9 +142,8 @@ fun GlobalMapScreen(
     // ── Camera follows own location on first fix ──────────────────────────────
     LaunchedEffect(uiState.hasMyLocation, uiState.myLatitude, uiState.myLongitude) {
         if (uiState.hasMyLocation && uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
-            cameraState.position = CameraPosition(
-                target = Position(uiState.myLongitude, uiState.myLatitude),
-                zoom = 13.0
+            cameraPositionState.position = CameraPosition.fromLatLngZoom(
+                LatLng(uiState.myLatitude, uiState.myLongitude), 13.0f
             )
         }
     }
@@ -194,10 +192,9 @@ fun GlobalMapScreen(
                 .padding(contentPadding)
         ) {
             // ── Map ───────────────────────────────────────────────────────────
-            MaplibreMap(
+            GoogleMap(
                 modifier = Modifier.fillMaxSize(),
-                baseStyle = BaseStyle.Uri(MAP_STYLE),
-                cameraState = cameraState
+                cameraPositionState = cameraPositionState
             )
 
             // ── Friend avatar markers ─────────────────────────────────────────
@@ -223,7 +220,7 @@ fun GlobalMapScreen(
                             isPulsing = friend.isActive
                         )
                     },
-                    cameraPosition = cameraState.position,
+                    cameraPosition = cameraPositionState.position,
                     shadowColor = shadowColor,
                     borderColor = borderColor,
                     textColor = textColor,
@@ -327,20 +324,18 @@ fun GlobalMapScreen(
                         val valid = uiState.friendLocations.filter { it.latitude != 0.0 }
                         if (valid.size == 1) {
                             scope.launch {
-                                cameraState.position = CameraPosition(
-                                    target = Position(valid[0].longitude, valid[0].latitude),
-                                    zoom = 14.0
-                                )
+                                cameraPositionState.position = CameraPosition.fromLatLngZoom(
+                                        LatLng(valid[0].latitude, valid[0].longitude), 14.0f
+                                    )
                             }
                         } else if (valid.size > 1) {
                             scope.launch {
-                                cameraState.position = CameraPosition(
-                                    target = Position(
-                                        valid.map { it.longitude }.average(),
-                                        valid.map { it.latitude }.average()
-                                    ),
-                                    zoom = 10.0
-                                )
+                                cameraPositionState.position = CameraPosition.fromLatLngZoom(
+                                        LatLng(
+                                            valid.map { it.latitude }.average(),
+                                            valid.map { it.longitude }.average()
+                                        ), 10.0f
+                                    )
                             }
                         }
                     },
@@ -441,9 +436,8 @@ fun GlobalMapScreen(
                                         viewModel.selectFriend(friend)
                                         if (friend.latitude != 0.0) {
                                             scope.launch {
-                                                cameraState.position = CameraPosition(
-                                                    target = Position(friend.longitude, friend.latitude),
-                                                    zoom = 14.0
+                                                cameraPositionState.position = CameraPosition.fromLatLngZoom(
+                                                    LatLng(friend.latitude, friend.longitude), 14.0f
                                                 )
                                             }
                                         }

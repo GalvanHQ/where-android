@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.core.theme.Dimens
-import org.maplibre.compose.camera.CameraPosition
+import com.google.android.gms.maps.model.CameraPosition
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.ln
@@ -111,12 +111,12 @@ fun AvatarMarkersOverlay(
     val density = LocalDensity.current
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val widthPx  = with(density) { maxWidth.toPx() }
+        val widthPx = with(density) { maxWidth.toPx() }
         val heightPx = with(density) { maxHeight.toPx() }
-        val zoom     = cameraPosition.zoom
+        val zoom = cameraPosition.zoom.toDouble()
         val centerLat = cameraPosition.target.latitude
         val centerLng = cameraPosition.target.longitude
-        val radiusPx  = with(density) { markerRadius.toPx() }
+        val radiusPx = with(density) { markerRadius.toPx() }
 
         markers.forEachIndexed { index, marker ->
             val pos = latLngToPixel(

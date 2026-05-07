@@ -26,7 +26,8 @@ timber = "5.0.1"
 coroutines = "1.9.0"
 googleFonts = "1.7.8"
 playServicesAuth = "21.3.0"
-maplibreCompose = "0.12.1"
+playServicesMaps = "19.2.0"
+mapsCompose = "6.2.1"
 
 # Retrofit & Socket.IO
 retrofit = "2.11.0"
@@ -90,8 +91,9 @@ timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "tim
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutines" }
 
-# MapLibre
-maplibre-compose = { group = "org.maplibre.compose", name = "maplibre-compose", version.ref = "maplibreCompose" }
+# Google Maps
+play-services-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "playServicesMaps" }
+maps-compose = { group = "com.google.maps.android", name = "maps-compose", version.ref = "mapsCompose" }
 
 # Retrofit & Socket.IO
 retrofit-core = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }

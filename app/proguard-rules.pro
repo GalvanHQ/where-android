@@ -19,9 +19,6 @@
 -keep class dagger.hilt.** { *; }
 -keep class * extends dagger.hilt.android.internal.managers.ViewComponentManager { *; }
 
-# MapLibre
--keep class org.maplibre.** { *; }
-
 # Kotlin serialization
 -keepattributes *Annotation*
 -keepclassmembers class * {

@@ -65,11 +65,10 @@ import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.common.WhereTopAppBar
 import com.ovi.where.presentation.model.MemberLocationUiModel
 import kotlinx.coroutines.launch
-import org.maplibre.compose.camera.CameraPosition
-import org.maplibre.compose.camera.rememberCameraState
-import org.maplibre.compose.map.MaplibreMap
-import org.maplibre.compose.style.BaseStyle
-import org.maplibre.spatialk.geojson.Position
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.rememberCameraPositionState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,9 +85,9 @@ fun MapScreen(
     var showDurationDialog by remember { mutableStateOf(false) }
     var selectedDuration by remember { mutableStateOf(60f) }
 
-    val cameraState = rememberCameraState(
-        firstPosition = CameraPosition(zoom = 2.0, target = Position(0.0, 0.0))
-    )
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(LatLng(0.0, 0.0), 2.0f)
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -103,9 +102,8 @@ fun MapScreen(
 
     LaunchedEffect(uiState.hasMyLocation, uiState.myLatitude, uiState.myLongitude) {
         if (uiState.hasMyLocation && uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
-            cameraState.position = CameraPosition(
-                target = Position(uiState.myLongitude, uiState.myLatitude),
-                zoom = 14.0
+            cameraPositionState.position = CameraPosition.fromLatLngZoom(
+                LatLng(uiState.myLatitude, uiState.myLongitude), 14.0f
             )
         }
     }
@@ -147,19 +145,17 @@ fun MapScreen(
                             val valid = uiState.locations.filter { it.hasValidLocation }
                             if (valid.size == 1) {
                                 scope.launch {
-                                    cameraState.position = CameraPosition(
-                                        target = Position(valid[0].longitude, valid[0].latitude),
-                                        zoom = 14.0
+                                    cameraPositionState.position = CameraPosition.fromLatLngZoom(
+                                        LatLng(valid[0].latitude, valid[0].longitude), 14.0f
                                     )
                                 }
                             } else if (valid.size > 1) {
                                 scope.launch {
-                                    cameraState.position = CameraPosition(
-                                        target = Position(
-                                            valid.map { it.longitude }.average(),
-                                            valid.map { it.latitude }.average()
-                                        ),
-                                        zoom = 11.0
+                                    cameraPositionState.position = CameraPosition.fromLatLngZoom(
+                                        LatLng(
+                                            valid.map { it.latitude }.average(),
+                                            valid.map { it.longitude }.average()
+                                        ), 11.0f
                                     )
                                 }
                             }
@@ -218,10 +214,9 @@ fun MapScreen(
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
 
-            MaplibreMap(
+            GoogleMap(
                 modifier = Modifier.fillMaxSize(),
-                baseStyle = BaseStyle.Uri("https://tiles.openfreemap.org/styles/liberty"),
-                cameraState = cameraState
+                cameraPositionState = cameraPositionState
             )
 
             // Member markers overlay — uses shared AvatarMarkersOverlay from MapUtils
@@ -243,7 +238,7 @@ fun MapScreen(
                             isPulsing = loc.isActive
                         )
                     },
-                    cameraPosition = cameraState.position,
+                    cameraPosition = cameraPositionState.position,
                     shadowColor = shadowColor,
                     borderColor = borderColor,
                     textColor = textColor,
@@ -252,9 +247,8 @@ fun MapScreen(
                         val loc = validLocations.firstOrNull { it.id == marker.id }
                         if (loc != null) {
                             scope.launch {
-                                cameraState.position = CameraPosition(
-                                    target = Position(loc.longitude, loc.latitude),
-                                    zoom = 15.0
+                                cameraPositionState.position = CameraPosition.fromLatLngZoom(
+                                    LatLng(loc.latitude, loc.longitude), 15.0f
                                 )
                             }
                         }
@@ -338,9 +332,8 @@ fun MapScreen(
                                     onClick = {
                                         if (location.hasValidLocation) {
                                             scope.launch {
-                                                cameraState.position = CameraPosition(
-                                                    target = Position(location.longitude, location.latitude),
-                                                    zoom = 15.0
+                                                cameraPositionState.position = CameraPosition.fromLatLngZoom(
+                                                    LatLng(location.latitude, location.longitude), 15.0f
                                                 )
                                             }
                                         }

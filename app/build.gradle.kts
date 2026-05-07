@@ -37,17 +37,17 @@ android {
     buildTypes {
         debug {
             isDebuggable = true
-            // Local Node.js dev server (use machine LAN IP for physical device)
-            buildConfigField("String", "CHAT_SERVER_HTTP_URL", "\"http://192.168.31.234:8080\"")
-            buildConfigField("String", "CHAT_SERVER_WS_URL",   "\"http://192.168.31.234:8080\"")
+            // Cloud Run server URL
+            buildConfigField("String", "CHAT_SERVER_HTTP_URL", "\"https://where-chat-server-node-zgzelfwe5q-uc.a.run.app\"")
+            buildConfigField("String", "CHAT_SERVER_WS_URL",   "\"https://where-chat-server-node-zgzelfwe5q-uc.a.run.app\"")
         }
         release {
             isMinifyEnabled = true
             isDebuggable = false
             signingConfig = signingConfigs.getByName("release")
-            // Cloud Run server URL (update after deploying Node.js server)
-            buildConfigField("String", "CHAT_SERVER_HTTP_URL", "\"http://where-chat-server-node-xxx.uc.a.run.app\"")
-            buildConfigField("String", "CHAT_SERVER_WS_URL", "ws://where-chat-server-node-xxx.uc.a.run.app")
+            // Cloud Run server URL
+            buildConfigField("String", "CHAT_SERVER_HTTP_URL", "\"https://where-chat-server-node-zgzelfwe5q-uc.a.run.app\"")
+            buildConfigField("String", "CHAT_SERVER_WS_URL", "\"https://where-chat-server-node-zgzelfwe5q-uc.a.run.app\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

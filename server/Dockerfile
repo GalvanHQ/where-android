@@ -2,10 +2,10 @@ FROM node:21-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY server/package*.json ./
 RUN npm install --production
 
-COPY . .
+COPY server/ .
 
 EXPOSE 8080
 

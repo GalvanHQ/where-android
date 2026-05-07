@@ -1,23 +1,24 @@
 steps:
-  # Copy server files from server/ to root for Docker build
+  # Step 1: Copy server files from server/ to root for Docker build
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
       - '-c'
       - 'cp server/index.js . && cp -r server/src . && cp server/package.json . && cp server/package-lock.json .'
 
-  # Build Docker image
+  # Step 2: Build Docker image with BuildKit
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node:$BUILD_ID', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node:latest', '.']
+    args: ['build', '--no-cache', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node:$BUILD_ID', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node:latest', '.']
 
-  # Push image
+  # Step 3: Push image (build ID tag)
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node:$BUILD_ID']
 
+  # Step 4: Push image (latest tag)
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node:latest']
 
-  # Deploy to Cloud Run
+  # Step 5: Deploy to Cloud Run with production configs
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
@@ -39,6 +40,14 @@ steps:
       - '8080'
       - '--ingress'
       - 'all'
+      - '--timeout'
+      - '3600'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '10'
+      - '--concurrency'
+      - '80'
 
 options:
   logging: CLOUD_LOGGING_ONLY

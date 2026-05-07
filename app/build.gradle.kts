@@ -45,6 +45,9 @@ android {
             isMinifyEnabled = true
             isDebuggable = false
             signingConfig = signingConfigs.getByName("release")
+            // Cloud Run server URL (update after deploying Node.js server)
+            buildConfigField("String", "CHAT_SERVER_HTTP_URL", "\"http://where-chat-server-node-xxx.uc.a.run.app\"")
+            buildConfigField("String", "CHAT_SERVER_WS_URL", "ws://where-chat-server-node-xxx.uc.a.run.app")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

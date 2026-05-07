@@ -1,13 +1,23 @@
 steps:
-  # Build Node.js server from server/ directory
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node:$BUILD_ID', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node:latest', '-f', 'server/Dockerfile', '.']
+  # Copy server files from server/ to root for Docker build
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - 'cp server/index.js . && cp -r server/src . && cp server/package.json . && cp server/package-lock.json .'
 
+  # Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node:$BUILD_ID', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node:latest', '.']
+
+  # Push image
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node:$BUILD_ID']
+
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node:latest']
 
+  # Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:

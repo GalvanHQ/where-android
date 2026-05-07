@@ -1,13 +1,20 @@
-# Include these
-server/
-cloudbuild.yaml
-
-# Exclude these
-.git
-.gradle
-.idea
-*.md
-.DS_Store
+# Ignore these directories
+.git/
+.gradle/
+.idea/
 app/
 build/
-gradle/
+node_modules/
+
+# Ignore these file types
+*.md
+*.kt
+*.kts
+*.java
+*.xml
+.DS_Store
+
+# Keep server files for Docker build
+!server/
+!cloudbuild.yaml
+!Dockerfile

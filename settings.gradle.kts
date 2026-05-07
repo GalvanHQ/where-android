@@ -21,4 +21,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "Where"
 include(":app")
-include(":server")

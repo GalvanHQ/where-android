@@ -5,25 +5,16 @@ import com.ovi.where.core.common.Resource
 import com.ovi.where.data.remote.chat.ConversationDto
 import com.ovi.where.data.remote.chat.CreateDirectConversationRequest
 import com.ovi.where.data.remote.chat.CreateGroupConversationRequest
-import com.ovi.where.data.remote.chat.KtorApiClient
+import com.ovi.where.data.remote.chat.ChatApiClient
 import com.ovi.where.domain.model.Conversation
 import com.ovi.where.domain.model.ConversationType
 import com.ovi.where.domain.repository.ConversationRepository
-import io.ktor.client.call.body
-import io.ktor.client.request.bearerAuth
-import io.ktor.client.request.get
-import io.ktor.client.request.patch
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import com.google.firebase.firestore.FirebaseFirestore
 import com.ovi.where.core.constants.AppConstants
-import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -108,13 +99,10 @@ class ConversationRepositoryImpl @Inject constructor(
         return try {
             val token = getIdToken()
             println("Creating conversation with otherUserId: $otherUserId")
-            val dto = KtorApiClient.httpClient
-                .post("${KtorApiClient.HTTP_BASE_URL}/api/conversations/direct") {
-                    bearerAuth(token)
-                    contentType(ContentType.Application.Json)
-                    setBody(CreateDirectConversationRequest(otherUserId))
-                }
-                .body<ConversationDto>()
+            val dto = ChatApiClient.apiService.getOrCreateDirectConversation(
+                "Bearer $token",
+                CreateDirectConversationRequest(otherUserId)
+            )
             println("Parsed DTO: $dto")
             Resource.Success(dto.toDomain())
         } catch (e: Exception) {
@@ -128,13 +116,10 @@ class ConversationRepositoryImpl @Inject constructor(
     ): Resource<Conversation> {
         return try {
             val token = getIdToken()
-            val dto = KtorApiClient.httpClient
-                .post("${KtorApiClient.HTTP_BASE_URL}/api/conversations/group") {
-                    bearerAuth(token)
-                    contentType(ContentType.Application.Json)
-                    setBody(CreateGroupConversationRequest(groupId, name, memberIds))
-                }
-                .body<ConversationDto>()
+            val dto = ChatApiClient.apiService.createGroupConversation(
+                "Bearer $token",
+                CreateGroupConversationRequest(groupId, name, memberIds)
+            )
             Resource.Success(dto.toDomain())
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to create group conversation")
@@ -144,10 +129,7 @@ class ConversationRepositoryImpl @Inject constructor(
     override suspend fun markAsRead(conversationId: String, userId: String): Resource<Unit> {
         return try {
             val token = getIdToken()
-            KtorApiClient.httpClient
-                .patch("${KtorApiClient.HTTP_BASE_URL}/api/conversations/$conversationId/read") {
-                    bearerAuth(token)
-                }
+            ChatApiClient.apiService.markAsRead("Bearer $token", conversationId)
             Resource.Success(Unit)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to mark as read")

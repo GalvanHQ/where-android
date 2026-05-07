@@ -1,23 +1,25 @@
 steps:
-  - name: 'gcr.io/cloud-builders/gsutil'
-    args: ['cp', 'gs://where-loc-server-artifacts/server-all.jar', '/workspace/server-all.jar']
-
+  # Step 1: Build Docker image from server/ directory
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server/server:$BUILD_ID', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server/server:latest', '-f', 'server/Dockerfile', '.']
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node/where-chat-server-node:$BUILD_ID', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node/where-chat-server-node:latest', 'server']
 
+  # Step 2: Push image (build ID tag)
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'us-central1-docker.pkg.dev/where-loc/where-chat-server/server:$BUILD_ID']
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'us-central1-docker.pkg.dev/where-loc/where-chat-server/server:latest']
+    args: ['push', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node/where-chat-server-node:$BUILD_ID']
 
+  # Step 3: Push image (latest tag)
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node/where-chat-server-node:latest']
+
+  # Step 4: Deploy to Cloud Run with production configs
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
       - 'run'
       - 'deploy'
-      - 'where-chat-server'
+      - 'where-chat-server-node'
       - '--image'
-      - 'us-central1-docker.pkg.dev/where-loc/where-chat-server/server:latest'
+      - 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node/where-chat-server-node:latest'
       - '--region'
       - 'us-central1'
       - '--platform'
@@ -26,15 +28,19 @@ steps:
       - '--memory'
       - '512Mi'
       - '--cpu'
-      - '1'
+      - '2'
       - '--port'
       - '8080'
-      - '--service-account'
-      - '1025951597272-compute@developer.gserviceaccount.com'
-      - '--set-env-vars'
-      - 'GOOGLE_CLOUD_PROJECT=where-loc'
       - '--ingress'
       - 'all'
+      - '--timeout'
+      - '3600'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '10'
+      - '--concurrency'
+      - '80'
 
 options:
   logging: CLOUD_LOGGING_ONLY

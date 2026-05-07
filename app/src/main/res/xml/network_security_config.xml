@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- Allow cleartext for local dev servers -->
     <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">where-chat-server-zgzelfwe5q-uc.a.run.app</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">192.168.31.234</domain>
+        <domain includeSubdomains="true">localhost</domain>
     </domain-config>
 </network-security-config>

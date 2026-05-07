@@ -2,11 +2,11 @@ FROM node:21-alpine
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY server/package.json server/package-lock.json ./
 RUN npm install --production
 
-COPY index.js ./
-COPY src/ ./src/
+COPY server/index.js ./
+COPY server/src/ ./src/
 
 EXPOSE 8080
 

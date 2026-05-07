@@ -1,6 +1,6 @@
 package com.ovi.where.di
 
-import com.ovi.where.data.remote.chat.ChatWebSocketClient
+import com.ovi.where.data.remote.chat.ChatSocketIoClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -13,5 +13,5 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideChatWebSocketClient(): ChatWebSocketClient = ChatWebSocketClient()
+    fun provideChatSocketIoClient(): ChatSocketIoClient = ChatSocketIoClient()
 }

@@ -1,5 +1,6 @@
 package com.ovi.where.presentation.navigation
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -7,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,15 +16,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChatBubble
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material.icons.outlined.People
-import androidx.compose.material.icons.outlined.Person
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -35,30 +27,54 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import coil.compose.AsyncImage
+import com.ovi.where.R
 import com.ovi.where.presentation.chat.ChatsScreen
 import com.ovi.where.presentation.map.GlobalMapScreen
 import com.ovi.where.presentation.people.PeopleScreen
 import com.ovi.where.presentation.profile.ProfileScreen
-import coil.compose.AsyncImage
 
 private sealed class BottomTab(
     val route: String,
-    val selectedIcon: ImageVector,
-    val unselectedIcon: ImageVector,
+    @DrawableRes val selectedIconResId: Int,
+    @DrawableRes val unselectedIconResId: Int,
     val label: String
 ) {
-    object Map : BottomTab("tab_map", Icons.Filled.LocationOn, Icons.Outlined.LocationOn, "Map")
-    object Chats : BottomTab("tab_chats", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubbleOutline, "Chats")
-    object People : BottomTab("tab_people", Icons.Filled.People, Icons.Outlined.People, "People")
-    object Profile : BottomTab("tab_profile", Icons.Filled.Person, Icons.Outlined.Person, "Profile")
+    object Map : BottomTab(
+        route = "tab_map",
+        selectedIconResId = R.drawable.map_filled,
+        unselectedIconResId = R.drawable.map_outlined,
+        label = "Map"
+    )
+
+    object Chats : BottomTab(
+        route = "tab_chats",
+        selectedIconResId = R.drawable.chat_filled,
+        unselectedIconResId = R.drawable.chat_outlined,
+        label = "Chats"
+    )
+
+    object People : BottomTab(
+        route = "tab_people",
+        selectedIconResId = R.drawable.people_filled,
+        unselectedIconResId = R.drawable.people_outlined,
+        label = "People"
+    )
+
+    object Profile : BottomTab(
+        route = "tab_profile",
+        selectedIconResId = R.drawable.profile_filled,
+        unselectedIconResId = R.drawable.profile_outlined,
+        label = "Profile"
+    )
 }
 
 private val bottomTabs = listOf(BottomTab.Map, BottomTab.Chats, BottomTab.People, BottomTab.Profile)
@@ -151,6 +167,7 @@ private fun WhereBottomBar(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
         tonalElevation = 3.dp
     ) {
@@ -165,15 +182,29 @@ private fun WhereBottomBar(
         ) {
             bottomTabs.forEach { tab ->
                 val selected = currentRoute == tab.route
+                val containerColor =
+                    if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+                val contentColor =
+                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 Surface(
                     onClick = { onTabClick(tab) },
                     modifier = Modifier.size(width = 72.dp, height = 44.dp),
                     shape = MaterialTheme.shapes.extraLarge,
-                    color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                    contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = containerColor,
+                    contentColor = contentColor
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         if (tab == BottomTab.Profile && !profilePhotoUrl.isNullOrEmpty()) {
+                            val selectedBorderModifier =
+                                if (selected) {
+                                    Modifier.border(
+                                        width = 2.dp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = CircleShape
+                                    )
+                                } else {
+                                    Modifier
+                                }
                             AsyncImage(
                                 model = profilePhotoUrl,
                                 contentDescription = tab.label,
@@ -182,15 +213,13 @@ private fun WhereBottomBar(
                                     .size(30.dp)
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.surfaceVariant)
-                                    .border(
-                                        width = if (selected) 2.dp else 0.dp,
-                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                                        shape = CircleShape
-                                    )
+                                    .then(selectedBorderModifier)
                             )
                         } else {
+                            val iconResId =
+                                if (selected) tab.selectedIconResId else tab.unselectedIconResId
                             Icon(
-                                imageVector = if (selected) tab.selectedIcon else tab.unselectedIcon,
+                                painter = painterResource(id = iconResId),
                                 contentDescription = tab.label,
                                 modifier = Modifier.size(25.dp)
                             )

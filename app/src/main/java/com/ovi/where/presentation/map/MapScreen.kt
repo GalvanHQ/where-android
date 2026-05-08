@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,14 +54,31 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.imageLoader
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.MarkerComposable
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
 import com.ovi.where.R
 import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.core.theme.Dimens
@@ -67,10 +86,6 @@ import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.common.WhereTopAppBar
 import com.ovi.where.presentation.model.MemberLocationUiModel
 import kotlinx.coroutines.launch
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.rememberCameraPositionState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,7 +100,7 @@ fun MapScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showDurationDialog by remember { mutableStateOf(false) }
-    var selectedDuration by remember { mutableStateOf(60f) }
+    var selectedDuration by remember { mutableFloatStateOf(60f) }
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(LatLng(0.0, 0.0), 2.0f)
@@ -104,8 +119,11 @@ fun MapScreen(
 
     LaunchedEffect(uiState.hasMyLocation, uiState.myLatitude, uiState.myLongitude) {
         if (uiState.hasMyLocation && uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
-            cameraPositionState.position = CameraPosition.fromLatLngZoom(
-                LatLng(uiState.myLatitude, uiState.myLongitude), 14.0f
+            cameraPositionState.animate(
+                CameraUpdateFactory.newLatLngZoom(
+                    LatLng(uiState.myLatitude, uiState.myLongitude), 14f
+                ),
+                durationMs = 800
             )
         }
     }
@@ -115,6 +133,7 @@ fun MapScreen(
             when (event) {
                 is com.ovi.where.core.common.UiEvent.ShowSnackbar ->
                     snackbarHostState.showSnackbar(event.message.asString(context))
+
                 else -> Unit
             }
         }
@@ -147,17 +166,23 @@ fun MapScreen(
                             val valid = uiState.locations.filter { it.hasValidLocation }
                             if (valid.size == 1) {
                                 scope.launch {
-                                    cameraPositionState.position = CameraPosition.fromLatLngZoom(
-                                        LatLng(valid[0].latitude, valid[0].longitude), 14.0f
+                                    cameraPositionState.animate(
+                                        CameraUpdateFactory.newLatLngZoom(
+                                            LatLng(valid[0].latitude, valid[0].longitude), 14f
+                                        ),
+                                        durationMs = 600
                                     )
                                 }
                             } else if (valid.size > 1) {
                                 scope.launch {
-                                    cameraPositionState.position = CameraPosition.fromLatLngZoom(
-                                        LatLng(
-                                            valid.map { it.latitude }.average(),
-                                            valid.map { it.longitude }.average()
-                                        ), 11.0f
+                                    cameraPositionState.animate(
+                                        CameraUpdateFactory.newLatLngZoom(
+                                            LatLng(
+                                                valid.map { it.latitude }.average(),
+                                                valid.map { it.longitude }.average()
+                                            ), 11f
+                                        ),
+                                        durationMs = 600
                                     )
                                 }
                             }
@@ -166,7 +191,10 @@ fun MapScreen(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     shape = MaterialTheme.shapes.medium
                 ) {
-                    Icon(Icons.Default.CenterFocusStrong, contentDescription = stringResource(R.string.cd_fit_all))
+                    Icon(
+                        Icons.Default.CenterFocusStrong,
+                        contentDescription = stringResource(R.string.cd_fit_all)
+                    )
                 }
                 Spacer(Modifier.height(Dimens.spaceSmall))
                 SmallFloatingActionButton(
@@ -176,13 +204,19 @@ fun MapScreen(
                         ) == PackageManager.PERMISSION_GRANTED
                         if (hasPermission) viewModel.locateMe()
                         else permissionLauncher.launch(
-                            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
                         )
                     },
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     shape = MaterialTheme.shapes.medium
                 ) {
-                    Icon(Icons.Default.MyLocation, contentDescription = stringResource(R.string.cd_my_location))
+                    Icon(
+                        Icons.Default.MyLocation,
+                        contentDescription = stringResource(R.string.cd_my_location)
+                    )
                 }
                 Spacer(Modifier.height(Dimens.spaceMedium))
                 if (uiState.isSharing) {
@@ -214,49 +248,122 @@ fun MapScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
 
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
-                cameraPositionState = cameraPositionState
-            )
-
-            // Member markers overlay — uses shared AvatarMarkersOverlay from MapUtils
-            val validLocations = uiState.locations.filter { it.hasValidLocation }
-            if (validLocations.isNotEmpty()) {
-                val shadowColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
-                val borderColor = MaterialTheme.colorScheme.surface
-                val textColor   = MaterialTheme.colorScheme.onPrimary
-                val pulseColor  = MaterialTheme.colorScheme.tertiary
-
-                AvatarMarkersOverlay(
-                    markers = validLocations.map { loc ->
-                        MapMarker(
-                            id = loc.id,
-                            userId = loc.userId,
-                            label = loc.displayName.take(1).uppercase(),
-                            latitude = loc.latitude,
-                            longitude = loc.longitude,
-                            photoUrl = loc.photoUrl,
-                            isPulsing = loc.isActive
-                        )
-                    },
-                    cameraPosition = cameraPositionState.position,
-                    shadowColor = shadowColor,
-                    borderColor = borderColor,
-                    textColor = textColor,
-                    pulseColor = pulseColor,
-                    onMarkerClick = { marker ->
-                        val loc = validLocations.firstOrNull { it.id == marker.id }
-                        if (loc != null) {
+                cameraPositionState = cameraPositionState,
+                properties = MapProperties(
+                    isMyLocationEnabled = false
+                ),
+                uiSettings = MapUiSettings(
+                    myLocationButtonEnabled = false,
+                    zoomControlsEnabled = false
+                )
+            ) {
+                // Member markers — geo-anchored via MarkerComposable
+                val validLocations = uiState.locations.filter { it.hasValidLocation }
+                validLocations.forEach { location ->
+                    val markerState =
+                        remember(location.userId, location.latitude, location.longitude) {
+                            MarkerState(position = LatLng(location.latitude, location.longitude))
+                        }
+                    val avatarColor =
+                        AvatarColors[location.userId.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
+                    MarkerComposable(
+                        state = markerState,
+                        title = location.displayName,
+                        snippet = location.timeAgo,
+                        zIndex = 5f,
+                        onClick = {
                             scope.launch {
-                                cameraPositionState.position = CameraPosition.fromLatLngZoom(
-                                    LatLng(loc.latitude, loc.longitude), 15.0f
+                                cameraPositionState.animate(
+                                    CameraUpdateFactory.newLatLngZoom(
+                                        LatLng(location.latitude, location.longitude), 15f
+                                    ),
+                                    durationMs = 600
                                 )
                             }
+                            true
                         }
+                    ) {
+                        // Life360-style pin marker
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .shadow(6.dp, CircleShape)
+                                    .clip(CircleShape)
+                                    .background(avatarColor)
+                                    .border(3.dp, MaterialTheme.colorScheme.surface, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                var bitmap by remember(location.photoUrl) {
+                                    mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(
+                                        null
+                                    )
+                                }
+                                val context = LocalContext.current
+
+                                LaunchedEffect(location.photoUrl) {
+                                    if (!location.photoUrl.isNullOrEmpty()) {
+                                        val request = coil.request.ImageRequest.Builder(context)
+                                            .data(location.photoUrl)
+                                            .size(coil.size.Size.ORIGINAL)
+                                            .allowHardware(false)
+                                            .build()
+                                        val result = context.imageLoader.execute(request)
+                                        if (result is coil.request.SuccessResult) {
+                                            val drawable = result.drawable
+                                            val b =
+                                                (drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                                                    ?: drawable.toBitmap()
+                                            bitmap = b.asImageBitmap()
+                                        }
+                                    }
+                                }
+
+                                if (bitmap != null) {
+                                    androidx.compose.foundation.Image(
+                                        bitmap = bitmap!!,
+                                        contentDescription = location.displayName,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else {
+                                    Text(
+                                        text = location.displayName.take(1).uppercase(),
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                        // Triangle tail
+                        val tailColor = MaterialTheme.colorScheme.surface
+                        Box(
+                            modifier = Modifier
+                                .width(14.dp)
+                                .height(10.dp)
+                                .drawBehind {
+                                    val path = Path().apply {
+                                        moveTo(0f, 0f)
+                                        lineTo(size.width, 0f)
+                                        lineTo(size.width / 2f, size.height)
+                                        close()
+                                    }
+                                    drawPath(path, color = tailColor)
+                                }
+                        )
                     }
-                )
+                }
             }
 
             // Sharing status banner
@@ -271,7 +378,10 @@ fun MapScreen(
                     )
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall),
+                        modifier = Modifier.padding(
+                            horizontal = Dimens.spaceLarge,
+                            vertical = Dimens.spaceSmall
+                        ),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -295,7 +405,9 @@ fun MapScreen(
 
             uiState.error?.let { error ->
                 Card(
-                    modifier = Modifier.align(Alignment.TopCenter).padding(Dimens.spaceMedium),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(Dimens.spaceMedium),
                     shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
                 ) {
@@ -326,7 +438,9 @@ fun MapScreen(
                         )
                         Spacer(Modifier.height(Dimens.spaceSmall))
                         LazyColumn(
-                            modifier = Modifier.fillMaxWidth().height(Dimens.memberListHeight),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(Dimens.memberListHeight),
                             verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
                         ) {
                             items(items = uiState.locations, key = { it.id }) { location ->
@@ -335,8 +449,15 @@ fun MapScreen(
                                     onClick = {
                                         if (location.hasValidLocation) {
                                             scope.launch {
-                                                cameraPositionState.position = CameraPosition.fromLatLngZoom(
-                                                    LatLng(location.latitude, location.longitude), 15.0f
+                                                cameraPositionState.animate(
+                                                    CameraUpdateFactory.newLatLngZoom(
+                                                        LatLng(
+                                                            location.latitude,
+                                                            location.longitude
+                                                        ),
+                                                        15f
+                                                    ),
+                                                    durationMs = 600
                                                 )
                                             }
                                         }
@@ -351,6 +472,7 @@ fun MapScreen(
         }
     }
 }
+
 
 @Composable
 private fun DurationPickerDialog(
@@ -394,10 +516,10 @@ private fun DurationPickerDialog(
 
 private fun formatDuration(context: android.content.Context, minutes: Long): String {
     return when {
-        minutes < 60       -> context.getString(R.string.duration_minutes, minutes)
-        minutes == 60L     -> context.getString(R.string.duration_one_hour)
+        minutes < 60 -> context.getString(R.string.duration_minutes, minutes)
+        minutes == 60L -> context.getString(R.string.duration_one_hour)
         minutes % 60 == 0L -> context.getString(R.string.duration_hours, minutes / 60)
-        else               -> context.getString(R.string.duration_hours_minutes, minutes / 60, minutes % 60)
+        else -> context.getString(R.string.duration_hours_minutes, minutes / 60, minutes % 60)
     }
 }
 
@@ -451,7 +573,7 @@ fun MemberLocationItem(
             )
             Text(
                 text = if (location.hasValidLocation) location.timeAgo
-                       else stringResource(R.string.msg_location_not_available),
+                else stringResource(R.string.msg_location_not_available),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

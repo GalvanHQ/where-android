@@ -75,5 +75,14 @@ service cloud.firestore {
       // Delete: only involved parties can delete (unfriend)
       allow delete: if isAuthenticated() && isInvolved();
     }
+
+    // ===== CONSOLIDATED ACTIVE LOCATIONS =====
+    match /activeLocations/{userId} {
+      // Read: authenticated users whose uid is in the visibleTo array
+      allow read: if isAuthenticated()
+        && request.auth.uid in resource.data.visibleTo;
+      // Write: only the location owner
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
   }
 }

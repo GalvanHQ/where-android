@@ -14,23 +14,23 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -39,6 +39,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ChatBubbleOutline
@@ -91,27 +92,33 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.compose.rememberAsyncImagePainter
+import coil.request.CachePolicy
+import coil.request.ImageRequest
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapType
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.MarkerComposable
+import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.ovi.where.R
 import com.ovi.where.core.theme.AvatarColors
@@ -164,12 +171,18 @@ fun GlobalMapScreen(
         else context.showToast(context.getString(R.string.toast_location_denied))
     }
 
-    // ── Camera follows own location on first fix ──────────────────────────────
-    LaunchedEffect(uiState.hasMyLocation, uiState.myLatitude, uiState.myLongitude) {
-        if (uiState.hasMyLocation && uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
-            cameraPositionState.position = CameraPosition.fromLatLngZoom(
-                LatLng(uiState.myLatitude, uiState.myLongitude), 13.0f
+    // ── Camera animation on requestCameraMove flag ────────────────────────────
+    LaunchedEffect(uiState.requestCameraMove) {
+        if (uiState.requestCameraMove && uiState.hasMyLocation &&
+            uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0
+        ) {
+            cameraPositionState.animate(
+                CameraUpdateFactory.newLatLngZoom(
+                    LatLng(uiState.myLatitude, uiState.myLongitude), 15f
+                ),
+                durationMs = 800
             )
+            viewModel.onCameraMoveConsumed()
         }
     }
 
@@ -209,60 +222,55 @@ fun GlobalMapScreen(
                 cameraPositionState = cameraPositionState,
                 properties = MapProperties(
                     mapType = mapType,
-                    isMyLocationEnabled = locationGranted
+                    isMyLocationEnabled = false // we draw our own marker
+                ),
+                uiSettings = MapUiSettings(
+                    myLocationButtonEnabled = false,
+                    zoomControlsEnabled = false
                 )
-            )
-
-            // ── My location indicator ───────────────────────────────────────────
-            if (uiState.hasMyLocation && uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
-                @Suppress("unused") val shadowColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
-                val borderColor = MaterialTheme.colorScheme.surface
-                val textColor = MaterialTheme.colorScheme.onPrimary
-                MyLocationMarkerOverlay(
-                    latitude = uiState.myLatitude,
-                    longitude = uiState.myLongitude,
-                    photoUrl = uiState.myPhotoUrl,
-                    cameraPosition = cameraPositionState.position,
-                    shadowColor = shadowColor,
-                    borderColor = borderColor,
-                    textColor = textColor
-                )
-            }
-
-            // ── Friend avatar markers ─────────────────────────────────────────
-            val validFriends = uiState.friendLocations.filter {
-                it.latitude != 0.0 && it.longitude != 0.0
-            }
-            if (validFriends.isNotEmpty()) {
-                // Capture theme colours before DrawScope
-                val shadowColor  = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
-                val borderColor  = MaterialTheme.colorScheme.surface
-                val textColor    = MaterialTheme.colorScheme.onPrimary
-                val pulseColor   = MaterialTheme.colorScheme.tertiary
-
-                AvatarMarkersOverlay(
-                    markers = validFriends.map { friend ->
-                        MapMarker(
-                            id = friend.userId,
-                            userId = friend.userId,
-                            label = friend.displayName.take(1).uppercase(),
-                            latitude = friend.latitude,
-                            longitude = friend.longitude,
-                            photoUrl = friend.photoUrl,
-                            isPulsing = friend.isActive
-                        )
-                    },
-                    cameraPosition = cameraPositionState.position,
-                    shadowColor = shadowColor,
-                    borderColor = borderColor,
-                    textColor = textColor,
-                    pulseColor = pulseColor,
-                    onMarkerClick = { marker ->
-                        val friend = validFriends.firstOrNull { it.userId == marker.userId }
-                        if (friend != null) viewModel.selectFriend(friend)
+            ) {
+                // ── My location marker (inside GoogleMap → sticks to LatLng) ──
+                if (uiState.hasMyLocation && uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
+                    val myMarkerState = remember(uiState.myLatitude, uiState.myLongitude) {
+                        MarkerState(position = LatLng(uiState.myLatitude, uiState.myLongitude))
                     }
-                )
+                    MarkerComposable(
+                        state = myMarkerState,
+                        title = "My Location",
+                        zIndex = 10f
+                    ) {
+                        MyLocationMarkerContent(
+                            photoUrl = uiState.myPhotoUrl
+                        )
+                    }
+                }
+
+                // ── Friend avatar markers (inside GoogleMap → sticks to LatLng) ──
+                val validFriends = uiState.friendLocations.filter {
+                    it.latitude != 0.0 && it.longitude != 0.0
+                }
+                validFriends.forEach { friend ->
+                    val friendMarkerState = remember(friend.userId, friend.latitude, friend.longitude) {
+                        MarkerState(position = LatLng(friend.latitude, friend.longitude))
+                    }
+                    MarkerComposable(
+                        state = friendMarkerState,
+                        title = friend.displayName,
+                        snippet = friend.timeAgo,
+                        zIndex = 5f,
+                        onClick = {
+                            viewModel.selectFriend(friend)
+                            true
+                        }
+                    ) {
+                        FriendMapMarkerContent(
+                            friend = friend
+                        )
+                    }
+                }
             }
+
+
 
             // ── Group filter pill ─────────────────────────────────────────────
             Surface(
@@ -549,9 +557,12 @@ fun GlobalMapScreen(
                                         viewModel.selectFriend(friend)
                                         if (friend.latitude != 0.0) {
                                             scope.launch {
-                                                cameraPositionState.position = CameraPosition.fromLatLngZoom(
-                                                    LatLng(friend.latitude, friend.longitude), 14.0f
-                                                )
+                                cameraPositionState.animate(
+                                    CameraUpdateFactory.newLatLngZoom(
+                                        LatLng(friend.latitude, friend.longitude), 15f
+                                    ),
+                                    durationMs = 600
+                                )
                                             }
                                         }
                                     }
@@ -1083,6 +1094,20 @@ private fun TargetAvatar(target: GroupFilter) {
     }
 }
 
+// ── Map Type Sheet (Redesigned with preview cards) ───────────────────────────
+
+private data class MapStyleOption(
+    val type: MapType,
+    val label: String,
+    val previewUrl: String,
+    val description: String
+)
+
+private val mapStyleOptions = listOf(
+    MapStyleOption(MapType.NORMAL, "Default", "https://picsum.photos/seed/map_default/400/300", "Clean streets"),
+    MapStyleOption(MapType.SATELLITE, "Satellite", "https://picsum.photos/seed/map_satellite/400/300", "Aerial imagery")
+)
+
 @Composable
 private fun MapTypeSheet(
     selected: MapType,
@@ -1096,103 +1121,214 @@ private fun MapTypeSheet(
     ) {
         Text("Map style", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Switch between standard streets and satellite imagery.",
+            "Choose how the map looks",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(Dimens.spaceLarge))
-        MapTypeRow(
-            title = "Default",
-            subtitle = "Clean street map",
-            selected = selected == MapType.NORMAL,
-            onClick = { onSelect(MapType.NORMAL) }
-        )
-        Spacer(Modifier.height(Dimens.spaceSmall))
-        MapTypeRow(
-            title = "Satellite",
-            subtitle = "Real-world imagery",
-            selected = selected == MapType.SATELLITE,
-            onClick = { onSelect(MapType.SATELLITE) }
-        )
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            mapStyleOptions.forEach { option ->
+                Box(modifier = Modifier.weight(1f)) {
+                    MapStyleCard(
+                        option = option,
+                        isSelected = selected == option.type,
+                        onClick = { onSelect(option.type) }
+                    )
+                }
+            }
+        }
+
         Spacer(Modifier.height(Dimens.spaceLarge))
     }
 }
 
 @Composable
-private fun MapTypeRow(
-    title: String,
-    subtitle: String,
-    selected: Boolean,
+private fun MapStyleCard(
+    option: MapStyleOption,
+    isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    Surface(
+    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary
+                      else MaterialTheme.colorScheme.outlineVariant
+    val containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                         else MaterialTheme.colorScheme.surfaceVariant
+
+    Card(
         onClick = onClick,
-        shape = MaterialTheme.shapes.large,
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        border = androidx.compose.foundation.BorderStroke(
+            width = if (isSelected) 2.dp else 1.dp,
+            color = borderColor
+        ),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLarge),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(Dimens.spaceLarge),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(Icons.Default.Layers, null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(Dimens.spaceLarge))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // Preview image area
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1.4f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                AsyncImage(
+                    model = option.previewUrl,
+                    contentDescription = option.label,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                if (isSelected) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                    )
+                }
             }
-            if (selected) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+
+            Spacer(Modifier.height(Dimens.spaceMedium))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = option.label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = option.description,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (isSelected) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = "Selected",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
         }
     }
 }
 
+// ── Life360-Style Pin Marker Composables ─────────────────────────────────────
+
+private val MARKER_AVATAR_SIZE = 44.dp
+private val MARKER_BORDER_WIDTH = 3.dp
+private val MARKER_TAIL_HEIGHT = 10.dp
+
+/**
+ * Life360-style pin marker: circle avatar with thick white border
+ * + pointed tail triangle below. Used for both "my" and friend markers.
+ */
 @Composable
-private fun MyLocationMarkerOverlay(
-    latitude: Double,
-    longitude: Double,
+private fun Life360PinMarker(
     photoUrl: String?,
-    cameraPosition: CameraPosition,
-    @Suppress("unused") shadowColor: Color,
-    borderColor: Color,
-    textColor: Color
+    fallbackLabel: String,
+    accentColor: Color,
+    borderColor: Color = MaterialTheme.colorScheme.surface
 ) {
-    val density = LocalDensity.current
+    val context = LocalContext.current
+    val tailColor = borderColor
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val widthPx = with(density) { maxWidth.toPx() }
-        val heightPx = with(density) { maxHeight.toPx() }
-        val zoom = cameraPosition.zoom.toDouble()
-        val centerLat = cameraPosition.target.latitude
-        val centerLng = cameraPosition.target.longitude
-        val radiusPx = with(density) { Dimens.markerRadius.toPx() }
+    val painter = rememberAsyncImagePainter(
+        model = ImageRequest.Builder(context)
+            .data(photoUrl)
+            .crossfade(true)
+            .memoryCacheKey(photoUrl)
+            .diskCacheKey(photoUrl)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .build()
+    )
 
-        val pos: Offset = latLngToPixel(latitude, longitude, centerLat, centerLng, zoom, widthPx, heightPx)
-        val markerSize = Dimens.markerRadius * 2
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
 
         Box(
             modifier = Modifier
-                .offset { IntOffset((pos.x - radiusPx).toInt(), (pos.y - radiusPx).toInt()) }
-                .size(markerSize)
+                .size(MARKER_AVATAR_SIZE)
+                .shadow(6.dp, CircleShape)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary)
-                .border(3f.dp, borderColor, CircleShape),
+                .background(accentColor)
+                .border(MARKER_BORDER_WIDTH, borderColor, CircleShape),
             contentAlignment = Alignment.Center
         ) {
+
             if (!photoUrl.isNullOrEmpty()) {
-                AsyncImage(
-                    model = photoUrl,
+                Image(
+                    painter = painter,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
                 Text(
-                    text = "ME",
-                    color = textColor,
-                    fontSize = 12.sp,
+                    text = fallbackLabel,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
             }
         }
+
+        Box(
+            modifier = Modifier
+                .width(14.dp)
+                .height(MARKER_TAIL_HEIGHT)
+                .drawBehind {
+                    val path = Path().apply {
+                        moveTo(0f, 0f)
+                        lineTo(size.width, 0f)
+                        lineTo(size.width / 2f, size.height)
+                        close()
+                    }
+                    drawPath(path, color = tailColor)
+                }
+        )
     }
+}
+
+@Composable
+private fun MyLocationMarkerContent(
+    photoUrl: String?
+) {
+    Life360PinMarker(
+        photoUrl = photoUrl,
+        fallbackLabel = "ME",
+        accentColor = MaterialTheme.colorScheme.primary
+    )
+}
+
+@Composable
+private fun FriendMapMarkerContent(
+    friend: FriendLocationUiModel
+) {
+    Life360PinMarker(
+        photoUrl = friend.photoUrl,
+        fallbackLabel = friend.displayName.take(1).uppercase(),
+        accentColor = avatarColorFor(friend.userId)
+    )
 }
 

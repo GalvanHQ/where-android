@@ -16,6 +16,10 @@ interface LocationRepository {
         bearing: Float
     ): Resource<Unit>
 
+    /** Single consolidated listener — returns all locations visible to current user. */
+    fun observeActiveLocations(): Flow<List<SharedLocation>>
+
+    // Legacy methods kept for backward compat
     fun observeGroupLocations(groupId: String): Flow<List<SharedLocation>>
     fun observeDirectLocationShares(friendIds: List<String>): Flow<List<SharedLocation>>
     fun observeUserLocation(userId: String, groupId: String): Flow<SharedLocation?>
@@ -25,4 +29,7 @@ interface LocationRepository {
     /** Checks Firestore for an active sharing session and restores in-memory state.
      *  Returns true if the user is currently sharing in this group. */
     suspend fun checkSharingStatus(groupId: String): Boolean
+
+    /** Populate visibleTo field for a group share (fetches group member UIDs). */
+    suspend fun getGroupMemberIds(groupId: String): List<String>
 }

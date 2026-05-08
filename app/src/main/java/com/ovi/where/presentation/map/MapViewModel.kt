@@ -21,6 +21,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -49,7 +50,7 @@ class MapViewModel @Inject constructor(
     fun observeLocations(groupId: String) {
         currentGroupId = groupId
 
-        // Restore sharing state from Firestore (fixes the process-kill persistence bug)
+        // Restore sharing state from Firestore
         viewModelScope.launch {
             val isSharing = locationRepository.checkSharingStatus(groupId)
             _uiState.value = _uiState.value.copy(isSharing = isSharing)
@@ -57,22 +58,25 @@ class MapViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
-            observeGroupLocationsUseCase(groupId).collect { locations ->
-                val unknownIds = locations.map { it.userId }
-                    .filter { !userDisplayNames.containsKey(it) }
-                if (unknownIds.isNotEmpty()) fetchDisplayNames(unknownIds)
+            observeGroupLocationsUseCase(groupId)
+                .distinctUntilChanged()
+                .collect { locations ->
+                    val unknownIds = locations.map { it.userId }
+                        .filter { !userDisplayNames.containsKey(it) }
+                    if (unknownIds.isNotEmpty()) fetchDisplayNames(unknownIds)
 
-                _uiState.value = _uiState.value.copy(
-                    locations = locations.map { sharedLocation ->
-                        sharedLocation.toUiModel(
-                            displayName = userDisplayNames[sharedLocation.userId] ?: sharedLocation.userId,
-                            timeAgoText = formatTimeAgo(sharedLocation.timestamp),
-                            photoUrl = userPhotoUrls[sharedLocation.userId]
-                        )
-                    },
-                    isLoading = false
-                )
-            }
+                    _uiState.value = _uiState.value.copy(
+                        locations = locations.map { sharedLocation ->
+                            sharedLocation.toUiModel(
+                                displayName = userDisplayNames[sharedLocation.userId] ?: sharedLocation.userId,
+                                timeAgoText = formatTimeAgo(sharedLocation.timestamp),
+                                photoUrl = userPhotoUrls[sharedLocation.userId]
+                            )
+                        },
+                        isLoading = false,
+                        isEmpty = locations.isEmpty()
+                    )
+                }
         }
     }
 
@@ -162,5 +166,6 @@ data class MapUiState(
     val hasMyLocation: Boolean = false,
     val isSharing: Boolean = false,
     val isLoading: Boolean = false,
+    val isEmpty: Boolean = false,
     val error: String? = null
 )

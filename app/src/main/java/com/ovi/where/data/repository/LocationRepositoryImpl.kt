@@ -12,6 +12,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,6 +26,10 @@ class LocationRepositoryImpl @Inject constructor(
         get() = firebaseAuth.currentUser?.uid
 
     private val activeSharingSessions = mutableMapOf<String, Long>()
+
+    // Write throttle tracking
+    @Volatile
+    private var lastWriteTimestamp = 0L
 
     private fun isDirectTarget(targetId: String): Boolean = targetId.startsWith("direct:")
 
@@ -45,9 +50,41 @@ class LocationRepositoryImpl @Inject constructor(
             } else {
                 Long.MAX_VALUE
             }
-            
+
             activeSharingSessions[groupId] = expiryTime
-            
+
+            val isDirect = isDirectTarget(groupId)
+            val targetType = if (isDirect) "direct" else "group"
+
+            // Build visibleTo list
+            val visibleTo = if (isDirect) {
+                val friendId = directFriendId(groupId)
+                listOf(uid, friendId)
+            } else {
+                getGroupMemberIds(groupId)
+            }
+
+            // Write to consolidated activeLocations collection
+            val activeLocationData = hashMapOf(
+                "userId" to uid,
+                "targetType" to targetType,
+                "targetId" to groupId,
+                "isSharingActive" to true,
+                "sharingExpiresAt" to expiryTime,
+                "timestamp" to System.currentTimeMillis(),
+                "visibleTo" to visibleTo,
+                "latitude" to 0.0,
+                "longitude" to 0.0,
+                "accuracy" to 0f,
+                "speed" to 0f,
+                "bearing" to 0f
+            )
+            firestore.collection(AppConstants.FIRESTORE_COLLECTION_ACTIVE_LOCATIONS)
+                .document(uid)
+                .set(activeLocationData, SetOptions.merge())
+                .await()
+
+            // Legacy dual-write
             val locationData = hashMapOf(
                 "userId" to uid,
                 "groupId" to groupId,
@@ -55,8 +92,7 @@ class LocationRepositoryImpl @Inject constructor(
                 "sharingExpiresAt" to expiryTime,
                 "timestamp" to System.currentTimeMillis()
             )
-
-            if (isDirectTarget(groupId)) {
+            if (isDirect) {
                 val friendId = directFriendId(groupId)
                 val shareDoc = directShareDoc(uid, friendId)
                 shareDoc.set(
@@ -78,9 +114,10 @@ class LocationRepositoryImpl @Inject constructor(
                     .set(locationData, SetOptions.merge())
                     .await()
             }
-            
+
             Resource.Success(Unit)
         } catch (e: Exception) {
+            Timber.e(e, "Failed to start location sharing")
             Resource.Error(e.message ?: "Failed to start location sharing")
         }
     }
@@ -88,14 +125,25 @@ class LocationRepositoryImpl @Inject constructor(
     override suspend fun stopLocationSharing(groupId: String): Resource<Unit> {
         return try {
             val uid = currentUid ?: return Resource.Error("Not authenticated")
-            
+
             activeSharingSessions.remove(groupId)
-            
+
+            // Update consolidated doc
+            firestore.collection(AppConstants.FIRESTORE_COLLECTION_ACTIVE_LOCATIONS)
+                .document(uid)
+                .set(
+                    mapOf(
+                        "isSharingActive" to false,
+                        "timestamp" to System.currentTimeMillis()
+                    ),
+                    SetOptions.merge()
+                ).await()
+
+            // Legacy dual-write
             val updates = mapOf(
                 "isSharingActive" to false,
                 "timestamp" to System.currentTimeMillis()
             )
-
             if (isDirectTarget(groupId)) {
                 directShareDoc(uid, directFriendId(groupId))
                     .collection(AppConstants.FIRESTORE_COLLECTION_LOCATIONS)
@@ -110,9 +158,10 @@ class LocationRepositoryImpl @Inject constructor(
                     .set(updates, SetOptions.merge())
                     .await()
             }
-            
+
             Resource.Success(Unit)
         } catch (e: Exception) {
+            Timber.e(e, "Failed to stop location sharing")
             Resource.Error(e.message ?: "Failed to stop location sharing")
         }
     }
@@ -127,7 +176,32 @@ class LocationRepositoryImpl @Inject constructor(
     ): Resource<Unit> {
         return try {
             val uid = currentUid ?: return Resource.Error("Not authenticated")
-            
+            val now = System.currentTimeMillis()
+
+            // Throttle writes — skip if within throttle window
+            val shouldThrottle = (now - lastWriteTimestamp) < AppConstants.LOCATION_WRITE_THROTTLE_MS
+            if (shouldThrottle) {
+                Timber.d("Write throttled — skipping Firestore update (${now - lastWriteTimestamp}ms since last)")
+                return Resource.Success(Unit)
+            }
+            lastWriteTimestamp = now
+
+            // Consolidated write
+            val activeData = hashMapOf(
+                "latitude" to latitude,
+                "longitude" to longitude,
+                "accuracy" to accuracy,
+                "speed" to speed,
+                "bearing" to bearing,
+                "timestamp" to now,
+                "isSharingActive" to true
+            )
+            firestore.collection(AppConstants.FIRESTORE_COLLECTION_ACTIVE_LOCATIONS)
+                .document(uid)
+                .set(activeData, SetOptions.merge())
+                .await()
+
+            // Legacy dual-write
             val locationData = hashMapOf(
                 "id" to uid,
                 "userId" to uid,
@@ -137,10 +211,9 @@ class LocationRepositoryImpl @Inject constructor(
                 "accuracy" to accuracy,
                 "speed" to speed,
                 "bearing" to bearing,
-                "timestamp" to System.currentTimeMillis(),
+                "timestamp" to now,
                 "isSharingActive" to true
             )
-            
             if (isDirectTarget(groupId)) {
                 directShareDoc(uid, directFriendId(groupId))
                     .collection(AppConstants.FIRESTORE_COLLECTION_LOCATIONS)
@@ -157,9 +230,49 @@ class LocationRepositoryImpl @Inject constructor(
             }
             Resource.Success(Unit)
         } catch (e: Exception) {
+            Timber.e(e, "Failed to update location")
             Resource.Error(e.message ?: "Failed to update location")
         }
     }
+
+    // ── Consolidated listener (Phase 1 key) ──────────────────────────────────
+
+    override fun observeActiveLocations(): Flow<List<SharedLocation>> = callbackFlow {
+        val uid = currentUid ?: run { trySend(emptyList()); close(); return@callbackFlow }
+
+        val listener: ListenerRegistration = firestore
+            .collection(AppConstants.FIRESTORE_COLLECTION_ACTIVE_LOCATIONS)
+            .whereArrayContains("visibleTo", uid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Timber.e(error, "activeLocations listener error")
+                    // Gracefully degrade — emit empty list instead of crashing
+                    trySend(emptyList()).isSuccess
+                    return@addSnapshotListener
+                }
+                val locations = snapshot?.documents?.mapNotNull { doc ->
+                    val location = doc.toObject(SharedLocation::class.java)
+                    if (location != null) {
+                        val now = System.currentTimeMillis()
+                        val stillActive = location.isSharingActive &&
+                            (location.sharingExpiresAt == 0L ||
+                             location.sharingExpiresAt == Long.MAX_VALUE ||
+                             now < location.sharingExpiresAt)
+                        if (stillActive && location.userId != uid) {
+                            location.copy(
+                                id = doc.id,
+                                isSharingActive = true,
+                                groupId = location.targetId
+                            )
+                        } else null
+                    } else null
+                } ?: emptyList()
+                trySend(locations).isSuccess
+            }
+        awaitClose { listener.remove() }
+    }
+
+    // ── Legacy listeners (kept for backward compat) ──────────────────────────
 
     override fun observeGroupLocations(groupId: String): Flow<List<SharedLocation>> = callbackFlow {
         val listener: ListenerRegistration = firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
@@ -174,7 +287,7 @@ class LocationRepositoryImpl @Inject constructor(
                     val location = doc.toObject(SharedLocation::class.java)
                     if (location != null) {
                         val now = System.currentTimeMillis()
-                        val stillActive = location.isSharingActive && 
+                        val stillActive = location.isSharingActive &&
                             (location.sharingExpiresAt == 0L || location.sharingExpiresAt == Long.MAX_VALUE || now < location.sharingExpiresAt)
                         location.copy(id = doc.id, isSharingActive = stillActive)
                     } else null
@@ -232,7 +345,7 @@ class LocationRepositoryImpl @Inject constructor(
                 val location = snapshot?.toObject(SharedLocation::class.java)
                 val resolvedLocation = if (location != null) {
                     val now = System.currentTimeMillis()
-                    val stillActive = location.isSharingActive && 
+                    val stillActive = location.isSharingActive &&
                         (location.sharingExpiresAt == 0L || location.sharingExpiresAt == Long.MAX_VALUE || now < location.sharingExpiresAt)
                     location.copy(id = snapshot.id, isSharingActive = stillActive)
                 } else null
@@ -253,6 +366,27 @@ class LocationRepositoryImpl @Inject constructor(
     override suspend fun checkSharingStatus(groupId: String): Boolean {
         return try {
             val uid = currentUid ?: return false
+
+            // Check consolidated doc first
+            val activeDoc = firestore.collection(AppConstants.FIRESTORE_COLLECTION_ACTIVE_LOCATIONS)
+                .document(uid)
+                .get()
+                .await()
+
+            if (activeDoc.exists()) {
+                val isActive = activeDoc.getBoolean("isSharingActive") ?: false
+                val expiresAt = activeDoc.getLong("sharingExpiresAt") ?: 0L
+                val targetId = activeDoc.getString("targetId") ?: ""
+                val now = System.currentTimeMillis()
+                val stillActive = isActive && targetId == groupId &&
+                    (expiresAt == Long.MAX_VALUE || now < expiresAt)
+                if (stillActive) {
+                    activeSharingSessions[groupId] = expiresAt
+                    return true
+                }
+            }
+
+            // Fallback to legacy
             val doc = if (isDirectTarget(groupId)) {
                 directShareDoc(uid, directFriendId(groupId))
                     .collection(AppConstants.FIRESTORE_COLLECTION_LOCATIONS)
@@ -274,14 +408,29 @@ class LocationRepositoryImpl @Inject constructor(
             val stillActive = isActive && (expiresAt == Long.MAX_VALUE || now < expiresAt)
 
             if (stillActive) {
-                // Restore in-memory state so isSharingLocation() works correctly
                 activeSharingSessions[groupId] = expiresAt
             } else {
                 activeSharingSessions.remove(groupId)
             }
             stillActive
         } catch (e: Exception) {
+            Timber.e(e, "Failed to check sharing status")
             false
+        }
+    }
+
+    override suspend fun getGroupMemberIds(groupId: String): List<String> {
+        return try {
+            val snapshot = firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
+                .document(groupId)
+                .collection(AppConstants.FIRESTORE_COLLECTION_MEMBERS)
+                .get()
+                .await()
+            snapshot.documents.mapNotNull { it.getString("userId") ?: it.id }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to fetch group members")
+            val uid = currentUid
+            if (uid != null) listOf(uid) else emptyList()
         }
     }
 }

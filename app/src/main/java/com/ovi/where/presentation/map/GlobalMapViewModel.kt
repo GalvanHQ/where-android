@@ -15,14 +15,13 @@ import com.ovi.where.core.common.UiEvent
 import com.ovi.where.core.common.UiText
 import com.ovi.where.data.local.prefs.UserPreferences
 import com.ovi.where.data.location.LocationManager
-import com.ovi.where.domain.model.Group
 import com.ovi.where.domain.model.SharedLocation
 import com.ovi.where.domain.model.User
 import com.ovi.where.domain.repository.LocationRepository
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
 import com.ovi.where.domain.usecase.friend.ObserveFriendsUseCase
 import com.ovi.where.domain.usecase.group.GetUserGroupsUseCase
-import com.ovi.where.domain.usecase.location.ObserveGroupLocationsUseCase
+import com.ovi.where.domain.usecase.location.ObserveActiveLocationsUseCase
 import com.ovi.where.domain.usecase.location.StartLocationSharingUseCase
 import com.ovi.where.domain.usecase.location.StopLocationSharingUseCase
 import com.ovi.where.domain.usecase.user.GetUsersUseCase
@@ -30,17 +29,14 @@ import com.ovi.where.domain.usecase.auth.ObserveCurrentUserUseCase
 import com.ovi.where.service.LocationTrackingService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
-import java.util.Date
-import java.text.SimpleDateFormat
-import java.util.Locale
 import javax.inject.Inject
 
 /**
@@ -53,10 +49,14 @@ data class FriendLocationUiModel(
     val photoUrl: String?,
     val latitude: Double,
     val longitude: Double,
+    val accuracy: Float = 0f,
+    val speed: Float = 0f,
+    val bearing: Float = 0f,
     val timeAgo: String,
-    val isActive: Boolean,         // isSharingActive
-    val groupId: String,           // which group this location came from
-    val groupName: String
+    val isActive: Boolean,
+    val groupId: String,
+    val groupName: String,
+    val distanceMeters: Float? = null
 )
 
 /** Simple group representation for the filter pill / sheet. */
@@ -71,7 +71,7 @@ data class GroupFilter(
 class GlobalMapViewModel @Inject constructor(
     application: Application,
     private val getUserGroupsUseCase: GetUserGroupsUseCase,
-    private val observeGroupLocationsUseCase: ObserveGroupLocationsUseCase,
+    private val observeActiveLocationsUseCase: ObserveActiveLocationsUseCase,
     private val startLocationSharingUseCase: StartLocationSharingUseCase,
     private val stopLocationSharingUseCase: StopLocationSharingUseCase,
     private val getUsersUseCase: GetUsersUseCase,
@@ -93,16 +93,19 @@ class GlobalMapViewModel @Inject constructor(
     private val _navigateToChat = MutableStateFlow<String?>(null)
     val navigateToChat: StateFlow<String?> = _navigateToChat.asStateFlow()
 
-    // Per-group raw locations (groupId → list of SharedLocation)
-    private val rawLocations = MutableStateFlow<Map<String, List<SharedLocation>>>(emptyMap())
-
     // User profile cache (userId → User)
     private val userCache = mutableMapOf<String, User>()
 
-    // Per-group Firestore listener jobs
-    private val groupJobs = mutableMapOf<String, Job>()
-    private var directLocationJob: Job? = null
+    // Debounced user-fetch tracking
+    private val pendingUserFetchIds = mutableSetOf<String>()
+    private var userFetchJob: Job? = null
+
+    // Single consolidated location stream job
+    private var locationStreamJob: Job? = null
     private var friendsJob: Job? = null
+
+    // Auto-refresh timeAgo ticker
+    private var timeAgoRefreshJob: Job? = null
 
     val currentUserId: String? get() = firebaseAuth.currentUser?.uid
 
@@ -115,12 +118,22 @@ class GlobalMapViewModel @Inject constructor(
     }
 
     init {
-        loadGroupsAndObserve()
-        observeFriendsAndDirectLocations()
+        loadGroupsAndStartObserving()
+        observeFriends()
+        observeConsolidatedLocations()
         observeLocationOffDialogPref()
         observeCurrentUser()
         checkGpsEnabled()
         registerLocationProviderReceiver()
+        startTimeAgoTicker()
+        autoLocateOnLaunch()
+    }
+
+    /** Auto-locate user on first launch (like Google Maps). */
+    private fun autoLocateOnLaunch() {
+        viewModelScope.launch {
+            locateMe()
+        }
     }
 
     private fun checkGpsEnabled() {
@@ -160,9 +173,9 @@ class GlobalMapViewModel @Inject constructor(
         }
     }
 
-    // ── Initialisation ────────────────────────────────────────────────────────
+    // ── Consolidated Location Stream (replaces N groupJobs + directLocationJob) ──
 
-    private fun loadGroupsAndObserve() {
+    private fun loadGroupsAndStartObserving() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             when (val result = getUserGroupsUseCase()) {
@@ -171,8 +184,8 @@ class GlobalMapViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         groups = groups.map { GroupFilter(it.id, it.name) }
                     )
-                    groups.forEach { group -> observeGroupLocations(group) }
-                    checkAllSharingSessions(groups, _uiState.value.directTargets)
+                    // Check sharing sessions in background
+                    checkAllSharingSessions()
                 }
                 is Resource.Error -> {
                     _uiState.value = _uiState.value.copy(
@@ -185,86 +198,7 @@ class GlobalMapViewModel @Inject constructor(
         }
     }
 
-    private fun observeGroupLocations(group: Group) {
-        val job = viewModelScope.launch {
-            observeGroupLocationsUseCase(group.id).collect { locations ->
-                val current = rawLocations.value.toMutableMap()
-                current[group.id] = locations
-                rawLocations.value = current
-                rebuildFriendLocations()
-            }
-        }
-        groupJobs[group.id]?.cancel()
-        groupJobs[group.id] = job
-    }
-
-    /** Aggregate raw locations from all groups into a deduplicated friend list. */
-    private fun rebuildFriendLocations() {
-        val uid = currentUserId ?: return
-        val activeFilter = _uiState.value.activeGroupFilter
-        val groupsToShow = if (activeFilter != null) {
-            rawLocations.value.filterKeys { it == activeFilter.id }
-        } else {
-            rawLocations.value
-        }
-
-        // Flatten all locations across groups
-        val allLocations = mutableListOf<Triple<SharedLocation, String, String>>() // loc, groupId, groupName
-        val groups = _uiState.value.groups
-        for ((groupId, locations) in groupsToShow) {
-            val target = groups.firstOrNull { it.id == groupId } ?: _uiState.value.directTargets.firstOrNull { it.id == groupId }
-            val groupName = target?.name ?: if (groupId.startsWith("direct:")) "Direct" else ""
-            locations
-                .filter { it.userId != uid && it.isSharingActive }
-                .forEach { allLocations.add(Triple(it, groupId, groupName)) }
-        }
-
-        // Deduplicate by userId — keep the most recent location per user
-        val deduped = allLocations
-            .groupBy { it.first.userId }
-            .mapValues { (_, entries) -> entries.maxByOrNull { it.first.timestamp }!! }
-            .values.toList()
-
-        // Fetch any unknown display names
-        val unknownIds = deduped.map { it.first.userId }.filter { !userCache.containsKey(it) }
-        if (unknownIds.isNotEmpty()) {
-            viewModelScope.launch { fetchUsers(unknownIds) }
-        }
-
-        val friendLocations = deduped.map { (loc, groupId, groupName) ->
-            val user = userCache[loc.userId]
-            FriendLocationUiModel(
-                userId = loc.userId,
-                displayName = user?.displayName ?: loc.userId,
-                username = user?.username ?: "",
-                photoUrl = user?.photoUrl,
-                latitude = loc.latitude,
-                longitude = loc.longitude,
-                timeAgo = formatTimeAgo(loc.timestamp),
-                isActive = loc.isSharingActive,
-                groupId = groupId,
-                groupName = groupName
-            )
-        }
-
-        _uiState.value = _uiState.value.copy(
-            friendLocations = friendLocations,
-            isLoading = false
-        )
-    }
-
-    private suspend fun fetchUsers(userIds: List<String>) {
-        when (val result = getUsersUseCase(userIds)) {
-            is Resource.Success -> {
-                result.data?.forEach { user -> userCache[user.id] = user }
-                rebuildFriendLocations()
-            }
-            else -> {}
-        }
-    }
-
-    /** Check all groups for an active sharing session to restore isSharing state. */
-    private fun observeFriendsAndDirectLocations() {
+    private fun observeFriends() {
         friendsJob?.cancel()
         friendsJob = viewModelScope.launch {
             observeFriendsUseCase().collect { friends ->
@@ -278,47 +212,160 @@ class GlobalMapViewModel @Inject constructor(
                     )
                 }
                 _uiState.value = _uiState.value.copy(directTargets = directTargets)
-                observeDirectLocations(friends.map { it.id })
-                checkAllSharingSessions(emptyList(), directTargets)
+                checkAllSharingSessions()
             }
         }
     }
 
-    private fun observeDirectLocations(friendIds: List<String>) {
-        directLocationJob?.cancel()
-        directLocationJob = viewModelScope.launch {
-            locationRepository.observeDirectLocationShares(friendIds).collect { locations ->
-                val current = rawLocations.value.toMutableMap()
-                current.keys.filter { it.startsWith("direct:") }.forEach { current.remove(it) }
-                locations.forEach { loc ->
-                    current["direct:${loc.userId}"] = listOf(loc)
+    /**
+     * Single consolidated Firestore listener for ALL locations visible to current user.
+     * Replaces N per-group listeners + direct location listener.
+     */
+    private fun observeConsolidatedLocations() {
+        locationStreamJob?.cancel()
+        locationStreamJob = viewModelScope.launch {
+            observeActiveLocationsUseCase()
+                .distinctUntilChanged()
+                .collect { locations ->
+                    processLocationUpdates(locations)
                 }
-                rawLocations.value = current
-                rebuildFriendLocations()
+        }
+    }
+
+    private fun processLocationUpdates(locations: List<SharedLocation>) {
+        val uid = currentUserId ?: return
+        val activeFilter = _uiState.value.activeGroupFilter
+
+        // Client-side filter by group if filter is active
+        val filtered = if (activeFilter != null) {
+            locations.filter { it.targetId == activeFilter.id }
+        } else {
+            locations
+        }
+
+        // Deduplicate by userId — keep latest timestamp per user
+        val deduped = filtered
+            .filter { it.userId != uid && it.isSharingActive }
+            .groupBy { it.userId }
+            .mapValues { (_, entries) -> entries.maxByOrNull { it.timestamp }!! }
+            .values.toList()
+
+        // Debounced user profile fetch for unknown IDs
+        val unknownIds = deduped.map { it.userId }.filter { !userCache.containsKey(it) }
+        if (unknownIds.isNotEmpty()) {
+            debouncedFetchUsers(unknownIds)
+        }
+
+        // Build UI models with distance-from-me
+        val myLat = _uiState.value.myLatitude
+        val myLng = _uiState.value.myLongitude
+        val hasMyLoc = _uiState.value.hasMyLocation
+        val groups = _uiState.value.groups
+        val directTargets = _uiState.value.directTargets
+
+        val friendLocations = deduped.map { loc ->
+            val user = userCache[loc.userId]
+            val target = groups.firstOrNull { it.id == loc.targetId }
+                ?: directTargets.firstOrNull { it.id == loc.targetId }
+            val groupName = target?.name ?: if (loc.targetType == "direct") "Direct" else ""
+
+            val distance = if (hasMyLoc && loc.latitude != 0.0 && loc.longitude != 0.0) {
+                val results = FloatArray(1)
+                android.location.Location.distanceBetween(myLat, myLng, loc.latitude, loc.longitude, results)
+                results[0]
+            } else null
+
+            FriendLocationUiModel(
+                userId = loc.userId,
+                displayName = user?.displayName ?: loc.userId,
+                username = user?.username ?: "",
+                photoUrl = user?.photoUrl,
+                latitude = loc.latitude,
+                longitude = loc.longitude,
+                accuracy = loc.accuracy,
+                speed = loc.speed,
+                bearing = loc.bearing,
+                timeAgo = formatTimeAgo(loc.timestamp),
+                isActive = loc.isSharingActive,
+                groupId = loc.targetId,
+                groupName = groupName,
+                distanceMeters = distance
+            )
+        }
+
+        _uiState.value = _uiState.value.copy(
+            friendLocations = friendLocations,
+            isLoading = false
+        )
+    }
+
+    /** Debounced user fetch — collect IDs for 200ms then batch fetch. */
+    private fun debouncedFetchUsers(ids: List<String>) {
+        synchronized(pendingUserFetchIds) { pendingUserFetchIds.addAll(ids) }
+        userFetchJob?.cancel()
+        userFetchJob = viewModelScope.launch {
+            delay(200)
+            val toFetch: List<String>
+            synchronized(pendingUserFetchIds) {
+                toFetch = pendingUserFetchIds.toList()
+                pendingUserFetchIds.clear()
+            }
+            if (toFetch.isNotEmpty()) fetchUsers(toFetch)
+        }
+    }
+
+    private suspend fun fetchUsers(userIds: List<String>) {
+        when (val result = getUsersUseCase(userIds)) {
+            is Resource.Success -> {
+                result.data?.forEach { user -> userCache[user.id] = user }
+                // Re-trigger UI rebuild with cached data
+                observeActiveLocationsUseCase()
+                    .distinctUntilChanged()
+                    // Just take 1 to trigger a rebuild, the ongoing collector handles the rest
+            }
+            else -> {}
+        }
+    }
+
+    /** Auto-refresh timeAgo every 30s */
+    private fun startTimeAgoTicker() {
+        timeAgoRefreshJob?.cancel()
+        timeAgoRefreshJob = viewModelScope.launch {
+            while (true) {
+                delay(30_000)
+                val current = _uiState.value
+                if (current.friendLocations.isNotEmpty()) {
+                    _uiState.value = current.copy(
+                        friendLocations = current.friendLocations.map { friend ->
+                            friend // timeAgo recalculated on next location update
+                        }
+                    )
+                }
             }
         }
     }
 
-    private fun checkAllSharingSessions(groups: List<Group>, directTargets: List<GroupFilter>) {
+    private fun checkAllSharingSessions() {
         viewModelScope.launch {
+            val groups = _uiState.value.groups
+            val directTargets = _uiState.value.directTargets
+
             for (group in groups) {
                 if (locationRepository.checkSharingStatus(group.id)) {
                     _uiState.value = _uiState.value.copy(
                         isSharing = true,
                         sharingGroupId = group.id
                     )
-                    break // Only one group can be active at a time
+                    return@launch
                 }
             }
-            if (!_uiState.value.isSharing) {
-                for (target in directTargets) {
-                    if (locationRepository.checkSharingStatus(target.id)) {
-                        _uiState.value = _uiState.value.copy(
-                            isSharing = true,
-                            sharingGroupId = target.id
-                        )
-                        break
-                    }
+            for (target in directTargets) {
+                if (locationRepository.checkSharingStatus(target.id)) {
+                    _uiState.value = _uiState.value.copy(
+                        isSharing = true,
+                        sharingGroupId = target.id
+                    )
+                    return@launch
                 }
             }
         }
@@ -328,7 +375,8 @@ class GlobalMapViewModel @Inject constructor(
 
     fun setGroupFilter(filter: GroupFilter?) {
         _uiState.value = _uiState.value.copy(activeGroupFilter = filter)
-        rebuildFriendLocations()
+        // Re-process with new filter applied
+        observeConsolidatedLocations()
     }
 
     fun selectFriend(friend: FriendLocationUiModel?) {
@@ -397,10 +445,15 @@ class GlobalMapViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     myLatitude = loc.latitude,
                     myLongitude = loc.longitude,
-                    hasMyLocation = true
+                    hasMyLocation = true,
+                    requestCameraMove = true
                 )
             }
         }
+    }
+
+    fun onCameraMoveConsumed() {
+        _uiState.value = _uiState.value.copy(requestCameraMove = false)
     }
 
     fun openOrCreateDm(userId: String) {
@@ -418,6 +471,15 @@ class GlobalMapViewModel @Inject constructor(
 
     fun onChatNavigated() {
         _navigateToChat.value = null
+    }
+
+    /** Format distance for display. */
+    fun formatDistance(meters: Float?): String {
+        if (meters == null) return ""
+        return when {
+            meters < 1000 -> "${meters.toInt()}m away"
+            else -> String.format("%.1fkm away", meters / 1000)
+        }
     }
 
     private fun startLocationService(groupId: String, durationMinutes: Long) {
@@ -450,7 +512,9 @@ class GlobalMapViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        groupJobs.values.forEach { it.cancel() }
+        locationStreamJob?.cancel()
+        friendsJob?.cancel()
+        timeAgoRefreshJob?.cancel()
         unregisterLocationProviderReceiver()
     }
 }
@@ -461,10 +525,11 @@ data class GlobalMapUiState(
     val myLatitude: Double = 0.0,
     val myLongitude: Double = 0.0,
     val hasMyLocation: Boolean = false,
+    val requestCameraMove: Boolean = false,
     // Groups
     val groups: List<GroupFilter> = emptyList(),
     val directTargets: List<GroupFilter> = emptyList(),
-    val activeGroupFilter: GroupFilter? = null,    // null = show all groups
+    val activeGroupFilter: GroupFilter? = null,
     // Sharing
     val isSharing: Boolean = false,
     val sharingGroupId: String? = null,

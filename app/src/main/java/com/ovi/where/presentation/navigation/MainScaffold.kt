@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -36,6 +37,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.ovi.where.R
 import com.ovi.where.presentation.chat.ChatsScreen
 import com.ovi.where.presentation.map.GlobalMapScreen
@@ -206,7 +209,15 @@ private fun WhereBottomBar(
                                     Modifier
                                 }
                             AsyncImage(
-                                model = profilePhotoUrl,
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(profilePhotoUrl)
+                                    .crossfade(true)
+                                    .memoryCacheKey(profilePhotoUrl)
+                                    .diskCacheKey(profilePhotoUrl)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .size(128)
+                                    .build(),
                                 contentDescription = tab.label,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier

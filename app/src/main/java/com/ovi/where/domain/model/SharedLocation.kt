@@ -11,5 +11,9 @@ data class SharedLocation(
     val bearing: Float = 0f,
     val timestamp: Long = 0L,
     val isSharingActive: Boolean = false,
-    val sharingExpiresAt: Long = 0L
+    val sharingExpiresAt: Long = 0L,
+    // Consolidated location fields
+    val targetType: String = "group",  // "group" or "direct"
+    val targetId: String = "",         // groupId or "direct:friendId"
+    val visibleTo: List<String> = emptyList()
 )

@@ -26,6 +26,10 @@ object AppConstants {
     const val FIRESTORE_COLLECTION_MESSAGES = "messages"
     const val FIRESTORE_COLLECTION_FRIENDSHIPS = "friendships"
     const val FIRESTORE_COLLECTION_DIRECT_LOCATION_SHARES = "directLocationShares"
+    const val FIRESTORE_COLLECTION_ACTIVE_LOCATIONS = "activeLocations"
+
+    // Write throttle (ms) — skip Firestore writes if less than this since last write
+    const val LOCATION_WRITE_THROTTLE_MS = 15_000L
 
     // DataStore
     const val DATASTORE_USER_PREFERENCES = "user_preferences"

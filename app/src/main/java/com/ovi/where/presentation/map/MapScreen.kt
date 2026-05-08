@@ -52,12 +52,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.ovi.where.R
 import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.core.theme.Dimens
@@ -235,6 +237,7 @@ fun MapScreen(
                             label = loc.displayName.take(1).uppercase(),
                             latitude = loc.latitude,
                             longitude = loc.longitude,
+                            photoUrl = loc.photoUrl,
                             isPulsing = loc.isActive
                         )
                     },
@@ -411,18 +414,29 @@ fun MemberLocationItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         val color = AvatarColors[location.userId.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
-        Box(
-            modifier = Modifier
-                .size(Dimens.avatarSizeSmall)
-                .clip(CircleShape)
-                .background(color),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = location.displayName.take(1).uppercase(),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.surface
+        if (!location.photoUrl.isNullOrEmpty()) {
+            AsyncImage(
+                model = location.photoUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(Dimens.avatarSizeSmall)
+                    .clip(CircleShape)
             )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(Dimens.avatarSizeSmall)
+                    .clip(CircleShape)
+                    .background(color),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = location.displayName.take(1).uppercase(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.surface
+                )
+            }
         }
 
         Spacer(Modifier.width(Dimens.spaceMedium))

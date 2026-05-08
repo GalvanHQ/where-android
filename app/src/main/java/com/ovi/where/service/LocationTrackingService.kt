@@ -48,8 +48,10 @@ class LocationTrackingService : Service() {
             ACTION_START -> {
                 currentGroupId = intent.getStringExtra(EXTRA_GROUP_ID)
                 val duration = intent.getLongExtra(EXTRA_DURATION_MINUTES, -1L)
-                if (duration != -1L) {
-                    expiresAt = System.currentTimeMillis() + duration * 60_000
+                expiresAt = if (duration > 0) {
+                    System.currentTimeMillis() + duration * 60_000
+                } else {
+                    null
                 }
                 startForegroundService()
             }

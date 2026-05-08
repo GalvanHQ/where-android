@@ -216,6 +216,9 @@
 
     <!-- Toast Messages -->
     <string name="toast_location_denied">Location permission denied</string>
+    <string name="title_location_off">Location is Off</string>
+    <string name="msg_location_off">Your location is turned off. Enable it to see and share your location on the map.</string>
+    <string name="action_enable_location">Enable Location</string>
     <string name="toast_invite_code_copied">Invite code copied!</string>
     <string name="toast_location_settings">Open Settings to manage location permission</string>
     <string name="toast_privacy_coming_soon">Privacy settings coming soon</string>

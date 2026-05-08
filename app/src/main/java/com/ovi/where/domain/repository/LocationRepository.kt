@@ -17,6 +17,7 @@ interface LocationRepository {
     ): Resource<Unit>
 
     fun observeGroupLocations(groupId: String): Flow<List<SharedLocation>>
+    fun observeDirectLocationShares(friendIds: List<String>): Flow<List<SharedLocation>>
     fun observeUserLocation(userId: String, groupId: String): Flow<SharedLocation?>
     fun isSharingLocation(groupId: String): Boolean
     fun getSharingExpiryTime(groupId: String): Long?

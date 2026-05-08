@@ -23,6 +23,7 @@ class UserPreferences @Inject constructor(
         val LOCATION_SHARING_ENABLED = booleanPreferencesKey("location_sharing_enabled")
         val BATTERY_SAVER_MODE = booleanPreferencesKey("battery_saver_mode")
         val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
+        val LOCATION_OFF_DIALOG_SHOWN = booleanPreferencesKey("location_off_dialog_shown")
     }
 
     val userId: Flow<String?> = dataStore.data.map { preferences ->
@@ -47,6 +48,10 @@ class UserPreferences @Inject constructor(
 
     val isOnboardingComplete: Flow<Boolean> = dataStore.data.map { preferences ->
         preferences[Keys.ONBOARDING_COMPLETE] ?: false
+    }
+
+    val isLocationOffDialogShown: Flow<Boolean> = dataStore.data.map { preferences ->
+        preferences[Keys.LOCATION_OFF_DIALOG_SHOWN] ?: false
     }
 
     suspend fun saveUserId(userId: String) {
@@ -88,6 +93,12 @@ class UserPreferences @Inject constructor(
     suspend fun setOnboardingComplete(complete: Boolean) {
         dataStore.edit { preferences ->
             preferences[Keys.ONBOARDING_COMPLETE] = complete
+        }
+    }
+
+    suspend fun setLocationOffDialogShown(shown: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[Keys.LOCATION_OFF_DIALOG_SHOWN] = shown
         }
     }
 

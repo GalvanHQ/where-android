@@ -44,6 +44,7 @@ class MapViewModel @Inject constructor(
 
     private var currentGroupId: String? = null
     private val userDisplayNames = mutableMapOf<String, String>()
+    private val userPhotoUrls = mutableMapOf<String, String?>()
 
     fun observeLocations(groupId: String) {
         currentGroupId = groupId
@@ -65,7 +66,8 @@ class MapViewModel @Inject constructor(
                     locations = locations.map { sharedLocation ->
                         sharedLocation.toUiModel(
                             displayName = userDisplayNames[sharedLocation.userId] ?: sharedLocation.userId,
-                            timeAgoText = formatTimeAgo(sharedLocation.timestamp)
+                            timeAgoText = formatTimeAgo(sharedLocation.timestamp),
+                            photoUrl = userPhotoUrls[sharedLocation.userId]
                         )
                     },
                     isLoading = false
@@ -78,6 +80,7 @@ class MapViewModel @Inject constructor(
         when (val result = getUsersUseCase(userIds)) {
             is Resource.Success -> result.data?.forEach { user ->
                 userDisplayNames[user.id] = user.displayName
+                userPhotoUrls[user.id] = user.photoUrl
             }
             else -> {}
         }

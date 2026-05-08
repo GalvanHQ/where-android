@@ -1,7 +1,9 @@
 package com.ovi.where.presentation.map
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -10,14 +12,14 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -26,7 +28,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -37,9 +41,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CenterFocusStrong
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
@@ -57,9 +63,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -74,6 +82,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -82,32 +92,38 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapType
+import com.google.maps.android.compose.rememberCameraPositionState
 import com.ovi.where.R
 import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.showToast
 import kotlinx.coroutines.launch
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.rememberCameraPositionState
-
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GlobalMapScreen(
-    contentPadding: PaddingValues = PaddingValues(),
+    @Suppress("unused") contentPadding: PaddingValues = PaddingValues(),
     onNavigateToChat: (String) -> Unit = {},
     onNavigateToUserProfile: (String) -> Unit = {},
     onNavigateToGroupMap: (String) -> Unit = {},
@@ -118,6 +134,12 @@ fun GlobalMapScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    fun hasLocationPerms(): Boolean {
+        return ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    }
+    var locationGranted by remember { mutableStateOf(hasLocationPerms()) }
 
     // Handle navigation to chat
     LaunchedEffect(navigateToChat) {
@@ -137,6 +159,7 @@ fun GlobalMapScreen(
     ) { perms ->
         val granted = perms[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
                 perms[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        locationGranted = granted
         if (granted) viewModel.locateMe()
         else context.showToast(context.getString(R.string.toast_location_denied))
     }
@@ -161,27 +184,14 @@ fun GlobalMapScreen(
         }
     }
 
-    // ── Sharing duration state (local) ────────────────────────────────────────
-    var sharingDuration by remember { mutableStateOf(60f) }
-    var pendingShareGroupId by remember { mutableStateOf<String?>(null) }
-
-    // Duration dialog
-    if (pendingShareGroupId != null) {
-        DurationPickerDialog(
-            currentDuration = sharingDuration,
-            onDurationChange = { sharingDuration = it },
-            onDismiss = { pendingShareGroupId = null },
-            onConfirm = {
-                viewModel.startSharing(pendingShareGroupId!!, sharingDuration.toLong())
-                pendingShareGroupId = null
-            }
-        )
-    }
+    var mapType by remember { mutableStateOf(MapType.NORMAL) }
+    var showMapTypeSheet by remember { mutableStateOf(false) }
 
     // ── Bottom sheet state ────────────────────────────────────────────────────
     val friendSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val groupPickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val shareSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val mapTypeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -196,8 +206,28 @@ fun GlobalMapScreen(
             // ── Map ───────────────────────────────────────────────────────────
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
-                cameraPositionState = cameraPositionState
+                cameraPositionState = cameraPositionState,
+                properties = MapProperties(
+                    mapType = mapType,
+                    isMyLocationEnabled = locationGranted
+                )
             )
+
+            // ── My location indicator ───────────────────────────────────────────
+            if (uiState.hasMyLocation && uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
+                @Suppress("unused") val shadowColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
+                val borderColor = MaterialTheme.colorScheme.surface
+                val textColor = MaterialTheme.colorScheme.onPrimary
+                MyLocationMarkerOverlay(
+                    latitude = uiState.myLatitude,
+                    longitude = uiState.myLongitude,
+                    photoUrl = uiState.myPhotoUrl,
+                    cameraPosition = cameraPositionState.position,
+                    shadowColor = shadowColor,
+                    borderColor = borderColor,
+                    textColor = textColor
+                )
+            }
 
             // ── Friend avatar markers ─────────────────────────────────────────
             val validFriends = uiState.friendLocations.filter {
@@ -282,12 +312,59 @@ fun GlobalMapScreen(
                 }
             }
 
+            // ── Location off banner ───────────────────────────────────────────
+            if (!uiState.isLocationEnabled) {
+                Card(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 64.dp, start = Dimens.spaceLarge, end = Dimens.spaceLarge),
+                    shape = MaterialTheme.shapes.medium,
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.LocationOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(Dimens.iconSizeMedium),
+                            tint = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Spacer(Modifier.width(Dimens.spaceSmall))
+                        Text(
+                            text = "Location is turned off",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = {
+                            context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                        }) {
+                            Text(
+                                text = "Enable",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+            }
+
             // ── Sharing status banner ─────────────────────────────────────────
             if (uiState.isSharing) {
                 Card(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = 64.dp, start = Dimens.spaceLarge, end = Dimens.spaceLarge),
+                        .padding(
+                            top = if (!uiState.isLocationEnabled) 112.dp else 64.dp,
+                            start = Dimens.spaceLarge,
+                            end = Dimens.spaceLarge
+                        ),
                     shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer
@@ -300,7 +377,7 @@ fun GlobalMapScreen(
                         SharingPulseDot()
                         Spacer(Modifier.width(Dimens.spaceSmall))
                         Text(
-                            text = "Sharing in ${uiState.groups.firstOrNull { it.id == uiState.sharingGroupId }?.name ?: "group"}",
+                            text = "Sharing with ${(uiState.groups + uiState.directTargets).firstOrNull { it.id == uiState.sharingGroupId }?.name ?: "target"}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onTertiaryContainer
                         )
@@ -311,6 +388,51 @@ fun GlobalMapScreen(
             // ── Loading indicator ─────────────────────────────────────────────
             if (uiState.isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }
+
+            // ── Location off dialog ─────────────────────────────────────────────
+            if (uiState.showLocationOffDialog && !locationGranted) {
+                AlertDialog(
+                    onDismissRequest = {
+                        viewModel.showLocationOffDialog(false)
+                        viewModel.setLocationOffDialogShown()
+                    },
+                    icon = {
+                        Icon(
+                            Icons.Default.LocationOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    title = { Text(stringResource(R.string.title_location_off)) },
+                    text = { Text(stringResource(R.string.msg_location_off)) },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                permissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                )
+                                viewModel.showLocationOffDialog(false)
+                            }
+                        ) {
+                            Text(stringResource(R.string.action_enable_location))
+                        }
+                    },
+                    dismissButton = {
+                        IconButton(
+                            onClick = {
+                                viewModel.showLocationOffDialog(false)
+                                viewModel.setLocationOffDialogShown()
+                            }
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_cancel))
+                        }
+                    }
+                )
             }
 
             // ── FABs (right side) ─────────────────────────────────────────────
@@ -324,31 +446,13 @@ fun GlobalMapScreen(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
             ) {
-                // Fit all friends
+                // Map type
                 SmallFloatingActionButton(
-                    onClick = {
-                        val valid = uiState.friendLocations.filter { it.latitude != 0.0 }
-                        if (valid.size == 1) {
-                            scope.launch {
-                                cameraPositionState.position = CameraPosition.fromLatLngZoom(
-                                        LatLng(valid[0].latitude, valid[0].longitude), 14.0f
-                                    )
-                            }
-                        } else if (valid.size > 1) {
-                            scope.launch {
-                                cameraPositionState.position = CameraPosition.fromLatLngZoom(
-                                        LatLng(
-                                            valid.map { it.latitude }.average(),
-                                            valid.map { it.longitude }.average()
-                                        ), 10.0f
-                                    )
-                            }
-                        }
-                    },
+                    onClick = { showMapTypeSheet = true },
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = MaterialTheme.shapes.medium
+                    shape = CircleShape
                 ) {
-                    Icon(Icons.Default.CenterFocusStrong, contentDescription = "Fit all")
+                    Icon(Icons.Default.Layers, contentDescription = "Map type")
                 }
 
                 // My location
@@ -356,14 +460,17 @@ fun GlobalMapScreen(
                     onClick = {
                         val hasPermission = ContextCompat.checkSelfPermission(
                             context, Manifest.permission.ACCESS_FINE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED
+                        ) == PackageManager.PERMISSION_GRANTED ||
+                            ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.ACCESS_COARSE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
                         if (hasPermission) viewModel.locateMe()
                         else permissionLauncher.launch(
                             arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
                         )
                     },
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    shape = MaterialTheme.shapes.medium
+                    shape = CircleShape
                 ) {
                     Icon(Icons.Default.MyLocation, contentDescription = stringResource(R.string.cd_my_location))
                 }
@@ -385,14 +492,10 @@ fun GlobalMapScreen(
                     FloatingActionButton(
                         onClick = {
                             when {
-                                uiState.groups.isEmpty() -> {
+                                uiState.groups.isEmpty() && uiState.directTargets.isEmpty() -> {
                                     scope.launch {
-                                        snackbarHostState.showSnackbar("Join a group first to share your location")
+                                        snackbarHostState.showSnackbar("Add friends or join a group first")
                                     }
-                                }
-                                uiState.groups.size == 1 -> {
-                                    // Only one group — go straight to duration picker
-                                    pendingShareGroupId = uiState.groups[0].id
                                 }
                                 else -> viewModel.showShareSheet(true)
                             }
@@ -501,11 +604,27 @@ fun GlobalMapScreen(
             onDismissRequest = { viewModel.showShareSheet(false) },
             sheetState = shareSheetState
         ) {
-            ShareGroupPickerSheet(
+            ShareTargetSheet(
                 groups = uiState.groups,
-                onSelect = { groupId ->
+                directTargets = uiState.directTargets,
+                onStart = { targetId, durationMinutes ->
                     viewModel.showShareSheet(false)
-                    pendingShareGroupId = groupId
+                    viewModel.startSharing(targetId, durationMinutes)
+                }
+            )
+        }
+    }
+
+    if (showMapTypeSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showMapTypeSheet = false },
+            sheetState = mapTypeSheetState
+        ) {
+            MapTypeSheet(
+                selected = mapType,
+                onSelect = {
+                    mapType = it
+                    showMapTypeSheet = false
                 }
             )
         }
@@ -718,126 +837,362 @@ private fun GroupFilterSheet(
     activeFilter: GroupFilter?,
     onSelect: (GroupFilter?) -> Unit
 ) {
+    var query by remember { mutableStateOf("") }
+    val filteredGroups = groups.filter { it.name.contains(query, ignoreCase = true) }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(Dimens.spaceXLarge)
             .navigationBarsPadding()
     ) {
-        Text("Show locations from", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(Dimens.spaceLarge))
-
-        // All friends option
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onSelect(null) }
-                .padding(vertical = Dimens.spaceMedium),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            RadioButton(selected = activeFilter == null, onClick = { onSelect(null) })
-            Spacer(Modifier.width(Dimens.spaceMedium))
-            Text("All Friends", style = MaterialTheme.typography.bodyLarge)
-        }
-
-        groups.forEach { group ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onSelect(group) }
-                    .padding(vertical = Dimens.spaceMedium),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RadioButton(selected = activeFilter?.id == group.id, onClick = { onSelect(group) })
-                Spacer(Modifier.width(Dimens.spaceMedium))
-                Text(group.name, style = MaterialTheme.typography.bodyLarge)
-            }
-        }
-
-        Spacer(Modifier.height(Dimens.spaceLarge))
-    }
-}
-
-@Composable
-private fun ShareGroupPickerSheet(
-    groups: List<GroupFilter>,
-    onSelect: (String) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(Dimens.spaceXLarge)
-            .navigationBarsPadding()
-    ) {
-        Text("Share location in", style = MaterialTheme.typography.titleMedium)
+        Text("Map filter", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Choose a group to share your live location with",
+            "Choose which circle appears on the map.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(Dimens.spaceLarge))
 
-        groups.forEach { group ->
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onSelect(group.id) }
-                    .padding(vertical = Dimens.spaceSmall),
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Row(
-                    modifier = Modifier.padding(Dimens.spaceLarge),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.LocationOn, null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(Dimens.spaceLarge))
-                    Text(group.name, style = MaterialTheme.typography.bodyLarge)
-                }
+        if (groups.size > 6) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Default.Groups, null) },
+                placeholder = { Text("Search groups") },
+                shape = MaterialTheme.shapes.extraLarge
+            )
+            Spacer(Modifier.height(Dimens.spaceMedium))
+        }
+
+        LazyColumn(
+            modifier = Modifier.heightIn(max = 420.dp),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
+        ) {
+            item {
+                FilterRow(
+                    title = "All friends",
+                    subtitle = "${groups.size} groups",
+                    selected = activeFilter == null,
+                    onClick = { onSelect(null) }
+                )
             }
-            Spacer(Modifier.height(Dimens.spaceSmall))
+            items(filteredGroups, key = { it.id }) { group ->
+                FilterRow(
+                    title = group.name,
+                    subtitle = "Group locations",
+                    selected = activeFilter?.id == group.id,
+                    onClick = { onSelect(group) }
+                )
+            }
         }
 
         Spacer(Modifier.height(Dimens.spaceLarge))
     }
 }
 
-// Reuse DurationPickerDialog from MapScreen (same implementation, local copy)
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DurationPickerDialog(
-    currentDuration: Float,
-    onDurationChange: (Float) -> Unit,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
+private fun FilterRow(
+    title: String,
+    subtitle: String,
+    selected: Boolean,
+    onClick: () -> Unit
 ) {
-    val context = LocalContext.current
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.title_share_duration)) },
-        text = {
-            Column {
-                Text(stringResource(R.string.msg_share_duration_instruction),
-                    style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(Dimens.spaceMedium))
-                Slider(value = currentDuration, onValueChange = onDurationChange, valueRange = 15f..480f, steps = 15)
-                Text(
-                    text = formatDurationLocal(context, currentDuration.toLong()),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
+    Surface(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.large,
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLarge),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Groups, null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(Dimens.spaceLarge))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        },
-        confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(R.string.action_start_sharing)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
-    )
-}
-
-private fun formatDurationLocal(context: android.content.Context, minutes: Long): String {
-    return when {
-        minutes < 60      -> context.getString(R.string.duration_minutes, minutes)
-        minutes == 60L    -> context.getString(R.string.duration_one_hour)
-        minutes % 60 == 0L -> context.getString(R.string.duration_hours, minutes / 60)
-        else              -> context.getString(R.string.duration_hours_minutes, minutes / 60, minutes % 60)
+            RadioButton(selected = selected, onClick = onClick)
+        }
     }
 }
+
+@Composable
+private fun ShareTargetSheet(
+    groups: List<GroupFilter>,
+    directTargets: List<GroupFilter>,
+    onStart: (String, Long) -> Unit
+) {
+    val targets = groups + directTargets
+    var selectedTargetId by remember { mutableStateOf(targets.firstOrNull()?.id.orEmpty()) }
+    var selectedDuration by remember { mutableLongStateOf(60L) }
+    var customDuration by remember { mutableFloatStateOf(60f) }
+    var query by remember { mutableStateOf("") }
+    val effectiveDuration = if (selectedDuration == -1L) customDuration.toLong() else selectedDuration
+    val filteredTargets = targets.filter { it.name.contains(query, ignoreCase = true) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(Dimens.spaceXLarge)
+            .navigationBarsPadding()
+    ) {
+        Text("Share live location", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "Choose who can see you and when sharing stops.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(Dimens.spaceLarge))
+
+        Text("Share with", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(Dimens.spaceMedium))
+
+        if (targets.size > 6) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Default.Person, null) },
+                placeholder = { Text("Search people or groups") },
+                shape = MaterialTheme.shapes.extraLarge
+            )
+            Spacer(Modifier.height(Dimens.spaceMedium))
+        }
+
+        LazyColumn(
+            modifier = Modifier.heightIn(max = 320.dp),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
+        ) {
+            items(filteredTargets, key = { it.id }) { target ->
+                val selected = selectedTargetId == target.id
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { selectedTargetId = target.id },
+                    shape = MaterialTheme.shapes.medium,
+                    color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Row(
+                        modifier = Modifier.padding(Dimens.spaceLarge),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TargetAvatar(target)
+                        Spacer(Modifier.width(Dimens.spaceLarge))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(target.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (target.isDirect) "Private share" else "Group share",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (selected) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+            if (filteredTargets.isEmpty()) {
+                item {
+                    Text(
+                        "No matches",
+                        modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLarge),
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(Dimens.spaceLarge))
+        Text("Duration", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(Dimens.spaceMedium))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)) {
+            item { DurationChip("15m", selectedDuration == 15L) { selectedDuration = 15L } }
+            item { DurationChip("1h", selectedDuration == 60L) { selectedDuration = 60L } }
+            item { DurationChip("Custom", selectedDuration == -1L) { selectedDuration = -1L } }
+            item { DurationChip("Until stop", selectedDuration == 0L) { selectedDuration = 0L } }
+        }
+        if (selectedDuration == -1L) {
+            Spacer(Modifier.height(Dimens.spaceLarge))
+            Slider(value = customDuration, onValueChange = { customDuration = it }, valueRange = 15f..480f, steps = 30)
+            Text(
+                "${customDuration.toLong()} minutes",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Spacer(Modifier.height(Dimens.spaceXLarge))
+        Button(
+            onClick = { if (selectedTargetId.isNotBlank()) onStart(selectedTargetId, effectiveDuration) },
+            modifier = Modifier.fillMaxWidth().height(Dimens.buttonHeight),
+            shape = MaterialTheme.shapes.extraLarge
+        ) {
+            Icon(Icons.Default.NearMe, null)
+            Spacer(Modifier.width(Dimens.spaceSmall))
+            Text("Start sharing")
+        }
+
+        Spacer(Modifier.height(Dimens.spaceLarge))
+    }
+}
+
+@Composable
+private fun DurationChip(text: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.extraLarge,
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium),
+            style = MaterialTheme.typography.labelLarge
+        )
+    }
+}
+
+@Composable
+private fun TargetAvatar(target: GroupFilter) {
+    if (target.isDirect && !target.photoUrl.isNullOrEmpty()) {
+        AsyncImage(
+            model = target.photoUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.size(Dimens.avatarSizeMedium).clip(CircleShape)
+        )
+    } else {
+        Surface(
+            modifier = Modifier.size(Dimens.avatarSizeMedium),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.primary
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    if (target.isDirect) Icons.Default.Person else Icons.Default.Groups,
+                    null,
+                    modifier = Modifier.size(Dimens.iconSizeMedium)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MapTypeSheet(
+    selected: MapType,
+    onSelect: (MapType) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(Dimens.spaceXLarge)
+            .navigationBarsPadding()
+    ) {
+        Text("Map style", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "Switch between standard streets and satellite imagery.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(Dimens.spaceLarge))
+        MapTypeRow(
+            title = "Default",
+            subtitle = "Clean street map",
+            selected = selected == MapType.NORMAL,
+            onClick = { onSelect(MapType.NORMAL) }
+        )
+        Spacer(Modifier.height(Dimens.spaceSmall))
+        MapTypeRow(
+            title = "Satellite",
+            subtitle = "Real-world imagery",
+            selected = selected == MapType.SATELLITE,
+            onClick = { onSelect(MapType.SATELLITE) }
+        )
+        Spacer(Modifier.height(Dimens.spaceLarge))
+    }
+}
+
+@Composable
+private fun MapTypeRow(
+    title: String,
+    subtitle: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.large,
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLarge),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Layers, null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(Dimens.spaceLarge))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (selected) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+@Composable
+private fun MyLocationMarkerOverlay(
+    latitude: Double,
+    longitude: Double,
+    photoUrl: String?,
+    cameraPosition: CameraPosition,
+    @Suppress("unused") shadowColor: Color,
+    borderColor: Color,
+    textColor: Color
+) {
+    val density = LocalDensity.current
+
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val widthPx = with(density) { maxWidth.toPx() }
+        val heightPx = with(density) { maxHeight.toPx() }
+        val zoom = cameraPosition.zoom.toDouble()
+        val centerLat = cameraPosition.target.latitude
+        val centerLng = cameraPosition.target.longitude
+        val radiusPx = with(density) { Dimens.markerRadius.toPx() }
+
+        val pos: Offset = latLngToPixel(latitude, longitude, centerLat, centerLng, zoom, widthPx, heightPx)
+        val markerSize = Dimens.markerRadius * 2
+
+        Box(
+            modifier = Modifier
+                .offset { IntOffset((pos.x - radiusPx).toInt(), (pos.y - radiusPx).toInt()) }
+                .size(markerSize)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
+                .border(3f.dp, borderColor, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!photoUrl.isNullOrEmpty()) {
+                AsyncImage(
+                    model = photoUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Text(
+                    text = "ME",
+                    color = textColor,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+

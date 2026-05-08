@@ -1,6 +1,11 @@
 package com.ovi.where.presentation.map
 
 import android.app.Application
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.location.LocationManager as SystemLocationManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -8,17 +13,20 @@ import com.ovi.where.R
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.common.UiEvent
 import com.ovi.where.core.common.UiText
+import com.ovi.where.data.local.prefs.UserPreferences
 import com.ovi.where.data.location.LocationManager
 import com.ovi.where.domain.model.Group
 import com.ovi.where.domain.model.SharedLocation
 import com.ovi.where.domain.model.User
 import com.ovi.where.domain.repository.LocationRepository
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
+import com.ovi.where.domain.usecase.friend.ObserveFriendsUseCase
 import com.ovi.where.domain.usecase.group.GetUserGroupsUseCase
 import com.ovi.where.domain.usecase.location.ObserveGroupLocationsUseCase
 import com.ovi.where.domain.usecase.location.StartLocationSharingUseCase
 import com.ovi.where.domain.usecase.location.StopLocationSharingUseCase
 import com.ovi.where.domain.usecase.user.GetUsersUseCase
+import com.ovi.where.domain.usecase.auth.ObserveCurrentUserUseCase
 import com.ovi.where.service.LocationTrackingService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -54,7 +62,9 @@ data class FriendLocationUiModel(
 /** Simple group representation for the filter pill / sheet. */
 data class GroupFilter(
     val id: String,
-    val name: String
+    val name: String,
+    val isDirect: Boolean = false,
+    val photoUrl: String? = null
 )
 
 @HiltViewModel
@@ -68,7 +78,10 @@ class GlobalMapViewModel @Inject constructor(
     private val locationRepository: LocationRepository,
     private val locationManager: LocationManager,
     private val firebaseAuth: FirebaseAuth,
-    private val getOrCreateDirectConversationUseCase: GetOrCreateDirectConversationUseCase
+    private val getOrCreateDirectConversationUseCase: GetOrCreateDirectConversationUseCase,
+    private val observeFriendsUseCase: ObserveFriendsUseCase,
+    private val userPreferences: UserPreferences,
+    private val observeCurrentUserUseCase: ObserveCurrentUserUseCase
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(GlobalMapUiState())
@@ -88,11 +101,63 @@ class GlobalMapViewModel @Inject constructor(
 
     // Per-group Firestore listener jobs
     private val groupJobs = mutableMapOf<String, Job>()
+    private var directLocationJob: Job? = null
+    private var friendsJob: Job? = null
 
     val currentUserId: String? get() = firebaseAuth.currentUser?.uid
 
+    private val locationProviderReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == SystemLocationManager.PROVIDERS_CHANGED_ACTION) {
+                checkGpsEnabled()
+            }
+        }
+    }
+
     init {
         loadGroupsAndObserve()
+        observeFriendsAndDirectLocations()
+        observeLocationOffDialogPref()
+        observeCurrentUser()
+        checkGpsEnabled()
+        registerLocationProviderReceiver()
+    }
+
+    private fun checkGpsEnabled() {
+        val lm = getApplication<Application>().getSystemService(Context.LOCATION_SERVICE) as SystemLocationManager
+        val enabled = lm.isProviderEnabled(SystemLocationManager.GPS_PROVIDER) ||
+                lm.isProviderEnabled(SystemLocationManager.NETWORK_PROVIDER)
+        _uiState.value = _uiState.value.copy(isLocationEnabled = enabled)
+    }
+
+    private fun registerLocationProviderReceiver() {
+        val app = getApplication<Application>()
+        val filter = IntentFilter(SystemLocationManager.PROVIDERS_CHANGED_ACTION)
+        app.registerReceiver(locationProviderReceiver, filter)
+    }
+
+    private fun unregisterLocationProviderReceiver() {
+        try {
+            getApplication<Application>().unregisterReceiver(locationProviderReceiver)
+        } catch (_: IllegalArgumentException) { /* not registered */ }
+    }
+
+    private fun observeCurrentUser() {
+        viewModelScope.launch {
+            observeCurrentUserUseCase().collect { user ->
+                _uiState.value = _uiState.value.copy(myPhotoUrl = user?.photoUrl)
+            }
+        }
+    }
+
+    private fun observeLocationOffDialogPref() {
+        viewModelScope.launch {
+            userPreferences.isLocationOffDialogShown.collect { shown ->
+                if (!shown) {
+                    _uiState.value = _uiState.value.copy(showLocationOffDialog = true)
+                }
+            }
+        }
     }
 
     // ── Initialisation ────────────────────────────────────────────────────────
@@ -107,7 +172,7 @@ class GlobalMapViewModel @Inject constructor(
                         groups = groups.map { GroupFilter(it.id, it.name) }
                     )
                     groups.forEach { group -> observeGroupLocations(group) }
-                    checkAllSharingSessions(groups)
+                    checkAllSharingSessions(groups, _uiState.value.directTargets)
                 }
                 is Resource.Error -> {
                     _uiState.value = _uiState.value.copy(
@@ -147,7 +212,8 @@ class GlobalMapViewModel @Inject constructor(
         val allLocations = mutableListOf<Triple<SharedLocation, String, String>>() // loc, groupId, groupName
         val groups = _uiState.value.groups
         for ((groupId, locations) in groupsToShow) {
-            val groupName = groups.firstOrNull { it.id == groupId }?.name ?: ""
+            val target = groups.firstOrNull { it.id == groupId } ?: _uiState.value.directTargets.firstOrNull { it.id == groupId }
+            val groupName = target?.name ?: if (groupId.startsWith("direct:")) "Direct" else ""
             locations
                 .filter { it.userId != uid && it.isSharingActive }
                 .forEach { allLocations.add(Triple(it, groupId, groupName)) }
@@ -198,7 +264,42 @@ class GlobalMapViewModel @Inject constructor(
     }
 
     /** Check all groups for an active sharing session to restore isSharing state. */
-    private fun checkAllSharingSessions(groups: List<Group>) {
+    private fun observeFriendsAndDirectLocations() {
+        friendsJob?.cancel()
+        friendsJob = viewModelScope.launch {
+            observeFriendsUseCase().collect { friends ->
+                friends.forEach { userCache[it.id] = it }
+                val directTargets = friends.map {
+                    GroupFilter(
+                        id = "direct:${it.id}",
+                        name = it.displayName,
+                        isDirect = true,
+                        photoUrl = it.photoUrl
+                    )
+                }
+                _uiState.value = _uiState.value.copy(directTargets = directTargets)
+                observeDirectLocations(friends.map { it.id })
+                checkAllSharingSessions(emptyList(), directTargets)
+            }
+        }
+    }
+
+    private fun observeDirectLocations(friendIds: List<String>) {
+        directLocationJob?.cancel()
+        directLocationJob = viewModelScope.launch {
+            locationRepository.observeDirectLocationShares(friendIds).collect { locations ->
+                val current = rawLocations.value.toMutableMap()
+                current.keys.filter { it.startsWith("direct:") }.forEach { current.remove(it) }
+                locations.forEach { loc ->
+                    current["direct:${loc.userId}"] = listOf(loc)
+                }
+                rawLocations.value = current
+                rebuildFriendLocations()
+            }
+        }
+    }
+
+    private fun checkAllSharingSessions(groups: List<Group>, directTargets: List<GroupFilter>) {
         viewModelScope.launch {
             for (group in groups) {
                 if (locationRepository.checkSharingStatus(group.id)) {
@@ -207,6 +308,17 @@ class GlobalMapViewModel @Inject constructor(
                         sharingGroupId = group.id
                     )
                     break // Only one group can be active at a time
+                }
+            }
+            if (!_uiState.value.isSharing) {
+                for (target in directTargets) {
+                    if (locationRepository.checkSharingStatus(target.id)) {
+                        _uiState.value = _uiState.value.copy(
+                            isSharing = true,
+                            sharingGroupId = target.id
+                        )
+                        break
+                    }
                 }
             }
         }
@@ -233,6 +345,10 @@ class GlobalMapViewModel @Inject constructor(
 
     fun showShareSheet(show: Boolean) {
         _uiState.value = _uiState.value.copy(showShareSheet = show)
+    }
+
+    fun showLocationOffDialog(show: Boolean) {
+        _uiState.value = _uiState.value.copy(showLocationOffDialog = show)
     }
 
     fun startSharing(groupId: String, durationMinutes: Long) {
@@ -326,9 +442,16 @@ class GlobalMapViewModel @Inject constructor(
         }
     }
 
+    fun setLocationOffDialogShown() {
+        viewModelScope.launch {
+            userPreferences.setLocationOffDialogShown(true)
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         groupJobs.values.forEach { it.cancel() }
+        unregisterLocationProviderReceiver()
     }
 }
 
@@ -340,6 +463,7 @@ data class GlobalMapUiState(
     val hasMyLocation: Boolean = false,
     // Groups
     val groups: List<GroupFilter> = emptyList(),
+    val directTargets: List<GroupFilter> = emptyList(),
     val activeGroupFilter: GroupFilter? = null,    // null = show all groups
     // Sharing
     val isSharing: Boolean = false,
@@ -349,6 +473,9 @@ data class GlobalMapUiState(
     val showFriendSheet: Boolean = false,
     val showGroupPicker: Boolean = false,
     val showShareSheet: Boolean = false,
+    val showLocationOffDialog: Boolean = false,
+    val myPhotoUrl: String? = null,
+    val isLocationEnabled: Boolean = true,
     val isLoading: Boolean = true,
     val error: String? = null
 )

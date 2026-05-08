@@ -25,6 +25,7 @@ object AppConstants {
     const val FIRESTORE_COLLECTION_CONVERSATIONS = "conversations"
     const val FIRESTORE_COLLECTION_MESSAGES = "messages"
     const val FIRESTORE_COLLECTION_FRIENDSHIPS = "friendships"
+    const val FIRESTORE_COLLECTION_DIRECT_LOCATION_SHARES = "directLocationShares"
 
     // DataStore
     const val DATASTORE_USER_PREFERENCES = "user_preferences"

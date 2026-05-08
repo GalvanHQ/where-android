@@ -6,6 +6,7 @@ data class MemberLocationUiModel(
     val id: String,
     val userId: String,
     val displayName: String,
+    val photoUrl: String?,
     val latitude: Double,
     val longitude: Double,
     val timeAgo: String,
@@ -15,12 +16,14 @@ data class MemberLocationUiModel(
 
 fun SharedLocation.toUiModel(
     displayName: String = userId,
-    timeAgoText: String
+    timeAgoText: String,
+    photoUrl: String? = null
 ): MemberLocationUiModel {
     return MemberLocationUiModel(
         id = id,
         userId = userId,
         displayName = displayName.take(20),
+        photoUrl = photoUrl,
         latitude = latitude,
         longitude = longitude,
         timeAgo = timeAgoText,

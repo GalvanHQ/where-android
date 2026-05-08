@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -73,11 +75,16 @@ fun OnboardingScreen(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium),
+                    .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall),
                 horizontalArrangement = Arrangement.End
             ) {
                 TextButton(onClick = ::finish) {
@@ -127,7 +134,7 @@ fun OnboardingScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = Dimens.spaceXLarge, vertical = Dimens.spaceLarge),
+                    .padding(horizontal = Dimens.spaceXLarge, vertical = Dimens.spaceMedium),
                 horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
             ) {
                 if (pagerState.currentPage < pages.size - 1) {
@@ -167,7 +174,7 @@ fun OnboardingScreen(
                 }
             }
 
-            Spacer(Modifier.height(Dimens.spaceLarge))
+            Spacer(Modifier.height(Dimens.spaceMedium))
         }
     }
 }
@@ -183,15 +190,15 @@ private fun OnboardingPageContent(page: OnboardingPage) {
     ) {
         Box(
             modifier = Modifier
-                .size(Dimens.avatarCircle)
+                .size(136.dp)
                 .clip(MaterialTheme.shapes.extraLarge)
-                .background(MaterialTheme.colorScheme.primaryContainer),
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = page.icon,
                 contentDescription = null,
-                modifier = Modifier.size(Dimens.iconSizeXXLarge),
+                modifier = Modifier.size(76.dp),
                 tint = MaterialTheme.colorScheme.primary
             )
         }

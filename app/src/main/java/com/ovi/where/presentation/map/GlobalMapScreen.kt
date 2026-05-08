@@ -22,12 +22,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -183,13 +185,13 @@ fun GlobalMapScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = MaterialTheme.colorScheme.background
     ) { scaffoldPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(scaffoldPadding)
-                .padding(contentPadding)
         ) {
             // ── Map ───────────────────────────────────────────────────────────
             GoogleMap(
@@ -236,6 +238,7 @@ fun GlobalMapScreen(
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
+                    .statusBarsPadding()
                     .padding(top = Dimens.spaceMedium)
                     .clickable { viewModel.showGroupPicker(true) },
                 shape = MaterialTheme.shapes.extraLarge,
@@ -314,7 +317,10 @@ fun GlobalMapScreen(
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = Dimens.spaceLarge, bottom = if (uiState.friendLocations.isNotEmpty()) 200.dp else Dimens.spaceLarge),
+                    .padding(
+                        end = Dimens.spaceLarge,
+                        bottom = if (uiState.friendLocations.isNotEmpty()) 220.dp else 96.dp
+                    ),
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
             ) {
@@ -413,8 +419,12 @@ fun GlobalMapScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(Dimens.spaceMedium)
-                        .navigationBarsPadding(),
+                        .padding(
+                            start = Dimens.spaceMedium,
+                            end = Dimens.spaceMedium,
+                            top = Dimens.spaceMedium,
+                            bottom = 84.dp
+                        ),
                     shape = MaterialTheme.shapes.large,
                     elevation = CardDefaults.cardElevation(Dimens.cardElevationHigh),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)

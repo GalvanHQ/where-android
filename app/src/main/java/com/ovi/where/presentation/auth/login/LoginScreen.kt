@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +36,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -106,6 +110,8 @@ fun LoginScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
                     .verticalScroll(rememberScrollState())
                     .imePadding()
                     .padding(Dimens.spaceXLarge),
@@ -131,7 +137,7 @@ fun LoginScreen(
                 EmailTextField(
                     value = uiState.email,
                     onValueChange = viewModel::onEmailChange,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
                     enabled = !uiState.isLoading,
                     errorMessage = uiState.emailError,
                     keyboardActions = androidx.compose.foundation.text.KeyboardActions(
@@ -146,7 +152,7 @@ fun LoginScreen(
                     value = uiState.password,
                     onValueChange = viewModel::onPasswordChange,
                     label = stringResource(R.string.label_password),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
                     enabled = !uiState.isLoading,
                     errorMessage = uiState.passwordError,
                     keyboardActions = androidx.compose.foundation.text.KeyboardActions(
@@ -159,7 +165,7 @@ fun LoginScreen(
                 )
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onNavigateToForgotPassword) {
@@ -186,7 +192,7 @@ fun LoginScreen(
                 PrimaryButton(
                     text = stringResource(R.string.action_sign_in),
                     onClick = viewModel::onSignIn,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
                     isLoading = uiState.isLoading
                 )
 

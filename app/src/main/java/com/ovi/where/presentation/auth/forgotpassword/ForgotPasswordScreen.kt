@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
@@ -37,6 +39,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ovi.where.R
 import com.ovi.where.core.common.UiEvent
@@ -81,6 +84,7 @@ fun ForgotPasswordScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .navigationBarsPadding()
                     .verticalScroll(rememberScrollState())
                     .imePadding()
                     .padding(Dimens.spaceXLarge),
@@ -123,7 +127,7 @@ fun ForgotPasswordScreen(
                         EmailTextField(
                             value = uiState.email,
                             onValueChange = viewModel::onEmailChange,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
                             enabled = !uiState.isLoading,
                             errorMessage = uiState.emailError,
                             keyboardActions = KeyboardActions(onDone = {
@@ -145,7 +149,7 @@ fun ForgotPasswordScreen(
                         PrimaryButton(
                             text = stringResource(R.string.action_send_reset_email),
                             onClick = viewModel::onSendReset,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
                             isLoading = uiState.isLoading
                         )
                     }

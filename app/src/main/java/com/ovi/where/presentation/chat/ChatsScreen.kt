@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -43,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
+import com.ovi.where.presentation.common.WhereTabHeader
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,9 +59,11 @@ fun ChatsScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onNavigateToSearchPeople,
+                modifier = Modifier.padding(bottom = 88.dp),
                 containerColor = MaterialTheme.colorScheme.primary,
                 shape = MaterialTheme.shapes.large
             ) {
@@ -78,22 +82,12 @@ fun ChatsScreen(
                 .padding(contentPadding)
         ) {
             // ── Header ──────────────────────────────────────────────────────
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = Dimens.spaceXLarge, end = Dimens.spaceMedium, top = Dimens.spaceLarge),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Chats",
-                    style = MaterialTheme.typography.headlineLarge
-                )
+            WhereTabHeader(title = "Chats") {
                 IconButton(onClick = onNavigateToSearchPeople) {
                     Icon(
                         Icons.Default.Search,
                         contentDescription = "Search",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }

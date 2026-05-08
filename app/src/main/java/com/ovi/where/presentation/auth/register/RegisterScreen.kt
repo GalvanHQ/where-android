@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -44,6 +46,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ovi.where.R
 import com.ovi.where.core.common.UiEvent
@@ -96,6 +99,7 @@ fun RegisterScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .navigationBarsPadding()
                     .verticalScroll(rememberScrollState())
                     .imePadding()
                     .padding(Dimens.spaceXLarge),
@@ -122,7 +126,7 @@ fun RegisterScreen(
                     value = uiState.name,
                     onValueChange = viewModel::onNameChange,
                     label = stringResource(R.string.label_name),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
                     enabled = !uiState.isLoading,
                     errorMessage = uiState.nameError,
                     keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
@@ -136,7 +140,7 @@ fun RegisterScreen(
                     value = uiState.username,
                     onValueChange = viewModel::onUsernameChange,
                     label = { Text("@username") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
                     enabled = !uiState.isLoading,
                     singleLine = true,
                     isError = uiState.usernameError != null,
@@ -193,7 +197,7 @@ fun RegisterScreen(
                 EmailTextField(
                     value = uiState.email,
                     onValueChange = viewModel::onEmailChange,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
                     enabled = !uiState.isLoading,
                     errorMessage = uiState.emailError,
                     keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
@@ -207,7 +211,7 @@ fun RegisterScreen(
                     value = uiState.password,
                     onValueChange = viewModel::onPasswordChange,
                     label = stringResource(R.string.label_password),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
                     enabled = !uiState.isLoading,
                     errorMessage = uiState.passwordError,
                     keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
@@ -221,7 +225,7 @@ fun RegisterScreen(
                     value = uiState.confirmPassword,
                     onValueChange = viewModel::onConfirmPasswordChange,
                     label = stringResource(R.string.label_confirm_password),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
                     enabled = !uiState.isLoading,
                     errorMessage = uiState.confirmPasswordError,
                     keyboardActions = KeyboardActions(onDone = {
@@ -246,7 +250,7 @@ fun RegisterScreen(
                 PrimaryButton(
                     text = stringResource(R.string.action_create_account),
                     onClick = viewModel::onRegister,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
                     isLoading = uiState.isLoading,
                     enabled = !uiState.isCheckingUsername
                 )

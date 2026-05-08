@@ -10,8 +10,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -75,12 +77,15 @@ import com.ovi.where.core.common.UiEvent
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.BatteryOptimizationUtils
 import com.ovi.where.presentation.common.WhereTopAppBar
+import com.ovi.where.presentation.common.WhereTabHeader
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
+    contentPadding: PaddingValues = PaddingValues(),
     onNavigateBack: () -> Unit,
     onLogout: () -> Unit,
+    showBackButton: Boolean = true,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -113,11 +118,16 @@ fun ProfileScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            WhereTopAppBar(
-                title = stringResource(R.string.title_profile),
-                onNavigateBack = if (onNavigateBack != {}) onNavigateBack else null
-            )
+            if (showBackButton) {
+                WhereTopAppBar(
+                    title = stringResource(R.string.title_profile),
+                    onNavigateBack = onNavigateBack
+                )
+            } else {
+                WhereTabHeader(title = stringResource(R.string.title_profile))
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
@@ -125,11 +135,12 @@ fun ProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .padding(contentPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(Dimens.spaceMedium),
+                .padding(horizontal = Dimens.spaceLarge),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(Dimens.spaceLarge))
+            Spacer(Modifier.height(Dimens.spaceMedium))
 
             // ── Avatar ────────────────────────────────────────────────────────
             Box(contentAlignment = Alignment.BottomEnd) {
@@ -178,7 +189,7 @@ fun ProfileScreen(
                 }
             }
 
-            Spacer(Modifier.height(Dimens.spaceLarge))
+            Spacer(Modifier.height(Dimens.spaceMedium))
 
             // ── Display name ──────────────────────────────────────────────────
             if (uiState.isEditingName) {
@@ -319,14 +330,14 @@ fun ProfileScreen(
             }
 
             // ── Stats row ─────────────────────────────────────────────────────
-            Spacer(Modifier.height(Dimens.spaceLarge))
+            Spacer(Modifier.height(Dimens.spaceMedium))
             Card(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceSmall),
                 shape = MaterialTheme.shapes.large,
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLarge),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = Dimens.spaceLarge),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     StatItem(
@@ -347,7 +358,7 @@ fun ProfileScreen(
                 }
             }
 
-            Spacer(Modifier.height(Dimens.spaceLarge))
+            Spacer(Modifier.height(Dimens.spaceMedium))
 
             // ── Settings card ─────────────────────────────────────────────────
             Card(
@@ -391,12 +402,12 @@ fun ProfileScreen(
                 }
             }
 
-            Spacer(Modifier.height(Dimens.spaceLarge))
+            Spacer(Modifier.height(Dimens.spaceMedium))
 
             // ── Sign out ──────────────────────────────────────────────────────
             Button(
                 onClick = viewModel::onLogout,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(Dimens.buttonHeightSmall),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer,
                     contentColor   = MaterialTheme.colorScheme.onErrorContainer

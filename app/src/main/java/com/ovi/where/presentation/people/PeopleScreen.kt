@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
+import com.ovi.where.presentation.common.WhereTabHeader
 import com.ovi.where.presentation.model.FriendUiModel
 
 @Composable
@@ -71,18 +72,7 @@ fun PeopleScreen(
             .padding(contentPadding)
     ) {
         // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Dimens.spaceXLarge, vertical = Dimens.spaceLarge),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "People",
-                style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+        WhereTabHeader(title = "People") {
             IconButton(onClick = onNavigateToSearchPeople) {
                 Icon(
                     Icons.Default.Search,
@@ -94,7 +84,11 @@ fun PeopleScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = Dimens.spaceLarge),
+            contentPadding = PaddingValues(
+                start = Dimens.spaceLarge,
+                end = Dimens.spaceLarge,
+                bottom = Dimens.spaceLarge
+            ),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
         ) {
             // Friend Requests Card

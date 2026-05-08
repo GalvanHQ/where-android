@@ -78,9 +78,11 @@ service cloud.firestore {
 
     // ===== CONSOLIDATED ACTIVE LOCATIONS =====
     match /activeLocations/{userId} {
-      // Read: authenticated users whose uid is in the visibleTo array
+      // Owner can always read their own document
+      // Others can read if their uid is in the visibleTo array
       allow read: if isAuthenticated()
-        && request.auth.uid in resource.data.visibleTo;
+        && (request.auth.uid == userId
+            || request.auth.uid in resource.data.visibleTo);
       // Write: only the location owner
       allow write: if isAuthenticated() && request.auth.uid == userId;
     }

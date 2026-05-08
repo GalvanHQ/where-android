@@ -3,9 +3,12 @@ package com.ovi.where.presentation.map
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -16,7 +19,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +33,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -46,13 +49,10 @@ import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BottomSheetDefaults
@@ -97,9 +97,14 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -107,9 +112,10 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import coil.compose.rememberAsyncImagePainter
+import coil.imageLoader
 import coil.request.CachePolicy
 import coil.request.ImageRequest
+import coil.request.SuccessResult
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
@@ -143,9 +149,16 @@ fun GlobalMapScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     fun hasLocationPerms(): Boolean {
-        return ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
     }
+
     var locationGranted by remember { mutableStateOf(hasLocationPerms()) }
 
     // Handle navigation to chat
@@ -192,6 +205,7 @@ fun GlobalMapScreen(
             when (event) {
                 is com.ovi.where.core.common.UiEvent.ShowSnackbar ->
                     snackbarHostState.showSnackbar(event.message.asString(context))
+
                 else -> Unit
             }
         }
@@ -234,13 +248,36 @@ fun GlobalMapScreen(
                     val myMarkerState = remember(uiState.myLatitude, uiState.myLongitude) {
                         MarkerState(position = LatLng(uiState.myLatitude, uiState.myLongitude))
                     }
+
+                    // Pre-load my profile bitmap for marker
+                    var myAvatarBitmap by remember { mutableStateOf<Bitmap?>(null) }
+                    LaunchedEffect(uiState.myPhotoUrl) {
+                        val url = uiState.myPhotoUrl
+                        if (!url.isNullOrEmpty()) {
+                            val request = ImageRequest.Builder(context)
+                                .data(url)
+                                .allowHardware(false)
+                                .memoryCacheKey(url)
+                                .diskCacheKey(url)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .diskCachePolicy(CachePolicy.ENABLED)
+                                .size(128)
+                                .build()
+                            val result = context.imageLoader.execute(request)
+                            if (result is SuccessResult) {
+                                myAvatarBitmap = (result.drawable as? BitmapDrawable)?.bitmap
+                            }
+                        }
+                    }
+
                     MarkerComposable(
+                        keys = arrayOf(myAvatarBitmap ?: Unit),
                         state = myMarkerState,
                         title = "My Location",
                         zIndex = 10f
                     ) {
                         MyLocationMarkerContent(
-                            photoUrl = uiState.myPhotoUrl
+                            avatarBitmap = myAvatarBitmap
                         )
                     }
                 }
@@ -250,10 +287,34 @@ fun GlobalMapScreen(
                     it.latitude != 0.0 && it.longitude != 0.0
                 }
                 validFriends.forEach { friend ->
-                    val friendMarkerState = remember(friend.userId, friend.latitude, friend.longitude) {
-                        MarkerState(position = LatLng(friend.latitude, friend.longitude))
+                    val friendMarkerState =
+                        remember(friend.userId, friend.latitude, friend.longitude) {
+                            MarkerState(position = LatLng(friend.latitude, friend.longitude))
+                        }
+
+                    // Pre-load friend avatar bitmap for marker
+                    var friendAvatarBitmap by remember(friend.userId) { mutableStateOf<Bitmap?>(null) }
+                    LaunchedEffect(friend.photoUrl) {
+                        val url = friend.photoUrl
+                        if (!url.isNullOrEmpty()) {
+                            val request = ImageRequest.Builder(context)
+                                .data(url)
+                                .allowHardware(false)
+                                .memoryCacheKey(url)
+                                .diskCacheKey(url)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .diskCachePolicy(CachePolicy.ENABLED)
+                                .size(128)
+                                .build()
+                            val result = context.imageLoader.execute(request)
+                            if (result is SuccessResult) {
+                                friendAvatarBitmap = (result.drawable as? BitmapDrawable)?.bitmap
+                            }
+                        }
                     }
+
                     MarkerComposable(
+                        keys = arrayOf(friendAvatarBitmap ?: Unit),
                         state = friendMarkerState,
                         title = friend.displayName,
                         snippet = friend.timeAgo,
@@ -264,12 +325,12 @@ fun GlobalMapScreen(
                         }
                     ) {
                         FriendMapMarkerContent(
-                            friend = friend
+                            friend = friend,
+                            avatarBitmap = friendAvatarBitmap
                         )
                     }
                 }
             }
-
 
 
             // ── Group filter pill ─────────────────────────────────────────────
@@ -285,7 +346,10 @@ fun GlobalMapScreen(
                 shadowElevation = 4.dp
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium),
+                    modifier = Modifier.padding(
+                        horizontal = Dimens.spaceLarge,
+                        vertical = Dimens.spaceMedium
+                    ),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -326,7 +390,7 @@ fun GlobalMapScreen(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = 64.dp, start = Dimens.spaceLarge, end = Dimens.spaceLarge),
-                    shape = MaterialTheme.shapes.medium,
+                    shape = MaterialTheme.shapes.extraLarge,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer
                     )
@@ -369,7 +433,7 @@ fun GlobalMapScreen(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(
-                            top = if (!uiState.isLocationEnabled) 112.dp else 64.dp,
+                            top = if (!uiState.isLocationEnabled) 130.dp else 120.dp,
                             start = Dimens.spaceLarge,
                             end = Dimens.spaceLarge
                         ),
@@ -379,7 +443,10 @@ fun GlobalMapScreen(
                     )
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall),
+                        modifier = Modifier.padding(
+                            horizontal = Dimens.spaceLarge,
+                            vertical = Dimens.spaceSmall
+                        ),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         SharingPulseDot()
@@ -437,7 +504,12 @@ fun GlobalMapScreen(
                                 viewModel.setLocationOffDialogShown()
                             }
                         ) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_cancel))
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = stringResource(R.string.action_cancel),
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(Dimens.iconSizeMedium)
+                            )
                         }
                     }
                 )
@@ -460,7 +532,12 @@ fun GlobalMapScreen(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     shape = CircleShape
                 ) {
-                    Icon(Icons.Default.Layers, contentDescription = "Map type")
+                    Icon(
+                        imageVector = ImageVector.vectorResource(id = R.drawable.layers),
+                        contentDescription = "Map type",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(Dimens.iconSizeMedium)
+                    )
                 }
 
                 // My location
@@ -469,18 +546,26 @@ fun GlobalMapScreen(
                         val hasPermission = ContextCompat.checkSelfPermission(
                             context, Manifest.permission.ACCESS_FINE_LOCATION
                         ) == PackageManager.PERMISSION_GRANTED ||
-                            ContextCompat.checkSelfPermission(
-                                context, Manifest.permission.ACCESS_COARSE_LOCATION
-                            ) == PackageManager.PERMISSION_GRANTED
+                                ContextCompat.checkSelfPermission(
+                                    context, Manifest.permission.ACCESS_COARSE_LOCATION
+                                ) == PackageManager.PERMISSION_GRANTED
                         if (hasPermission) viewModel.locateMe()
                         else permissionLauncher.launch(
-                            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
                         )
                     },
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     shape = CircleShape
                 ) {
-                    Icon(Icons.Default.MyLocation, contentDescription = stringResource(R.string.cd_my_location))
+                    Icon(
+                        imageVector = ImageVector.vectorResource(id = R.drawable.location_crosshairs),
+                        contentDescription = stringResource(R.string.cd_my_location),
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(Dimens.iconSizeMedium)
+                    )
                 }
 
                 // Share / Stop sharing
@@ -491,9 +576,10 @@ fun GlobalMapScreen(
                         shape = MaterialTheme.shapes.large
                     ) {
                         Icon(
-                            Icons.Default.Stop,
+                            Icons.Rounded.Stop,
                             contentDescription = stringResource(R.string.cd_stop_sharing),
-                            tint = MaterialTheme.colorScheme.onErrorContainer
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(Dimens.iconSizeLarge)
                         )
                     }
                 } else {
@@ -505,6 +591,7 @@ fun GlobalMapScreen(
                                         snackbarHostState.showSnackbar("Add friends or join a group first")
                                     }
                                 }
+
                                 else -> viewModel.showShareSheet(true)
                             }
                         },
@@ -512,9 +599,10 @@ fun GlobalMapScreen(
                         shape = MaterialTheme.shapes.large
                     ) {
                         Icon(
-                            Icons.Default.NearMe,
+                            imageVector = ImageVector.vectorResource(id = R.drawable.paper_plane),
                             contentDescription = stringResource(R.string.cd_share_location),
-                            tint = MaterialTheme.colorScheme.onPrimary
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(Dimens.iconSizeLarge)
                         )
                     }
                 }
@@ -557,12 +645,13 @@ fun GlobalMapScreen(
                                         viewModel.selectFriend(friend)
                                         if (friend.latitude != 0.0) {
                                             scope.launch {
-                                cameraPositionState.animate(
-                                    CameraUpdateFactory.newLatLngZoom(
-                                        LatLng(friend.latitude, friend.longitude), 15f
-                                    ),
-                                    durationMs = 600
-                                )
+                                                cameraPositionState.animate(
+                                                    CameraUpdateFactory.newLatLngZoom(
+                                                        LatLng(friend.latitude, friend.longitude),
+                                                        15f
+                                                    ),
+                                                    durationMs = 600
+                                                )
                                             }
                                         }
                                     }
@@ -677,7 +766,9 @@ private fun FriendAvatarChip(
                     model = friend.photoUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(Dimens.avatarSizeMedium).clip(CircleShape)
+                    modifier = Modifier
+                        .size(Dimens.avatarSizeMedium)
+                        .clip(CircleShape)
                 )
             } else {
                 Box(
@@ -743,7 +834,9 @@ private fun FriendDetailSheet(
                 model = friend.photoUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(Dimens.avatarSizeXLarge).clip(CircleShape)
+                modifier = Modifier
+                    .size(Dimens.avatarSizeXLarge)
+                    .clip(CircleShape)
             )
         } else {
             Box(
@@ -785,9 +878,11 @@ private fun FriendDetailSheet(
                     color = MaterialTheme.colorScheme.tertiary
                 )
             } else {
-                Icon(Icons.Default.LocationOff, null,
+                Icon(
+                    Icons.Default.LocationOff, null,
                     modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(Modifier.width(Dimens.spaceSmall))
                 Text(
                     text = if (friend.timeAgo.isNotEmpty()) "Last seen ${friend.timeAgo}" else "Location not available",
@@ -810,7 +905,11 @@ private fun FriendDetailSheet(
                 modifier = Modifier.weight(1f),
                 shape = MaterialTheme.shapes.medium
             ) {
-                Icon(Icons.Default.ChatBubbleOutline, null, modifier = Modifier.size(Dimens.iconSizeMedium))
+                Icon(
+                    Icons.Default.ChatBubbleOutline,
+                    null,
+                    modifier = Modifier.size(Dimens.iconSizeMedium)
+                )
                 Spacer(Modifier.width(Dimens.spaceSmall))
                 Text("Message")
             }
@@ -917,14 +1016,24 @@ private fun FilterRow(
         color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLarge),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Dimens.spaceLarge),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(Icons.Default.Groups, null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(Dimens.spaceLarge))
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             RadioButton(selected = selected, onClick = onClick)
         }
@@ -942,7 +1051,8 @@ private fun ShareTargetSheet(
     var selectedDuration by remember { mutableLongStateOf(60L) }
     var customDuration by remember { mutableFloatStateOf(60f) }
     var query by remember { mutableStateOf("") }
-    val effectiveDuration = if (selectedDuration == -1L) customDuration.toLong() else selectedDuration
+    val effectiveDuration =
+        if (selectedDuration == -1L) customDuration.toLong() else selectedDuration
     val filteredTargets = targets.filter { it.name.contains(query, ignoreCase = true) }
 
     Column(
@@ -959,7 +1069,11 @@ private fun ShareTargetSheet(
         )
         Spacer(Modifier.height(Dimens.spaceLarge))
 
-        Text("Share with", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "Share with",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Spacer(Modifier.height(Dimens.spaceMedium))
 
         if (targets.size > 6) {
@@ -994,14 +1108,22 @@ private fun ShareTargetSheet(
                         TargetAvatar(target)
                         Spacer(Modifier.width(Dimens.spaceLarge))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(target.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                target.name,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
                             Text(
                                 if (target.isDirect) "Private share" else "Group share",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        if (selected) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                        if (selected) Icon(
+                            Icons.Default.Check,
+                            null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             }
@@ -1009,7 +1131,9 @@ private fun ShareTargetSheet(
                 item {
                     Text(
                         "No matches",
-                        modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLarge),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(Dimens.spaceLarge),
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1018,7 +1142,11 @@ private fun ShareTargetSheet(
         }
 
         Spacer(Modifier.height(Dimens.spaceLarge))
-        Text("Duration", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "Duration",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Spacer(Modifier.height(Dimens.spaceMedium))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)) {
             item { DurationChip("15m", selectedDuration == 15L) { selectedDuration = 15L } }
@@ -1028,7 +1156,12 @@ private fun ShareTargetSheet(
         }
         if (selectedDuration == -1L) {
             Spacer(Modifier.height(Dimens.spaceLarge))
-            Slider(value = customDuration, onValueChange = { customDuration = it }, valueRange = 15f..480f, steps = 30)
+            Slider(
+                value = customDuration,
+                onValueChange = { customDuration = it },
+                valueRange = 15f..480f,
+                steps = 30
+            )
             Text(
                 "${customDuration.toLong()} minutes",
                 style = MaterialTheme.typography.titleSmall,
@@ -1038,13 +1171,27 @@ private fun ShareTargetSheet(
 
         Spacer(Modifier.height(Dimens.spaceXLarge))
         Button(
-            onClick = { if (selectedTargetId.isNotBlank()) onStart(selectedTargetId, effectiveDuration) },
-            modifier = Modifier.fillMaxWidth().height(Dimens.buttonHeight),
+            onClick = {
+                if (selectedTargetId.isNotBlank()) onStart(
+                    selectedTargetId,
+                    effectiveDuration
+                )
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(Dimens.buttonHeight),
             shape = MaterialTheme.shapes.extraLarge
         ) {
-            Icon(Icons.Default.NearMe, null)
+            Icon(
+                imageVector = ImageVector.vectorResource(id = R.drawable.paper_plane),
+                contentDescription = null,
+                modifier = Modifier.size(Dimens.iconSizeMedium)
+            )
             Spacer(Modifier.width(Dimens.spaceSmall))
-            Text("Start sharing")
+            Text(
+                text = "Start sharing",
+                style = MaterialTheme.typography.labelLarge
+            )
         }
 
         Spacer(Modifier.height(Dimens.spaceLarge))
@@ -1061,7 +1208,10 @@ private fun DurationChip(text: String, selected: Boolean, onClick: () -> Unit) {
     ) {
         Text(
             text = text,
-            modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium),
+            modifier = Modifier.padding(
+                horizontal = Dimens.spaceLarge,
+                vertical = Dimens.spaceMedium
+            ),
             style = MaterialTheme.typography.labelLarge
         )
     }
@@ -1074,7 +1224,9 @@ private fun TargetAvatar(target: GroupFilter) {
             model = target.photoUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.size(Dimens.avatarSizeMedium).clip(CircleShape)
+            modifier = Modifier
+                .size(Dimens.avatarSizeMedium)
+                .clip(CircleShape)
         )
     } else {
         Surface(
@@ -1099,13 +1251,23 @@ private fun TargetAvatar(target: GroupFilter) {
 private data class MapStyleOption(
     val type: MapType,
     val label: String,
-    val previewUrl: String,
+    @DrawableRes val photoRes: Int,
     val description: String
 )
 
 private val mapStyleOptions = listOf(
-    MapStyleOption(MapType.NORMAL, "Default", "https://picsum.photos/seed/map_default/400/300", "Clean streets"),
-    MapStyleOption(MapType.SATELLITE, "Satellite", "https://picsum.photos/seed/map_satellite/400/300", "Aerial imagery")
+    MapStyleOption(
+        type = MapType.NORMAL,
+        label = "Default",
+        photoRes = R.drawable.maptype_default_preview,
+        description = "Clean streets"
+    ),
+    MapStyleOption(
+        type = MapType.SATELLITE,
+        label = "Satellite",
+        photoRes = R.drawable.maptype_satellite_preview,
+        description = "Aerial imagery"
+    )
 )
 
 @Composable
@@ -1116,19 +1278,23 @@ private fun MapTypeSheet(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(Dimens.spaceXLarge)
+            .padding(Dimens.spaceLarge)
             .navigationBarsPadding()
     ) {
-        Text("Map style", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Choose how the map looks",
-            style = MaterialTheme.typography.bodySmall,
+            text = "Map Style",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(Dimens.spaceSmall))
+        Text(
+            text = "Choose how the map looks",
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(Modifier.height(Dimens.spaceLarge))
-
+        Spacer(Modifier.height(Dimens.spaceXLarge))
         Row(
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             mapStyleOptions.forEach { option ->
@@ -1142,7 +1308,7 @@ private fun MapTypeSheet(
             }
         }
 
-        Spacer(Modifier.height(Dimens.spaceLarge))
+        Spacer(Modifier.height(Dimens.spaceXLarge))
     }
 }
 
@@ -1153,13 +1319,13 @@ private fun MapStyleCard(
     onClick: () -> Unit
 ) {
     val borderColor = if (isSelected) MaterialTheme.colorScheme.primary
-                      else MaterialTheme.colorScheme.outlineVariant
+    else MaterialTheme.colorScheme.outlineVariant
     val containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                         else MaterialTheme.colorScheme.surfaceVariant
+    else MaterialTheme.colorScheme.surfaceVariant
 
     Card(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor),
         border = androidx.compose.foundation.BorderStroke(
             width = if (isSelected) 2.dp else 1.dp,
@@ -1179,11 +1345,11 @@ private fun MapStyleCard(
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                AsyncImage(
-                    model = option.previewUrl,
+                Image(
+                    painter = painterResource(option.photoRes),
                     contentDescription = option.label,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxWidth(),
+                    contentScale = ContentScale.Crop
                 )
                 if (isSelected) {
                     Box(
@@ -1210,7 +1376,7 @@ private fun MapStyleCard(
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                         color = if (isSelected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = option.description,
@@ -1231,54 +1397,53 @@ private fun MapStyleCard(
     }
 }
 
-// ── Life360-Style Pin Marker Composables ─────────────────────────────────────
+// ── Premium Map Pin Marker ───────────────────────────────────────────────────
 
-private val MARKER_AVATAR_SIZE = 44.dp
-private val MARKER_BORDER_WIDTH = 3.dp
-private val MARKER_TAIL_HEIGHT = 10.dp
+private val PIN_BODY_SIZE = 52.dp        // Circle avatar area
+private val PIN_BORDER_WIDTH = 3.dp      // White border ring
+private val PIN_TAIL_WIDTH = 20.dp       // Tail width
+private val PIN_TAIL_HEIGHT = 12.dp      // Tail height
+private val PIN_INNER_PADDING = 3.5.dp   // Gap between border and avatar
 
 /**
- * Life360-style pin marker: circle avatar with thick white border
- * + pointed tail triangle below. Used for both "my" and friend markers.
+ * Premium drop-pin marker — circular avatar body with a clean white border,
+ * smooth bezier-curved tail pointer, accent-colored shadow, and optional
+ * avatar bitmap. Pre-loaded bitmap avoids async issues on software canvas.
  */
 @Composable
 private fun Life360PinMarker(
-    photoUrl: String?,
+    avatarBitmap: Bitmap?,
     fallbackLabel: String,
     accentColor: Color,
-    borderColor: Color = MaterialTheme.colorScheme.surface
+    borderColor: Color = Color.White
 ) {
-    val context = LocalContext.current
-    val tailColor = borderColor
-
-    val painter = rememberAsyncImagePainter(
-        model = ImageRequest.Builder(context)
-            .data(photoUrl)
-            .crossfade(true)
-            .memoryCacheKey(photoUrl)
-            .diskCacheKey(photoUrl)
-            .diskCachePolicy(CachePolicy.ENABLED)
-            .memoryCachePolicy(CachePolicy.ENABLED)
-            .build()
-    )
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-
+        // ── Circular avatar body ──────────────────────────────────────────
         Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(MARKER_AVATAR_SIZE)
-                .shadow(6.dp, CircleShape)
+                .size(PIN_BODY_SIZE)
+                .shadow(
+                    elevation = 10.dp,
+                    shape = CircleShape,
+                    ambientColor = accentColor.copy(alpha = 0.25f),
+                    spotColor = accentColor.copy(alpha = 0.35f)
+                )
+                .background(borderColor, CircleShape)
+                .padding(PIN_BORDER_WIDTH)
                 .clip(CircleShape)
                 .background(accentColor)
-                .border(MARKER_BORDER_WIDTH, borderColor, CircleShape),
-            contentAlignment = Alignment.Center
+                .padding(PIN_INNER_PADDING)
+                .clip(CircleShape)
+                .background(surfaceVariant)
         ) {
-
-            if (!photoUrl.isNullOrEmpty()) {
+            if (avatarBitmap != null) {
                 Image(
-                    painter = painter,
+                    painter = BitmapPainter(avatarBitmap.asImageBitmap()),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -1288,23 +1453,36 @@ private fun Life360PinMarker(
                     text = fallbackLabel,
                     color = Color.White,
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.ExtraBold
                 )
             }
         }
 
+        // ── Smooth curved tail pointer ────────────────────────────────────
         Box(
             modifier = Modifier
-                .width(14.dp)
-                .height(MARKER_TAIL_HEIGHT)
+                .offset(y = (-2).dp) // Overlap body slightly for seamless join
+                .size(width = PIN_TAIL_WIDTH, height = PIN_TAIL_HEIGHT)
                 .drawBehind {
                     val path = Path().apply {
+                        // Flat top edge
                         moveTo(0f, 0f)
                         lineTo(size.width, 0f)
-                        lineTo(size.width / 2f, size.height)
+                        // Right curve down to point
+                        cubicTo(
+                            size.width * 0.75f, size.height * 0.15f,
+                            size.width * 0.6f, size.height * 0.85f,
+                            size.width / 2f, size.height
+                        )
+                        // Left curve back up from point
+                        cubicTo(
+                            size.width * 0.4f, size.height * 0.85f,
+                            size.width * 0.25f, size.height * 0.15f,
+                            0f, 0f
+                        )
                         close()
                     }
-                    drawPath(path, color = tailColor)
+                    drawPath(path, color = borderColor)
                 }
         )
     }
@@ -1312,10 +1490,10 @@ private fun Life360PinMarker(
 
 @Composable
 private fun MyLocationMarkerContent(
-    photoUrl: String?
+    avatarBitmap: Bitmap?
 ) {
     Life360PinMarker(
-        photoUrl = photoUrl,
+        avatarBitmap = avatarBitmap,
         fallbackLabel = "ME",
         accentColor = MaterialTheme.colorScheme.primary
     )
@@ -1323,12 +1501,12 @@ private fun MyLocationMarkerContent(
 
 @Composable
 private fun FriendMapMarkerContent(
-    friend: FriendLocationUiModel
+    friend: FriendLocationUiModel,
+    avatarBitmap: Bitmap?
 ) {
     Life360PinMarker(
-        photoUrl = friend.photoUrl,
+        avatarBitmap = avatarBitmap,
         fallbackLabel = friend.displayName.take(1).uppercase(),
         accentColor = avatarColorFor(friend.userId)
     )
 }
-

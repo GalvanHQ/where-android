@@ -1,5 +1,6 @@
 package com.ovi.where.data.repository
 
+import android.content.Context
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
@@ -8,6 +9,7 @@ import com.ovi.where.core.common.Resource
 import com.ovi.where.core.constants.AppConstants
 import com.ovi.where.domain.model.User
 import com.ovi.where.domain.repository.AuthRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,7 +24,8 @@ import javax.inject.Singleton
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    @ApplicationContext private val context: Context
 ) : AuthRepository {
 
     /** Background scope for non-critical Firestore writes (profile creation, token save). */
@@ -186,6 +189,17 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun signOut() {
         firebaseAuth.signOut()
+        // Also sign out from Google Sign-In client to clear cached account,
+        // so the account chooser appears on next Google sign-in attempt.
+        try {
+            val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
+                com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN
+            ).build()
+            val googleClient = com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(context, gso)
+            googleClient.signOut().await()
+        } catch (e: Exception) {
+            Timber.w(e, "Google sign-out failed (non-fatal)")
+        }
     }
 
     // ── Password reset ────────────────────────────────────────────────────────

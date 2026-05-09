@@ -7,12 +7,15 @@ import com.ovi.where.R
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.common.UiEvent
 import com.ovi.where.core.common.UiText
+
 import com.ovi.where.domain.usecase.auth.CheckUsernameAvailableUseCase
 import com.ovi.where.domain.usecase.auth.RegisterUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+
+import kotlinx.coroutines.channels.Channel
+
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -106,6 +109,8 @@ class RegisterViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(nameError = ctx.getString(R.string.error_name_too_short))
             isValid = false
         }
+
+
 
         if (state.username.isBlank()) {
             _uiState.value = _uiState.value.copy(usernameError = "Username is required")

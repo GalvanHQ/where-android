@@ -3,7 +3,9 @@ package com.ovi.where.presentation.auth.login
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,16 +13,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,6 +60,8 @@ import com.ovi.where.presentation.common.PrimaryButton
 fun LoginScreen(
     onNavigateToRegister: () -> Unit,
     onLoginSuccess: () -> Unit,
+    onNavigateToEmailVerification: () -> Unit,
+    onNavigateToCompleteProfile: () -> Unit,
     onNavigateToForgotPassword: () -> Unit = {},
     viewModel: LoginViewModel = hiltViewModel()
 ) {
@@ -91,132 +99,172 @@ fun LoginScreen(
             when (event) {
                 is UiEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message.asString(context))
                 is UiEvent.ShowToast -> snackbarHostState.showSnackbar(event.message.asString(context))
-                is UiEvent.Navigate -> if (event.route == "home") onLoginSuccess()
+                is UiEvent.Navigate -> when (event.route) {
+                    "home" -> onLoginSuccess()
+                    "email_verification" -> onNavigateToEmailVerification()
+                    "complete_profile" -> onNavigateToCompleteProfile()
+                }
                 is UiEvent.LaunchGoogleSignIn -> googleSignInLauncher.launch(googleSignInClient.signInIntent)
                 else -> Unit
             }
         }
     }
 
-    Surface(
+    Scaffold(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Column(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(Dimens.spaceXLarge),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Spacer(modifier = Modifier.height(Dimens.space2XLarge))
+
+            // Premium Logo Header
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
-                    .verticalScroll(rememberScrollState())
-                    .imePadding()
-                    .padding(Dimens.spaceXLarge),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                    .size(80.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.displayMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.height(Dimens.spaceSmall))
-
-                Text(
-                    text = stringResource(R.string.app_tagline),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(Dimens.space3XLarge))
-
-                EmailTextField(
-                    value = uiState.email,
-                    onValueChange = viewModel::onEmailChange,
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
-                    enabled = !uiState.isLoading,
-                    errorMessage = uiState.emailError,
-                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                        onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                    ),
-                    imeAction = ImeAction.Next
-                )
-
-                Spacer(modifier = Modifier.height(Dimens.spaceMedium))
-
-                PasswordTextField(
-                    value = uiState.password,
-                    onValueChange = viewModel::onPasswordChange,
-                    label = stringResource(R.string.label_password),
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
-                    enabled = !uiState.isLoading,
-                    errorMessage = uiState.passwordError,
-                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                        onDone = {
-                            focusManager.clearFocus()
-                            viewModel.onSignIn()
-                        }
-                    ),
-                    imeAction = ImeAction.Done
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onNavigateToForgotPassword) {
-                        Text(
-                            text = stringResource(R.string.label_forgot_password),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-
-                uiState.error?.let { error ->
-                    Spacer(modifier = Modifier.height(Dimens.spaceSmall))
-                    Text(
-                        text = error,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(Dimens.spaceMedium))
-
-                PrimaryButton(
-                    text = stringResource(R.string.action_sign_in),
-                    onClick = viewModel::onSignIn,
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
-                    isLoading = uiState.isLoading
-                )
-
-                Spacer(modifier = Modifier.height(Dimens.spaceLarge))
-
-                DividerText(text = stringResource(R.string.label_or))
-
-                Spacer(modifier = Modifier.height(Dimens.spaceLarge))
-
-                GoogleSignInButton(
-                    onClick = viewModel::onGoogleSignIn,
-                    modifier = Modifier.fillMaxWidth(),
-                    isLoading = uiState.isGoogleLoading,
-                    enabled = !uiState.isLoading
-                )
-
-                Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
-
-                AnnotatedClickableText(
-                    prefix = stringResource(R.string.msg_already_have_account),
-                    clickableText = stringResource(R.string.action_sign_up),
-                    onClick = onNavigateToRegister
+                Icon(
+                    imageVector = Icons.Rounded.LocationOn,
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
+
+            Spacer(modifier = Modifier.height(Dimens.spaceLarge))
+
+            Text(
+                text = stringResource(R.string.app_name),
+                style = MaterialTheme.typography.displaySmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(Dimens.spaceSmall))
+
+            Text(
+                text = stringResource(R.string.app_tagline),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(Dimens.space3XLarge))
+
+            // Login Form Card
+            ElevatedCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 420.dp),
+                shape = MaterialTheme.shapes.extraLarge
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(Dimens.space2XLarge),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    EmailTextField(
+                        value = uiState.email,
+                        onValueChange = viewModel::onEmailChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !uiState.isLoading,
+                        errorMessage = uiState.emailError,
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                        ),
+                        imeAction = ImeAction.Next
+                    )
+
+                    Spacer(modifier = Modifier.height(Dimens.spaceMedium))
+
+                    PasswordTextField(
+                        value = uiState.password,
+                        onValueChange = viewModel::onPasswordChange,
+                        label = stringResource(R.string.label_password),
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !uiState.isLoading,
+                        errorMessage = uiState.passwordError,
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                            onDone = {
+                                focusManager.clearFocus()
+                                viewModel.onSignIn()
+                            }
+                        ),
+                        imeAction = ImeAction.Done
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            onClick = onNavigateToForgotPassword,
+                            modifier = Modifier.padding(top = Dimens.spaceSmall)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.label_forgot_password),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    uiState.error?.let { error ->
+                        Spacer(modifier = Modifier.height(Dimens.spaceMedium))
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(Dimens.spaceLarge))
+
+                    PrimaryButton(
+                        text = stringResource(R.string.action_sign_in),
+                        onClick = viewModel::onSignIn,
+                        modifier = Modifier.fillMaxWidth(),
+                        isLoading = uiState.isLoading
+                    )
+
+                    Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
+
+                    DividerText(text = stringResource(R.string.label_or))
+
+                    Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
+
+                    GoogleSignInButton(
+                        onClick = viewModel::onGoogleSignIn,
+                        modifier = Modifier.fillMaxWidth(),
+                        isLoading = uiState.isGoogleLoading,
+                        enabled = !uiState.isLoading
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(Dimens.space3XLarge))
+
+            AnnotatedClickableText(
+                prefix = stringResource(R.string.msg_already_have_account),
+                clickableText = stringResource(R.string.action_sign_up),
+                onClick = onNavigateToRegister
+            )
+            
+            Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
         }
     }
 }

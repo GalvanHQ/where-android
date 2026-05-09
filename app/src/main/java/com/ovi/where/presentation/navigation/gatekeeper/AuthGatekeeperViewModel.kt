@@ -1,4 +1,4 @@
-package com.ovi.where.presentation.splash
+package com.ovi.where.presentation.navigation.gatekeeper
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,36 +8,43 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * Determines initial navigation destination based on auth state.
+ * Replaces the legacy SplashViewModel.
+ */
 @HiltViewModel
-class SplashViewModel @Inject constructor(
+class AuthGatekeeperViewModel @Inject constructor(
     private val observeCurrentUserUseCase: ObserveCurrentUserUseCase,
     private val userPreferences: UserPreferences
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SplashUiState())
-    val uiState: StateFlow<SplashUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(AuthGatekeeperState())
+    val uiState: StateFlow<AuthGatekeeperState> = _uiState.asStateFlow()
 
-    fun checkAuthStatus() {
+    fun resolve() {
         viewModelScope.launch {
-            val onboardingComplete = userPreferences.isOnboardingComplete.first()
+            val onboardingDone = userPreferences.isOnboardingComplete.first()
             observeCurrentUserUseCase().collect { user ->
-                _uiState.value = SplashUiState(
+                _uiState.value = AuthGatekeeperState(
                     isLoading = false,
                     isLoggedIn = user != null,
-                    onboardingComplete = onboardingComplete
+                    onboardingComplete = onboardingDone,
+                    isEmailVerified = user?.isEmailVerified ?: false,
+                    isProfileComplete = user?.isProfileComplete ?: false
                 )
             }
         }
     }
 }
 
-data class SplashUiState(
+data class AuthGatekeeperState(
     val isLoading: Boolean = true,
     val isLoggedIn: Boolean = false,
-    val onboardingComplete: Boolean = false
+    val onboardingComplete: Boolean = false,
+    val isEmailVerified: Boolean = false,
+    val isProfileComplete: Boolean = false
 )

@@ -8,14 +8,17 @@ import com.ovi.where.domain.repository.LocationRepository
 import com.ovi.where.domain.repository.MessageRepository
 import com.ovi.where.domain.repository.UserRepository
 import com.ovi.where.domain.usecase.auth.CheckUsernameAvailableUseCase
+import com.ovi.where.domain.usecase.auth.CompleteProfileUseCase
 import com.ovi.where.domain.usecase.auth.GoogleSignInUseCase
-import com.ovi.where.domain.usecase.auth.UpdateBioUseCase
-import com.ovi.where.domain.usecase.auth.UpdateUsernameUseCase
 import com.ovi.where.domain.usecase.auth.ObserveCurrentUserUseCase
 import com.ovi.where.domain.usecase.auth.RegisterUseCase
+import com.ovi.where.domain.usecase.auth.ReloadUserUseCase
 import com.ovi.where.domain.usecase.auth.ResetPasswordUseCase
+import com.ovi.where.domain.usecase.auth.SendEmailVerificationUseCase
 import com.ovi.where.domain.usecase.auth.SignInUseCase
 import com.ovi.where.domain.usecase.auth.SignOutUseCase
+import com.ovi.where.domain.usecase.auth.UpdateBioUseCase
+import com.ovi.where.domain.usecase.auth.UpdateUsernameUseCase
 import com.ovi.where.domain.usecase.auth.UpdateProfileUseCase
 import com.ovi.where.domain.usecase.chat.CreateGroupConversationUseCase
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
@@ -68,6 +71,9 @@ object UseCaseModule {
     @Provides fun provideUpdateBioUseCase(r: AuthRepository) = UpdateBioUseCase(r)
     @Provides fun provideUpdateUsernameUseCase(r: AuthRepository) = UpdateUsernameUseCase(r)
     @Provides fun provideCheckUsernameAvailableUseCase(r: AuthRepository) = CheckUsernameAvailableUseCase(r)
+    @Provides fun provideSendEmailVerificationUseCase(r: AuthRepository) = SendEmailVerificationUseCase(r)
+    @Provides fun provideReloadUserUseCase(r: AuthRepository) = ReloadUserUseCase(r)
+    @Provides fun provideCompleteProfileUseCase(r: AuthRepository) = CompleteProfileUseCase(r)
 
     // ── Group ────────────────────────────────────────────────────────────────
     @Provides fun provideCreateGroupUseCase(r: GroupRepository) = CreateGroupUseCase(r)

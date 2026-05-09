@@ -14,5 +14,11 @@ data class User(
     val isOnline: Boolean = false,
     val lastSeen: Long = 0L,
     val createdAt: Long = 0L,
-    val fcmToken: String? = null
-)
+    val fcmToken: String? = null,
+    @PropertyName("isEmailVerified")
+    val isEmailVerified: Boolean = false
+) {
+    /** Profile is complete when the user has chosen a username. */
+    val isProfileComplete: Boolean
+        get() = username.isNotBlank()
+}

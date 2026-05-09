@@ -4,7 +4,6 @@ import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Source
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.constants.AppConstants
 import com.ovi.where.domain.model.User
@@ -15,7 +14,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import timber.log.Timber
 import javax.inject.Inject
@@ -43,23 +41,25 @@ class AuthRepositoryImpl @Inject constructor(
                         .get()
                         .addOnSuccessListener { doc ->
                             val user = doc.toObject(User::class.java)
-                            // If Firestore returns an empty doc, build a basic User from Auth data
-                            trySend(user ?: User(
+                            // Merge email-verified flag from Firebase Auth
+                            val merged = (user ?: User(
                                 id          = firebaseUser.uid,
                                 displayName = firebaseUser.displayName ?: "",
                                 email       = firebaseUser.email ?: "",
                                 photoUrl    = firebaseUser.photoUrl?.toString()
-                            )).isSuccess
+                            )).copy(isEmailVerified = firebaseUser.isEmailVerified)
+                            trySend(merged).isSuccess
                         }
                         .addOnFailureListener {
                             // Firestore unavailable — emit minimal user from Firebase Auth so the
                             // app can still navigate to the main screen.
                             Timber.w(it, "currentUser Firestore read failed, using Auth data")
                             trySend(User(
-                                id          = firebaseUser.uid,
-                                displayName = firebaseUser.displayName ?: "",
-                                email       = firebaseUser.email ?: "",
-                                photoUrl    = firebaseUser.photoUrl?.toString()
+                                id              = firebaseUser.uid,
+                                displayName     = firebaseUser.displayName ?: "",
+                                email           = firebaseUser.email ?: "",
+                                photoUrl        = firebaseUser.photoUrl?.toString(),
+                                isEmailVerified = firebaseUser.isEmailVerified
                             )).isSuccess
                         }
                 } else {
@@ -83,13 +83,17 @@ class AuthRepositoryImpl @Inject constructor(
             
             // If the user document was never created, let's create it
             if (user.createdAt == 0L) {
-                val newUser = user.copy(createdAt = System.currentTimeMillis())
+                val newUser = user.copy(
+                    createdAt       = System.currentTimeMillis(),
+                    isEmailVerified = firebaseUser.isEmailVerified
+                )
                 firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
                     .document(userId).set(newUser).await()
                 return Resource.Success(newUser)
             }
 
-            return Resource.Success(user)
+            // Always merge the latest verification state from Firebase Auth
+            return Resource.Success(user.copy(isEmailVerified = firebaseUser.isEmailVerified))
         } catch (e: Exception) {
             Resource.Error(mapFirebaseError(e))
         }
@@ -113,12 +117,16 @@ class AuthRepositoryImpl @Inject constructor(
             val result = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
             val userId = result.user?.uid ?: return Resource.Error("User creation failed")
 
+            // ② Send email verification immediately
+            result.user?.sendEmailVerification()?.await()
+
             val user = User(
-                id          = userId,
-                displayName = name,
-                username    = username.lowercase(),
-                email       = email,
-                createdAt   = System.currentTimeMillis()
+                id              = userId,
+                displayName     = name,
+                username        = username.lowercase(),
+                email           = email,
+                createdAt       = System.currentTimeMillis(),
+                isEmailVerified = false  // just registered, not yet verified
             )
 
             // Write to Firestore and wait for it
@@ -134,6 +142,9 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     // ── Google sign-in ────────────────────────────────────────────────────────
+    //
+    // Key change: Google-signed-in users whose Firestore doc has no username
+    // are NOT auto-completed. The caller gates on User.isProfileComplete.
 
     override suspend fun signInWithGoogle(idToken: String): Resource<User> {
         return try {
@@ -146,19 +157,24 @@ class AuthRepositoryImpl @Inject constructor(
             val user = fetchUserWithFallback(userId, firebaseUser.email ?: "", firebaseUser.displayName)
 
             // If this is a new Google user whose profile doesn't exist in Firestore yet,
-            // write it in the background.
+            // create a minimal doc (no username → isProfileComplete = false).
             if (user.createdAt == 0L) {
-                val newUser = user.copy(
-                    photoUrl  = firebaseUser.photoUrl?.toString(),
-                    createdAt = System.currentTimeMillis()
+                val newUser = User(
+                    id              = userId,
+                    displayName     = firebaseUser.displayName ?: "",
+                    email           = firebaseUser.email ?: "",
+                    photoUrl        = firebaseUser.photoUrl?.toString(),
+                    createdAt       = System.currentTimeMillis(),
+                    isEmailVerified = firebaseUser.isEmailVerified
+                    // username is "" → isProfileComplete = false
                 )
-                // Write directly
                 firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
                     .document(userId).set(newUser).await()
                 Resource.Success(newUser)
             } else {
                 Resource.Success(user.copy(
-                    photoUrl = user.photoUrl ?: firebaseUser.photoUrl?.toString()
+                    photoUrl        = user.photoUrl ?: firebaseUser.photoUrl?.toString(),
+                    isEmailVerified = firebaseUser.isEmailVerified
                 ))
             }
         } catch (e: Exception) {
@@ -226,13 +242,76 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun checkUsernameAvailable(username: String): Boolean {
         return try {
-            firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+            val currentUid = currentUserId
+            val docs = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
                 .whereEqualTo("username", username.lowercase())
                 .limit(1)
                 .get().await()
-                .isEmpty
+            // Available if empty OR the only match is the current user
+            docs.isEmpty || (docs.size() == 1 && docs.documents[0].id == currentUid)
         } catch (e: Exception) {
             true // assume available on error — don't block registration
+        }
+    }
+
+    // ── Email verification ───────────────────────────────────────────────────
+
+    override suspend fun sendEmailVerification(): Resource<Unit> {
+        return try {
+            val user = firebaseAuth.currentUser ?: return Resource.Error("Not authenticated")
+            user.sendEmailVerification().await()
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Resource.Error(mapFirebaseError(e))
+        }
+    }
+
+    override suspend fun reloadUser(): Resource<User> {
+        return try {
+            val fbUser = firebaseAuth.currentUser ?: return Resource.Error("Not authenticated")
+            fbUser.reload().await()
+            val userId = fbUser.uid
+
+            // Sync verification status to Firestore
+            if (fbUser.isEmailVerified) {
+                try {
+                    firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                        .document(userId)
+                        .update("isEmailVerified", true)
+                        .await()
+                } catch (_: Exception) { /* best-effort */ }
+            }
+
+            val user = fetchUserWithFallback(userId, fbUser.email ?: "", fbUser.displayName)
+            Resource.Success(user.copy(isEmailVerified = fbUser.isEmailVerified))
+        } catch (e: Exception) {
+            Resource.Error(mapFirebaseError(e))
+        }
+    }
+
+    // ── Profile completion (Google sign-in gating) ───────────────────────────
+
+    override suspend fun completeProfile(
+        displayName: String,
+        username: String
+    ): Resource<User> {
+        return try {
+            val userId = currentUserId ?: return Resource.Error("Not authenticated")
+
+            if (!checkUsernameAvailable(username)) {
+                return Resource.Error("This username is already taken.")
+            }
+
+            val updates = hashMapOf<String, Any>(
+                "displayName" to displayName,
+                "username"    to username.lowercase()
+            )
+            firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                .document(userId).update(updates).await()
+
+            Resource.Success(fetchUserWithFallback(userId, "", displayName))
+        } catch (e: Exception) {
+            Resource.Error(mapFirebaseError(e))
         }
     }
 

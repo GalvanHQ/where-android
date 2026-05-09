@@ -4,54 +4,69 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.ovi.where.DeepLinkManager
+import com.ovi.where.presentation.auth.complete.CompleteProfileScreen
 import com.ovi.where.presentation.auth.forgotpassword.ForgotPasswordScreen
 import com.ovi.where.presentation.auth.login.LoginScreen
 import com.ovi.where.presentation.auth.register.RegisterScreen
+import com.ovi.where.presentation.auth.verification.EmailVerificationScreen
 import com.ovi.where.presentation.chat.ChatScreen
 import com.ovi.where.presentation.group.JoinGroupScreen
 import com.ovi.where.presentation.group.create.CreateGroupScreen
 import com.ovi.where.presentation.group.details.GroupDetailsScreen
 import com.ovi.where.presentation.group.edit.EditGroupScreen
 import com.ovi.where.presentation.map.MapScreen
+import com.ovi.where.presentation.navigation.gatekeeper.AuthGatekeeperViewModel
 import com.ovi.where.presentation.onboarding.OnboardingScreen
 import com.ovi.where.presentation.people.FriendRequestsScreen
 import com.ovi.where.presentation.people.SearchUsersScreen
 import com.ovi.where.presentation.people.UserProfileScreen
-import com.ovi.where.presentation.splash.SplashScreen
+import com.ovi.where.presentation.profile.edit.EditProfileScreen
+import com.ovi.where.presentation.settings.SettingsScreen
 
 private const val NAV_ANIM_DURATION = 300
+private const val GATEKEEPER_ROUTE = "gatekeeper"
 
 /**
  * Root navigation graph.
  *
- * @param deepLinkRoute  Optional nav route parsed from the launching Intent
- *                       (notification tap while app was closed). When non-null
- *                       and the user is already authenticated, [SplashScreen]
- *                       navigates to this route instead of [Screen.Main].
+ * Replaces the legacy custom SplashScreen with a lightweight gatekeeper composable
+ * that resolves auth state using [SplashViewModel] and routes accordingly:
+ *   - Not onboarded          → Onboarding
+ *   - Not logged in          → Login
+ *   - Email not verified     → EmailVerification
+ *   - Profile not complete   → CompleteProfile
+ *   - All good               → Main (with optional deep-link)
  */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavGraph(
     modifier: Modifier = Modifier,
     navController: NavHostController,
-    startDestination: String = Screen.Splash.route,
+    startDestination: String = GATEKEEPER_ROUTE,
     deepLinkRoute: String? = null
 ) {
     // ── Handle deep links delivered via onNewIntent (app already running) ─────
     LaunchedEffect(Unit) {
         snapshotFlow { DeepLinkManager.pending }.collect { route ->
             if (route != null) {
-                DeepLinkManager.pending = null       // consume
+                DeepLinkManager.pending = null
                 navigateToDeepLink(navController, route)
             }
         }
@@ -74,39 +89,39 @@ fun AppNavGraph(
             slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(NAV_ANIM_DURATION))
         }
     ) {
-        // ── Splash ────────────────────────────────────────────────────────────
+        // ── Gatekeeper (replaces custom SplashScreen) ─────────────────────────
         composable(
-            Screen.Splash.route,
-            enterTransition = { fadeIn(tween(500)) },
+            GATEKEEPER_ROUTE,
+            enterTransition = { fadeIn(tween(0)) },
             exitTransition  = { fadeOut(tween(300)) }
         ) {
-            SplashScreen(
-                onNavigateToOnboarding = {
-                    navController.navigate(Screen.Onboarding.route) {
-                        popUpTo(Screen.Splash.route) { inclusive = true }
+            val viewModel: AuthGatekeeperViewModel = hiltViewModel()
+            val uiState by viewModel.uiState.collectAsState()
+
+            LaunchedEffect(Unit) { viewModel.resolve() }
+
+            if (uiState.isLoading) {
+                // Minimal loading indicator during auth check
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                LaunchedEffect(uiState) {
+                    val target = when {
+                        !uiState.onboardingComplete -> Screen.Onboarding.route
+                        !uiState.isLoggedIn         -> Screen.Login.route
+                        !uiState.isEmailVerified    -> Screen.EmailVerification.route
+                        !uiState.isProfileComplete  -> Screen.CompleteProfile.route
+                        else                        -> Screen.Main.route
                     }
-                },
-                onNavigateToLogin = {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(Screen.Splash.route) { inclusive = true }
+                    navController.navigate(target) {
+                        popUpTo(GATEKEEPER_ROUTE) { inclusive = true }
                     }
-                },
-                onNavigateToHome = {
-                    // User is already authenticated —
-                    // go to the deep-link target if one was supplied,
-                    // otherwise open the normal Main scaffold.
-                    if (deepLinkRoute != null) {
-                        navController.navigate(Screen.Main.route) {
-                            popUpTo(Screen.Splash.route) { inclusive = true }
-                        }
+                    if (target == Screen.Main.route && deepLinkRoute != null) {
                         navigateToDeepLink(navController, deepLinkRoute)
-                    } else {
-                        navController.navigate(Screen.Main.route) {
-                            popUpTo(Screen.Splash.route) { inclusive = true }
-                        }
                     }
                 }
-            )
+            }
         }
 
         // ── Onboarding ────────────────────────────────────────────────────────
@@ -132,9 +147,18 @@ fun AppNavGraph(
                     navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
-                    // If a deep-link was pending before the user had to log in, resolve it now
                     if (deepLinkRoute != null) {
                         navigateToDeepLink(navController, deepLinkRoute)
+                    }
+                },
+                onNavigateToEmailVerification = {
+                    navController.navigate(Screen.EmailVerification.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                },
+                onNavigateToCompleteProfile = {
+                    navController.navigate(Screen.CompleteProfile.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
                 onNavigateToForgotPassword = { navController.navigate(Screen.ForgotPassword.route) }
@@ -149,6 +173,11 @@ fun AppNavGraph(
                     navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Register.route) { inclusive = true }
                     }
+                },
+                onNavigateToEmailVerification = {
+                    navController.navigate(Screen.EmailVerification.route) {
+                        popUpTo(Screen.Register.route) { inclusive = true }
+                    }
                 }
             )
         }
@@ -156,6 +185,33 @@ fun AppNavGraph(
         // ── Forgot Password ───────────────────────────────────────────────────
         composable(Screen.ForgotPassword.route) {
             ForgotPasswordScreen(onNavigateBack = { navController.popBackStack() })
+        }
+
+        // ── Email Verification (blocking gate) ────────────────────────────────
+        composable(Screen.EmailVerification.route) {
+            EmailVerificationScreen(
+                onVerified = {
+                    navController.navigate(Screen.Main.route) {
+                        popUpTo(Screen.EmailVerification.route) { inclusive = true }
+                    }
+                },
+                onSignOut = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        // ── Complete Profile (blocking gate for Google sign-in) ────────────────
+        composable(Screen.CompleteProfile.route) {
+            CompleteProfileScreen(
+                onProfileComplete = {
+                    navController.navigate(Screen.Main.route) {
+                        popUpTo(Screen.CompleteProfile.route) { inclusive = true }
+                    }
+                }
+            )
         }
 
         // ── Main scaffold (bottom tabs) ───────────────────────────────────────
@@ -181,7 +237,28 @@ fun AppNavGraph(
                 onNavigateToJoinGroup     = { navController.navigate(Screen.JoinGroup.route) },
                 onNavigateToFriendRequests = { navController.navigate(Screen.FriendRequests.route) },
                 onNavigateToSearchPeople  = { navController.navigate(Screen.SearchPeople.route) },
+                onNavigateToEditProfile   = { navController.navigate(Screen.EditProfile.route) },
+                onNavigateToSettings      = { navController.navigate(Screen.Settings.route) },
                 onLogout = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        // ── Edit Profile ──────────────────────────────────────────────────────
+        composable(Screen.EditProfile.route) {
+            EditProfileScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // ── Settings ──────────────────────────────────────────────────────────
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onSignOut = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
                     }
@@ -306,39 +383,25 @@ fun AppNavGraph(
 /**
  * Parses a plain route string (e.g. "chat/CONV_ID", "friend_requests") and
  * navigates to the corresponding destination in the back stack.
- *
- * Supported routes (matching FCM payload values):
- *  • chat/{conversationId}
- *  • friend_requests
- *  • user_profile/{userId}
- *  • group_map/{groupId}
- *  • group_details/{groupId}
  */
 private fun navigateToDeepLink(navController: NavHostController, route: String) {
     val segments = route.split("/")
     when {
-        // chat/CONV_ID
         segments.size == 2 && segments[0] == "chat" -> {
             navController.navigate(Screen.Chat.createRoute(segments[1]))
         }
-        // friend_requests
         route == "friend_requests" -> {
             navController.navigate(Screen.FriendRequests.route)
         }
-        // user_profile/USER_ID
         segments.size == 2 && segments[0] == "user_profile" -> {
             navController.navigate(Screen.UserProfile.createRoute(segments[1]))
         }
-        // group_map/GROUP_ID
         segments.size == 2 && segments[0] == "group_map" -> {
             navController.navigate(Screen.GroupMap.createRoute(segments[1]))
         }
-        // group_details/GROUP_ID
         segments.size == 2 && segments[0] == "group_details" -> {
             navController.navigate(Screen.GroupDetails.createRoute(segments[1]))
         }
-        else -> {
-            // Unknown route — no-op; app stays on Main
-        }
+        else -> { /* Unknown route — no-op */ }
     }
 }

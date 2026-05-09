@@ -82,7 +82,7 @@ class RegisterViewModel @Inject constructor(
             when (val result = registerUseCase(state.name, state.username, state.email, state.password)) {
                 is Resource.Success -> {
                     _uiState.value = _uiState.value.copy(isLoading = false)
-                    _uiEvent.send(UiEvent.Navigate("home"))
+                    _uiEvent.send(UiEvent.Navigate("email_verification"))
                 }
                 is Resource.Error -> {
                     _uiState.value = _uiState.value.copy(isLoading = false, error = result.message)

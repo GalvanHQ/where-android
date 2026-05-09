@@ -65,7 +65,15 @@ class LoginViewModel @Inject constructor(
             when (val result = googleSignInUseCase(idToken)) {
                 is Resource.Success -> {
                     _uiState.value = _uiState.value.copy(isGoogleLoading = false)
-                    _uiEvent.send(UiEvent.Navigate("home"))
+                    val user = result.data
+                    when {
+                        user != null && !user.isProfileComplete ->
+                            _uiEvent.send(UiEvent.Navigate("complete_profile"))
+                        user != null && !user.isEmailVerified ->
+                            _uiEvent.send(UiEvent.Navigate("email_verification"))
+                        else ->
+                            _uiEvent.send(UiEvent.Navigate("home"))
+                    }
                 }
                 is Resource.Error -> {
                     _uiState.value = _uiState.value.copy(isGoogleLoading = false)
@@ -91,7 +99,12 @@ class LoginViewModel @Inject constructor(
             when (val result = signInUseCase(state.email, state.password)) {
                 is Resource.Success -> {
                     _uiState.value = _uiState.value.copy(isLoading = false)
-                    _uiEvent.send(UiEvent.Navigate("home"))
+                    val user = result.data
+                    if (user != null && !user.isEmailVerified) {
+                        _uiEvent.send(UiEvent.Navigate("email_verification"))
+                    } else {
+                        _uiEvent.send(UiEvent.Navigate("home"))
+                    }
                 }
                 is Resource.Error -> {
                     _uiState.value = _uiState.value.copy(

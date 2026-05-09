@@ -2,14 +2,19 @@ package com.ovi.where.presentation.navigation
 
 sealed class Screen(val route: String) {
     // Auth flow
-    object Splash : Screen("splash")
     object Onboarding : Screen("onboarding")
     object Login : Screen("login")
     object Register : Screen("register")
     object ForgotPassword : Screen("forgot_password")
+    object EmailVerification : Screen("email_verification")
+    object CompleteProfile : Screen("complete_profile")
 
     // Main scaffold (bottom tabs)
     object Main : Screen("main")
+
+    // Profile sub-screens
+    object EditProfile : Screen("edit_profile")
+    object Settings : Screen("settings")
 
     // Chat routes
     object Chat : Screen("chat/{conversationId}") {

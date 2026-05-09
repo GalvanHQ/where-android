@@ -92,6 +92,8 @@ fun MainScaffold(
     onNavigateToJoinGroup: () -> Unit,
     onNavigateToFriendRequests: () -> Unit,
     onNavigateToSearchPeople: () -> Unit,
+    onNavigateToEditProfile: () -> Unit,
+    onNavigateToSettings: () -> Unit,
     onLogout: () -> Unit,
     viewModel: MainScaffoldViewModel = hiltViewModel()
 ) {
@@ -152,10 +154,8 @@ fun MainScaffold(
             }
             composable(BottomTab.Profile.route) {
                 ProfileScreen(
-                    contentPadding = paddingValues,
-                    onNavigateBack = {},
-                    onLogout = onLogout,
-                    showBackButton = false
+                    onNavigateToEditProfile = onNavigateToEditProfile,
+                    onNavigateToSettings = onNavigateToSettings
                 )
             }
         }

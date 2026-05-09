@@ -3,29 +3,32 @@ package com.ovi.where.presentation.auth.forgotpassword
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MarkEmailRead
+import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -75,86 +78,125 @@ fun ForgotPasswordScreen(
                 onNavigateBack = onNavigateBack
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     ) { paddingValues ->
-        Surface(
-            modifier = Modifier.fillMaxSize().padding(paddingValues),
-            color = MaterialTheme.colorScheme.background
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(Dimens.spaceXLarge),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .navigationBarsPadding()
-                    .verticalScroll(rememberScrollState())
-                    .imePadding()
-                    .padding(Dimens.spaceXLarge),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                AnimatedVisibility(visible = uiState.isSuccess, enter = fadeIn(), exit = fadeOut()) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.MarkEmailRead,
-                            contentDescription = null,
-                            modifier = Modifier.size(Dimens.iconSizeXLarge),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.height(Dimens.spaceLarge))
-                        Text(
-                            text = stringResource(R.string.msg_reset_email_sent),
-                            style = MaterialTheme.typography.titleMedium,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
+            Spacer(modifier = Modifier.height(Dimens.space2XLarge))
 
-                AnimatedVisibility(visible = !uiState.isSuccess, enter = fadeIn(), exit = fadeOut()) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = stringResource(R.string.title_forgot_password),
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Spacer(Modifier.height(Dimens.spaceSmall))
-                        Text(
-                            text = stringResource(R.string.msg_forgot_password_subtitle),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(Modifier.height(Dimens.space3XLarge))
-                        EmailTextField(
-                            value = uiState.email,
-                            onValueChange = viewModel::onEmailChange,
-                            modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
-                            enabled = !uiState.isLoading,
-                            errorMessage = uiState.emailError,
-                            keyboardActions = KeyboardActions(onDone = {
-                                focusManager.clearFocus()
-                                viewModel.onSendReset()
-                            }),
-                            imeAction = ImeAction.Done
-                        )
-                        uiState.error?.let { error ->
-                            Spacer(Modifier.height(Dimens.spaceMedium))
+            // Premium Logo Header
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.LocationOn,
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(Dimens.spaceLarge))
+
+            Text(
+                text = stringResource(R.string.title_forgot_password),
+                style = MaterialTheme.typography.displaySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(Dimens.spaceSmall))
+
+            Text(
+                text = stringResource(R.string.msg_forgot_password_subtitle),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(Modifier.height(Dimens.space3XLarge))
+
+            ElevatedCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 420.dp),
+                shape = MaterialTheme.shapes.extraLarge
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(Dimens.space2XLarge),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    AnimatedVisibility(visible = uiState.isSuccess, enter = fadeIn(), exit = fadeOut()) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.MarkEmailRead,
+                                contentDescription = null,
+                                modifier = Modifier.size(Dimens.iconSizeXLarge),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.height(Dimens.spaceLarge))
                             Text(
-                                text = error,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                                textAlign = TextAlign.Center
+                                text = stringResource(R.string.msg_reset_email_sent),
+                                style = MaterialTheme.typography.titleMedium,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
-                        Spacer(Modifier.height(Dimens.spaceXLarge))
-                        PrimaryButton(
-                            text = stringResource(R.string.action_send_reset_email),
-                            onClick = viewModel::onSendReset,
-                            modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
-                            isLoading = uiState.isLoading
-                        )
+                    }
+
+                    AnimatedVisibility(visible = !uiState.isSuccess, enter = fadeIn(), exit = fadeOut()) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            EmailTextField(
+                                value = uiState.email,
+                                onValueChange = viewModel::onEmailChange,
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !uiState.isLoading,
+                                errorMessage = uiState.emailError,
+                                keyboardActions = KeyboardActions(onDone = {
+                                    focusManager.clearFocus()
+                                    viewModel.onSendReset()
+                                }),
+                                imeAction = ImeAction.Done
+                            )
+                            uiState.error?.let { error ->
+                                Spacer(Modifier.height(Dimens.spaceMedium))
+                                Text(
+                                    text = error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                            Spacer(Modifier.height(Dimens.spaceXLarge))
+                            PrimaryButton(
+                                text = stringResource(R.string.action_send_reset_email),
+                                onClick = viewModel::onSendReset,
+                                modifier = Modifier.fillMaxWidth(),
+                                isLoading = uiState.isLoading
+                            )
+                        }
                     }
                 }
             }
+            
+            Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
         }
     }
 }

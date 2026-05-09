@@ -8,16 +8,18 @@ data class UserProfileUiModel(
     val username: String,
     val email: String,
     val bio: String,
-    val photoUrl: String?
+    val photoUrl: String?,
+    val isEmailVerified: Boolean
 )
 
 fun User.toProfileUiModel(): UserProfileUiModel {
     return UserProfileUiModel(
-        userId      = id,
-        displayName = displayName,
-        username    = username,
-        email       = email,
-        bio         = bio,
-        photoUrl    = photoUrl
+        userId          = id,
+        displayName     = displayName,
+        username        = username,
+        email           = email,
+        bio             = bio,
+        photoUrl        = photoUrl,
+        isEmailVerified = isEmailVerified
     )
 }

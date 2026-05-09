@@ -1,7 +1,7 @@
-# 📍 NearBy
+# 📍 WHERE
 
 ## 🧠 Project Overview
-The **NearBy** is a mobile application designed to simplify real-time coordination among friends, teams, and groups. It enables users to create private groups and share their live location with selected members for a specific duration or continuously.
+The **WHERE** is a mobile application designed to simplify real-time coordination among friends, teams, and groups. It enables users to create private groups and share their live location with selected members for a specific duration or continuously.
 
 The primary goal is to eliminate the common problem of repeatedly calling or messaging others to ask about their whereabouts when planning meetups.
 
@@ -22,6 +22,7 @@ The primary goal is to eliminate the common problem of repeatedly calling or mes
 - Create and manage groups
 - Invite members via link or username
 - Role-based access (Admin / Member)
+- group chatting or individual chatting
 
 ### 📍 Live Location Sharing
 - Share live location with group members

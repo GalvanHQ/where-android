@@ -49,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -147,6 +148,11 @@ fun ChatScreen(
                 if (uiState.isLoading) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 } else {
+                    // ⚡ Bolt: Memoize the grouping operation to prevent O(N) recalculation on every recomposition
+                    val groupedMessages = remember(uiState.messages) {
+                        uiState.messages.groupBy { it.dateKey }
+                    }
+
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
@@ -156,9 +162,7 @@ fun ChatScreen(
                         ),
                         verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
                     ) {
-                        // Group messages by pre-computed dateKey from MessageUiModel
-                        val grouped = uiState.messages.groupBy { it.dateKey }
-                        grouped.forEach { (_, messages) ->
+                        groupedMessages.forEach { (_, messages) ->
                             item {
                                 DateSeparator(date = formatDateHeader(messages.first().dateKey))
                             }

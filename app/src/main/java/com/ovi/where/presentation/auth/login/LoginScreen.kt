@@ -3,6 +3,9 @@ package com.ovi.where.presentation.auth.login
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,13 +18,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.LocationOn
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -36,10 +38,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -69,6 +74,15 @@ fun LoginScreen(
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // ── Entrance animation ───────────────────────────────────────────────
+    val contentAlpha = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        contentAlpha.animateTo(
+            1f,
+            animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing)
+        )
+    }
 
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -113,7 +127,7 @@ fun LoginScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(
             modifier = Modifier
@@ -121,18 +135,24 @@ fun LoginScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .imePadding()
-                .padding(Dimens.spaceXLarge),
+                .padding(horizontal = Dimens.spaceXLarge)
+                .alpha(contentAlpha.value),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(Dimens.space2XLarge))
+            Spacer(modifier = Modifier.height(Dimens.space3XLarge))
 
-            // Premium Logo Header
+            // ── Branded logo mark ────────────────────────────────────────
             Box(
                 modifier = Modifier
-                    .size(80.dp)
+                    .size(72.dp)
                     .background(
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.tertiary
+                            )
+                        ),
                         shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
@@ -140,121 +160,111 @@ fun LoginScreen(
                 Icon(
                     imageVector = Icons.Rounded.LocationOn,
                     contentDescription = null,
-                    modifier = Modifier.size(40.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                    modifier = Modifier.size(36.dp),
+                    tint = MaterialTheme.colorScheme.onPrimary
                 )
             }
 
-            Spacer(modifier = Modifier.height(Dimens.spaceLarge))
+            Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
 
             Text(
                 text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.onSurface
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onBackground
             )
 
             Spacer(modifier = Modifier.height(Dimens.spaceSmall))
 
             Text(
                 text = stringResource(R.string.app_tagline),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(Dimens.space3XLarge))
 
-            // Login Form Card
-            ElevatedCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 420.dp),
-                shape = MaterialTheme.shapes.extraLarge
+            // ── Floating inputs — no card wrapper ────────────────────────
+            EmailTextField(
+                value = uiState.email,
+                onValueChange = viewModel::onEmailChange,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !uiState.isLoading,
+                errorMessage = uiState.emailError,
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                ),
+                imeAction = ImeAction.Next
+            )
+
+            Spacer(modifier = Modifier.height(Dimens.spaceLarge))
+
+            PasswordTextField(
+                value = uiState.password,
+                onValueChange = viewModel::onPasswordChange,
+                label = stringResource(R.string.label_password),
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !uiState.isLoading,
+                errorMessage = uiState.passwordError,
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                    onDone = {
+                        focusManager.clearFocus()
+                        viewModel.onSignIn()
+                    }
+                ),
+                imeAction = ImeAction.Done
+            )
+
+            // Forgot password — right-aligned
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(Dimens.space2XLarge),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                TextButton(
+                    onClick = onNavigateToForgotPassword,
+                    modifier = Modifier.padding(top = Dimens.spaceXSmall)
                 ) {
-                    EmailTextField(
-                        value = uiState.email,
-                        onValueChange = viewModel::onEmailChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !uiState.isLoading,
-                        errorMessage = uiState.emailError,
-                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                        ),
-                        imeAction = ImeAction.Next
-                    )
-
-                    Spacer(modifier = Modifier.height(Dimens.spaceMedium))
-
-                    PasswordTextField(
-                        value = uiState.password,
-                        onValueChange = viewModel::onPasswordChange,
-                        label = stringResource(R.string.label_password),
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !uiState.isLoading,
-                        errorMessage = uiState.passwordError,
-                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                            onDone = {
-                                focusManager.clearFocus()
-                                viewModel.onSignIn()
-                            }
-                        ),
-                        imeAction = ImeAction.Done
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(
-                            onClick = onNavigateToForgotPassword,
-                            modifier = Modifier.padding(top = Dimens.spaceSmall)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.label_forgot_password),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-
-                    uiState.error?.let { error ->
-                        Spacer(modifier = Modifier.height(Dimens.spaceMedium))
-                        Text(
-                            text = error,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(Dimens.spaceLarge))
-
-                    PrimaryButton(
-                        text = stringResource(R.string.action_sign_in),
-                        onClick = viewModel::onSignIn,
-                        modifier = Modifier.fillMaxWidth(),
-                        isLoading = uiState.isLoading
-                    )
-
-                    Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
-
-                    DividerText(text = stringResource(R.string.label_or))
-
-                    Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
-
-                    GoogleSignInButton(
-                        onClick = viewModel::onGoogleSignIn,
-                        modifier = Modifier.fillMaxWidth(),
-                        isLoading = uiState.isGoogleLoading,
-                        enabled = !uiState.isLoading
+                    Text(
+                        text = stringResource(R.string.label_forgot_password),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
+
+            // Error message
+            uiState.error?.let { error ->
+                Spacer(modifier = Modifier.height(Dimens.spaceMedium))
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
+
+            PrimaryButton(
+                text = stringResource(R.string.action_sign_in),
+                onClick = viewModel::onSignIn,
+                modifier = Modifier.fillMaxWidth(),
+                isLoading = uiState.isLoading
+            )
+
+            Spacer(modifier = Modifier.height(Dimens.space2XLarge))
+
+            DividerText(text = stringResource(R.string.label_or))
+
+            Spacer(modifier = Modifier.height(Dimens.space2XLarge))
+
+            GoogleSignInButton(
+                onClick = viewModel::onGoogleSignIn,
+                modifier = Modifier.fillMaxWidth(),
+                isLoading = uiState.isGoogleLoading,
+                enabled = !uiState.isLoading
+            )
 
             Spacer(modifier = Modifier.height(Dimens.space3XLarge))
 
@@ -263,8 +273,8 @@ fun LoginScreen(
                 clickableText = stringResource(R.string.action_sign_up),
                 onClick = onNavigateToRegister
             )
-            
-            Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
+
+            Spacer(modifier = Modifier.height(Dimens.space2XLarge))
         }
     }
 }

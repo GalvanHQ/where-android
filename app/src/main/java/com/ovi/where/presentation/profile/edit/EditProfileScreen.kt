@@ -2,7 +2,11 @@ package com.ovi.where.presentation.profile.edit
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -43,8 +48,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
@@ -65,6 +73,15 @@ fun EditProfileScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri -> viewModel.onPhotoSelected(uri) }
 
+    // ── Entrance animation ───────────────────────────────────────────────
+    val contentAlpha = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        contentAlpha.animateTo(
+            1f,
+            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+        )
+    }
+
     LaunchedEffect(uiState.isSaved) {
         if (uiState.isSaved) onNavigateBack()
     }
@@ -79,7 +96,12 @@ fun EditProfileScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Edit Profile") },
+                title = {
+                    Text(
+                        "Edit Profile",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -90,8 +112,9 @@ fun EditProfileScreen(
                         CircularProgressIndicator(
                             modifier = Modifier
                                 .size(Dimens.iconSizeMedium)
-                                .padding(end = Dimens.spaceLarge),
-                            strokeWidth = 2.dp
+                                .padding(end = Dimens.spaceMedium),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     } else {
                         TextButton(
@@ -99,59 +122,82 @@ fun EditProfileScreen(
                             enabled = uiState.displayName.isNotBlank()
                                     && uiState.isUsernameAvailable != false
                         ) {
-                            Text("Save", style = MaterialTheme.typography.labelLarge)
+                            Text(
+                                "Save",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = Dimens.spaceXLarge),
+                .padding(horizontal = Dimens.spaceXLarge)
+                .alpha(contentAlpha.value),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
 
-            // ── Avatar ───────────────────────────────────────────────
-            Box(
-                contentAlignment = Alignment.BottomEnd
-            ) {
-                val imageModel = uiState.newPhotoUri ?: uiState.photoUrl
-                if (imageModel != null) {
-                    AsyncImage(
-                        model = imageModel,
-                        contentDescription = "Profile photo",
-                        modifier = Modifier
-                            .size(Dimens.avatarCircle)
-                            .clip(CircleShape)
-                            .clickable { photoLauncher.launch("image/*") },
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
+            // ── Avatar with gradient ring + camera badge ─────────────────
+            Box(contentAlignment = Alignment.BottomEnd) {
+                Box(contentAlignment = Alignment.Center) {
+                    // Gradient ring
                     Box(
                         modifier = Modifier
-                            .size(Dimens.avatarCircle)
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant,
-                                CircleShape
+                            .size(Dimens.avatarCircle + 8.dp)
+                            .border(
+                                width = 3.dp,
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.tertiary
+                                    )
+                                ),
+                                shape = CircleShape
                             )
-                            .clickable { photoLauncher.launch("image/*") },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Outlined.Person,
-                            contentDescription = null,
-                            modifier = Modifier.size(Dimens.iconSizeXLarge),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    val imageModel = uiState.newPhotoUri ?: uiState.photoUrl
+                    if (imageModel != null) {
+                        AsyncImage(
+                            model = imageModel,
+                            contentDescription = "Profile photo",
+                            modifier = Modifier
+                                .size(Dimens.avatarCircle)
+                                .clip(CircleShape)
+                                .clickable { photoLauncher.launch("image/*") },
+                            contentScale = ContentScale.Crop
                         )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(Dimens.avatarCircle)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    CircleShape
+                                )
+                                .clickable { photoLauncher.launch("image/*") },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Outlined.Person,
+                                contentDescription = null,
+                                modifier = Modifier.size(Dimens.iconSizeXLarge),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
 
@@ -160,7 +206,15 @@ fun EditProfileScreen(
                     modifier = Modifier
                         .offset(x = (-4).dp, y = (-4).dp)
                         .size(36.dp)
-                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primary,
+                                    MaterialTheme.colorScheme.tertiary
+                                )
+                            ),
+                            shape = CircleShape
+                        )
                         .clickable { photoLauncher.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
@@ -175,7 +229,7 @@ fun EditProfileScreen(
 
             Spacer(modifier = Modifier.height(Dimens.space2XLarge))
 
-            // ── Display Name ─────────────────────────────────────────
+            // ── Display Name ─────────────────────────────────────────────
             OutlinedTextField(
                 value = uiState.displayName,
                 onValueChange = { viewModel.onDisplayNameChanged(it) },
@@ -186,12 +240,16 @@ fun EditProfileScreen(
                     capitalization = KeyboardCapitalization.Words,
                     imeAction = ImeAction.Next
                 ),
-                shape = MaterialTheme.shapes.medium
+                shape = MaterialTheme.shapes.medium,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                )
             )
 
             Spacer(modifier = Modifier.height(Dimens.spaceLarge))
 
-            // ── Username ─────────────────────────────────────────────
+            // ── Username ─────────────────────────────────────────────────
             OutlinedTextField(
                 value = uiState.username,
                 onValueChange = { viewModel.onUsernameChanged(it) },
@@ -208,7 +266,7 @@ fun EditProfileScreen(
                         )
                         uiState.isUsernameAvailable == true -> Text(
                             text = "Username is available",
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.secondary
                         )
                     }
                 },
@@ -217,7 +275,7 @@ fun EditProfileScreen(
                         uiState.isUsernameAvailable == true -> Icon(
                             Icons.Filled.Check,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.secondary
                         )
                         uiState.usernameError != null -> Icon(
                             Icons.Filled.Close,
@@ -227,12 +285,16 @@ fun EditProfileScreen(
                     }
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                shape = MaterialTheme.shapes.medium
+                shape = MaterialTheme.shapes.medium,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                )
             )
 
             Spacer(modifier = Modifier.height(Dimens.spaceLarge))
 
-            // ── Bio ──────────────────────────────────────────────────
+            // ── Bio ──────────────────────────────────────────────────────
             OutlinedTextField(
                 value = uiState.bio,
                 onValueChange = { viewModel.onBioChanged(it) },
@@ -242,13 +304,23 @@ fun EditProfileScreen(
                     .height(120.dp),
                 maxLines = 4,
                 supportingText = {
-                    Text("${uiState.bio.length}/150")
+                    Text(
+                        "${uiState.bio.length}/150",
+                        color = if (uiState.bio.length > 150)
+                            MaterialTheme.colorScheme.error
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 },
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Sentences,
                     imeAction = ImeAction.Done
                 ),
-                shape = MaterialTheme.shapes.medium
+                shape = MaterialTheme.shapes.medium,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                )
             )
 
             Spacer(modifier = Modifier.height(Dimens.space3XLarge))

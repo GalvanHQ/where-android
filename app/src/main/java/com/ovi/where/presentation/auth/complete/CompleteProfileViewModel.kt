@@ -13,6 +13,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import android.content.Context
+import android.net.Uri
+import com.ovi.where.core.utils.ImageUploadUtil
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -20,7 +24,8 @@ import javax.inject.Inject
 class CompleteProfileViewModel @Inject constructor(
     private val completeProfileUseCase: CompleteProfileUseCase,
     private val checkUsernameAvailableUseCase: CheckUsernameAvailableUseCase,
-    private val observeCurrentUserUseCase: ObserveCurrentUserUseCase
+    private val observeCurrentUserUseCase: ObserveCurrentUserUseCase,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CompleteProfileUiState())
@@ -41,6 +46,12 @@ class CompleteProfileViewModel @Inject constructor(
                     }
                 }
             }
+        }
+    }
+
+    fun onPhotoSelected(uri: Uri?) {
+        uri?.let {
+            _uiState.update { it.copy(newPhotoUri = uri) }
         }
     }
 
@@ -90,7 +101,21 @@ class CompleteProfileViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            when (val result = completeProfileUseCase(state.displayName, state.username)) {
+            
+            var finalPhotoUrl: String? = state.photoUrl
+            
+            // Upload photo if newly selected
+            if (state.newPhotoUri != null && ImageUploadUtil.isLocalUri(state.newPhotoUri.toString())) {
+                val uploadResult = ImageUploadUtil.uploadProfilePicture(context, state.newPhotoUri)
+                if (uploadResult.isSuccess) {
+                    finalPhotoUrl = uploadResult.getOrNull()
+                } else {
+                    _uiState.update { it.copy(isLoading = false, error = "Failed to upload photo") }
+                    return@launch
+                }
+            }
+            
+            when (val result = completeProfileUseCase(state.displayName, state.username, finalPhotoUrl)) {
                 is Resource.Success -> {
                     _uiState.update { it.copy(isLoading = false, isComplete = true) }
                 }
@@ -111,6 +136,7 @@ data class CompleteProfileUiState(
     val displayName: String = "",
     val username: String = "",
     val photoUrl: String? = null,
+    val newPhotoUri: Uri? = null,
     val isLoading: Boolean = false,
     val isComplete: Boolean = false,
     val isUsernameAvailable: Boolean? = null,

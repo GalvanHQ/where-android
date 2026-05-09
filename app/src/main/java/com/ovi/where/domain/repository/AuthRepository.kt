@@ -29,10 +29,10 @@ interface AuthRepository {
     suspend fun sendEmailVerification(): Resource<Unit>
     /** Reloads the Firebase Auth user (to refresh isEmailVerified). */
     suspend fun reloadUser(): Resource<User>
-    /** Completes profile for Google-signed-in users who lack metadata. */
     suspend fun completeProfile(
         displayName: String,
-        username: String
+        username: String,
+        photoUrl: String?
     ): Resource<User>
 }
 

@@ -1,10 +1,13 @@
 package com.ovi.where.presentation.auth.complete
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -20,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Person
@@ -61,6 +66,10 @@ fun CompleteProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val photoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri -> viewModel.onPhotoSelected(uri) }
 
     // ── Entrance animation ───────────────────────────────────────────────
     val contentAlpha = remember { Animatable(0f) }
@@ -148,30 +157,62 @@ fun CompleteProfileScreen(
             Spacer(modifier = Modifier.height(Dimens.space2XLarge))
 
             // ── Avatar ───────────────────────────────────────────────────
-            if (uiState.photoUrl != null) {
-                AsyncImage(
-                    model = uiState.photoUrl,
-                    contentDescription = "Profile photo",
-                    modifier = Modifier
-                        .size(Dimens.avatarCircle)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
+            Box(contentAlignment = Alignment.BottomEnd) {
+                Box(contentAlignment = Alignment.Center) {
+                    val imageModel = uiState.newPhotoUri ?: uiState.photoUrl
+                    if (imageModel != null) {
+                        AsyncImage(
+                            model = imageModel,
+                            contentDescription = "Profile photo",
+                            modifier = Modifier
+                                .size(Dimens.avatarCircle)
+                                .clip(CircleShape)
+                                .clickable { photoLauncher.launch("image/*") },
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(Dimens.avatarCircle)
+                                .background(
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = CircleShape
+                                )
+                                .clickable { photoLauncher.launch("image/*") },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Person,
+                                contentDescription = null,
+                                modifier = Modifier.size(Dimens.iconSizeXLarge),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Camera badge
                 Box(
                     modifier = Modifier
-                        .size(Dimens.avatarCircle)
+                        .offset(x = (-4).dp, y = (-4).dp)
+                        .size(36.dp)
                         .background(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primary,
+                                    MaterialTheme.colorScheme.tertiary
+                                )
+                            ),
                             shape = CircleShape
-                        ),
+                        )
+                        .clickable { photoLauncher.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(Dimens.iconSizeXLarge),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        Icons.Filled.CameraAlt,
+                        contentDescription = "Change photo",
+                        modifier = Modifier.size(Dimens.badgeIconSize),
+                        tint = MaterialTheme.colorScheme.onPrimary
                     )
                 }
             }

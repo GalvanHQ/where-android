@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Group
@@ -39,6 +40,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -62,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
+import com.ovi.where.presentation.common.WhereTabHeader
 
 /**
  * Social-focused Profile screen inspired by Instagram / WhatsApp.
@@ -103,7 +106,8 @@ fun ProfileScreen(
             .verticalScroll(rememberScrollState())
             .alpha(contentAlpha.value)
     ) {
-        Spacer(modifier = Modifier.height(Dimens.space2XLarge))
+        // Header
+        WhereTabHeader(title = "Profile")
 
         // ── Avatar + Name + Username ─────────────────────────────────────
         Column(

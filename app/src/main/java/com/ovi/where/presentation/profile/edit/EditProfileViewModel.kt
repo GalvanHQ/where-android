@@ -9,7 +9,9 @@ import com.ovi.where.domain.usecase.auth.ObserveCurrentUserUseCase
 import com.ovi.where.domain.usecase.auth.UpdateBioUseCase
 import com.ovi.where.domain.usecase.auth.UpdateProfileUseCase
 import com.ovi.where.domain.usecase.auth.UpdateUsernameUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import com.ovi.where.core.utils.ImageUploadUtil
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
 @HiltViewModel
@@ -25,7 +28,8 @@ class EditProfileViewModel @Inject constructor(
     private val updateProfileUseCase: UpdateProfileUseCase,
     private val updateBioUseCase: UpdateBioUseCase,
     private val updateUsernameUseCase: UpdateUsernameUseCase,
-    private val checkUsernameAvailableUseCase: CheckUsernameAvailableUseCase
+    private val checkUsernameAvailableUseCase: CheckUsernameAvailableUseCase,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(EditProfileUiState())
@@ -105,7 +109,21 @@ class EditProfileViewModel @Inject constructor(
             _uiState.update { it.copy(isSaving = true, error = null) }
 
             // Update display name & photo
-            val photoUrl = state.newPhotoUri?.toString() ?: state.photoUrl
+            var photoUrl = state.photoUrl
+            val oldPhotoUrl = state.photoUrl
+            if (state.newPhotoUri != null && ImageUploadUtil.isLocalUri(state.newPhotoUri.toString())) {
+                val uploadResult = ImageUploadUtil.uploadProfilePicture(context, state.newPhotoUri)
+                if (uploadResult.isSuccess) {
+                    photoUrl = uploadResult.getOrNull()
+                    if (!oldPhotoUrl.isNullOrEmpty()) {
+                        ImageUploadUtil.deleteProfilePicture(oldPhotoUrl)
+                    }
+                } else {
+                    _uiState.update { it.copy(isSaving = false, error = "Failed to upload photo") }
+                    return@launch
+                }
+            }
+
             val profileResult = updateProfileUseCase(state.displayName, photoUrl)
             if (profileResult is Resource.Error) {
                 _uiState.update { it.copy(isSaving = false, error = profileResult.message) }

@@ -293,7 +293,8 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun completeProfile(
         displayName: String,
-        username: String
+        username: String,
+        photoUrl: String?
     ): Resource<User> {
         return try {
             val userId = currentUserId ?: return Resource.Error("Not authenticated")
@@ -306,10 +307,15 @@ class AuthRepositoryImpl @Inject constructor(
                 "displayName" to displayName,
                 "username"    to username.lowercase()
             )
+            if (photoUrl != null) {
+                updates["photoUrl"] = photoUrl
+            }
+
             firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
                 .document(userId).update(updates).await()
 
-            Resource.Success(fetchUserWithFallback(userId, "", displayName))
+            val updatedUser = fetchUserWithFallback(userId, "", displayName)
+            Resource.Success(if (photoUrl != null) updatedUser.copy(photoUrl = photoUrl) else updatedUser)
         } catch (e: Exception) {
             Resource.Error(mapFirebaseError(e))
         }

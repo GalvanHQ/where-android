@@ -8,6 +8,6 @@ import javax.inject.Inject
 class CompleteProfileUseCase @Inject constructor(
     private val authRepository: AuthRepository
 ) {
-    suspend operator fun invoke(displayName: String, username: String): Resource<User> =
-        authRepository.completeProfile(displayName, username)
+    suspend operator fun invoke(displayName: String, username: String, photoUrl: String? = null): Resource<User> =
+        authRepository.completeProfile(displayName, username, photoUrl)
 }

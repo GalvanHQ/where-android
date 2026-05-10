@@ -66,7 +66,7 @@ import com.ovi.where.presentation.common.PrimaryButton
 
 @Composable
 fun LoginScreen(
-    onNavigateToRegister: () -> Unit,
+    onNavigateToSignUp: () -> Unit,
     onLoginSuccess: () -> Unit,
     onNavigateToEmailVerification: () -> Unit,
     onNavigateToCompleteProfile: () -> Unit,
@@ -274,7 +274,7 @@ fun LoginScreen(
             AnnotatedClickableText(
                 prefix = stringResource(R.string.msg_already_have_account),
                 clickableText = stringResource(R.string.action_sign_up),
-                onClick = onNavigateToRegister
+                onClick = onNavigateToSignUp
             )
 
             Spacer(modifier = Modifier.height(Dimens.space2XLarge))

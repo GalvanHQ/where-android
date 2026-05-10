@@ -1,10 +1,9 @@
-package com.ovi.where.presentation.auth.register
+package com.ovi.where.presentation.auth.signup
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,8 +18,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -49,24 +46,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Box
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ovi.where.R
 import com.ovi.where.core.common.UiEvent
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.presentation.common.AnnotatedClickableText
 import com.ovi.where.presentation.common.EmailTextField
-import com.ovi.where.presentation.common.NameTextField
 import com.ovi.where.presentation.common.PasswordTextField
 import com.ovi.where.presentation.common.PrimaryButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RegisterScreen(
+fun SignUpScreen(
     onNavigateToLogin: () -> Unit,
-    onRegisterSuccess: () -> Unit,
     onNavigateToEmailVerification: () -> Unit,
-    onNavigateToCompleteProfile: () -> Unit,
-    viewModel: RegisterViewModel = hiltViewModel()
+    viewModel: SignUpViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -88,9 +83,7 @@ fun RegisterScreen(
                 is UiEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message.asString(context))
                 is UiEvent.ShowToast -> snackbarHostState.showSnackbar(event.message.asString(context))
                 is UiEvent.Navigate -> when (event.route) {
-                    "home" -> onRegisterSuccess()
                     "email_verification" -> onNavigateToEmailVerification()
-                    "complete_profile" -> onNavigateToCompleteProfile()
                 }
                 else -> Unit
             }
@@ -156,7 +149,7 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
 
             Text(
-                text = stringResource(R.string.action_create_account),
+                text = stringResource(R.string.action_sign_up),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onBackground
@@ -165,7 +158,7 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(Dimens.spaceSmall))
 
             Text(
-                text = "Join Where and stay connected with your people.",
+                text = "Create your account to get started.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -173,80 +166,7 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(Dimens.space2XLarge))
 
-            // ── Floating form fields ─────────────────────────────────────
-            NameTextField(
-                value = uiState.name,
-                onValueChange = viewModel::onNameChange,
-                label = "Full Name",
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !uiState.isLoading,
-                errorMessage = uiState.nameError,
-                keyboardActions = KeyboardActions(
-                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                ),
-                imeAction = ImeAction.Next
-            )
-
-            Spacer(modifier = Modifier.height(Dimens.spaceLarge))
-
-            androidx.compose.material3.OutlinedTextField(
-                value = uiState.username,
-                onValueChange = viewModel::onUsernameChange,
-                label = { Text("Username") },
-                prefix = { Text("@") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !uiState.isLoading,
-                isError = uiState.usernameError != null,
-                supportingText = {
-                    when {
-                        uiState.usernameError != null -> Text(
-                            text = uiState.usernameError!!,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        uiState.isCheckingUsername -> Text(
-                            text = "Checking availability...",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        uiState.isUsernameAvailable == true -> Text(
-                            text = "Username is available",
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    }
-                },
-                trailingIcon = {
-                    when {
-                        uiState.isCheckingUsername -> androidx.compose.material3.CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
-                        uiState.isUsernameAvailable == true -> Icon(
-                            Icons.Filled.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary
-                        )
-                        uiState.usernameError != null -> Icon(
-                            Icons.Filled.Close,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
-                },
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    imeAction = ImeAction.Next
-                ),
-                keyboardActions = KeyboardActions(
-                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                ),
-                shape = MaterialTheme.shapes.medium,
-                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                )
-            )
-
-            Spacer(modifier = Modifier.height(Dimens.spaceLarge))
-
+            // ── Email ────────────────────────────────────────────────────
             EmailTextField(
                 value = uiState.email,
                 onValueChange = viewModel::onEmailChange,
@@ -261,6 +181,7 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(Dimens.spaceLarge))
 
+            // ── Password ─────────────────────────────────────────────────
             PasswordTextField(
                 value = uiState.password,
                 onValueChange = viewModel::onPasswordChange,
@@ -276,6 +197,7 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(Dimens.spaceLarge))
 
+            // ── Confirm Password ─────────────────────────────────────────
             PasswordTextField(
                 value = uiState.confirmPassword,
                 onValueChange = viewModel::onConfirmPasswordChange,
@@ -286,7 +208,7 @@ fun RegisterScreen(
                 keyboardActions = KeyboardActions(
                     onDone = {
                         focusManager.clearFocus()
-                        viewModel.onRegister()
+                        viewModel.onSignUp()
                     }
                 ),
                 imeAction = ImeAction.Done
@@ -306,8 +228,8 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
 
             PrimaryButton(
-                text = stringResource(R.string.action_create_account),
-                onClick = viewModel::onRegister,
+                text = stringResource(R.string.action_sign_up),
+                onClick = viewModel::onSignUp,
                 modifier = Modifier.fillMaxWidth(),
                 isLoading = uiState.isLoading
             )

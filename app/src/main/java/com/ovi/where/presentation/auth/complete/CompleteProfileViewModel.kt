@@ -75,13 +75,22 @@ class CompleteProfileViewModel @Inject constructor(
         if (cleaned.length >= 3) {
             usernameCheckJob = viewModelScope.launch {
                 delay(500L)
-                val available = checkUsernameAvailableUseCase(cleaned)
-                _uiState.update {
-                    it.copy(
-                        isUsernameAvailable = available,
-                        isCheckingUsername = false,
-                        usernameError = if (!available) "Username is already taken" else null
-                    )
+                try {
+                    val available = checkUsernameAvailableUseCase(cleaned)
+                    _uiState.update {
+                        it.copy(
+                            isUsernameAvailable = available,
+                            isCheckingUsername = false,
+                            usernameError = if (!available) "Username is already taken" else null
+                        )
+                    }
+                } catch (e: Exception) {
+                    _uiState.update {
+                        it.copy(
+                            isCheckingUsername = false,
+                            usernameError = "Unable to check username. Try again."
+                        )
+                    }
                 }
             }
         }

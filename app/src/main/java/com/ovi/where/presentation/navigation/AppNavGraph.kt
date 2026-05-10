@@ -24,7 +24,7 @@ import com.ovi.where.DeepLinkManager
 import com.ovi.where.presentation.auth.complete.CompleteProfileScreen
 import com.ovi.where.presentation.auth.forgotpassword.ForgotPasswordScreen
 import com.ovi.where.presentation.auth.login.LoginScreen
-import com.ovi.where.presentation.auth.register.RegisterScreen
+import com.ovi.where.presentation.auth.signup.SignUpScreen
 import com.ovi.where.presentation.auth.verification.EmailVerificationScreen
 import com.ovi.where.presentation.chat.ChatScreen
 import com.ovi.where.presentation.group.JoinGroupScreen
@@ -142,7 +142,7 @@ fun AppNavGraph(
         // ── Login ─────────────────────────────────────────────────────────────
         composable(Screen.Login.route) {
             LoginScreen(
-                onNavigateToRegister = { navController.navigate(Screen.Register.route) },
+                onNavigateToSignUp = { navController.navigate(Screen.SignUp.route) },
                 onLoginSuccess = {
                     navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
@@ -165,23 +165,13 @@ fun AppNavGraph(
             )
         }
 
-        // ── Register ──────────────────────────────────────────────────────────
-        composable(Screen.Register.route) {
-            RegisterScreen(
+        // ── Sign Up ───────────────────────────────────────────────────────────
+        composable(Screen.SignUp.route) {
+            SignUpScreen(
                 onNavigateToLogin = { navController.popBackStack() },
-                onRegisterSuccess = {
-                    navController.navigate(Screen.Main.route) {
-                        popUpTo(Screen.Register.route) { inclusive = true }
-                    }
-                },
                 onNavigateToEmailVerification = {
                     navController.navigate(Screen.EmailVerification.route) {
-                        popUpTo(Screen.Register.route) { inclusive = true }
-                    }
-                },
-                onNavigateToCompleteProfile = {
-                    navController.navigate(Screen.CompleteProfile.route) {
-                        popUpTo(Screen.Register.route) { inclusive = true }
+                        popUpTo(Screen.SignUp.route) { inclusive = true }
                     }
                 }
             )
@@ -196,8 +186,9 @@ fun AppNavGraph(
         composable(Screen.EmailVerification.route) {
             EmailVerificationScreen(
                 onVerified = {
-                    navController.navigate(Screen.Main.route) {
-                        popUpTo(Screen.EmailVerification.route) { inclusive = true }
+                    // Route through gatekeeper to check profile completeness
+                    navController.navigate(GATEKEEPER_ROUTE) {
+                        popUpTo(0) { inclusive = true }
                     }
                 },
                 onSignOut = {

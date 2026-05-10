@@ -9,12 +9,7 @@ interface AuthRepository {
     val currentUser: Flow<User?>
 
     suspend fun signInWithEmail(email: String, password: String): Resource<User>
-    suspend fun registerWithEmail(
-        name: String,
-        username: String,
-        email: String,
-        password: String
-    ): Resource<User>
+    suspend fun registerWithEmail(email: String, password: String): Resource<User>
     suspend fun signInWithGoogle(idToken: String): Resource<User>
     suspend fun signOut()
     fun resetPassword(email: String): Flow<Resource<Unit>>
@@ -35,4 +30,3 @@ interface AuthRepository {
         photoUrl: String?
     ): Resource<User>
 }
-

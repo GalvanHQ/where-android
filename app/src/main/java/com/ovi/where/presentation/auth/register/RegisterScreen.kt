@@ -208,7 +208,7 @@ fun RegisterScreen(
                             text = "Checking availability...",
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        uiState.username.length >= 3 && uiState.usernameError == null -> Text(
+                        uiState.isUsernameAvailable == true -> Text(
                             text = "Username is available",
                             color = MaterialTheme.colorScheme.secondary
                         )
@@ -220,7 +220,7 @@ fun RegisterScreen(
                             modifier = Modifier.size(20.dp),
                             strokeWidth = 2.dp
                         )
-                        uiState.username.length >= 3 && uiState.usernameError == null -> Icon(
+                        uiState.isUsernameAvailable == true -> Icon(
                             Icons.Filled.Check,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.secondary

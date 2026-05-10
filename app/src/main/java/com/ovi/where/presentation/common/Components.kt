@@ -64,6 +64,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -79,7 +80,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import com.ovi.where.R
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.core.theme.GoogleBlue
 
 // ── Loading ───────────────────────────────────────────────────────────────────
 
@@ -306,10 +306,11 @@ fun GoogleSignInButton(
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                Text(
-                    text       = stringResource(R.string.label_google_logo),
-                    style      = MaterialTheme.typography.titleLarge,
-                    color      = GoogleBlue   // intentional brand colour
+                Icon(
+                    imageVector = ImageVector.vectorResource(id = R.drawable.google_logo),
+                    contentDescription = null,
+                    tint = Color.Unspecified,
+                    modifier = Modifier.size(Dimens.iconSizeSmall)
                 )
                 Spacer(modifier = Modifier.width(Dimens.spaceMedium))
                 Text(

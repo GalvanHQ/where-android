@@ -64,10 +64,12 @@ class CompleteProfileViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 username = cleaned,
-                usernameError = null,
-                isUsernameAvailable = null
+                usernameError = if (cleaned.isNotEmpty() && cleaned.length < 3) "Username must be at least 3 characters" else null,
+                isUsernameAvailable = null,
+                isCheckingUsername = cleaned.length >= 3
             )
         }
+        
         // Debounced availability check
         usernameCheckJob?.cancel()
         if (cleaned.length >= 3) {
@@ -77,6 +79,7 @@ class CompleteProfileViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isUsernameAvailable = available,
+                        isCheckingUsername = false,
                         usernameError = if (!available) "Username is already taken" else null
                     )
                 }
@@ -96,6 +99,10 @@ class CompleteProfileViewModel @Inject constructor(
         }
         if (state.isUsernameAvailable == false) {
             _uiState.update { it.copy(usernameError = "Username is already taken") }
+            return
+        }
+        if (state.isUsernameAvailable == null && !state.isCheckingUsername) {
+            _uiState.update { it.copy(usernameError = "Please wait for username validation") }
             return
         }
 
@@ -139,6 +146,7 @@ data class CompleteProfileUiState(
     val newPhotoUri: Uri? = null,
     val isLoading: Boolean = false,
     val isComplete: Boolean = false,
+    val isCheckingUsername: Boolean = false,
     val isUsernameAvailable: Boolean? = null,
     val usernameError: String? = null,
     val error: String? = null

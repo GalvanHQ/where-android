@@ -261,6 +261,10 @@ fun CompleteProfileScreen(
                                 text = uiState.usernameError!!,
                                 color = MaterialTheme.colorScheme.error
                             )
+                            uiState.isCheckingUsername -> Text(
+                                text = "Checking availability...",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                             uiState.isUsernameAvailable == true -> Text(
                                 text = "Username is available",
                                 color = MaterialTheme.colorScheme.secondary
@@ -269,6 +273,10 @@ fun CompleteProfileScreen(
                     },
                     trailingIcon = {
                         when {
+                            uiState.isCheckingUsername -> CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
                             uiState.isUsernameAvailable == true -> Icon(
                                 Icons.Filled.Check,
                                 contentDescription = null,

@@ -202,10 +202,10 @@ class GlobalMapViewModel @Inject constructor(
         friendsJob?.cancel()
         friendsJob = viewModelScope.launch {
             observeFriendsUseCase().collect { friends ->
-                friends.forEach { userCache[it.id] = it }
+                // FriendEntry already carries display fields — no need to cache as User.
                 val directTargets = friends.map {
                     GroupFilter(
-                        id = "direct:${it.id}",
+                        id = "direct:${it.friendUid}",
                         name = it.displayName,
                         isDirect = true,
                         photoUrl = it.photoUrl

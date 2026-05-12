@@ -2,21 +2,58 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if request.auth.uid == userId;
+    function isSelf(uid) {
+      return request.auth.uid == uid;
     }
 
+    function isAdmin() {
+      return request.auth.token.admin == true;
+    }
+
+    // ===== USERS =====
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isSelf(userId);
+
+      // ── Friends subcollection (denormalized summary) ──
+      // Phase 0 permissive: owner OR admin can write (dual-write period).
+      // Phase 3 cutover will restrict write to admin-only.
+      match /friends/{friendUid} {
+        allow read: if isSelf(userId);
+        allow write: if isSelf(userId) || isAdmin();
+      }
+
+      // ── Inbox / Outbox aggregation docs ──
+      match /inbox/{docId} {
+        allow read: if isSelf(userId);
+        allow write: if isSelf(userId) || isAdmin();
+      }
+      match /outbox/{docId} {
+        allow read: if isSelf(userId);
+        allow write: if isSelf(userId) || isAdmin();
+      }
+
+      // ── Social summary counter ──
+      match /summary/{docId} {
+        allow read: if isSelf(userId);
+        allow write: if isSelf(userId) || isAdmin();
+      }
+
+      // ── Blocks (private to the blocker) ──
+      match /blocks/{blockedUid} {
+        allow read, write: if isSelf(userId);
+      }
+    }
+
+    // ===== GROUPS =====
     match /groups/{groupId} {
       allow create: if isAuthenticated();
-      // Allow reading if authenticated (so invite code lookup works)
       allow read: if isAuthenticated();
-      // Allow update for members, or to join
       allow update: if isAuthenticated();
       allow delete: if isAuthenticated() && request.auth.uid == resource.data.createdBy;
 
@@ -25,22 +62,26 @@ service cloud.firestore {
       }
 
       match /locations/{userId} {
-        allow read: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+        allow read: if isAuthenticated()
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
         allow write: if request.auth.uid == userId;
       }
     }
 
+    // ===== CONVERSATIONS =====
     match /conversations/{conversationId} {
       allow read, update: if isAuthenticated() && request.auth.uid in resource.data.participantIds;
       allow create: if isAuthenticated();
-      
+
       match /messages/{messageId} {
-        allow read: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
+        allow read: if isAuthenticated()
+          && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
         allow create: if isAuthenticated() && request.auth.uid == request.resource.data.senderId;
         allow update: if isAuthenticated();
       }
     }
 
+    // ===== DIRECT LOCATION SHARES =====
     match /directLocationShares/{shareId} {
       allow read, write: if isAuthenticated()
         && request.auth.uid in resource.data.participantIds;
@@ -53,37 +94,43 @@ service cloud.firestore {
         allow write: if isAuthenticated() && request.auth.uid == userId;
       }
     }
-    
-    // Friendships: users can only access friendships where they are involved
+
+    // ===== CANONICAL FRIENDSHIP PAIR DOCS =====
+    // Legacy friendshipId-based docs still live here during migration.
+    // New pairId-based docs also live here.
+    // Phase 0 permissive: involved parties can still read/write (legacy compat).
+    // Phase 3 cutover will restrict writes to admin-only.
     match /friendships/{friendshipId} {
-      // Helper function to check if user is involved in the friendship
-      function isInvolved() {
-        return request.auth.uid == resource.data.requesterId
-            || request.auth.uid == resource.data.receiverId;
-      }
+      // Read: pair members (new model uses `members` array; legacy uses requesterId/receiverId)
+      allow read: if isAuthenticated()
+        && (request.auth.uid in resource.data.members
+            || request.auth.uid == resource.data.requesterId
+            || request.auth.uid == resource.data.receiverId);
 
-      // Read: only involved parties can read
-      allow read: if isAuthenticated() && isInvolved();
-
-      // Create: only if user is the requester
+      // Create: requester or admin
       allow create: if isAuthenticated()
-                    && request.auth.uid == request.resource.data.requesterId;
+        && (request.auth.uid == request.resource.data.requesterId || isAdmin());
 
-      // Update: only involved parties can update (e.g., accept/decline)
-      allow update: if isAuthenticated() && isInvolved();
+      // Update: involved parties or admin
+      allow update: if isAuthenticated()
+        && (request.auth.uid in resource.data.members
+            || request.auth.uid == resource.data.requesterId
+            || request.auth.uid == resource.data.receiverId
+            || isAdmin());
 
-      // Delete: only involved parties can delete (unfriend)
-      allow delete: if isAuthenticated() && isInvolved();
+      // Delete: involved parties or admin
+      allow delete: if isAuthenticated()
+        && (request.auth.uid in resource.data.members
+            || request.auth.uid == resource.data.requesterId
+            || request.auth.uid == resource.data.receiverId
+            || isAdmin());
     }
 
     // ===== CONSOLIDATED ACTIVE LOCATIONS =====
     match /activeLocations/{userId} {
-      // Owner can always read their own document
-      // Others can read if their uid is in the visibleTo array
       allow read: if isAuthenticated()
         && (request.auth.uid == userId
             || request.auth.uid in resource.data.visibleTo);
-      // Write: only the location owner
       allow write: if isAuthenticated() && request.auth.uid == userId;
     }
   }

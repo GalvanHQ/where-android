@@ -72,6 +72,14 @@ android {
             excludes += "/META-INF/io.netty.versions.properties"
         }
     }
+
+    testOptions {
+        unitTests.all {
+            // Run JUnit 5 (Kotest) tests while keeping existing JUnit 4 tests alive
+            // via the vintage engine.
+            it.useJUnitPlatform()
+        }
+    }
 }
 
 dependencies {
@@ -98,6 +106,8 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.storage)
+    implementation(libs.firebase.functions)
+    implementation(libs.firebase.config)
     // TODO: Re-enable after fixing build ID issue
     // implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.analytics)
@@ -139,9 +149,16 @@ dependencies {
     implementation(libs.okhttp.logging)
 
     testImplementation(libs.junit)
+    testImplementation(libs.hilt.android.testing)
     testImplementation(libs.mockk)
     testImplementation(libs.robolectric)
     testImplementation(libs.kotlin.test.junit)
+    // Kotest property-based testing on the JUnit 5 Platform.
+    testImplementation(libs.kotest.property)
+    testImplementation(libs.kotest.runner.junit5)
+    testImplementation(libs.kotest.assertions.core)
+    // Vintage engine keeps existing JUnit 4 tests running under JUnit Platform.
+    testRuntimeOnly(libs.junit.vintage.engine)
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -1,51 +1,43 @@
 package com.ovi.where.presentation.people
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.presentation.common.WhereTabHeader
+import com.ovi.where.presentation.common.WhereTopAppBar
 import com.ovi.where.presentation.model.FriendUiModel
+import com.ovi.where.presentation.people.components.ErrorInfoCard
+import com.ovi.where.presentation.people.components.FriendRow
+import com.ovi.where.presentation.people.components.FriendsSectionHeader
+import com.ovi.where.presentation.people.components.PeopleEmptyState
+import com.ovi.where.presentation.people.components.PeopleSkeleton
+import com.ovi.where.presentation.people.components.RequestsInboxCard
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PeopleScreen(
     contentPadding: PaddingValues = PaddingValues(),
@@ -66,207 +58,163 @@ fun PeopleScreen(
         }
     }
 
+    // Bottom sheet state for long-press actions
+    var selectedFriendForSheet by remember { mutableStateOf<FriendUiModel?>(null) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding)
     ) {
-        // Header
-        WhereTabHeader(title = "People") {
-            IconButton(onClick = onNavigateToSearchPeople) {
-                Icon(
-                    Icons.Default.Search,
-                    contentDescription = "Search",
-                    tint = MaterialTheme.colorScheme.primary
-                )
+        // Top app bar with search icon
+        WhereTopAppBar(
+            title = "People",
+            actions = {
+                IconButton(onClick = onNavigateToSearchPeople) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Search people"
+                    )
+                }
             }
+        )
+
+        // Loading state
+        if (uiState.isLoading) {
+            PeopleSkeleton()
+            return@Column
         }
+
+        // Error state
+        if (uiState.error != null) {
+            ErrorInfoCard(
+                message = uiState.error ?: "Something went wrong",
+                onRetry = { viewModel.onRetry() },
+                modifier = Modifier.padding(
+                    horizontal = Dimens.spaceLarge,
+                    vertical = Dimens.spaceMedium
+                )
+            )
+        }
+
+        // Empty state: no friends and no pending requests
+        if (uiState.friends.isEmpty() && uiState.pendingRequestCount == 0) {
+            PeopleEmptyState(onFindFriends = onNavigateToSearchPeople)
+            return@Column
+        }
+
+        // Content: LazyColumn with sections
+        val activeFriends = uiState.friends.filter { it.isOnline }
+        val allFriends = uiState.friends
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = Dimens.spaceLarge,
-                end = Dimens.spaceLarge,
-                bottom = Dimens.spaceLarge
-            ),
-            verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
+            contentPadding = PaddingValues(bottom = Dimens.spaceLarge)
         ) {
-            // Friend Requests Card
+            // Requests inbox card
             if (uiState.pendingRequestCount > 0) {
-                item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onNavigateToFriendRequests() },
-                        shape = MaterialTheme.shapes.large,
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                item(key = "requests_inbox") {
+                    RequestsInboxCard(
+                        count = uiState.pendingRequestCount,
+                        onClick = onNavigateToFriendRequests,
+                        modifier = Modifier.padding(
+                            horizontal = Dimens.spaceLarge,
+                            vertical = Dimens.spaceMedium
                         )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(Dimens.spaceLarge),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(Dimens.avatarSizeMedium)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.PersonAdd, null,
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(Dimens.iconSizeMedium)
-                                )
-                            }
-                            Spacer(Modifier.width(Dimens.spaceLarge))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Friend Requests",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                                Text(
-                                    text = "${uiState.pendingRequestCount} pending",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                                )
-                            }
-                        }
-                    }
+                    )
                 }
             }
 
-            // Friends header
-            item {
-                Spacer(Modifier.height(Dimens.spaceSmall))
-                Text(
-                    text = "${uiState.friends.size} Friends",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            // "Active now" section
+            if (activeFriends.isNotEmpty()) {
+                item(key = "active_header") {
+                    FriendsSectionHeader(
+                        title = "Active now",
+                        count = activeFriends.size,
+                        accentColor = MaterialTheme.colorScheme.tertiary
+                    )
+                }
+                items(
+                    items = activeFriends,
+                    key = { "active_${it.userId}" }
+                ) { friend ->
+                    FriendRow(
+                        friend = friend,
+                        onTap = { onNavigateToUserProfile(friend.userId) },
+                        onMessage = { viewModel.openOrCreateDm(friend.userId) },
+                        onLongPress = { selectedFriendForSheet = friend }
+                    )
+                }
+            }
+
+            // "All friends" section
+            item(key = "all_friends_header") {
+                FriendsSectionHeader(
+                    title = "All friends",
+                    count = allFriends.size
                 )
             }
-
-            // Friends list
-            if (uiState.friends.isEmpty() && !uiState.isLoading) {
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = Dimens.space3XLarge),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            Icons.Default.People, null,
-                            modifier = Modifier.size(Dimens.iconSizeXLarge),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        )
-                        Spacer(Modifier.height(Dimens.spaceLarge))
-                        Text(
-                            text = "No friends yet",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "Search for people to add them as friends",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(Modifier.height(Dimens.spaceLarge))
-                        TextButton(onClick = onNavigateToSearchPeople) {
-                            Text("Find Friends")
-                        }
-                    }
-                }
-            }
-
-            items(items = uiState.friends, key = { it.userId }) { friend ->
+            items(
+                items = allFriends,
+                key = { it.userId }
+            ) { friend ->
                 FriendRow(
-                    user = friend,
+                    friend = friend,
                     onTap = { onNavigateToUserProfile(friend.userId) },
-                    onMessage = { viewModel.openOrCreateDm(friend.userId) }
+                    onMessage = { viewModel.openOrCreateDm(friend.userId) },
+                    onLongPress = { selectedFriendForSheet = friend }
                 )
             }
 
-            item { Spacer(Modifier.height(Dimens.spaceLarge)) }
+            item(key = "bottom_spacer") {
+                Spacer(Modifier.height(Dimens.spaceLarge))
+            }
         }
     }
-}
 
-@Composable
-private fun FriendRow(
-    user: FriendUiModel,
-    onTap: () -> Unit,
-    onMessage: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onTap)
-            .padding(vertical = Dimens.spaceMedium),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (!user.photoUrl.isNullOrEmpty()) {
-            AsyncImage(
-                model = user.photoUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(Dimens.avatarSizeMedium).clip(CircleShape)
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(Dimens.avatarSizeMedium)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
+    // Long-press bottom sheet with Unfriend and Block options
+    if (selectedFriendForSheet != null) {
+        ModalBottomSheet(
+            onDismissRequest = { selectedFriendForSheet = null },
+            sheetState = sheetState
+        ) {
+            val friend = selectedFriendForSheet!!
+            Column(
+                modifier = Modifier.padding(
+                    horizontal = Dimens.spaceLarge,
+                    vertical = Dimens.spaceMedium
+                )
             ) {
                 Text(
-                    text  = user.avatarInitial,
+                    text = friend.displayName,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    modifier = Modifier.padding(bottom = Dimens.spaceMedium)
                 )
+                TextButton(
+                    onClick = {
+                        viewModel.removeFriend(friend.userId)
+                        selectedFriendForSheet = null
+                    }
+                ) {
+                    Text(
+                        text = "Unfriend",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                TextButton(
+                    onClick = {
+                        // Block action — ViewModel method will be wired in task 23.2
+                        selectedFriendForSheet = null
+                    }
+                ) {
+                    Text(
+                        text = "Block",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                Spacer(Modifier.height(Dimens.spaceLarge))
             }
-        }
-
-        Spacer(Modifier.width(Dimens.spaceLarge))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text     = user.displayName,
-                style    = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (user.username.isNotEmpty()) {
-                Text(
-                    text  = "@${user.username}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        if (user.isOnline) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.tertiary)
-            )
-            Spacer(Modifier.width(Dimens.spaceMedium))
-        }
-
-        IconButton(onClick = onMessage) {
-            Icon(
-                Icons.Default.ChatBubbleOutline,
-                contentDescription = "Message",
-                tint = MaterialTheme.colorScheme.primary
-            )
         }
     }
 }

@@ -27,16 +27,20 @@ import com.ovi.where.domain.usecase.chat.ObserveConversationsUseCase
 import com.ovi.where.domain.usecase.chat.ObserveMessagesUseCase
 import com.ovi.where.domain.usecase.chat.SendLocationMessageUseCase
 import com.ovi.where.domain.usecase.chat.SendMessageUseCase
-import com.ovi.where.domain.usecase.friend.AcceptFriendRequestByUserIdUseCase
 import com.ovi.where.domain.usecase.friend.AcceptFriendRequestUseCase
-import com.ovi.where.domain.usecase.friend.DeclineFriendRequestByUserIdUseCase
+import com.ovi.where.domain.usecase.friend.BlockUserUseCase
+import com.ovi.where.domain.usecase.friend.CancelFriendRequestUseCase
 import com.ovi.where.domain.usecase.friend.DeclineFriendRequestUseCase
 import com.ovi.where.domain.usecase.friend.GetFriendshipStatusUseCase
 import com.ovi.where.domain.usecase.friend.ObserveAllFriendLocationsUseCase
-import com.ovi.where.domain.usecase.friend.ObserveFriendRequestsUseCase
+import com.ovi.where.domain.usecase.friend.ObserveBlockedUsersUseCase
 import com.ovi.where.domain.usecase.friend.ObserveFriendsUseCase
+import com.ovi.where.domain.usecase.friend.ObserveIncomingRequestsUseCase
+import com.ovi.where.domain.usecase.friend.ObserveOutgoingRequestsUseCase
+import com.ovi.where.domain.usecase.friend.ObserveSocialSummaryUseCase
 import com.ovi.where.domain.usecase.friend.RemoveFriendUseCase
 import com.ovi.where.domain.usecase.friend.SendFriendRequestUseCase
+import com.ovi.where.domain.usecase.friend.UnblockUserUseCase
 import com.ovi.where.domain.usecase.group.CreateGroupUseCase
 import com.ovi.where.domain.usecase.group.DeleteGroupUseCase
 import com.ovi.where.domain.usecase.group.GetGroupUseCase
@@ -98,14 +102,18 @@ object UseCaseModule {
     // ── Friends ──────────────────────────────────────────────────────────────
     @Provides fun provideSendFriendRequestUseCase(r: FriendshipRepository) = SendFriendRequestUseCase(r)
     @Provides fun provideAcceptFriendRequestUseCase(r: FriendshipRepository) = AcceptFriendRequestUseCase(r)
-    @Provides fun provideAcceptFriendRequestByUserIdUseCase(r: FriendshipRepository) = AcceptFriendRequestByUserIdUseCase(r)
     @Provides fun provideDeclineFriendRequestUseCase(r: FriendshipRepository) = DeclineFriendRequestUseCase(r)
-    @Provides fun provideDeclineFriendRequestByUserIdUseCase(r: FriendshipRepository) = DeclineFriendRequestByUserIdUseCase(r)
     @Provides fun provideRemoveFriendUseCase(r: FriendshipRepository) = RemoveFriendUseCase(r)
     @Provides fun provideObserveFriendsUseCase(r: FriendshipRepository) = ObserveFriendsUseCase(r)
-    @Provides fun provideObserveFriendRequestsUseCase(r: FriendshipRepository) = ObserveFriendRequestsUseCase(r)
     @Provides fun provideGetFriendshipStatusUseCase(r: FriendshipRepository) = GetFriendshipStatusUseCase(r)
     @Provides fun provideObserveAllFriendLocationsUseCase(r: FriendshipRepository) = ObserveAllFriendLocationsUseCase(r)
+    @Provides fun provideCancelFriendRequestUseCase(r: FriendshipRepository) = CancelFriendRequestUseCase(r)
+    @Provides fun provideBlockUserUseCase(r: FriendshipRepository) = BlockUserUseCase(r)
+    @Provides fun provideUnblockUserUseCase(r: FriendshipRepository) = UnblockUserUseCase(r)
+    @Provides fun provideObserveIncomingRequestsUseCase(r: FriendshipRepository) = ObserveIncomingRequestsUseCase(r)
+    @Provides fun provideObserveOutgoingRequestsUseCase(r: FriendshipRepository) = ObserveOutgoingRequestsUseCase(r)
+    @Provides fun provideObserveSocialSummaryUseCase(r: FriendshipRepository) = ObserveSocialSummaryUseCase(r)
+    @Provides fun provideObserveBlockedUsersUseCase(r: FriendshipRepository) = ObserveBlockedUsersUseCase(r)
 
     // ── Chat ─────────────────────────────────────────────────────────────────
     @Provides fun provideObserveConversationsUseCase(r: ConversationRepository) = ObserveConversationsUseCase(r)

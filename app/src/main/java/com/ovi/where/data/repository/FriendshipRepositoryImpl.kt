@@ -2,256 +2,209 @@ package com.ovi.where.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.functions.FirebaseFunctions
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.constants.AppConstants
+import com.ovi.where.domain.model.BlockEntry
+import com.ovi.where.domain.model.FriendEntry
 import com.ovi.where.domain.model.Friendship
+import com.ovi.where.domain.model.FriendshipIds
 import com.ovi.where.domain.model.FriendshipStatus
+import com.ovi.where.domain.model.RequestEntry
+import com.ovi.where.domain.model.RequestInbox
 import com.ovi.where.domain.model.SharedLocation
-import com.ovi.where.domain.model.User
+import com.ovi.where.domain.model.SocialSummary
 import com.ovi.where.domain.repository.FriendshipRepository
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.tasks.await
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Production implementation of [FriendshipRepository] against the new
+ * denormalized data model (design §5.2).
+ *
+ * - Read methods use single snapshot listeners on per-user subcollections/docs.
+ * - Write methods route through Firebase Cloud Functions callables.
+ * - [observeAllFriendLocations] is unchanged from the legacy implementation.
+ */
 @Singleton
 class FriendshipRepositoryImpl @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val functions: FirebaseFunctions
 ) : FriendshipRepository {
 
     private val currentUid: String?
         get() = firebaseAuth.currentUser?.uid
 
-    override suspend fun sendFriendRequest(receiverId: String): Resource<Unit> {
-        return try {
-            val uid = currentUid ?: return Resource.Error("Not authenticated")
-            val id = UUID.randomUUID().toString()
-            val friendship = Friendship(
-                id = id,
-                requesterId = uid,
-                receiverId = receiverId,
-                status = FriendshipStatus.PENDING,
-                createdAt = System.currentTimeMillis(),
-                updatedAt = System.currentTimeMillis()
-            )
-            firestore.collection(AppConstants.FIRESTORE_COLLECTION_FRIENDSHIPS)
-                .document(id)
-                .set(friendship)
-                .await()
-            Resource.Success(Unit)
-        } catch (e: Exception) {
-            Resource.Error(e.message ?: "Failed to send friend request")
-        }
-    }
+    // ═══════════════════════════════════════════════════════════════════
+    // Reads — listeners (tasks 4.1–4.7)
+    // ═══════════════════════════════════════════════════════════════════
 
-    override suspend fun acceptFriendRequest(friendshipId: String): Resource<Unit> {
-        return try {
-            firestore.collection(AppConstants.FIRESTORE_COLLECTION_FRIENDSHIPS)
-                .document(friendshipId)
-                .update(
-                    mapOf(
-                        "status" to FriendshipStatus.ACCEPTED.name,
-                        "updatedAt" to System.currentTimeMillis()
-                    )
-                )
-                .await()
-            Resource.Success(Unit)
-        } catch (e: Exception) {
-            Resource.Error(e.message ?: "Failed to accept request")
-        }
-    }
-
-override suspend fun acceptFriendRequestByUserId(userId: String): Resource<Unit> {
-        return try {
-            val uid = currentUid ?: return Resource.Error("Not authenticated")
-            // Find friendship where current user is receiver and other user is requester
-            val snapshot = firestore.collection(AppConstants.FIRESTORE_COLLECTION_FRIENDSHIPS)
-                .whereEqualTo("requesterId", userId)
-                .whereEqualTo("receiverId", uid)
-                .whereEqualTo("status", FriendshipStatus.PENDING.name)
-                .get()
-                .await()
-            
-            if (snapshot.documents.isEmpty()) {
-                return Resource.Error("Friend request not found")
-            }
-            
-            val friendshipDoc = snapshot.documents.first()
-            friendshipDoc.reference.update(
-                mapOf(
-                    "status" to FriendshipStatus.ACCEPTED.name,
-                    "updatedAt" to System.currentTimeMillis()
-                )
-            ).await()
-            Resource.Success(Unit)
-        } catch (e: Exception) {
-            Resource.Error(e.message ?: "Failed to accept friend request")
-        }
-    }
-
-    override suspend fun declineFriendRequestByUserId(userId: String): Resource<Unit> {
-        return try {
-            val uid = currentUid ?: return Resource.Error("Not authenticated")
-            // Find friendship where current user is receiver and other user is requester
-            val snapshot = firestore.collection(AppConstants.FIRESTORE_COLLECTION_FRIENDSHIPS)
-                .whereEqualTo("requesterId", userId)
-                .whereEqualTo("receiverId", uid)
-                .whereEqualTo("status", FriendshipStatus.PENDING.name)
-                .get()
-                .await()
-            
-            if (snapshot.documents.isEmpty()) {
-                return Resource.Error("Friend request not found")
-            }
-            
-            snapshot.documents.first().reference.delete().await()
-            Resource.Success(Unit)
-        } catch (e: Exception) {
-            Resource.Error(e.message ?: "Failed to decline friend request")
-        }
-    }
-
-    override suspend fun declineFriendRequest(friendshipId: String): Resource<Unit> {
-        return try {
-            firestore.collection(AppConstants.FIRESTORE_COLLECTION_FRIENDSHIPS)
-                .document(friendshipId)
-                .delete()
-                .await()
-            Resource.Success(Unit)
-        } catch (e: Exception) {
-            Resource.Error(e.message ?: "Failed to decline request")
-        }
-    }
-
-
-    override suspend fun removeFriend(userId: String): Resource<Unit> {
-        return try {
-            val uid = currentUid ?: return Resource.Error("Not authenticated")
-            // Find the friendship doc (could be in either direction)
-            val asRequester = firestore.collection(AppConstants.FIRESTORE_COLLECTION_FRIENDSHIPS)
-                .whereEqualTo("requesterId", uid)
-                .whereEqualTo("receiverId", userId)
-                .get().await()
-            val asReceiver = firestore.collection(AppConstants.FIRESTORE_COLLECTION_FRIENDSHIPS)
-                .whereEqualTo("requesterId", userId)
-                .whereEqualTo("receiverId", uid)
-                .get().await()
-
-            val docs = asRequester.documents + asReceiver.documents
-            for (doc in docs) {
-                doc.reference.delete().await()
-            }
-            Resource.Success(Unit)
-        } catch (e: Exception) {
-            Resource.Error(e.message ?: "Failed to remove friend")
-        }
-    }
-
-    override fun observeFriends(): Flow<List<User>> = callbackFlow {
+    /**
+     * Task 4.1 — Single listener on `users/{uid}/friends` ordered by displayName.
+     * Emits empty list when unauthenticated. No truncation.
+     */
+    override fun observeFriends(): Flow<List<FriendEntry>> = callbackFlow {
         val uid = currentUid ?: run { trySend(emptyList()); close(); return@callbackFlow }
-
-        // Listen to all accepted friendships where user is either requester or receiver
-        val listener1 = firestore.collection(AppConstants.FIRESTORE_COLLECTION_FRIENDSHIPS)
-            .whereEqualTo("requesterId", uid)
-            .whereEqualTo("status", FriendshipStatus.ACCEPTED.name)
-            .addSnapshotListener { snapshot, _ ->
-                val friendIds = snapshot?.toObjects(Friendship::class.java)
-                    ?.map { it.receiverId } ?: emptyList()
-                fetchUsersAndSend(friendIds, uid)
+        val reg = firestore.collection("users").document(uid).collection("friends")
+            .orderBy("displayName")
+            .addSnapshotListener { snap, err ->
+                if (err != null) { close(err); return@addSnapshotListener }
+                trySend(snap?.toObjects(FriendEntry::class.java) ?: emptyList())
             }
-
-        val listener2 = firestore.collection(AppConstants.FIRESTORE_COLLECTION_FRIENDSHIPS)
-            .whereEqualTo("receiverId", uid)
-            .whereEqualTo("status", FriendshipStatus.ACCEPTED.name)
-            .addSnapshotListener { snapshot, _ ->
-                val friendIds = snapshot?.toObjects(Friendship::class.java)
-                    ?.map { it.requesterId } ?: emptyList()
-                fetchUsersAndSend(friendIds, uid)
-            }
-
-        awaitClose {
-            listener1.remove()
-            listener2.remove()
-        }
+        awaitClose { reg.remove() }
     }
 
-    private fun kotlinx.coroutines.channels.ProducerScope<List<User>>.fetchUsersAndSend(
-        friendIds: List<String>,
-        currentUid: String
-    ) {
-        if (friendIds.isEmpty()) {
-            trySend(emptyList())
-            return
-        }
-        // Chunk into 10s for Firestore whereIn limit
-        val allUsers = mutableListOf<User>()
-        val chunks = friendIds.chunked(10)
-        // Use a simple fire-and-forget approach for the callback
-        firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
-            .whereIn("id", friendIds.take(10))
-            .get()
-            .addOnSuccessListener { snapshot ->
-                allUsers.addAll(snapshot.toObjects(User::class.java))
-                trySend(allUsers.toList())
-            }
-    }
-
-    override fun observeFriendRequests(): Flow<List<Friendship>> = callbackFlow {
+    /**
+     * Task 4.2 — Single-doc listener on `users/{uid}/inbox/friendRequests`.
+     * Emits entries sorted by sentAt descending. Empty list when doc absent.
+     */
+    override fun observeIncomingRequests(): Flow<List<RequestEntry>> = callbackFlow {
         val uid = currentUid ?: run { trySend(emptyList()); close(); return@callbackFlow }
-
-        val listener = firestore.collection(AppConstants.FIRESTORE_COLLECTION_FRIENDSHIPS)
-            .whereEqualTo("receiverId", uid)
-            .whereEqualTo("status", FriendshipStatus.PENDING.name)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) { close(error); return@addSnapshotListener }
-                val requests = snapshot?.toObjects(Friendship::class.java) ?: emptyList()
-                trySend(requests)
+        val reg = firestore.collection("users").document(uid)
+            .collection("inbox").document("friendRequests")
+            .addSnapshotListener { snap, err ->
+                if (err != null) { close(err); return@addSnapshotListener }
+                val inbox = snap?.toObject(RequestInbox::class.java) ?: RequestInbox()
+                trySend(inbox.entries.values.sortedByDescending { it.sentAt })
             }
-        awaitClose { listener.remove() }
+        awaitClose { reg.remove() }
     }
 
+    /**
+     * Task 4.3 — Single-doc listener on `users/{uid}/outbox/friendRequests`.
+     */
+    override fun observeOutgoingRequests(): Flow<List<RequestEntry>> = callbackFlow {
+        val uid = currentUid ?: run { trySend(emptyList()); close(); return@callbackFlow }
+        val reg = firestore.collection("users").document(uid)
+            .collection("outbox").document("friendRequests")
+            .addSnapshotListener { snap, err ->
+                if (err != null) { close(err); return@addSnapshotListener }
+                val outbox = snap?.toObject(RequestInbox::class.java) ?: RequestInbox()
+                trySend(outbox.entries.values.sortedByDescending { it.sentAt })
+            }
+        awaitClose { reg.remove() }
+    }
+
+    /**
+     * Task 4.4 — Single-doc listener on `users/{uid}/summary/social`.
+     * Emits zero-valued SocialSummary when doc absent.
+     */
+    override fun observeSocialSummary(): Flow<SocialSummary> = callbackFlow {
+        val uid = currentUid ?: run { trySend(SocialSummary()); close(); return@callbackFlow }
+        val reg = firestore.collection("users").document(uid)
+            .collection("summary").document("social")
+            .addSnapshotListener { snap, err ->
+                if (err != null) { close(err); return@addSnapshotListener }
+                trySend(snap?.toObject(SocialSummary::class.java) ?: SocialSummary())
+            }
+        awaitClose { reg.remove() }
+    }
+
+    /**
+     * Task 4.5 — Subcollection listener on `users/{uid}/blocks`.
+     */
+    override fun observeBlockedUsers(): Flow<List<BlockEntry>> = callbackFlow {
+        val uid = currentUid ?: run { trySend(emptyList()); close(); return@callbackFlow }
+        val reg = firestore.collection("users").document(uid).collection("blocks")
+            .addSnapshotListener { snap, err ->
+                if (err != null) { close(err); return@addSnapshotListener }
+                trySend(snap?.toObjects(BlockEntry::class.java) ?: emptyList())
+            }
+        awaitClose { reg.remove() }
+    }
+
+    /**
+     * Task 4.6 — Single deterministic get on `friendships/{pairId}`.
+     * Returns null when no document exists (absence == NONE).
+     */
     override suspend fun getFriendshipStatus(otherUserId: String): FriendshipStatus? {
         val uid = currentUid ?: return null
         return try {
-            val asRequester = firestore.collection(AppConstants.FIRESTORE_COLLECTION_FRIENDSHIPS)
-                .whereEqualTo("requesterId", uid)
-                .whereEqualTo("receiverId", otherUserId)
-                .get().await()
-            if (asRequester.documents.isNotEmpty()) {
-                val friendship = asRequester.documents[0].toObject(Friendship::class.java)
-                return friendship?.status
-            }
-            val asReceiver = firestore.collection(AppConstants.FIRESTORE_COLLECTION_FRIENDSHIPS)
-                .whereEqualTo("requesterId", otherUserId)
-                .whereEqualTo("receiverId", uid)
-                .get().await()
-            if (asReceiver.documents.isNotEmpty()) {
-                val friendship = asReceiver.documents[0].toObject(Friendship::class.java)
-                return friendship?.status
-            }
-            null
-        } catch (e: Exception) {
+            val pairId = FriendshipIds.pairId(uid, otherUserId)
+            val doc = firestore.collection("friendships").document(pairId).get().await()
+            doc.toObject(Friendship::class.java)?.status
+        } catch (_: Exception) {
             null
         }
     }
+
+    /**
+     * Returns the full [Friendship] object for the pair (caller, otherUserId).
+     * Returns null when no document exists or the user is unauthenticated.
+     */
+    override suspend fun getFriendship(otherUserId: String): Friendship? {
+        val uid = currentUid ?: return null
+        return try {
+            val pairId = FriendshipIds.pairId(uid, otherUserId)
+            val doc = firestore.collection("friendships").document(pairId).get().await()
+            doc.toObject(Friendship::class.java)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Writes — Cloud Functions callables (tasks 5.1–5.7)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /** Task 5.1 */
+    override suspend fun sendFriendRequest(receiverId: String): Resource<Unit> =
+        callCallable("sendFriendRequest", mapOf("receiverId" to receiverId))
+
+    /** Task 5.2 */
+    override suspend fun cancelFriendRequest(receiverId: String): Resource<Unit> =
+        callCallable("cancelFriendRequest", mapOf("receiverId" to receiverId))
+
+    /** Task 5.3 */
+    override suspend fun acceptFriendRequest(requesterId: String): Resource<Unit> =
+        callCallable("acceptFriendRequest", mapOf("requesterId" to requesterId))
+
+    /** Task 5.4 */
+    override suspend fun declineFriendRequest(requesterId: String): Resource<Unit> =
+        callCallable("declineFriendRequest", mapOf("requesterId" to requesterId))
+
+    /** Task 5.5 */
+    override suspend fun removeFriend(friendId: String): Resource<Unit> =
+        callCallable("removeFriend", mapOf("friendId" to friendId))
+
+    /** Task 5.6 */
+    override suspend fun blockUser(userId: String): Resource<Unit> =
+        callCallable("blockUser", mapOf("userId" to userId))
+
+    /** Task 5.7 */
+    override suspend fun unblockUser(userId: String): Resource<Unit> =
+        callCallable("unblockUser", mapOf("userId" to userId))
+
+    /**
+     * Shared helper that invokes a named Cloud Function callable with the given
+     * payload and maps the result to [Resource]. Zero client-side Firestore reads.
+     */
+    private suspend fun callCallable(name: String, data: Map<String, Any>): Resource<Unit> {
+        return try {
+            functions.getHttpsCallable(name).call(data).await()
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to call $name")
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Unchanged per design §5.1
+    // ═══════════════════════════════════════════════════════════════════
 
     override fun observeAllFriendLocations(): Flow<List<SharedLocation>> = callbackFlow {
         val uid = currentUid ?: run { trySend(emptyList()); close(); return@callbackFlow }
 
-        // Get user's groups first, then listen to all their locations
         val groupsListener = firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
             .whereArrayContains("memberIds", uid)
             .addSnapshotListener { groupSnapshot, error ->
                 if (error != null) { close(error); return@addSnapshotListener }
-                val groupIds = groupSnapshot?.documents?.mapNotNull { it.id } ?: emptyList()
+                val groupIds = groupSnapshot?.documents?.map { it.id } ?: emptyList()
                 val allLocations = mutableListOf<SharedLocation>()
 
                 if (groupIds.isEmpty()) {
@@ -259,8 +212,7 @@ override suspend fun acceptFriendRequestByUserId(userId: String): Resource<Unit>
                     return@addSnapshotListener
                 }
 
-                // Listen to locations from each group
-                for (groupId in groupIds.take(5)) { // Limit to 5 groups for performance
+                for (groupId in groupIds.take(5)) {
                     firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
                         .document(groupId)
                         .collection(AppConstants.FIRESTORE_COLLECTION_LOCATIONS)
@@ -270,7 +222,6 @@ override suspend fun acceptFriendRequestByUserId(userId: String): Resource<Unit>
                             val locations = locationSnapshot.toObjects(SharedLocation::class.java)
                                 .filter { it.userId != uid }
                             allLocations.addAll(locations)
-                            // Deduplicate by userId (keep most recent)
                             val deduped = allLocations
                                 .groupBy { it.userId }
                                 .mapValues { entry -> entry.value.maxByOrNull { it.timestamp }!! }

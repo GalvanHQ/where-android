@@ -1,5 +1,6 @@
 package com.ovi.where.presentation.model
 
+import com.ovi.where.domain.model.FriendEntry
 import com.ovi.where.domain.model.User
 
 /**
@@ -16,6 +17,17 @@ data class FriendUiModel(
     val avatarInitial: String
 )
 
+/** Adapt the denormalized `users/{uid}/friends/{friendUid}` doc into a UI model. */
+fun FriendEntry.toFriendUiModel(): FriendUiModel = FriendUiModel(
+    userId        = friendUid,
+    displayName   = displayName,
+    username      = username,
+    photoUrl      = photoUrl,
+    isOnline      = isOnline,
+    avatarInitial = displayName.take(1).uppercase().ifEmpty { "?" }
+)
+
+/** Legacy adapter kept for other call sites that still carry a [User]. */
 fun User.toFriendUiModel(): FriendUiModel = FriendUiModel(
     userId        = id,
     displayName   = displayName,

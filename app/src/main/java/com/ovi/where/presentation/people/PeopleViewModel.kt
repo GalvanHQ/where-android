@@ -4,23 +4,32 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ovi.where.core.common.Resource
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
-import com.ovi.where.domain.usecase.friend.ObserveFriendRequestsUseCase
 import com.ovi.where.domain.usecase.friend.ObserveFriendsUseCase
+import com.ovi.where.domain.usecase.friend.ObserveSocialSummaryUseCase
 import com.ovi.where.domain.usecase.friend.RemoveFriendUseCase
+import com.ovi.where.domain.usecase.friend.BlockUserUseCase
 import com.ovi.where.presentation.model.FriendUiModel
 import com.ovi.where.presentation.model.toFriendUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * PeopleViewModel — design §5.4.
+ * Combines `observeFriends` + `observeSocialSummary` into a single UI state.
+ * Exposes long-press actions (unfriend, block) and message navigation.
+ */
 @HiltViewModel
 class PeopleViewModel @Inject constructor(
     private val observeFriendsUseCase: ObserveFriendsUseCase,
-    private val observeFriendRequestsUseCase: ObserveFriendRequestsUseCase,
+    private val observeSocialSummaryUseCase: ObserveSocialSummaryUseCase,
     private val removeFriendUseCase: RemoveFriendUseCase,
+    private val blockUserUseCase: BlockUserUseCase,
     private val getOrCreateDirectConversationUseCase: GetOrCreateDirectConversationUseCase
 ) : ViewModel() {
 
@@ -30,32 +39,34 @@ class PeopleViewModel @Inject constructor(
     private val _navigateToChat = MutableStateFlow<String?>(null)
     val navigateToChat: StateFlow<String?> = _navigateToChat.asStateFlow()
 
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error.asStateFlow()
-
     init {
-        observeFriends()
-        observeRequests()
+        observeData()
     }
 
-    private fun observeFriends() {
+    private fun observeData() {
         viewModelScope.launch {
-            observeFriendsUseCase().collect { friends ->
-                _uiState.value = _uiState.value.copy(
+            combine(
+                observeFriendsUseCase(),
+                observeSocialSummaryUseCase()
+            ) { friends, summary ->
+                PeopleUiState(
                     friends = friends
                         .map { it.toFriendUiModel() }
                         .sortedBy { it.displayName.lowercase() },
-                    isLoading = false
+                    pendingRequestCount = summary.pendingIncomingCount,
+                    isLoading = false,
+                    error = null
                 )
             }
-        }
-    }
-
-    private fun observeRequests() {
-        viewModelScope.launch {
-            observeFriendRequestsUseCase().collect { requests ->
-                _uiState.value = _uiState.value.copy(pendingRequestCount = requests.size)
-            }
+                .catch { e ->
+                    emit(
+                        _uiState.value.copy(
+                            isLoading = false,
+                            error = e.message ?: "Failed to load friends"
+                        )
+                    )
+                }
+                .collect { _uiState.value = it }
         }
     }
 
@@ -63,23 +74,29 @@ class PeopleViewModel @Inject constructor(
         viewModelScope.launch { removeFriendUseCase(userId) }
     }
 
+    fun blockUser(userId: String) {
+        viewModelScope.launch { blockUserUseCase(userId) }
+    }
+
     fun openOrCreateDm(userId: String) {
         viewModelScope.launch {
-            println("Opening DM for userId: $userId")
             when (val result = getOrCreateDirectConversationUseCase(userId)) {
                 is Resource.Success -> {
-                    println("Conversation created: ${result.data}")
                     result.data?.id?.let { conversationId ->
                         _navigateToChat.value = conversationId
                     }
                 }
                 is Resource.Error -> {
-                    println("Error: ${result.message}")
-                    _error.value = result.message
+                    _uiState.value = _uiState.value.copy(error = result.message)
                 }
                 else -> { /* Loading */ }
             }
         }
+    }
+
+    fun onRetry() {
+        _uiState.value = PeopleUiState() // reset to loading
+        observeData()
     }
 
     fun onChatNavigated() {
@@ -87,7 +104,7 @@ class PeopleViewModel @Inject constructor(
     }
 
     fun clearError() {
-        _error.value = null
+        _uiState.value = _uiState.value.copy(error = null)
     }
 }
 

@@ -16,12 +16,42 @@ sealed class ProfileFriendshipAction {
     object RequestReceived : ProfileFriendshipAction()
     /** Already friends — can message or unfriend. */
     object AlreadyFriends : ProfileFriendshipAction()
+    /** The caller has blocked this user. */
+    object Blocked : ProfileFriendshipAction()
+    /** This user has blocked the caller. */
+    object BlockedByThem : ProfileFriendshipAction()
 }
 
-fun FriendshipStatus?.toProfileAction(): ProfileFriendshipAction = when (this) {
+/**
+ * Maps a [FriendshipStatus] to the appropriate [ProfileFriendshipAction].
+ *
+ * For [FriendshipStatus.PENDING], the direction is determined by comparing
+ * [requesterId] with [callerUid]: if the caller initiated the request it's
+ * [ProfileFriendshipAction.RequestSent], otherwise [ProfileFriendshipAction.RequestReceived].
+ *
+ * For [FriendshipStatus.BLOCKED], the blocker is identified by [requesterId]
+ * (the `blockUser` callable sets `requesterId = callerUid` on the pair doc).
+ * If the caller is the blocker → [ProfileFriendshipAction.Blocked],
+ * otherwise → [ProfileFriendshipAction.BlockedByThem].
+ *
+ * @param callerUid The authenticated user's uid.
+ * @param requesterId The `requesterId` field from the canonical Friendship document,
+ *   or null when no document exists.
+ */
+fun FriendshipStatus?.toProfileAction(
+    callerUid: String,
+    requesterId: String?
+): ProfileFriendshipAction = when (this) {
     FriendshipStatus.ACCEPTED -> ProfileFriendshipAction.AlreadyFriends
-    FriendshipStatus.PENDING  -> ProfileFriendshipAction.RequestSent
-    else                      -> ProfileFriendshipAction.AddFriend
+    FriendshipStatus.PENDING -> {
+        if (requesterId == callerUid) ProfileFriendshipAction.RequestSent
+        else ProfileFriendshipAction.RequestReceived
+    }
+    FriendshipStatus.BLOCKED -> {
+        if (requesterId == callerUid) ProfileFriendshipAction.Blocked
+        else ProfileFriendshipAction.BlockedByThem
+    }
+    else -> ProfileFriendshipAction.AddFriend
 }
 
 /**
@@ -39,7 +69,11 @@ data class OtherUserProfileUiModel(
     val friendshipAction: ProfileFriendshipAction
 )
 
-fun User.toOtherProfileUiModel(status: FriendshipStatus?): OtherUserProfileUiModel =
+fun User.toOtherProfileUiModel(
+    status: FriendshipStatus?,
+    callerUid: String,
+    requesterId: String?
+): OtherUserProfileUiModel =
     OtherUserProfileUiModel(
         userId           = id,
         displayName      = displayName,
@@ -47,5 +81,5 @@ fun User.toOtherProfileUiModel(status: FriendshipStatus?): OtherUserProfileUiMod
         bio              = bio,
         photoUrl         = photoUrl,
         avatarInitial    = displayName.take(1).uppercase().ifEmpty { "?" },
-        friendshipAction = status.toProfileAction()
+        friendshipAction = status.toProfileAction(callerUid, requesterId)
     )

@@ -2,35 +2,58 @@ package com.ovi.where.presentation.people
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.functions.FirebaseFunctionsException
 import com.ovi.where.core.common.Resource
-import com.ovi.where.domain.model.FriendshipStatus
+import com.ovi.where.domain.repository.FriendshipRepository
 import com.ovi.where.domain.repository.UserRepository
-import com.ovi.where.domain.usecase.friend.AcceptFriendRequestByUserIdUseCase
-import com.ovi.where.domain.usecase.friend.DeclineFriendRequestByUserIdUseCase
+import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
+import com.ovi.where.domain.usecase.friend.AcceptFriendRequestUseCase
+import com.ovi.where.domain.usecase.friend.BlockUserUseCase
+import com.ovi.where.domain.usecase.friend.CancelFriendRequestUseCase
+import com.ovi.where.domain.usecase.friend.DeclineFriendRequestUseCase
 import com.ovi.where.domain.usecase.friend.GetFriendshipStatusUseCase
 import com.ovi.where.domain.usecase.friend.RemoveFriendUseCase
 import com.ovi.where.domain.usecase.friend.SendFriendRequestUseCase
-import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
+import com.ovi.where.domain.usecase.friend.UnblockUserUseCase
 import com.ovi.where.presentation.model.OtherUserProfileUiModel
 import com.ovi.where.presentation.model.ProfileFriendshipAction
 import com.ovi.where.presentation.model.toOtherProfileUiModel
-import com.ovi.where.presentation.model.toProfileAction
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * ViewModel for the User Profile screen.
+ *
+ * Handles all friendship actions (send, cancel, accept, decline, unfriend,
+ * block, unblock) with optimistic UI updates and error-code to snackbar mapping
+ * per design §7.
+ *
+ * Injects [FirebaseAuth] to provide the caller uid for the
+ * [ProfileFriendshipAction] mapper (needed to distinguish Blocked vs BlockedByThem
+ * and RequestSent vs RequestReceived).
+ */
 @HiltViewModel
 class UserProfileViewModel @Inject constructor(
     private val userRepository: UserRepository,
+    private val friendshipRepository: FriendshipRepository,
     private val getFriendshipStatusUseCase: GetFriendshipStatusUseCase,
     private val sendFriendRequestUseCase: SendFriendRequestUseCase,
+    private val cancelFriendRequestUseCase: CancelFriendRequestUseCase,
     private val removeFriendUseCase: RemoveFriendUseCase,
-    private val acceptFriendRequestByUserIdUseCase: AcceptFriendRequestByUserIdUseCase,
-    private val declineFriendRequestByUserIdUseCase: DeclineFriendRequestByUserIdUseCase,
-    private val getOrCreateDirectConversationUseCase: GetOrCreateDirectConversationUseCase
+    private val acceptFriendRequestUseCase: AcceptFriendRequestUseCase,
+    private val declineFriendRequestUseCase: DeclineFriendRequestUseCase,
+    private val blockUserUseCase: BlockUserUseCase,
+    private val unblockUserUseCase: UnblockUserUseCase,
+    private val getOrCreateDirectConversationUseCase: GetOrCreateDirectConversationUseCase,
+    private val firebaseAuth: FirebaseAuth
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UserProfileUiState())
@@ -39,16 +62,32 @@ class UserProfileViewModel @Inject constructor(
     private val _navigateToChat = MutableStateFlow<String?>(null)
     val navigateToChat: StateFlow<String?> = _navigateToChat.asStateFlow()
 
+    /** One-shot snackbar events for error/success messages (design §7). */
+    private val _snackbarEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val snackbarEvent: SharedFlow<String> = _snackbarEvent.asSharedFlow()
+
+    private val callerUid: String?
+        get() = firebaseAuth.currentUser?.uid
+
     fun loadUser(userId: String) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null, notFound = false)
             when (val result = userRepository.getUser(userId)) {
                 is Resource.Success -> {
-                    val user   = result.data ?: return@launch
-                    val status = getFriendshipStatusUseCase(userId)
-                    // Map domain User + FriendshipStatus → OtherUserProfileUiModel
+                    val user = result.data
+                    if (user == null) {
+                        _uiState.value = _uiState.value.copy(isLoading = false, notFound = true)
+                        return@launch
+                    }
+                    // Get the full friendship object to determine direction/blocker
+                    val friendship = friendshipRepository.getFriendship(userId)
+                    val uid = callerUid ?: ""
                     _uiState.value = _uiState.value.copy(
-                        profile   = user.toOtherProfileUiModel(status),
+                        profile = user.toOtherProfileUiModel(
+                            status = friendship?.status,
+                            callerUid = uid,
+                            requesterId = friendship?.requesterId
+                        ),
                         isLoading = false
                     )
                 }
@@ -61,47 +100,93 @@ class UserProfileViewModel @Inject constructor(
     }
 
     fun sendFriendRequest(userId: String) {
-        viewModelScope.launch {
-            sendFriendRequestUseCase(userId)
-            // Optimistically update the action — no raw FriendshipStatus exposed to UI
-            _uiState.value = _uiState.value.copy(
-                profile = _uiState.value.profile?.copy(
-                    friendshipAction = ProfileFriendshipAction.RequestSent
-                )
+        // Optimistic update to RequestSent
+        _uiState.value = _uiState.value.copy(
+            profile = _uiState.value.profile?.copy(
+                friendshipAction = ProfileFriendshipAction.RequestSent
             )
+        )
+        viewModelScope.launch {
+            val result = sendFriendRequestUseCase(userId)
+            handleActionResult(result, userId, ProfileFriendshipAction.AddFriend)
         }
     }
 
-    fun removeFriend(userId: String) {
-        viewModelScope.launch {
-            removeFriendUseCase(userId)
-            _uiState.value = _uiState.value.copy(
-                profile = _uiState.value.profile?.copy(
-                    friendshipAction = ProfileFriendshipAction.AddFriend
-                )
+    fun cancelFriendRequest(userId: String) {
+        // Optimistic update to AddFriend
+        _uiState.value = _uiState.value.copy(
+            profile = _uiState.value.profile?.copy(
+                friendshipAction = ProfileFriendshipAction.AddFriend
             )
+        )
+        viewModelScope.launch {
+            val result = cancelFriendRequestUseCase(userId)
+            handleActionResult(result, userId, ProfileFriendshipAction.RequestSent)
         }
     }
 
     fun acceptFriendRequest(userId: String) {
-        viewModelScope.launch {
-            acceptFriendRequestByUserIdUseCase(userId)
-            _uiState.value = _uiState.value.copy(
-                profile = _uiState.value.profile?.copy(
-                    friendshipAction = ProfileFriendshipAction.AlreadyFriends
-                )
+        // Optimistic update to AlreadyFriends
+        _uiState.value = _uiState.value.copy(
+            profile = _uiState.value.profile?.copy(
+                friendshipAction = ProfileFriendshipAction.AlreadyFriends
             )
+        )
+        viewModelScope.launch {
+            val result = acceptFriendRequestUseCase(userId)
+            handleActionResult(result, userId, ProfileFriendshipAction.RequestReceived)
         }
     }
 
     fun declineFriendRequest(userId: String) {
-        viewModelScope.launch {
-            declineFriendRequestByUserIdUseCase(userId)
-            _uiState.value = _uiState.value.copy(
-                profile = _uiState.value.profile?.copy(
-                    friendshipAction = ProfileFriendshipAction.AddFriend
-                )
+        // Optimistic update to AddFriend
+        _uiState.value = _uiState.value.copy(
+            profile = _uiState.value.profile?.copy(
+                friendshipAction = ProfileFriendshipAction.AddFriend
             )
+        )
+        viewModelScope.launch {
+            val result = declineFriendRequestUseCase(userId)
+            handleActionResult(result, userId, ProfileFriendshipAction.RequestReceived)
+        }
+    }
+
+    fun removeFriend(userId: String) {
+        // Optimistic update to AddFriend
+        _uiState.value = _uiState.value.copy(
+            profile = _uiState.value.profile?.copy(
+                friendshipAction = ProfileFriendshipAction.AddFriend
+            )
+        )
+        viewModelScope.launch {
+            val result = removeFriendUseCase(userId)
+            handleActionResult(result, userId, ProfileFriendshipAction.AlreadyFriends)
+        }
+    }
+
+    fun blockUser(userId: String) {
+        // Optimistic update to Blocked
+        _uiState.value = _uiState.value.copy(
+            profile = _uiState.value.profile?.copy(
+                friendshipAction = ProfileFriendshipAction.Blocked
+            )
+        )
+        viewModelScope.launch {
+            val result = blockUserUseCase(userId)
+            handleActionResult(result, userId, _uiState.value.profile?.friendshipAction ?: ProfileFriendshipAction.AddFriend)
+        }
+    }
+
+    fun unblockUser(userId: String) {
+        // Optimistic update to AddFriend
+        _uiState.value = _uiState.value.copy(
+            profile = _uiState.value.profile?.copy(
+                friendshipAction = ProfileFriendshipAction.AddFriend
+            )
+        )
+        viewModelScope.launch {
+            val result = unblockUserUseCase(userId)
+            handleActionResult(result, userId, ProfileFriendshipAction.Blocked)
         }
     }
 
@@ -113,7 +198,10 @@ class UserProfileViewModel @Inject constructor(
                         _navigateToChat.value = conversationId
                     }
                 }
-                else -> { /* Handle error if needed */ }
+                is Resource.Error -> {
+                    mapErrorToSnackbar(result.message)
+                }
+                else -> {}
             }
         }
     }
@@ -121,10 +209,83 @@ class UserProfileViewModel @Inject constructor(
     fun onChatNavigated() {
         _navigateToChat.value = null
     }
+
+    fun onRetry(userId: String) {
+        loadUser(userId)
+    }
+
+    // ─── Error-code to snackbar mapping (design §7) ──────────────────
+
+    /**
+     * Handles the result of a friendship action. On error, reverts the optimistic
+     * update and maps the error code to a snackbar message.
+     *
+     * @param result The result from the use case.
+     * @param userId The target user id (for refresh on certain errors).
+     * @param revertAction The [ProfileFriendshipAction] to revert to on failure.
+     */
+    private fun handleActionResult(
+        result: Resource<Unit>,
+        userId: String,
+        revertAction: ProfileFriendshipAction
+    ) {
+        if (result is Resource.Error) {
+            val errorMessage = result.message ?: ""
+            when {
+                errorMessage.contains("UNAVAILABLE", ignoreCase = true) -> {
+                    revertOptimistic(revertAction)
+                    _snackbarEvent.tryEmit("You're offline")
+                }
+                errorMessage.contains("DEADLINE_EXCEEDED", ignoreCase = true) -> {
+                    revertOptimistic(revertAction)
+                    _snackbarEvent.tryEmit("Couldn't complete action, try again")
+                }
+                errorMessage.contains("ALREADY_EXISTS", ignoreCase = true) ||
+                errorMessage.contains("failed-precondition", ignoreCase = true) ||
+                errorMessage.contains("FAILED_PRECONDITION", ignoreCase = true) -> {
+                    // Silently refresh — the state has changed server-side
+                    loadUser(userId)
+                }
+                errorMessage.contains("NOT_FOUND", ignoreCase = true) -> {
+                    _snackbarEvent.tryEmit("Request is no longer available")
+                    loadUser(userId)
+                }
+                errorMessage.contains("PERMISSION_DENIED", ignoreCase = true) -> {
+                    revertOptimistic(revertAction)
+                    _uiState.value = _uiState.value.copy(
+                        error = "Permission denied"
+                    )
+                }
+                else -> {
+                    revertOptimistic(revertAction)
+                    _snackbarEvent.tryEmit(errorMessage.ifEmpty { "Something went wrong" })
+                }
+            }
+        }
+    }
+
+    private fun revertOptimistic(action: ProfileFriendshipAction) {
+        _uiState.value = _uiState.value.copy(
+            profile = _uiState.value.profile?.copy(friendshipAction = action)
+        )
+    }
+
+    private fun mapErrorToSnackbar(message: String?) {
+        val msg = message ?: "Something went wrong"
+        when {
+            msg.contains("UNAVAILABLE", ignoreCase = true) ->
+                _snackbarEvent.tryEmit("You're offline")
+            msg.contains("DEADLINE_EXCEEDED", ignoreCase = true) ->
+                _snackbarEvent.tryEmit("Couldn't complete action, try again")
+            else ->
+                _snackbarEvent.tryEmit(msg)
+        }
+    }
 }
 
 data class UserProfileUiState(
     val profile: OtherUserProfileUiModel? = null,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val notFound: Boolean = false
 )

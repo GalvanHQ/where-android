@@ -1,41 +1,31 @@
 package com.ovi.where.presentation.people
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.presentation.model.ProfileFriendshipAction
 import com.ovi.where.presentation.common.WhereTopAppBar
+import com.ovi.where.presentation.people.components.ProfileActions
+import com.ovi.where.presentation.people.components.ProfileErrorState
+import com.ovi.where.presentation.people.components.ProfileHeader
+import com.ovi.where.presentation.people.components.ProfileNotFoundState
+import com.ovi.where.presentation.people.components.ProfileSkeleton
+import com.ovi.where.presentation.people.components.ProfileStats
 
-@androidx.compose.material3.ExperimentalMaterial3Api
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserProfileScreen(
     userId: String,
@@ -56,118 +46,68 @@ fun UserProfileScreen(
         }
     }
 
+    val topBarTitle = uiState.profile?.let { "@${it.username}" } ?: ""
+
     Scaffold(
         topBar = {
             WhereTopAppBar(
-                title = uiState.profile?.displayName ?: "Profile",
+                title = topBarTitle,
                 onNavigateBack = onNavigateBack
             )
         }
     ) { paddingValues ->
-        if (uiState.isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator() }
-        } else {
-            val profile = uiState.profile ?: return@Scaffold
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(Dimens.spaceXLarge),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Spacer(Modifier.height(Dimens.spaceLarge))
-
-                // Avatar — uses pre-computed avatarInitial from OtherUserProfileUiModel
-                if (!profile.photoUrl.isNullOrEmpty()) {
-                    AsyncImage(
-                        model = profile.photoUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(Dimens.avatarSizeXLarge).clip(CircleShape)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            when {
+                uiState.isLoading -> {
+                    ProfileSkeleton(
+                        modifier = Modifier.padding(top = Dimens.spaceXLarge)
                     )
-                } else {
-                    Box(
+                }
+                uiState.error != null && uiState.profile == null -> {
+                    ProfileErrorState(
+                        message = uiState.error ?: "Something went wrong",
+                        onRetry = { viewModel.loadUser(userId) }
+                    )
+                }
+                uiState.notFound -> {
+                    ProfileNotFoundState(onBack = onNavigateBack)
+                }
+                uiState.profile != null -> {
+                    val profile = uiState.profile!!
+
+                    Column(
                         modifier = Modifier
-                            .size(Dimens.avatarSizeXLarge)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
                     ) {
-                        Text(
-                            text  = profile.avatarInitial,
-                            style = MaterialTheme.typography.displaySmall,
-                            color = MaterialTheme.colorScheme.primary
+                        ProfileHeader(
+                            profile = profile,
+                            isSharing = false
                         )
-                    }
-                }
 
-                Spacer(Modifier.height(Dimens.spaceLarge))
+                        ProfileStats(
+                            mutualCount = 0,
+                            isSharing = false
+                        )
 
-                Text(text = profile.displayName, style = MaterialTheme.typography.headlineSmall)
+                        Spacer(Modifier.height(Dimens.spaceLarge))
 
-                if (profile.username.isNotEmpty()) {
-                    Text(
-                        text  = "@${profile.username}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                        ProfileActions(
+                            action = profile.friendshipAction,
+                            onSendRequest = { viewModel.sendFriendRequest(userId) },
+                            onCancelRequest = { viewModel.removeFriend(userId) },
+                            onAccept = { viewModel.acceptFriendRequest(userId) },
+                            onDecline = { viewModel.declineFriendRequest(userId) },
+                            onMessage = { viewModel.openOrCreateDm(userId) },
+                            onUnfriend = { viewModel.removeFriend(userId) },
+                            onBlock = { /* Block flow is task 26.x */ }
+                        )
 
-                if (profile.bio.isNotEmpty()) {
-                    Spacer(Modifier.height(Dimens.spaceMedium))
-                    Text(
-                        text      = profile.bio,
-                        style     = MaterialTheme.typography.bodyMedium,
-                        color     = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                Spacer(Modifier.height(Dimens.spaceXLarge))
-
-                // Action buttons driven by sealed ProfileFriendshipAction — no raw domain enum
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium, Alignment.CenterHorizontally)
-                ) {
-                    when (profile.friendshipAction) {
-                        is ProfileFriendshipAction.AlreadyFriends -> {
-                            Button(
-                                onClick = { viewModel.openOrCreateDm(userId) },
-                                shape   = MaterialTheme.shapes.medium
-                            ) { Text("Message") }
-                            OutlinedButton(
-                                onClick = { viewModel.removeFriend(userId) },
-                                shape   = MaterialTheme.shapes.medium
-                            ) { Text("Unfriend") }
-                        }
-                        is ProfileFriendshipAction.RequestSent -> {
-                            FilledTonalButton(
-                                onClick  = {},
-                                enabled  = false,
-                                shape    = MaterialTheme.shapes.medium
-                            ) { Text("Request Sent") }
-                        }
-                        is ProfileFriendshipAction.RequestReceived -> {
-                            Button(
-                                onClick = { viewModel.acceptFriendRequest(userId) },
-                                shape   = MaterialTheme.shapes.medium
-                            ) { Text("Accept Request") }
-                            OutlinedButton(
-                                onClick = { viewModel.declineFriendRequest(userId) },
-                                shape   = MaterialTheme.shapes.medium
-                            ) { Text("Decline") }
-                        }
-                        is ProfileFriendshipAction.AddFriend -> {
-                            Button(
-                                onClick = { viewModel.sendFriendRequest(userId) },
-                                shape   = MaterialTheme.shapes.medium
-                            ) { Text("Add Friend") }
-                        }
+                        Spacer(Modifier.height(Dimens.spaceXLarge))
                     }
                 }
             }

@@ -1,0 +1,1250 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.13/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:processDebugGoogleServices UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:kspDebugKotlin UP-TO-DATE
+> Task :app:compileDebugKotlin
+w: file:///C:/Users/USERAS/Desktop/where/where-android/app/src/main/java/com/ovi/where/data/repository/AuthRepositoryImpl.kt:233:60 'class GoogleSignInOptions : AbstractSafeParcelable, Api.ApiOptions.Optional, ReflectedParcelable' is deprecated. Deprecated in Java.
+w: file:///C:/Users/USERAS/Desktop/where/where-android/app/src/main/java/com/ovi/where/data/repository/AuthRepositoryImpl.kt:234:76 'class GoogleSignInOptions : AbstractSafeParcelable, Api.ApiOptions.Optional, ReflectedParcelable' is deprecated. Deprecated in Java.
+w: file:///C:/Users/USERAS/Desktop/where/where-android/app/src/main/java/com/ovi/where/data/repository/AuthRepositoryImpl.kt:239:60 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///C:/Users/USERAS/Desktop/where/where-android/app/src/main/java/com/ovi/where/presentation/auth/login/LoginScreen.kt:55:8 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///C:/Users/USERAS/Desktop/where/where-android/app/src/main/java/com/ovi/where/presentation/auth/login/LoginScreen.kt:56:8 'class GoogleSignInOptions : AbstractSafeParcelable, Api.ApiOptions.Optional, ReflectedParcelable' is deprecated. Deprecated in Java.
+w: file:///C:/Users/USERAS/Desktop/where/where-android/app/src/main/java/com/ovi/where/presentation/auth/login/LoginScreen.kt:94:24 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///C:/Users/USERAS/Desktop/where/where-android/app/src/main/java/com/ovi/where/presentation/auth/login/LoginScreen.kt:107:19 'class GoogleSignInOptions : AbstractSafeParcelable, Api.ApiOptions.Optional, ReflectedParcelable' is deprecated. Deprecated in Java.
+w: file:///C:/Users/USERAS/Desktop/where/where-android/app/src/main/java/com/ovi/where/presentation/auth/login/LoginScreen.kt:107:47 'class GoogleSignInOptions : AbstractSafeParcelable, Api.ApiOptions.Optional, ReflectedParcelable' is deprecated. Deprecated in Java.
+w: file:///C:/Users/USERAS/Desktop/where/where-android/app/src/main/java/com/ovi/where/presentation/auth/login/LoginScreen.kt:111:9 'class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///C:/Users/USERAS/Desktop/where/where-android/app/src/main/java/com/ovi/where/presentation/chat/ChatScreen.kt:423:39 'val Icons.Filled.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Send.
+e: Daemon compilation failed: null
+java.lang.Exception
+	at org.jetbrains.kotlin.daemon.common.CompileService$CallResult$Error.get(CompileService.kt:69)
+	at org.jetbrains.kotlin.daemon.common.CompileService$CallResult$Error.get(CompileService.kt:65)
+	at org.jetbrains.kotlin.compilerRunner.GradleKotlinCompilerWork.compileWithDaemon(GradleKotlinCompilerWork.kt:240)
+	at org.jetbrains.kotlin.compilerRunner.GradleKotlinCompilerWork.compileWithDaemonOrFallbackImpl(GradleKotlinCompilerWork.kt:159)
+	at org.jetbrains.kotlin.compilerRunner.GradleKotlinCompilerWork.run(GradleKotlinCompilerWork.kt:111)
+	at org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction.execute(GradleCompilerRunnerWithWorkers.kt:76)
+	at org.gradle.workers.internal.DefaultWorkerServer.execute(DefaultWorkerServer.java:63)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:66)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:62)
+	at org.gradle.internal.classloader.ClassLoaderUtils.executeInClassloader(ClassLoaderUtils.java:100)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1.lambda$execute$0(NoIsolationWorkerFactory.java:62)
+	at org.gradle.workers.internal.AbstractWorker$1.call(AbstractWorker.java:44)
+	at org.gradle.workers.internal.AbstractWorker$1.call(AbstractWorker.java:41)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
+	at org.gradle.workers.internal.AbstractWorker.executeWrappedInBuildOperation(AbstractWorker.java:41)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1.execute(NoIsolationWorkerFactory.java:59)
+	at org.gradle.workers.internal.DefaultWorkerExecutor.lambda$submitWork$0(DefaultWorkerExecutor.java:174)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.runExecution(DefaultConditionalExecutionQueue.java:194)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.access$700(DefaultConditionalExecutionQueue.java:127)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner$1.run(DefaultConditionalExecutionQueue.java:169)
+	at org.gradle.internal.Factories$1.create(Factories.java:31)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:263)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:127)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:132)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.runBatch(DefaultConditionalExecutionQueue.java:164)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.run(DefaultConditionalExecutionQueue.java:133)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:572)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
+	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
+	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1570)
+Caused by: java.io.FileNotFoundException: C:\Users\USERAS\Desktop\where\where-android\app\build\kotlin\compileDebugKotlin\classpath-snapshot\shrunk-classpath-snapshot.bin (The system cannot find the path specified)
+	at java.base/java.io.FileOutputStream.open0(Native Method)
+	at java.base/java.io.FileOutputStream.open(FileOutputStream.java:289)
+	at java.base/java.io.FileOutputStream.<init>(FileOutputStream.java:230)
+	at java.base/java.io.FileOutputStream.<init>(FileOutputStream.java:179)
+	at org.jetbrains.kotlin.incremental.storage.ExternalizersKt.saveToFile(externalizers.kt:178)
+	at org.jetbrains.kotlin.incremental.classpathDiff.ClasspathSnapshotShrinkerKt.shrinkAndSaveClasspathSnapshot(ClasspathSnapshotShrinker.kt:299)
+	at org.jetbrains.kotlin.incremental.IncrementalJvmCompilerRunner.performWorkAfterCompilation(IncrementalJvmCompilerRunner.kt:478)
+	at org.jetbrains.kotlin.incremental.IncrementalJvmCompilerRunner.performWorkAfterCompilation(IncrementalJvmCompilerRunner.kt:75)
+	at org.jetbrains.kotlin.incremental.IncrementalCompilerRunner.compileImpl(IncrementalCompilerRunner.kt:433)
+	at org.jetbrains.kotlin.incremental.IncrementalCompilerRunner.compileNonIncrementally(IncrementalCompilerRunner.kt:310)
+	at org.jetbrains.kotlin.incremental.IncrementalCompilerRunner.compile(IncrementalCompilerRunner.kt:137)
+	at org.jetbrains.kotlin.daemon.CompileServiceImplBase.execIncrementalCompiler(CompileServiceImpl.kt:678)
+	at org.jetbrains.kotlin.daemon.CompileServiceImplBase.access$execIncrementalCompiler(CompileServiceImpl.kt:92)
+	at org.jetbrains.kotlin.daemon.CompileServiceImpl.compile(CompileServiceImpl.kt:1805)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.rmi/sun.rmi.server.UnicastServerRef.dispatch(UnicastServerRef.java:360)
+	at java.rmi/sun.rmi.transport.Transport$1.run(Transport.java:200)
+	at java.rmi/sun.rmi.transport.Transport$1.run(Transport.java:197)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:714)
+	at java.rmi/sun.rmi.transport.Transport.serviceCall(Transport.java:196)
+	at java.rmi/sun.rmi.transport.tcp.TCPTransport.handleMessages(TCPTransport.java:598)
+	at java.rmi/sun.rmi.transport.tcp.TCPTransport$ConnectionHandler.run0(TCPTransport.java:844)
+	at java.rmi/sun.rmi.transport.tcp.TCPTransport$ConnectionHandler.lambda$run$0(TCPTransport.java:721)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:400)
+	at java.rmi/sun.rmi.transport.tcp.TCPTransport$ConnectionHandler.run(TCPTransport.java:720)
+	... 3 more
+
+Failed to compile with Kotlin daemon: java.lang.Exception
+	at org.jetbrains.kotlin.daemon.common.CompileService$CallResult$Error.get(CompileService.kt:69)
+	at org.jetbrains.kotlin.daemon.common.CompileService$CallResult$Error.get(CompileService.kt:65)
+	at org.jetbrains.kotlin.compilerRunner.GradleKotlinCompilerWork.compileWithDaemon(GradleKotlinCompilerWork.kt:240)
+	at org.jetbrains.kotlin.compilerRunner.GradleKotlinCompilerWork.compileWithDaemonOrFallbackImpl(GradleKotlinCompilerWork.kt:159)
+	at org.jetbrains.kotlin.compilerRunner.GradleKotlinCompilerWork.run(GradleKotlinCompilerWork.kt:111)
+	at org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction.execute(GradleCompilerRunnerWithWorkers.kt:76)
+	at org.gradle.workers.internal.DefaultWorkerServer.execute(DefaultWorkerServer.java:63)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:66)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:62)
+	at org.gradle.internal.classloader.ClassLoaderUtils.executeInClassloader(ClassLoaderUtils.java:100)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1.lambda$execute$0(NoIsolationWorkerFactory.java:62)
+	at org.gradle.workers.internal.AbstractWorker$1.call(AbstractWorker.java:44)
+	at org.gradle.workers.internal.AbstractWorker$1.call(AbstractWorker.java:41)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
+	at org.gradle.workers.internal.AbstractWorker.executeWrappedInBuildOperation(AbstractWorker.java:41)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1.execute(NoIsolationWorkerFactory.java:59)
+	at org.gradle.workers.internal.DefaultWorkerExecutor.lambda$submitWork$0(DefaultWorkerExecutor.java:174)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.runExecution(DefaultConditionalExecutionQueue.java:194)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.access$700(DefaultConditionalExecutionQueue.java:127)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner$1.run(DefaultConditionalExecutionQueue.java:169)
+	at org.gradle.internal.Factories$1.create(Factories.java:31)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:263)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:127)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:132)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.runBatch(DefaultConditionalExecutionQueue.java:164)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.run(DefaultConditionalExecutionQueue.java:133)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:572)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
+	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
+	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1570)
+Caused by: java.io.FileNotFoundException: C:\Users\USERAS\Desktop\where\where-android\app\build\kotlin\compileDebugKotlin\classpath-snapshot\shrunk-classpath-snapshot.bin (The system cannot find the path specified)
+	at java.base/java.io.FileOutputStream.open0(Native Method)
+	at java.base/java.io.FileOutputStream.open(FileOutputStream.java:289)
+	at java.base/java.io.FileOutputStream.<init>(FileOutputStream.java:230)
+	at java.base/java.io.FileOutputStream.<init>(FileOutputStream.java:179)
+	at org.jetbrains.kotlin.incremental.storage.ExternalizersKt.saveToFile(externalizers.kt:178)
+	at org.jetbrains.kotlin.incremental.classpathDiff.ClasspathSnapshotShrinkerKt.shrinkAndSaveClasspathSnapshot(ClasspathSnapshotShrinker.kt:299)
+	at org.jetbrains.kotlin.incremental.IncrementalJvmCompilerRunner.performWorkAfterCompilation(IncrementalJvmCompilerRunner.kt:478)
+	at org.jetbrains.kotlin.incremental.IncrementalJvmCompilerRunner.performWorkAfterCompilation(IncrementalJvmCompilerRunner.kt:75)
+	at org.jetbrains.kotlin.incremental.IncrementalCompilerRunner.compileImpl(IncrementalCompilerRunner.kt:433)
+	at org.jetbrains.kotlin.incremental.IncrementalCompilerRunner.compileNonIncrementally(IncrementalCompilerRunner.kt:310)
+	at org.jetbrains.kotlin.incremental.IncrementalCompilerRunner.compile(IncrementalCompilerRunner.kt:137)
+	at org.jetbrains.kotlin.daemon.CompileServiceImplBase.execIncrementalCompiler(CompileServiceImpl.kt:678)
+	at org.jetbrains.kotlin.daemon.CompileServiceImplBase.access$execIncrementalCompiler(CompileServiceImpl.kt:92)
+	at org.jetbrains.kotlin.daemon.CompileServiceImpl.compile(CompileServiceImpl.kt:1805)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.rmi/sun.rmi.server.UnicastServerRef.dispatch(UnicastServerRef.java:360)
+	at java.rmi/sun.rmi.transport.Transport$1.run(Transport.java:200)
+	at java.rmi/sun.rmi.transport.Transport$1.run(Transport.java:197)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:714)
+	at java.rmi/sun.rmi.transport.Transport.serviceCall(Transport.java:196)
+	at java.rmi/sun.rmi.transport.tcp.TCPTransport.handleMessages(TCPTransport.java:598)
+	at java.rmi/sun.rmi.transport.tcp.TCPTransport$ConnectionHandler.run0(TCPTransport.java:844)
+	at java.rmi/sun.rmi.transport.tcp.TCPTransport$ConnectionHandler.lambda$run$0(TCPTransport.java:721)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:400)
+	at java.rmi/sun.rmi.transport.tcp.TCPTransport$ConnectionHandler.run(TCPTransport.java:720)
+	... 3 more
+Using fallback strategy: Compile without Kotlin daemon
+Try ./gradlew --stop if this issue persists
+If it does not look related to your configuration, please file an issue with logs to https://kotl.in/issue
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\core\config\FeatureFlags_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\core\utils\ImageCompressor_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\local\dao\ConversationDao_Impl.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\local\dao\LocationDao_Impl.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\local\dao\MessageDao_Impl.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\local\db\AppDatabase_Impl.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\local\prefs\UserPreferences_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\location\LocationManager_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\remote\chat\ChatSocketIoClient_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\remote\FcmMessagingService_GeneratedInjector.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\remote\FcmMessagingService_MembersInjector.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\remote\Hilt_FcmMessagingService.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\repository\AuthRepositoryImpl_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\repository\ConversationRepositoryImpl_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\repository\FriendshipRepositoryImpl_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\repository\GroupRepositoryImpl_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\repository\LocationRepositoryImpl_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\repository\MessageRepositoryImpl_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\data\repository\UserRepositoryImpl_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\AppModule_ProvideAppDatabaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\AppModule_ProvideConversationDaoFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\AppModule_ProvideDataStoreFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\AppModule_ProvideFirebaseAuthFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\AppModule_ProvideFirebaseFirestoreFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\AppModule_ProvideFirebaseFunctionsFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\AppModule_ProvideFirebaseMessagingFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\AppModule_ProvideFirebaseRemoteConfigFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\AppModule_ProvideFirebaseStorageFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\AppModule_ProvideFusedLocationProviderClientFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\AppModule_ProvideLocationDaoFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\AppModule_ProvideMessageDaoFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\AppModule_ProvideUserPreferencesFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\NetworkModule_ProvideChatSocketIoClientFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideAcceptFriendRequestUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideBlockUserUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideCancelFriendRequestUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideCheckUsernameAvailableUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideCompleteProfileUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideCreateGroupConversationUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideCreateGroupUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideDeclineFriendRequestUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideDeleteGroupUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideGetFriendshipStatusUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideGetGroupUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideGetOrCreateDirectConversationUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideGetUserGroupsUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideGetUsersUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideGoogleSignInUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideJoinGroupUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideKickMemberUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideLeaveGroupUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideMarkConversationReadUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideObserveAllFriendLocationsUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideObserveBlockedUsersUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideObserveConversationsUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideObserveCurrentUserUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideObserveFriendsUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideObserveGroupLocationsUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideObserveGroupMembersUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideObserveIncomingRequestsUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideObserveMessagesUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideObserveOutgoingRequestsUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideObserveSocialSummaryUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvidePromoteMemberUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideRegisterUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideReloadUserUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideRemoveFriendUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideResetPasswordUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideSendEmailVerificationUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideSendFriendRequestUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideSendLocationMessageUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideSendMessageUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideSignInUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideSignOutUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideStartLocationSharingUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideStopLocationSharingUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideUnblockUserUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideUpdateBioUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideUpdateGroupUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideUpdateProfileUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\di\UseCaseModule_ProvideUpdateUsernameUseCaseFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\auth\CheckUsernameAvailableUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\auth\CompleteProfileUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\auth\GoogleSignInUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\auth\ObserveCurrentUserUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\auth\RegisterUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\auth\ReloadUserUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\auth\ResetPasswordUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\auth\SendEmailVerificationUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\auth\SignInUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\auth\SignOutUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\auth\UpdateBioUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\auth\UpdateProfileUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\auth\UpdateUsernameUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\chat\CreateGroupConversationUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\chat\GetOrCreateDirectConversationUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\chat\MarkConversationReadUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\chat\ObserveConversationsUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\chat\ObserveMessagesUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\chat\SendLocationMessageUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\chat\SendMessageUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\friend\AcceptFriendRequestUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\friend\BlockUserUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\friend\CancelFriendRequestUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\friend\DeclineFriendRequestUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\friend\GetFriendshipStatusUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\friend\ObserveAllFriendLocationsUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\friend\ObserveBlockedUsersUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\friend\ObserveFriendsUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\friend\ObserveIncomingRequestsUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\friend\ObserveOutgoingRequestsUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\friend\ObserveSocialSummaryUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\friend\RemoveFriendUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\friend\SendFriendRequestUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\friend\UnblockUserUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\group\CreateGroupUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\group\DeleteGroupUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\group\GetGroupUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\group\GetUserGroupsUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\group\JoinGroupUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\group\KickMemberUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\group\LeaveGroupUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\group\ObserveGroupMembersUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\group\PromoteMemberUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\group\UpdateGroupUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\location\ObserveActiveLocationsUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\location\ObserveGroupLocationsUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\location\StartLocationSharingUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\location\StopLocationSharingUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\domain\usecase\user\GetUsersUseCase_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\Hilt_MainActivity.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\MainActivity_GeneratedInjector.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\complete\CompleteProfileViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\complete\CompleteProfileViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\complete\CompleteProfileViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\complete\CompleteProfileViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\complete\CompleteProfileViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\forgotpassword\ForgotPasswordViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\forgotpassword\ForgotPasswordViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\forgotpassword\ForgotPasswordViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\forgotpassword\ForgotPasswordViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\forgotpassword\ForgotPasswordViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\login\LoginViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\login\LoginViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\login\LoginViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\login\LoginViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\login\LoginViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\signup\SignUpViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\signup\SignUpViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\signup\SignUpViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\signup\SignUpViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\signup\SignUpViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\verification\EmailVerificationViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\verification\EmailVerificationViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\verification\EmailVerificationViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\verification\EmailVerificationViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\auth\verification\EmailVerificationViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\chat\ChatsViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\chat\ChatsViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\chat\ChatsViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\chat\ChatsViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\chat\ChatsViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\chat\ChatViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\chat\ChatViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\chat\ChatViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\chat\ChatViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\chat\ChatViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\create\CreateGroupViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\create\CreateGroupViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\create\CreateGroupViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\create\CreateGroupViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\create\CreateGroupViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\edit\EditGroupViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\edit\EditGroupViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\edit\EditGroupViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\edit\EditGroupViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\edit\EditGroupViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\JoinGroupViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\JoinGroupViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\JoinGroupViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\JoinGroupViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\group\JoinGroupViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\map\GlobalMapViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\map\GlobalMapViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\map\GlobalMapViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\map\GlobalMapViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\map\GlobalMapViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\map\MapViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\map\MapViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\map\MapViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\map\MapViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\map\MapViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\navigation\gatekeeper\AuthGatekeeperViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\navigation\gatekeeper\AuthGatekeeperViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\navigation\gatekeeper\AuthGatekeeperViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\navigation\gatekeeper\AuthGatekeeperViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\navigation\gatekeeper\AuthGatekeeperViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\navigation\MainScaffoldViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\navigation\MainScaffoldViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\navigation\MainScaffoldViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\navigation\MainScaffoldViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\navigation\MainScaffoldViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\onboarding\OnboardingViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\onboarding\OnboardingViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\onboarding\OnboardingViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\onboarding\OnboardingViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\onboarding\OnboardingViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\FriendRequestsViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\FriendRequestsViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\FriendRequestsViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\FriendRequestsViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\FriendRequestsViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\PeopleViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\PeopleViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\PeopleViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\PeopleViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\PeopleViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\SearchUsersViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\SearchUsersViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\SearchUsersViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\SearchUsersViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\SearchUsersViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\UserProfileViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\UserProfileViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\UserProfileViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\UserProfileViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\people\UserProfileViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\profile\edit\EditProfileViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\profile\edit\EditProfileViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\profile\edit\EditProfileViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\profile\edit\EditProfileViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\profile\edit\EditProfileViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\profile\ProfileViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\profile\ProfileViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\profile\ProfileViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\profile\ProfileViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\profile\ProfileViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\settings\SettingsViewModel_Factory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\settings\SettingsViewModel_HiltModules.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\settings\SettingsViewModel_HiltModules_BindsModule_Binds_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\settings\SettingsViewModel_HiltModules_KeyModule_ProvideFactory.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\presentation\settings\SettingsViewModel_HiltModules_KeyModule_Provide_LazyMapKey.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\service\Hilt_LocationTrackingService.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\service\LocationTrackingService_GeneratedInjector.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\service\LocationTrackingService_MembersInjector.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\com\ovi\where\WhereApplication_GeneratedInjector.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\dagger\hilt\internal\aggregatedroot\codegen\_com_ovi_where_WhereApplication.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_data_remote_FcmMessagingService_GeneratedInjector.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_di_AppModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_di_NetworkModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_di_RepositoryModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_di_UseCaseModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_MainActivity_GeneratedInjector.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_auth_complete_CompleteProfileViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_auth_complete_CompleteProfileViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_auth_forgotpassword_ForgotPasswordViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_auth_forgotpassword_ForgotPasswordViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_auth_login_LoginViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_auth_login_LoginViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_auth_signup_SignUpViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_auth_signup_SignUpViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_auth_verification_EmailVerificationViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_auth_verification_EmailVerificationViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_chat_ChatsViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_chat_ChatsViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_chat_ChatViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_chat_ChatViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_group_create_CreateGroupViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_group_create_CreateGroupViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_group_details_GroupDetailsViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_group_details_GroupDetailsViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_group_edit_EditGroupViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_group_edit_EditGroupViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_group_JoinGroupViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_group_JoinGroupViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_map_GlobalMapViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_map_GlobalMapViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_map_MapViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_map_MapViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_navigation_gatekeeper_AuthGatekeeperViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_navigation_gatekeeper_AuthGatekeeperViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_navigation_MainScaffoldViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_navigation_MainScaffoldViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_onboarding_OnboardingViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_onboarding_OnboardingViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_people_FriendRequestsViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_people_FriendRequestsViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_people_PeopleViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_people_PeopleViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_people_SearchUsersViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_people_SearchUsersViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_people_UserProfileViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_people_UserProfileViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_profile_edit_EditProfileViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_profile_edit_EditProfileViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_profile_ProfileViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_profile_ProfileViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_settings_SettingsViewModel_HiltModules_BindsModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_presentation_settings_SettingsViewModel_HiltModules_KeyModule.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_service_LocationTrackingService_GeneratedInjector.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_ovi_where_WhereApplication_GeneratedInjector.java
+exception: warning: Java source root points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\generated\source\buildConfig\debug\com\ovi\where\BuildConfig.java
+exception: warning: classpath entry points to a non-existent location: C:\Users\USERAS\Desktop\where\where-android\app\build\intermediates\compile_and_runtime_not_namespaced_r_class_jar\debug\processDebugResources\R.jar
+exception: app\src\main\java\com\ovi\where\WhereApplication.kt:26:13: error: unresolved reference 'BuildConfig'.
+exception:         if (BuildConfig.DEBUG) {
+exception:             ^^^^^^^^^^^
+exception: app\src\main\java\com\ovi\where\core\theme\Type.kt:10:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\core\theme\Type.kt:16:25: error: unresolved reference 'R'.
+exception:     certificates      = R.array.com_google_android_gms_fonts_certs
+exception:                         ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:5:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:33:48: error: unresolved reference 'R'.
+exception:             diff < 60_000 -> context.getString(R.string.time_just_now)
+exception:                                                ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:36:53: error: unresolved reference 'R'.
+exception:                 context.resources.getQuantityString(R.plurals.time_ago_minutes, minutes, minutes)
+exception:                                                     ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:40:53: error: unresolved reference 'R'.
+exception:                 context.resources.getQuantityString(R.plurals.time_ago_hours, hours, hours)
+exception:                                                     ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:44:53: error: unresolved reference 'R'.
+exception:                 context.resources.getQuantityString(R.plurals.time_ago_days, days, days)
+exception:                                                     ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:54:49: error: unresolved reference 'R'.
+exception:         if (diff <= 0) return context.getString(R.string.time_expired)
+exception:                                                 ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:59:35: error: unresolved reference 'R'.
+exception:                 context.getString(R.string.time_seconds_remaining, seconds)
+exception:                                   ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:65:39: error: unresolved reference 'R'.
+exception:                     context.getString(R.string.time_minutes_remaining, minutes)
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:67:39: error: unresolved reference 'R'.
+exception:                     context.getString(R.string.time_minutes_seconds_remaining, minutes, remainingSeconds)
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:74:39: error: unresolved reference 'R'.
+exception:                     context.getString(R.string.time_hours_remaining, hours)
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:76:39: error: unresolved reference 'R'.
+exception:                     context.getString(R.string.time_hours_minutes_remaining, hours, minutes)
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:83:39: error: unresolved reference 'R'.
+exception:                     context.getString(R.string.time_days_remaining, days)
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:85:39: error: unresolved reference 'R'.
+exception:                     context.getString(R.string.time_days_hours_remaining, days, hours)
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:103:53: error: unresolved reference 'R'.
+exception:                 context.resources.getQuantityString(R.plurals.duration_format_minutes, minutes.toInt(), minutes.toInt())
+exception:                                                     ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:109:57: error: unresolved reference 'R'.
+exception:                     context.resources.getQuantityString(R.plurals.duration_format_hours, hours.toInt(), hours.toInt())
+exception:                                                         ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:111:72: error: unresolved reference 'R'.
+exception:                     val hourText = context.resources.getQuantityString(R.plurals.duration_format_hours, hours.toInt(), hours.toInt())
+exception:                                                                        ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:112:71: error: unresolved reference 'R'.
+exception:                     val minText = context.resources.getQuantityString(R.plurals.duration_format_minutes, remainingMinutes.toInt(), remainingMinutes.toInt())
+exception:                                                                       ^
+exception: app\src\main\java\com\ovi\where\core\utils\DateTimeUtils.kt:118:53: error: unresolved reference 'R'.
+exception:                 context.resources.getQuantityString(R.plurals.duration_format_days, days.toInt(), days.toInt())
+exception:                                                     ^
+exception: app\src\main\java\com\ovi\where\core\utils\LocationUtils.kt:4:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\core\utils\LocationUtils.kt:42:56: error: unresolved reference 'R'.
+exception:             distanceMeters < 1000 -> context.getString(R.string.distance_meters, distanceMeters.toInt())
+exception:                                                        ^
+exception: app\src\main\java\com\ovi\where\core\utils\LocationUtils.kt:43:57: error: unresolved reference 'R'.
+exception:             distanceMeters < 10000 -> context.getString(R.string.distance_km_decimal, distanceMeters / 1000)
+exception:                                                         ^
+exception: app\src\main\java\com\ovi\where\core\utils\LocationUtils.kt:44:39: error: unresolved reference 'R'.
+exception:             else -> context.getString(R.string.distance_km, (distanceMeters / 1000).toInt())
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\core\utils\LocationUtils.kt:50:47: error: unresolved reference 'R'.
+exception:             seconds < 60 -> context.getString(R.string.eta_less_than_one_min)
+exception:                                               ^
+exception: app\src\main\java\com\ovi\where\core\utils\LocationUtils.kt:51:49: error: unresolved reference 'R'.
+exception:             seconds < 3600 -> context.getString(R.string.eta_minutes, seconds / 60)
+exception:                                                 ^
+exception: app\src\main\java\com\ovi\where\core\utils\LocationUtils.kt:52:49: error: unresolved reference 'R'.
+exception:             seconds < 7200 -> context.getString(R.string.eta_hours_minutes, seconds / 3600, (seconds % 3600) / 60)
+exception:                                                 ^
+exception: app\src\main\java\com\ovi\where\core\utils\LocationUtils.kt:53:39: error: unresolved reference 'R'.
+exception:             else -> context.getString(R.string.eta_hours, seconds / 3600)
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:17:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:70:79: error: unresolved reference 'R'.
+exception:         val title = data["title"] ?: message.notification?.title ?: getString(R.string.app_name)
+exception:                                                                               ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:100:70: error: unresolved reference 'R'.
+exception:         val senderName       = data["senderName"]       ?: getString(R.string.app_name)
+exception:                                                                      ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:108:27: error: unresolved reference 'R'.
+exception:             .setSmallIcon(R.drawable.ic_launcher_foreground)
+exception:                           ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:109:14: error: unresolved reference 'setContentTitle'.
+exception:             .setContentTitle(senderName)
+exception:              ^^^^^^^^^^^^^^^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:128:27: error: unresolved reference 'R'.
+exception:             .setSmallIcon(R.drawable.ic_launcher_foreground)
+exception:                           ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:129:14: error: unresolved reference 'setContentTitle'.
+exception:             .setContentTitle(getString(R.string.app_name))
+exception:              ^^^^^^^^^^^^^^^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:129:40: error: unresolved reference 'R'.
+exception:             .setContentTitle(getString(R.string.app_name))
+exception:                                        ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:244:27: error: unresolved reference 'R'.
+exception:             .setSmallIcon(R.drawable.ic_launcher_foreground)
+exception:                           ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:245:14: error: unresolved reference 'setContentTitle'.
+exception:             .setContentTitle(title)
+exception:              ^^^^^^^^^^^^^^^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:284:27: error: unresolved reference 'R'.
+exception:                 getString(R.string.notification_channel_messages),
+exception:                           ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:287:46: error: unresolved reference 'R'.
+exception:                 description      = getString(R.string.notification_channel_messages_desc)
+exception:                                              ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:293:27: error: unresolved reference 'R'.
+exception:                 getString(R.string.notification_channel_social),
+exception:                           ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:296:41: error: unresolved reference 'R'.
+exception:                 description = getString(R.string.notification_channel_social_desc)
+exception:                                         ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:300:27: error: unresolved reference 'R'.
+exception:                 getString(R.string.notification_channel_location_updates),
+exception:                           ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:303:41: error: unresolved reference 'R'.
+exception:                 description = getString(R.string.notification_channel_location_updates_desc)
+exception:                                         ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:307:27: error: unresolved reference 'R'.
+exception:                 getString(R.string.notification_channel_group_activity),
+exception:                           ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:310:41: error: unresolved reference 'R'.
+exception:                 description = getString(R.string.notification_channel_group_activity_desc)
+exception:                                         ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:314:27: error: unresolved reference 'R'.
+exception:                 getString(R.string.notification_channel_general),
+exception:                           ^
+exception: app\src\main\java\com\ovi\where\data\remote\FcmMessagingService.kt:317:41: error: unresolved reference 'R'.
+exception:                 description = getString(R.string.notification_channel_general_desc)
+exception:                                         ^
+exception: app\src\main\java\com\ovi\where\data\remote\chat\ChatApiClient.kt:4:22: error: unresolved reference 'BuildConfig'.
+exception: import com.ovi.where.BuildConfig
+exception:                      ^^^^^^^^^^^
+exception: app\src\main\java\com\ovi\where\data\remote\chat\ChatApiClient.kt:13:33: error: unresolved reference 'BuildConfig'.
+exception:     val HTTP_BASE_URL: String = BuildConfig.CHAT_SERVER_HTTP_URL
+exception:                                 ^^^^^^^^^^^
+exception: app\src\main\java\com\ovi\where\data\remote\chat\ChatApiClient.kt:14:33: error: unresolved reference 'BuildConfig'.
+exception:     val WS_BASE_URL: String   = BuildConfig.CHAT_SERVER_WS_URL
+exception:                                 ^^^^^^^^^^^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginScreen.kt:57:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginScreen.kt:108:47: error: unresolved reference 'R'.
+exception:             .requestIdToken(context.getString(R.string.default_web_client_id))
+exception:                                               ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginScreen.kt:164:67: error: unresolved reference 'R'.
+exception:                     imageVector = ImageVector.vectorResource(id = R.drawable.where_notification_logo),
+exception:                                                                   ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginScreen.kt:174:39: error: unresolved reference 'R'.
+exception:                 text = stringResource(R.string.app_name),
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginScreen.kt:183:39: error: unresolved reference 'R'.
+exception:                 text = stringResource(R.string.app_tagline),
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginScreen.kt:209:40: error: unresolved reference 'R'.
+exception:                 label = stringResource(R.string.label_password),
+exception:                                        ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginScreen.kt:232:47: error: unresolved reference 'R'.
+exception:                         text = stringResource(R.string.label_forgot_password),
+exception:                                               ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginScreen.kt:253:39: error: unresolved reference 'R'.
+exception:                 text = stringResource(R.string.action_sign_in),
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginScreen.kt:261:47: error: unresolved reference 'R'.
+exception:             DividerText(text = stringResource(R.string.label_or))
+exception:                                               ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginScreen.kt:275:41: error: unresolved reference 'R'.
+exception:                 prefix = stringResource(R.string.msg_already_have_account),
+exception:                                         ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginScreen.kt:276:48: error: unresolved reference 'R'.
+exception:                 clickableText = stringResource(R.string.action_sign_up),
+exception:                                                ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginViewModel.kt:6:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginViewModel.kt:56:43: error: unresolved reference 'R'.
+exception:                     UiText.StringResource(R.string.error_google_sign_in_cancelled)
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginViewModel.kt:81:104: error: unresolved reference 'R'.
+exception:                         UiText.DynamicString(result.message ?: getApplication<Application>().getString(R.string.error_unknown))
+exception:                                                                                                        ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginViewModel.kt:114:135: error: unresolved reference 'R'.
+exception:                     _uiEvent.send(UiEvent.ShowSnackbar(UiText.DynamicString(result.message ?: getApplication<Application>().getString(R.string.error_unknown))))
+exception:                                                                                                                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginViewModel.kt:127:103: error: unresolved reference 'R'.
+exception:             _uiState.value = _uiState.value.copy(emailError = getApplication<Application>().getString(R.string.error_email_required))
+exception:                                                                                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginViewModel.kt:130:103: error: unresolved reference 'R'.
+exception:             _uiState.value = _uiState.value.copy(emailError = getApplication<Application>().getString(R.string.error_invalid_email))
+exception:                                                                                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginViewModel.kt:135:106: error: unresolved reference 'R'.
+exception:             _uiState.value = _uiState.value.copy(passwordError = getApplication<Application>().getString(R.string.error_password_required))
+exception:                                                                                                          ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\login\LoginViewModel.kt:138:106: error: unresolved reference 'R'.
+exception:             _uiState.value = _uiState.value.copy(passwordError = getApplication<Application>().getString(R.string.error_password_too_short))
+exception:                                                                                                          ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\signup\SignUpScreen.kt:51:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\signup\SignUpScreen.kt:152:39: error: unresolved reference 'R'.
+exception:                 text = stringResource(R.string.action_sign_up),
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\signup\SignUpScreen.kt:188:40: error: unresolved reference 'R'.
+exception:                 label = stringResource(R.string.label_password),
+exception:                                        ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\signup\SignUpScreen.kt:204:40: error: unresolved reference 'R'.
+exception:                 label = stringResource(R.string.label_confirm_password),
+exception:                                        ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\signup\SignUpScreen.kt:231:39: error: unresolved reference 'R'.
+exception:                 text = stringResource(R.string.action_sign_up),
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\signup\SignUpScreen.kt:240:41: error: unresolved reference 'R'.
+exception:                 prefix = stringResource(R.string.msg_already_have_account),
+exception:                                         ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\signup\SignUpScreen.kt:241:48: error: unresolved reference 'R'.
+exception:                 clickableText = stringResource(R.string.action_sign_in),
+exception:                                                ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\signup\SignUpViewModel.kt:6:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\signup\SignUpViewModel.kt:58:83: error: unresolved reference 'R'.
+exception:                         result.message ?: getApplication<Application>().getString(R.string.error_unknown)
+exception:                                                                                   ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\signup\SignUpViewModel.kt:71:77: error: unresolved reference 'R'.
+exception:             _uiState.value = _uiState.value.copy(emailError = ctx.getString(R.string.error_email_required))
+exception:                                                                             ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\signup\SignUpViewModel.kt:74:77: error: unresolved reference 'R'.
+exception:             _uiState.value = _uiState.value.copy(emailError = ctx.getString(R.string.error_invalid_email))
+exception:                                                                             ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\signup\SignUpViewModel.kt:79:80: error: unresolved reference 'R'.
+exception:             _uiState.value = _uiState.value.copy(passwordError = ctx.getString(R.string.error_password_required))
+exception:                                                                                ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\signup\SignUpViewModel.kt:82:80: error: unresolved reference 'R'.
+exception:             _uiState.value = _uiState.value.copy(passwordError = ctx.getString(R.string.error_password_too_short))
+exception:                                                                                ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\signup\SignUpViewModel.kt:87:87: error: unresolved reference 'R'.
+exception:             _uiState.value = _uiState.value.copy(confirmPasswordError = ctx.getString(R.string.error_confirm_password_required))
+exception:                                                                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\auth\signup\SignUpViewModel.kt:90:87: error: unresolved reference 'R'.
+exception:             _uiState.value = _uiState.value.copy(confirmPasswordError = ctx.getString(R.string.error_passwords_mismatch))
+exception:                                                                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\common\Components.kt:81:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\common\Components.kt:147:54: error: unresolved reference 'R'.
+exception:                 text = actionLabel ?: stringResource(R.string.msg_default_action),
+exception:                                                      ^
+exception: app\src\main\java\com\ovi\where\presentation\common\Components.kt:170:35: error: unresolved reference 'R'.
+exception:             text = stringResource(R.string.msg_oops),
+exception:                                   ^
+exception: app\src\main\java\com\ovi\where\presentation\common\Components.kt:183:49: error: unresolved reference 'R'.
+exception:             PrimaryButton(text = stringResource(R.string.action_retry), onClick = it)
+exception:                                                 ^
+exception: app\src\main\java\com\ovi\where\presentation\common\Components.kt:310:67: error: unresolved reference 'R'.
+exception:                     imageVector = ImageVector.vectorResource(id = R.drawable.google_logo),
+exception:                                                                   ^
+exception: app\src\main\java\com\ovi\where\presentation\common\Components.kt:317:44: error: unresolved reference 'R'.
+exception:                     text  = stringResource(R.string.action_continue_with_google),
+exception:                                            ^
+exception: app\src\main\java\com\ovi\where\presentation\common\Components.kt:376:48: error: unresolved reference 'R'.
+exception:                                 stringResource(R.string.cd_hide_password)
+exception:                                                ^
+exception: app\src\main\java\com\ovi\where\presentation\common\Components.kt:378:48: error: unresolved reference 'R'.
+exception:                                 stringResource(R.string.cd_show_password)
+exception:                                                ^
+exception: app\src\main\java\com\ovi\where\presentation\common\Components.kt:421:40: error: unresolved reference 'R'.
+exception:         label         = stringResource(R.string.label_email),
+exception:                                        ^
+exception: app\src\main\java\com\ovi\where\presentation\common\Components.kt:532:32: error: unresolved reference 'R'.
+exception:                 stringResource(R.string.status_sharing)
+exception:                                ^
+exception: app\src\main\java\com\ovi\where\presentation\common\Components.kt:534:32: error: unresolved reference 'R'.
+exception:                 stringResource(R.string.status_not_sharing),
+exception:                                ^
+exception: app\src\main\java\com\ovi\where\presentation\group\JoinGroupScreen.kt:30:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\group\JoinGroupScreen.kt:66:40: error: unresolved reference 'R'.
+exception:                 title = stringResource(R.string.title_join_group),
+exception:                                        ^
+exception: app\src\main\java\com\ovi\where\presentation\group\JoinGroupScreen.kt:84:43: error: unresolved reference 'R'.
+exception:                     text = stringResource(R.string.msg_enter_invite_code),
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\JoinGroupScreen.kt:91:43: error: unresolved reference 'R'.
+exception:                     text = stringResource(R.string.msg_invite_code_instruction),
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\JoinGroupScreen.kt:106:44: error: unresolved reference 'R'.
+exception:                     label = stringResource(R.string.label_invite_code),
+exception:                                            ^
+exception: app\src\main\java\com\ovi\where\presentation\group\JoinGroupScreen.kt:124:43: error: unresolved reference 'R'.
+exception:                     text = stringResource(R.string.action_join_group),
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupScreen.kt:32:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupScreen.kt:69:40: error: unresolved reference 'R'.
+exception:                 title = stringResource(R.string.title_create_group),
+exception:                                        ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupScreen.kt:90:43: error: unresolved reference 'R'.
+exception:                     text = stringResource(R.string.msg_create_group_title),
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupScreen.kt:98:43: error: unresolved reference 'R'.
+exception:                     text = stringResource(R.string.msg_create_group_subtitle),
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupScreen.kt:108:44: error: unresolved reference 'R'.
+exception:                     label = stringResource(R.string.label_group_name),
+exception:                                            ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupScreen.kt:121:44: error: unresolved reference 'R'.
+exception:                     label = stringResource(R.string.label_description_optional),
+exception:                                            ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupScreen.kt:145:43: error: unresolved reference 'R'.
+exception:                     text = stringResource(R.string.action_create_group),
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupScreen.kt:168:55: error: unresolved reference 'R'.
+exception:                                 text = stringResource(R.string.title_invite_code),
+exception:                                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupScreen.kt:180:55: error: unresolved reference 'R'.
+exception:                                 text = stringResource(R.string.msg_share_invite_instruction),
+exception:                                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupViewModel.kt:8:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupViewModel.kt:235:73: error: unresolved reference 'R'.
+exception:                         error = getApplication<Application>().getString(R.string.error_group_avatar_upload_failed)
+exception:                                                                         ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupViewModel.kt:240:73: error: unresolved reference 'R'.
+exception:                                 getApplication<Application>().getString(R.string.error_group_avatar_upload_failed)
+exception:                                                                         ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupViewModel.kt:278:77: error: unresolved reference 'R'.
+exception:                             error = getApplication<Application>().getString(R.string.error_failed_create_group)
+exception:                                                                             ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupViewModel.kt:292:37: error: unresolved reference 'R'.
+exception:                                     R.string.error_failed_create_group
+exception:                                     ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupViewModel.kt:316:43: error: unresolved reference 'R'.
+exception:                 nameError = app.getString(R.string.error_group_name_required)
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupViewModel.kt:322:43: error: unresolved reference 'R'.
+exception:                 nameError = app.getString(R.string.error_group_name_too_short)
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupViewModel.kt:328:43: error: unresolved reference 'R'.
+exception:                 nameError = app.getString(R.string.error_group_name_too_long)
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupViewModel.kt:334:46: error: unresolved reference 'R'.
+exception:                 membersError = app.getString(R.string.error_group_no_members)
+exception:                                              ^
+exception: app\src\main\java\com\ovi\where\presentation\group\create\CreateGroupViewModel.kt:340:46: error: unresolved reference 'R'.
+exception:                 membersError = app.getString(R.string.error_group_too_many_members)
+exception:                                              ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:67:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:109:37: error: unresolved reference 'R'.
+exception:     val shareTitle = stringResource(R.string.action_share_invite_code)
+exception:                                     ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:110:39: error: unresolved reference 'R'.
+exception:     val shareMessage = stringResource(R.string.msg_share_group_invite, uiState.groupName, uiState.inviteCode)
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:111:43: error: unresolved reference 'R'.
+exception:     val inviteCodeCopied = stringResource(R.string.toast_invite_code_copied)
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:117:43: error: unresolved reference 'R'.
+exception:             title = { Text(stringResource(R.string.action_leave_group)) },
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:118:42: error: unresolved reference 'R'.
+exception:             text = { Text(stringResource(R.string.msg_confirm_leave_group)) },
+exception:                                          ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:123:42: error: unresolved reference 'R'.
+exception:                 }) { Text(stringResource(R.string.action_confirm), color = MaterialTheme.colorScheme.error) }
+exception:                                          ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:126:89: error: unresolved reference 'R'.
+exception:                 TextButton(onClick = { showLeaveDialog = false }) { Text(stringResource(R.string.action_cancel)) }
+exception:                                                                                         ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:133:43: error: unresolved reference 'R'.
+exception:             title = { Text(stringResource(R.string.action_delete_group)) },
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:134:42: error: unresolved reference 'R'.
+exception:             text = { Text(stringResource(R.string.msg_confirm_delete_group)) },
+exception:                                          ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:139:42: error: unresolved reference 'R'.
+exception:                 }) { Text(stringResource(R.string.action_confirm), color = MaterialTheme.colorScheme.error) }
+exception:                                          ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:142:90: error: unresolved reference 'R'.
+exception:                 TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.action_cancel)) }
+exception:                                                                                          ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:150:63: error: unresolved reference 'R'.
+exception:                 title = uiState.group?.name ?: stringResource(R.string.title_group_details),
+exception:                                                               ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:154:85: error: unresolved reference 'R'.
+exception:                         Icon(Icons.Default.Map, contentDescription = stringResource(R.string.cd_view_map))
+exception:                                                                                     ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:158:94: error: unresolved reference 'R'.
+exception:                             Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.cd_more_options))
+exception:                                                                                              ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:163:66: error: unresolved reference 'R'.
+exception:                                     text = { Text(stringResource(R.string.action_copy_invite_code)) },
+exception:                                                                  ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:172:66: error: unresolved reference 'R'.
+exception:                                     text = { Text(stringResource(R.string.action_share_invite_code)) },
+exception:                                                                  ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:183:66: error: unresolved reference 'R'.
+exception:                                     text = { Text(stringResource(R.string.action_edit_group)) },
+exception:                                                                  ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:188:66: error: unresolved reference 'R'.
+exception:                                     text = { Text(stringResource(R.string.action_delete_group), color = MaterialTheme.colorScheme.error) },
+exception:                                                                  ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:195:62: error: unresolved reference 'R'.
+exception:                                 text = { Text(stringResource(R.string.action_leave_group), color = MaterialTheme.colorScheme.error) },
+exception:                                                              ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:221:51: error: unresolved reference 'R'.
+exception:                             text = stringResource(R.string.error_loading_group),
+exception:                                                   ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:227:49: error: unresolved reference 'R'.
+exception:                             Text(stringResource(R.string.action_retry))
+exception:                                                 ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:253:59: error: unresolved reference 'R'.
+exception:                                     text = stringResource(R.string.title_invite_code),
+exception:                                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:275:85: error: unresolved reference 'R'.
+exception:                                                 contentDescription = stringResource(R.string.cd_copy),
+exception:                                                                                     ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:284:85: error: unresolved reference 'R'.
+exception:                                                 contentDescription = stringResource(R.string.action_share),
+exception:                                                                                     ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:291:59: error: unresolved reference 'R'.
+exception:                                     text = stringResource(R.string.msg_share_invite_instruction),
+exception:                                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:325:51: error: unresolved reference 'R'.
+exception:                             text = stringResource(R.string.msg_members_count, uiState.members.size),
+exception:                                                   ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:370:43: error: unresolved reference 'R'.
+exception:             title = { Text(stringResource(R.string.action_kick_member)) },
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:371:42: error: unresolved reference 'R'.
+exception:             text = { Text(stringResource(R.string.msg_confirm_kick_member, member.displayName)) },
+exception:                                          ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:376:42: error: unresolved reference 'R'.
+exception:                 }) { Text(stringResource(R.string.action_confirm), color = MaterialTheme.colorScheme.error) }
+exception:                                          ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:379:88: error: unresolved reference 'R'.
+exception:                 TextButton(onClick = { showKickDialog = false }) { Text(stringResource(R.string.action_cancel)) }
+exception:                                                                                        ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:451:70: error: unresolved reference 'R'.
+exception:                                         text = { Text(stringResource(R.string.action_promote_admin)) },
+exception:                                                                      ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsScreen.kt:457:66: error: unresolved reference 'R'.
+exception:                                     text = { Text(stringResource(R.string.action_kick_member), color = MaterialTheme.colorScheme.error) },
+exception:                                                                  ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel.kt:7:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel.kt:63:33: error: unresolved reference 'R'.
+exception:                                 R.plurals.member_count, group.memberCount, group.memberCount
+exception:                                 ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel.kt:83:69: error: unresolved reference 'R'.
+exception:             val adminText = getApplication<Application>().getString(R.string.status_admin)
+exception:                                                                     ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel.kt:84:70: error: unresolved reference 'R'.
+exception:             val memberText = getApplication<Application>().getString(R.string.status_member)
+exception:                                                                      ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel.kt:117:47: error: unresolved reference 'R'.
+exception:                         UiText.StringResource(R.string.toast_left_group)
+exception:                                               ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel.kt:122:43: error: unresolved reference 'R'.
+exception:                     UiText.StringResource(R.string.error_unknown)
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel.kt:133:43: error: unresolved reference 'R'.
+exception:                     UiText.StringResource(R.string.toast_member_removed)
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel.kt:136:43: error: unresolved reference 'R'.
+exception:                     UiText.StringResource(R.string.error_kick_member_failed)
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel.kt:147:43: error: unresolved reference 'R'.
+exception:                     UiText.StringResource(R.string.toast_member_promoted)
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel.kt:150:43: error: unresolved reference 'R'.
+exception:                     UiText.StringResource(R.string.error_unknown)
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel.kt:161:78: error: unresolved reference 'R'.
+exception:                     _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.toast_group_deleted)))
+exception:                                                                              ^
+exception: app\src\main\java\com\ovi\where\presentation\group\details\GroupDetailsViewModel.kt:165:43: error: unresolved reference 'R'.
+exception:                     UiText.StringResource(R.string.error_delete_group_failed)
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\edit\EditGroupScreen.kt:29:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\group\edit\EditGroupScreen.kt:62:40: error: unresolved reference 'R'.
+exception:                 title = stringResource(R.string.title_edit_group),
+exception:                                        ^
+exception: app\src\main\java\com\ovi\where\presentation\group\edit\EditGroupScreen.kt:85:44: error: unresolved reference 'R'.
+exception:                     label = stringResource(R.string.label_group_name),
+exception:                                            ^
+exception: app\src\main\java\com\ovi\where\presentation\group\edit\EditGroupScreen.kt:97:44: error: unresolved reference 'R'.
+exception:                     label = stringResource(R.string.label_description_optional),
+exception:                                            ^
+exception: app\src\main\java\com\ovi\where\presentation\group\edit\EditGroupScreen.kt:107:43: error: unresolved reference 'R'.
+exception:                     text = stringResource(R.string.action_save),
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\group\edit\EditGroupViewModel.kt:18:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapScreen.kt:129:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapScreen.kt:184:50: error: unresolved reference 'R'.
+exception:         else context.showToast(context.getString(R.string.toast_location_denied))
+exception:                                                  ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapScreen.kt:483:51: error: unresolved reference 'R'.
+exception:                     title = { Text(stringResource(R.string.title_location_off)) },
+exception:                                                   ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapScreen.kt:484:50: error: unresolved reference 'R'.
+exception:                     text = { Text(stringResource(R.string.msg_location_off)) },
+exception:                                                  ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapScreen.kt:497:49: error: unresolved reference 'R'.
+exception:                             Text(stringResource(R.string.action_enable_location))
+exception:                                                 ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapScreen.kt:509:69: error: unresolved reference 'R'.
+exception:                                 contentDescription = stringResource(R.string.action_cancel),
+exception:                                                                     ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapScreen.kt:536:71: error: unresolved reference 'R'.
+exception:                         imageVector = ImageVector.vectorResource(id = R.drawable.layers),
+exception:                                                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapScreen.kt:564:71: error: unresolved reference 'R'.
+exception:                         imageVector = ImageVector.vectorResource(id = R.drawable.location_crosshairs),
+exception:                                                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapScreen.kt:565:61: error: unresolved reference 'R'.
+exception:                         contentDescription = stringResource(R.string.cd_my_location),
+exception:                                                             ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapScreen.kt:580:65: error: unresolved reference 'R'.
+exception:                             contentDescription = stringResource(R.string.cd_stop_sharing),
+exception:                                                                 ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapScreen.kt:602:75: error: unresolved reference 'R'.
+exception:                             imageVector = ImageVector.vectorResource(id = R.drawable.paper_plane),
+exception:                                                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapScreen.kt:603:65: error: unresolved reference 'R'.
+exception:                             contentDescription = stringResource(R.string.cd_share_location),
+exception:                                                                 ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapScreen.kt:1186:63: error: unresolved reference 'R'.
+exception:                 imageVector = ImageVector.vectorResource(id = R.drawable.paper_plane),
+exception:                                                               ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapScreen.kt:1262:20: error: unresolved reference 'R'.
+exception:         photoRes = R.drawable.maptype_default_preview,
+exception:                    ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapScreen.kt:1268:20: error: unresolved reference 'R'.
+exception:         photoRes = R.drawable.maptype_satellite_preview,
+exception:                    ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapViewModel.kt:12:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapViewModel.kt:413:78: error: unresolved reference 'R'.
+exception:                     _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.toast_sharing_started)))
+exception:                                                                              ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapViewModel.kt:417:78: error: unresolved reference 'R'.
+exception:                     _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.error_failed_start_sharing)))
+exception:                                                                              ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapViewModel.kt:431:78: error: unresolved reference 'R'.
+exception:                     _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.toast_sharing_stopped)))
+exception:                                                                              ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapViewModel.kt:434:78: error: unresolved reference 'R'.
+exception:                     _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.error_failed_stop_sharing)))
+exception:                                                                              ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapViewModel.kt:500:48: error: unresolved reference 'R'.
+exception:             diff < 60_000     -> ctx.getString(R.string.time_just_now)
+exception:                                                ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapViewModel.kt:501:48: error: unresolved reference 'R'.
+exception:             diff < 3_600_000  -> ctx.getString(R.string.time_minutes_ago, diff / 60_000)
+exception:                                                ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapViewModel.kt:502:48: error: unresolved reference 'R'.
+exception:             diff < 86_400_000 -> ctx.getString(R.string.time_hours_ago, diff / 3_600_000)
+exception:                                                ^
+exception: app\src\main\java\com\ovi\where\presentation\map\GlobalMapViewModel.kt:503:48: error: unresolved reference 'R'.
+exception:             else              -> ctx.getString(R.string.time_days_ago, diff / 86_400_000)
+exception:                                                ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:82:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:115:50: error: unresolved reference 'R'.
+exception:         else context.showToast(context.getString(R.string.toast_location_denied))
+exception:                                                  ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:157:40: error: unresolved reference 'R'.
+exception:                 title = stringResource(R.string.title_group_map),
+exception:                                        ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:196:61: error: unresolved reference 'R'.
+exception:                         contentDescription = stringResource(R.string.cd_fit_all)
+exception:                                                             ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:218:61: error: unresolved reference 'R'.
+exception:                         contentDescription = stringResource(R.string.cd_my_location)
+exception:                                                             ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:230:65: error: unresolved reference 'R'.
+exception:                             contentDescription = stringResource(R.string.cd_stop_sharing),
+exception:                                                                 ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:242:65: error: unresolved reference 'R'.
+exception:                             contentDescription = stringResource(R.string.cd_share_location),
+exception:                                                                 ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:435:51: error: unresolved reference 'R'.
+exception:                             text = stringResource(R.string.title_members),
+exception:                                                   ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:487:39: error: unresolved reference 'R'.
+exception:         title = { Text(stringResource(R.string.title_share_duration)) },
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:491:43: error: unresolved reference 'R'.
+exception:                     text = stringResource(R.string.msg_share_duration_instruction),
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:509:67: error: unresolved reference 'R'.
+exception:             TextButton(onClick = onConfirm) { Text(stringResource(R.string.action_start_sharing)) }
+exception:                                                                   ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:512:67: error: unresolved reference 'R'.
+exception:             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+exception:                                                                   ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:519:43: error: unresolved reference 'R'.
+exception:         minutes < 60 -> context.getString(R.string.duration_minutes, minutes)
+exception:                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:520:45: error: unresolved reference 'R'.
+exception:         minutes == 60L -> context.getString(R.string.duration_one_hour)
+exception:                                             ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:521:49: error: unresolved reference 'R'.
+exception:         minutes % 60 == 0L -> context.getString(R.string.duration_hours, minutes / 60)
+exception:                                                 ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:522:35: error: unresolved reference 'R'.
+exception:         else -> context.getString(R.string.duration_hours_minutes, minutes / 60, minutes % 60)
+exception:                                   ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapScreen.kt:576:37: error: unresolved reference 'R'.
+exception:                 else stringResource(R.string.msg_location_not_available),
+exception:                                     ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapViewModel.kt:6:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapViewModel.kt:100:78: error: unresolved reference 'R'.
+exception:                     _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.toast_sharing_started)))
+exception:                                                                              ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapViewModel.kt:104:78: error: unresolved reference 'R'.
+exception:                     _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.error_failed_start_sharing)))
+exception:                                                                              ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapViewModel.kt:117:78: error: unresolved reference 'R'.
+exception:                     _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.toast_sharing_stopped)))
+exception:                                                                              ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapViewModel.kt:120:78: error: unresolved reference 'R'.
+exception:                     _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.error_failed_stop_sharing)))
+exception:                                                                              ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapViewModel.kt:154:48: error: unresolved reference 'R'.
+exception:             diff < 60_000     -> ctx.getString(R.string.time_just_now)
+exception:                                                ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapViewModel.kt:155:48: error: unresolved reference 'R'.
+exception:             diff < 3_600_000  -> ctx.getString(R.string.time_minutes_ago, diff / 60_000)
+exception:                                                ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapViewModel.kt:156:48: error: unresolved reference 'R'.
+exception:             diff < 86_400_000 -> ctx.getString(R.string.time_hours_ago, diff / 3_600_000)
+exception:                                                ^
+exception: app\src\main\java\com\ovi\where\presentation\map\MapViewModel.kt:157:48: error: unresolved reference 'R'.
+exception:             else              -> ctx.getString(R.string.time_days_ago, diff / 86_400_000)
+exception:                                                ^
+exception: app\src\main\java\com\ovi\where\presentation\navigation\MainScaffold.kt:42:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\navigation\MainScaffold.kt:56:29: error: unresolved reference 'R'.
+exception:         selectedIconResId = R.drawable.map_filled,
+exception:                             ^
+exception: app\src\main\java\com\ovi\where\presentation\navigation\MainScaffold.kt:57:31: error: unresolved reference 'R'.
+exception:         unselectedIconResId = R.drawable.map_outlined,
+exception:                               ^
+exception: app\src\main\java\com\ovi\where\presentation\navigation\MainScaffold.kt:63:29: error: unresolved reference 'R'.
+exception:         selectedIconResId = R.drawable.chat_filled,
+exception:                             ^
+exception: app\src\main\java\com\ovi\where\presentation\navigation\MainScaffold.kt:64:31: error: unresolved reference 'R'.
+exception:         unselectedIconResId = R.drawable.chat_outlined,
+exception:                               ^
+exception: app\src\main\java\com\ovi\where\presentation\navigation\MainScaffold.kt:70:29: error: unresolved reference 'R'.
+exception:         selectedIconResId = R.drawable.people_filled,
+exception:                             ^
+exception: app\src\main\java\com\ovi\where\presentation\navigation\MainScaffold.kt:71:31: error: unresolved reference 'R'.
+exception:         unselectedIconResId = R.drawable.people_outlined,
+exception:                               ^
+exception: app\src\main\java\com\ovi\where\presentation\navigation\MainScaffold.kt:77:29: error: unresolved reference 'R'.
+exception:         selectedIconResId = R.drawable.profile_filled,
+exception:                             ^
+exception: app\src\main\java\com\ovi\where\presentation\navigation\MainScaffold.kt:78:31: error: unresolved reference 'R'.
+exception:         unselectedIconResId = R.drawable.profile_outlined,
+exception:                               ^
+exception: app\src\main\java\com\ovi\where\presentation\onboarding\OnboardingScreen.kt:45:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\presentation\onboarding\OnboardingScreen.kt:56:46: error: unresolved reference 'R'.
+exception:     OnboardingPage(Icons.Default.LocationOn, R.string.onboarding_slide1_title, R.string.onboarding_slide1_desc),
+exception:                                              ^
+exception: app\src\main\java\com\ovi\where\presentation\onboarding\OnboardingScreen.kt:56:80: error: unresolved reference 'R'.
+exception:     OnboardingPage(Icons.Default.LocationOn, R.string.onboarding_slide1_title, R.string.onboarding_slide1_desc),
+exception:                                                                                ^
+exception: app\src\main\java\com\ovi\where\presentation\onboarding\OnboardingScreen.kt:57:41: error: unresolved reference 'R'.
+exception:     OnboardingPage(Icons.Default.Group, R.string.onboarding_slide2_title, R.string.onboarding_slide2_desc),
+exception:                                         ^
+exception: app\src\main\java\com\ovi\where\presentation\onboarding\OnboardingScreen.kt:57:75: error: unresolved reference 'R'.
+exception:     OnboardingPage(Icons.Default.Group, R.string.onboarding_slide2_title, R.string.onboarding_slide2_desc),
+exception:                                                                           ^
+exception: app\src\main\java\com\ovi\where\presentation\onboarding\OnboardingScreen.kt:58:39: error: unresolved reference 'R'.
+exception:     OnboardingPage(Icons.Default.Map, R.string.onboarding_slide3_title, R.string.onboarding_slide3_desc)
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\presentation\onboarding\OnboardingScreen.kt:58:73: error: unresolved reference 'R'.
+exception:     OnboardingPage(Icons.Default.Map, R.string.onboarding_slide3_title, R.string.onboarding_slide3_desc)
+exception:                                                                         ^
+exception: app\src\main\java\com\ovi\where\presentation\onboarding\OnboardingScreen.kt:92:47: error: unresolved reference 'R'.
+exception:                         text = stringResource(R.string.action_skip),
+exception:                                               ^
+exception: app\src\main\java\com\ovi\where\presentation\onboarding\OnboardingScreen.kt:155:51: error: unresolved reference 'R'.
+exception:                             text = stringResource(R.string.action_next),
+exception:                                                   ^
+exception: app\src\main\java\com\ovi\where\presentation\onboarding\OnboardingScreen.kt:170:51: error: unresolved reference 'R'.
+exception:                             text = stringResource(R.string.action_get_started),
+exception:                                                   ^
+exception: app\src\main\java\com\ovi\where\service\LocationTrackingService.kt:13:22: error: unresolved reference 'R'.
+exception: import com.ovi.where.R
+exception:                      ^
+exception: app\src\main\java\com\ovi\where\service\LocationTrackingService.kt:112:40: error: unresolved reference 'R'.
+exception:             .setContentTitle(getString(R.string.notification_sharing_title))
+exception:                                        ^
+exception: app\src\main\java\com\ovi\where\service\LocationTrackingService.kt:113:39: error: unresolved reference 'R'.
+exception:             .setContentText(getString(R.string.notification_sharing_body))
+exception:                                       ^
+exception: app\src\main\java\com\ovi\where\service\LocationTrackingService.kt:114:27: error: unresolved reference 'R'.
+exception:             .setSmallIcon(R.drawable.ic_launcher_foreground)
+exception:                           ^
+exception: app\src\main\java\com\ovi\where\service\LocationTrackingService.kt:115:14: error: unresolved reference 'setContentIntent'.
+exception:             .setContentIntent(pendingIntent)
+exception:              ^^^^^^^^^^^^^^^^
+
+> Task :app:compileDebugKotlin FAILED
+
+[Incubating] Problems report is available at: file:///C:/Users/USERAS/Desktop/where/where-android/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.13/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 5m 7s
+17 actionable tasks: 1 executed, 16 up-to-date

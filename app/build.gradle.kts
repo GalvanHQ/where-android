@@ -153,6 +153,7 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.robolectric)
     testImplementation(libs.kotlin.test.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     // Kotest property-based testing on the JUnit 5 Platform.
     testImplementation(libs.kotest.property)
     testImplementation(libs.kotest.runner.junit5)

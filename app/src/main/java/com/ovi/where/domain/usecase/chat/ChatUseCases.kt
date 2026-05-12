@@ -46,7 +46,7 @@ class SendMessageUseCase @Inject constructor(
 class SendLocationMessageUseCase @Inject constructor(
     private val messageRepository: MessageRepository
 ) {
-    suspend operator fun invoke(conversationId: String, latitude: Double, longitude: Double): Resource<Message> =
+    suspend operator fun invoke(conversationId: String, latitude: Double?, longitude: Double?): Resource<Message> =
         messageRepository.sendLocationMessage(conversationId, latitude, longitude)
 }
 

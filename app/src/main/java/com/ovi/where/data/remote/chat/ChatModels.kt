@@ -36,6 +36,19 @@ data class MessageDto(
 )
 
 @Serializable
+data class MessagePageDto(
+    val messages: List<MessageDto> = emptyList(),
+    val nextCursor: String? = null,
+    val hasMore: Boolean = false
+)
+
+@Serializable
+data class UnreadCountDto(
+    val conversationId: String = "",
+    val unreadCount: Int = 0
+)
+
+@Serializable
 data class CreateDirectConversationRequest(val otherUserId: String)
 
 @Serializable
@@ -60,6 +73,8 @@ sealed class ServerFrame {
         val messageType: String = "TEXT",
         val latitude: Double? = null,
         val longitude: Double? = null,
+        val imageUrl: String? = null,
+        val thumbnailUrl: String? = null,
         val timestamp: Long = 0L,
         val readBy: List<String> = emptyList()
     ) : ServerFrame()
@@ -69,6 +84,27 @@ sealed class ServerFrame {
 
     @Serializable @SerialName("typing")
     data class UserTyping(val userId: String = "", val userName: String = "", val isTyping: Boolean = true) : ServerFrame()
+
+    @Serializable @SerialName("reaction_update")
+    data class ReactionUpdate(
+        val messageId: String = "",
+        val userId: String = "",
+        val emoji: String = "",
+        val action: String = "" // "add" or "remove"
+    ) : ServerFrame()
+
+    @Serializable @SerialName("read_receipt")
+    data class ReadReceipt(
+        val messageId: String = "",
+        val userId: String = "",
+        val timestamp: Long = 0L
+    ) : ServerFrame()
+
+    @Serializable @SerialName("presence")
+    data class Presence(
+        val userId: String = "",
+        val status: String = "" // "online" or "offline"
+    ) : ServerFrame()
 
     @Serializable @SerialName("error")
     data class Error(val message: String = "", val code: Int = 400) : ServerFrame()

@@ -1,6 +1,7 @@
 package com.ovi.where.presentation.model
 
 import com.ovi.where.domain.model.Message
+import com.ovi.where.domain.model.MessageStatus
 import com.ovi.where.domain.model.MessageType
 
 /** Whether this bubble renders as sent (right-aligned) or received (left-aligned). */
@@ -26,7 +27,9 @@ data class MessageUiModel(
     val latitude: Double?,
     val longitude: Double?,
     /** Human-readable coordinates label for location bubbles. */
-    val locationLabel: String?
+    val locationLabel: String?,
+    /** Message delivery status for showing retry affordance on FAILED messages. */
+    val status: MessageStatus = MessageStatus.SENT
 )
 
 fun Message.toUiModel(
@@ -52,6 +55,7 @@ fun Message.toUiModel(
         isLocation     = isLocation,
         latitude       = latitude,
         longitude      = longitude,
-        locationLabel  = locationLabel
+        locationLabel  = locationLabel,
+        status         = status
     )
 }

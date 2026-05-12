@@ -193,6 +193,10 @@
     <string name="error_passwords_mismatch">Passwords do not match</string>
     <string name="error_group_name_required">Group name is required</string>
     <string name="error_group_name_too_short">Name must be at least 3 characters</string>
+    <string name="error_group_name_too_long">Name must be at most 50 characters</string>
+    <string name="error_group_no_members">At least 1 member must be selected</string>
+    <string name="error_group_too_many_members">Maximum 50 members allowed</string>
+    <string name="error_group_avatar_upload_failed">Failed to upload group avatar</string>
     <string name="error_unknown">Something went wrong. Please try again.</string>
     <string name="error_google_sign_in_cancelled">Google Sign-In was cancelled</string>
     <string name="error_google_sign_in_failed">Google Sign-In failed. Please try again.</string>

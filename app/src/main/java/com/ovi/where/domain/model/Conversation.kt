@@ -11,7 +11,14 @@ data class Conversation(
     val lastMessageSenderId: String = "",
     val lastMessageTimestamp: Long = 0L,
     val unreadCounts: Map<String, Int> = emptyMap(),
-    val createdAt: Long = 0L
+    val createdAt: Long = 0L,
+    // Presence
+    val onlineMembers: Set<String> = emptySet(),
+    // Typing: userId -> userName
+    val typingMembers: Map<String, String> = emptyMap(),
+    // Mute/Pin
+    val mutedBy: List<String> = emptyList(),
+    val pinnedBy: List<String> = emptyList()
 )
 
 enum class ConversationType { DIRECT, GROUP }

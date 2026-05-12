@@ -86,6 +86,14 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideMessageDao(database: AppDatabase) = database.messageDao()
+
+    @Provides
+    @Singleton
+    fun provideConversationDao(database: AppDatabase) = database.conversationDao()
+
+    @Provides
+    @Singleton
     fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> = context.dataStore
 
     @Provides

@@ -5,6 +5,7 @@ import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 import retrofit2.http.Header
 
 interface ChatApiService {
@@ -12,6 +13,26 @@ interface ChatApiService {
     suspend fun getMessages(
         @Header("Authorization") token: String,
         @Path("conversationId") conversationId: String
+    ): List<MessageDto>
+
+    @GET("/api/conversations/{conversationId}/messages")
+    suspend fun getMessagesPaginated(
+        @Header("Authorization") token: String,
+        @Path("conversationId") conversationId: String,
+        @Query("before") before: String? = null,
+        @Query("limit") limit: Int = 30
+    ): MessagePageDto
+
+    /**
+     * Fetches messages after a given timestamp for catching up on missed messages.
+     * Used on reconnection to fetch messages received while disconnected (Requirement 13.5).
+     */
+    @GET("/api/conversations/{conversationId}/messages")
+    suspend fun getMessagesSince(
+        @Header("Authorization") token: String,
+        @Path("conversationId") conversationId: String,
+        @Query("after") after: String,
+        @Query("limit") limit: Int = 100
     ): List<MessageDto>
 
     @POST("/api/conversations/direct")
@@ -31,4 +52,22 @@ interface ChatApiService {
         @Header("Authorization") token: String,
         @Path("conversationId") conversationId: String
     )
+
+    /**
+     * Fetches all conversation unread counts in a single response.
+     * Used for foreground sync (Requirement 12.5).
+     */
+    @GET("/api/conversations/unread-counts")
+    suspend fun getUnreadCounts(
+        @Header("Authorization") token: String
+    ): List<UnreadCountDto>
+
+    /**
+     * Fetches the full conversation list from REST.
+     * Used for initial load when Room has no records (Requirement 12.7).
+     */
+    @GET("/api/conversations")
+    suspend fun getConversations(
+        @Header("Authorization") token: String
+    ): List<ConversationDto>
 }

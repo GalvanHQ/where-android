@@ -56,7 +56,6 @@ android {
     buildTypes {
         debug {
             isDebuggable = true
-            applicationIdSuffix = ".debug"
             // Cloud Run server URL
             buildConfigField("String", "CHAT_SERVER_HTTP_URL", "\"https://where-chat-server-node-zgzelfwe5q-uc.a.run.app\"")
             buildConfigField("String", "CHAT_SERVER_WS_URL",   "\"https://where-chat-server-node-zgzelfwe5q-uc.a.run.app\"")

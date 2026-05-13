@@ -127,9 +127,14 @@ import com.google.maps.android.compose.MarkerComposable
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.ovi.where.R
+import com.google.android.gms.maps.model.LatLngBounds
 import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.core.theme.Dimens
+import com.ovi.where.core.utils.LocationUtils
 import com.ovi.where.core.utils.showToast
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 
@@ -208,6 +213,64 @@ fun GlobalMapScreen(
 
                 else -> Unit
             }
+        }
+    }
+
+    val hapticFeedback = LocalHapticFeedback.current
+
+    // ── Auto-zoom to fit all friends on first load ────────────────────────────
+    var hasAutoZoomed by remember { mutableStateOf(false) }
+    LaunchedEffect(uiState.friendLocations) {
+        if (!hasAutoZoomed && uiState.friendLocations.isNotEmpty()) {
+            hasAutoZoomed = true
+            val validFriends = uiState.friendLocations.filter {
+                it.latitude != 0.0 && it.longitude != 0.0
+            }
+            if (validFriends.isNotEmpty()) {
+                val boundsBuilder = LatLngBounds.Builder()
+                validFriends.forEach { friend ->
+                    boundsBuilder.include(LatLng(friend.latitude, friend.longitude))
+                }
+                if (uiState.hasMyLocation && uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
+                    boundsBuilder.include(LatLng(uiState.myLatitude, uiState.myLongitude))
+                }
+                cameraPositionState.animate(
+                    CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 100),
+                    durationMs = 1000
+                )
+            }
+        }
+    }
+
+    // ── Friend proximity toast (once per friend per session) ──────────────────
+    val notifiedProximityFriends = remember { mutableSetOf<String>() }
+    LaunchedEffect(uiState.friendLocations, uiState.hasMyLocation) {
+        if (uiState.hasMyLocation && uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
+            uiState.friendLocations.forEach { friend ->
+                if (friend.latitude != 0.0 && friend.longitude != 0.0 &&
+                    !notifiedProximityFriends.contains(friend.userId)
+                ) {
+                    val distance = LocationUtils.calculateDistance(
+                        uiState.myLatitude, uiState.myLongitude,
+                        friend.latitude, friend.longitude
+                    )
+                    if (distance <= 500.0) {
+                        notifiedProximityFriends.add(friend.userId)
+                        snackbarHostState.showSnackbar("\uD83C\uDF89 ${friend.displayName} is nearby!")
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Sharing countdown timer ───────────────────────────────────────────────
+    var sharingSecondsRemaining by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(uiState.isSharing) {
+        if (uiState.isSharing) {
+            // ViewModel doesn't expose sharingExpiresAt yet, show "Sharing live"
+            sharingSecondsRemaining = null
+        } else {
+            sharingSecondsRemaining = null
         }
     }
 
@@ -320,6 +383,7 @@ fun GlobalMapScreen(
                         snippet = friend.timeAgo,
                         zIndex = 5f,
                         onClick = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                             viewModel.selectFriend(friend)
                             true
                         }
@@ -451,8 +515,16 @@ fun GlobalMapScreen(
                     ) {
                         SharingPulseDot()
                         Spacer(Modifier.width(Dimens.spaceSmall))
+                        val sharingTargetName = (uiState.groups + uiState.directTargets).firstOrNull { it.id == uiState.sharingGroupId }?.name ?: "target"
+                        val timerText = if (sharingSecondsRemaining != null) {
+                            val mins = sharingSecondsRemaining!! / 60
+                            val secs = sharingSecondsRemaining!! % 60
+                            " • ${"%02d:%02d".format(mins, secs)} remaining"
+                        } else {
+                            ""
+                        }
                         Text(
-                            text = "Sharing with ${(uiState.groups + uiState.directTargets).firstOrNull { it.id == uiState.sharingGroupId }?.name ?: "target"}",
+                            text = "Sharing live with $sharingTargetName$timerText",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onTertiaryContainer
                         )
@@ -608,6 +680,41 @@ fun GlobalMapScreen(
                 }
             }
 
+            // ── Empty state when no friends sharing ─────────────────────────
+            if (uiState.friendLocations.isEmpty() && !uiState.isLoading) {
+                Card(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 96.dp),
+                    shape = MaterialTheme.shapes.large,
+                    elevation = CardDefaults.cardElevation(2.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(
+                            horizontal = Dimens.spaceLarge,
+                            vertical = Dimens.spaceMedium
+                        ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.LocationOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(Dimens.iconSizeMedium),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.width(Dimens.spaceSmall))
+                        Text(
+                            text = "No friends sharing right now",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
             // ── Active sharers bottom strip ───────────────────────────────────
             AnimatedVisibility(
                 visible = uiState.friendLocations.isNotEmpty(),
@@ -641,6 +748,9 @@ fun GlobalMapScreen(
                             items(items = uiState.friendLocations, key = { it.userId }) { friend ->
                                 FriendAvatarChip(
                                     friend = friend,
+                                    myLatitude = uiState.myLatitude,
+                                    myLongitude = uiState.myLongitude,
+                                    hasMyLocation = uiState.hasMyLocation,
                                     onClick = {
                                         viewModel.selectFriend(friend)
                                         if (friend.latitude != 0.0) {
@@ -753,8 +863,12 @@ private fun SharingPulseDot() {
 @Composable
 private fun FriendAvatarChip(
     friend: FriendLocationUiModel,
+    myLatitude: Double = 0.0,
+    myLongitude: Double = 0.0,
+    hasMyLocation: Boolean = false,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val color = AvatarColors[friend.userId.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
     Column(
         modifier = Modifier.clickable(onClick = onClick),
@@ -808,6 +922,19 @@ private fun FriendAvatarChip(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1
         )
+        // Distance label
+        if (hasMyLocation && friend.latitude != 0.0 && friend.longitude != 0.0) {
+            val distance = LocationUtils.calculateDistance(
+                myLatitude, myLongitude,
+                friend.latitude, friend.longitude
+            )
+            Text(
+                text = LocationUtils.formatDistance(context, distance),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1
+            )
+        }
     }
 }
 

@@ -84,6 +84,8 @@ import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.common.WhereTopAppBar
 import com.ovi.where.presentation.model.MemberLocationUiModel
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -100,6 +102,8 @@ fun MapScreen(
 
     var showDurationDialog by remember { mutableStateOf(false) }
     var selectedDuration by remember { mutableFloatStateOf(60f) }
+
+    val hapticFeedback = LocalHapticFeedback.current
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(LatLng(0.0, 0.0), 2.0f)
@@ -279,6 +283,7 @@ fun MapScreen(
                         snippet = location.timeAgo,
                         zIndex = 5f,
                         onClick = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                             scope.launch {
                                 cameraPositionState.animate(
                                     CameraUpdateFactory.newLatLngZoom(
@@ -390,7 +395,7 @@ fun MapScreen(
                         )
                         Spacer(Modifier.width(Dimens.spaceSmall))
                         Text(
-                            "Sharing location",
+                            "Sharing live",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onTertiaryContainer
                         )

@@ -25,4 +25,10 @@ interface ConversationRepository {
      * Must complete before the Firestore listener starts incremental updates.
      */
     suspend fun fetchInitialConversationsIfNeeded(): Resource<Unit>
+
+    /**
+     * Deletes a conversation from the local database.
+     * Removes it from Room so it disappears from the conversation list.
+     */
+    suspend fun deleteConversation(conversationId: String): Resource<Unit>
 }

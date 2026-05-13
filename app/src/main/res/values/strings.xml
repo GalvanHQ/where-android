@@ -217,6 +217,11 @@
     <string name="error_photo_upload_failed">Failed to upload photo</string>
     <string name="error_delete_group_failed">Failed to delete group</string>
     <string name="error_kick_member_failed">Failed to remove member</string>
+    <string name="error_leave_group_failed">Failed to leave group</string>
+    <string name="error_operation_failed">Operation failed. Please try again.</string>
+    <string name="msg_sole_admin_cannot_leave">You are the only admin. Promote another member before leaving.</string>
+    <string name="label_shared_media">Shared Media</string>
+    <string name="action_see_all">See All</string>
 
     <!-- Toast Messages -->
     <string name="toast_location_denied">Location permission denied</string>

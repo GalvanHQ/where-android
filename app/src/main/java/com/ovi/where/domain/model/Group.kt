@@ -8,6 +8,7 @@ data class Group(
     val createdAt: Long = 0L,
     val memberCount: Int = 0,
     val inviteCode: String = "",
+    val avatarUrl: String? = null,
     val memberIds: List<String> = emptyList(),
     val conversationId: String? = null   // linked group chat conversation
 )

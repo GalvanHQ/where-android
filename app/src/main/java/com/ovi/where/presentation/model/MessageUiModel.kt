@@ -29,7 +29,31 @@ data class MessageUiModel(
     /** Human-readable coordinates label for location bubbles. */
     val locationLabel: String?,
     /** Message delivery status for showing retry affordance on FAILED messages. */
-    val status: MessageStatus = MessageStatus.SENT
+    val status: MessageStatus = MessageStatus.SENT,
+    // ─── Reactions (Task 11.4) ────────────────────────────────────────────────
+    /** Aggregated reactions: emoji → list of user IDs who reacted. */
+    val reactions: Map<String, List<String>> = emptyMap(),
+    // ─── Read Receipts (Task 11.6) ────────────────────────────────────────────
+    /** List of user IDs who have read this message (excluding sender). */
+    val readBy: List<String> = emptyList(),
+    /** Photo URLs of readers for avatar display (up to 3). */
+    val readByPhotoUrls: List<String?> = emptyList(),
+    // ─── Reply / Quote (Task 11.5) ────────────────────────────────────────────
+    /** ID of the message this is replying to (null if not a reply). */
+    val replyToId: String? = null,
+    /** Sender name of the quoted message. */
+    val replyToSenderName: String? = null,
+    /** Text of the quoted message (truncated to 100 chars). */
+    val replyToText: String? = null,
+    // ─── Image / Media (Task 11.8) ────────────────────────────────────────────
+    /** Whether this message is an image message. */
+    val isImage: Boolean = false,
+    /** URL of the full-size image. */
+    val imageUrl: String? = null,
+    /** URL of the thumbnail image. */
+    val thumbnailUrl: String? = null,
+    /** Upload progress 0-100 for pending image messages, null when not uploading. */
+    val uploadProgress: Int? = null
 )
 
 fun Message.toUiModel(
@@ -39,16 +63,27 @@ fun Message.toUiModel(
 ): MessageUiModel {
     val direction = if (senderId == currentUserId) BubbleDirection.SENT else BubbleDirection.RECEIVED
     val isLocation = type == MessageType.LOCATION
+    val isImage = type == MessageType.IMAGE
     val locationLabel = if (isLocation && latitude != null && longitude != null) {
         "%.4f, %.4f".format(latitude, longitude)
     } else null
+
+    // Filter readBy to exclude the sender
+    val filteredReadBy = readBy.filter { it != senderId }
+
+    // Truncate reply text to 100 characters
+    val truncatedReplyText = replyToText?.take(100)
 
     return MessageUiModel(
         id             = id,
         senderId       = senderId,
         senderName     = senderName,
         senderPhotoUrl = senderPhotoUrl,
-        text           = if (isLocation) "📍 Shared a location" else text,
+        text           = when {
+            isLocation -> "Shared a location"
+            isImage -> ""
+            else -> text
+        },
         formattedTime  = timeFormatter(timestamp),
         dateKey        = dateKeyFormatter(timestamp),
         direction      = direction,
@@ -56,6 +91,16 @@ fun Message.toUiModel(
         latitude       = latitude,
         longitude      = longitude,
         locationLabel  = locationLabel,
-        status         = status
+        status         = status,
+        reactions      = reactions,
+        readBy         = filteredReadBy,
+        readByPhotoUrls = emptyList(), // Populated by ViewModel if needed
+        replyToId      = replyToId,
+        replyToSenderName = replyToSenderName,
+        replyToText    = truncatedReplyText,
+        isImage        = isImage,
+        imageUrl       = imageUrl,
+        thumbnailUrl   = thumbnailUrl,
+        uploadProgress = null // Populated by ViewModel for pending uploads
     )
 }

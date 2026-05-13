@@ -54,6 +54,7 @@ class ChatViewModelPaginationTest : StringSpec({
     lateinit var firebaseAuth: FirebaseAuth
     lateinit var firebaseUser: FirebaseUser
     lateinit var locationManager: LocationManager
+    lateinit var friendshipRepository: com.ovi.where.domain.repository.FriendshipRepository
 
     val testDispatcher = StandardTestDispatcher()
 
@@ -71,6 +72,7 @@ class ChatViewModelPaginationTest : StringSpec({
         firebaseAuth = mockk(relaxed = true)
         firebaseUser = mockk(relaxed = true)
         locationManager = mockk(relaxed = true)
+        friendshipRepository = mockk(relaxed = true)
 
         every { firebaseAuth.currentUser } returns firebaseUser
         every { firebaseUser.uid } returns "user123"
@@ -110,7 +112,8 @@ class ChatViewModelPaginationTest : StringSpec({
             wsClient,
             messageRepositoryImpl,
             firebaseAuth,
-            locationManager
+            locationManager,
+            friendshipRepository
         )
     }
 

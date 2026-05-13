@@ -8,6 +8,9 @@ import com.ovi.where.R
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.common.UiEvent
 import com.ovi.where.core.common.UiText
+import com.ovi.where.domain.model.Message
+import com.ovi.where.domain.model.MessageType
+import com.ovi.where.domain.repository.MessageRepository
 import com.ovi.where.domain.usecase.group.DeleteGroupUseCase
 import com.ovi.where.domain.usecase.group.GetGroupUseCase
 import com.ovi.where.domain.usecase.group.KickMemberUseCase
@@ -37,6 +40,7 @@ class GroupDetailsViewModel @Inject constructor(
     private val promoteMemberUseCase: PromoteMemberUseCase,
     private val deleteGroupUseCase: DeleteGroupUseCase,
     private val getUsersUseCase: GetUsersUseCase,
+    private val messageRepository: MessageRepository,
     private val firebaseAuth: FirebaseAuth
 ) : AndroidViewModel(application) {
 
@@ -65,10 +69,14 @@ class GroupDetailsViewModel @Inject constructor(
                         ),
                         inviteCode = group?.inviteCode ?: "",
                         groupName = group?.name ?: "",
+                        groupDescription = group?.description ?: "",
+                        groupAvatarUrl = group?.avatarUrl,
                         groupConversationId = group?.conversationId,
                         isCurrentUserAdmin = isAdmin,
                         error = null
                     )
+                    // Load shared media if conversation exists
+                    group?.conversationId?.let { loadSharedMedia(it) }
                 }
                 is Resource.Error -> {
                     _uiState.value = _uiState.value.copy(isLoading = false, error = result.message)
@@ -94,22 +102,57 @@ class GroupDetailsViewModel @Inject constructor(
                         else -> {}
                     }
                 }
+
                 val adminId = currentUserId
+
+                // Map to UI models
+                val memberUiModels = members.map { member ->
+                    member.toUiModel(
+                        displayName = userNames[member.userId] ?: member.userId,
+                        adminText = adminText,
+                        memberText = memberText
+                    )
+                }
+
+                // Sort: admins first, then alphabetical by display name
+                val sortedMembers = memberUiModels.sortedWith(
+                    compareByDescending<GroupMemberUiModel> { it.isAdmin }
+                        .thenBy { it.displayName.lowercase() }
+                )
+
+                // Determine admin status and sole admin check
+                val isCurrentUserAdmin = members.any { it.userId == adminId && it.isAdmin() }
+                val adminCount = members.count { it.isAdmin() }
+                val isSoleAdmin = isCurrentUserAdmin && adminCount == 1
+
                 _uiState.value = _uiState.value.copy(
-                    members = members.map { member ->
-                        member.toUiModel(
-                            displayName = userNames[member.userId] ?: member.userId,
-                            adminText = adminText,
-                            memberText = memberText
-                        )
-                    },
-                    isCurrentUserAdmin = members.any { it.userId == adminId && it.isAdmin() }
+                    members = sortedMembers,
+                    isCurrentUserAdmin = isCurrentUserAdmin,
+                    isSoleAdmin = isSoleAdmin
                 )
             }
         }
     }
 
+    /**
+     * Loads the most recent shared media (IMAGE type messages) for the gallery preview.
+     */
+    private fun loadSharedMedia(conversationId: String) {
+        viewModelScope.launch {
+            messageRepository.observeMessages(conversationId).collect { messages ->
+                val mediaMessages = messages
+                    .filter { it.type == MessageType.IMAGE && it.imageUrl != null }
+                    .sortedByDescending { it.timestamp }
+                    .take(SHARED_MEDIA_LIMIT)
+                _uiState.value = _uiState.value.copy(sharedMedia = mediaMessages)
+            }
+        }
+    }
+
     fun leaveGroup(groupId: String) {
+        // Guard: sole admin cannot leave
+        if (_uiState.value.isSoleAdmin) return
+
         viewModelScope.launch {
             when (leaveGroupUseCase(groupId)) {
                 is Resource.Success -> {
@@ -168,6 +211,11 @@ class GroupDetailsViewModel @Inject constructor(
             }
         }
     }
+
+    companion object {
+        /** Maximum number of shared media items to display in the gallery preview */
+        const val SHARED_MEDIA_LIMIT = 20
+    }
 }
 
 private fun com.ovi.where.domain.model.GroupMember.isAdmin() =
@@ -178,8 +226,12 @@ data class GroupDetailsUiState(
     val members: List<GroupMemberUiModel> = emptyList(),
     val inviteCode: String = "",
     val groupName: String = "",
+    val groupDescription: String = "",
+    val groupAvatarUrl: String? = null,
     val groupConversationId: String? = null,
+    val sharedMedia: List<Message> = emptyList(),
     val isLoading: Boolean = false,
     val isCurrentUserAdmin: Boolean = false,
+    val isSoleAdmin: Boolean = false,
     val error: String? = null
 )

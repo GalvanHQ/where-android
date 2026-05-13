@@ -38,7 +38,8 @@ class EditGroupViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         name = group?.name ?: "",
-                        description = group?.description ?: ""
+                        description = group?.description ?: "",
+                        avatarUrl = group?.avatarUrl
                     )
                 }
                 is Resource.Error -> _uiState.value = _uiState.value.copy(isLoading = false)
@@ -87,5 +88,6 @@ data class EditGroupUiState(
     val name: String = "",
     val description: String = "",
     val nameError: String? = null,
+    val avatarUrl: String? = null,
     val isLoading: Boolean = false
 )

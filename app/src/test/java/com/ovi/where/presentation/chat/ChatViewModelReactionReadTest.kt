@@ -59,6 +59,7 @@ class ChatViewModelReactionReadTest : StringSpec({
     lateinit var firebaseUser: FirebaseUser
     lateinit var locationManager: LocationManager
     lateinit var connectionState: MutableStateFlow<ChatSocketIoClient.ConnectionState>
+    lateinit var friendshipRepository: com.ovi.where.domain.repository.FriendshipRepository
 
     val testDispatcher = StandardTestDispatcher()
 
@@ -76,6 +77,7 @@ class ChatViewModelReactionReadTest : StringSpec({
         firebaseAuth = mockk(relaxed = true)
         firebaseUser = mockk(relaxed = true)
         locationManager = mockk(relaxed = true)
+        friendshipRepository = mockk(relaxed = true)
 
         connectionState = MutableStateFlow(ChatSocketIoClient.ConnectionState.CONNECTED)
 
@@ -119,7 +121,8 @@ class ChatViewModelReactionReadTest : StringSpec({
             wsClient,
             messageRepositoryImpl,
             firebaseAuth,
-            locationManager
+            locationManager,
+            friendshipRepository
         )
     }
 

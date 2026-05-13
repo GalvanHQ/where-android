@@ -16,13 +16,25 @@ data class ConversationUiModel(
     val photoUrl: String?,
     val isGroup: Boolean,
     val groupId: String?,        // non-null only for group conversations
-    val currentUserId: String    // kept for unread count lookup in mapper
+    val currentUserId: String,   // kept for unread count lookup in mapper
+    /** Number of members in the conversation (relevant for group chats). */
+    val memberCount: Int = 0,
+    /** Whether the other user in a 1:1 conversation is currently online. */
+    val isOtherUserOnline: Boolean = false,
+    /** The other user's ID in a 1:1 conversation (null for groups). */
+    val otherUserId: String? = null
 )
 
 fun Conversation.toUiModel(currentUserId: String, timeFormatter: (Long) -> String): ConversationUiModel {
     val unread = (unreadCounts[currentUserId] as? Int)
         ?: (unreadCounts[currentUserId] as? Long)?.toInt()
         ?: 0
+    val otherUid = if (type == ConversationType.DIRECT) {
+        participantIds.firstOrNull { it != currentUserId }
+    } else null
+    val otherOnline = if (type == ConversationType.DIRECT && otherUid != null) {
+        otherUid in onlineMembers
+    } else false
     return ConversationUiModel(
         id               = id,
         title            = name.ifBlank { "Chat" },
@@ -32,6 +44,9 @@ fun Conversation.toUiModel(currentUserId: String, timeFormatter: (Long) -> Strin
         photoUrl         = photoUrl,
         isGroup          = type == ConversationType.GROUP,
         groupId          = groupId,
-        currentUserId    = currentUserId
+        currentUserId    = currentUserId,
+        memberCount      = participantIds.size,
+        isOtherUserOnline = otherOnline,
+        otherUserId      = otherUid
     )
 }

@@ -12,6 +12,8 @@ import com.ovi.where.data.remote.chat.ServerFrame
 import com.ovi.where.data.repository.MessageRepositoryImpl
 import com.ovi.where.domain.model.Message
 import com.ovi.where.domain.model.MessageStatus
+import com.ovi.where.domain.model.FriendshipStatus
+import com.ovi.where.domain.repository.FriendshipRepository
 import com.ovi.where.domain.usecase.chat.MarkConversationReadUseCase
 import com.ovi.where.domain.usecase.chat.ObserveConversationsUseCase
 import com.ovi.where.domain.usecase.chat.ObserveMessagesUseCase
@@ -38,6 +40,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
 /**
@@ -65,7 +68,8 @@ class ChatViewModel @Inject constructor(
     private val wsClient: ChatSocketIoClient,
     private val messageRepositoryImpl: MessageRepositoryImpl,
     private val firebaseAuth: FirebaseAuth,
-    private val locationManager: LocationManager
+    private val locationManager: LocationManager,
+    private val friendshipRepository: FriendshipRepository
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -190,10 +194,35 @@ class ChatViewModel @Inject constructor(
             observeConversationsUseCase().collect { conversations ->
                 val conv = conversations.firstOrNull { it.id == conversationId }
                 if (conv != null) {
-                    _uiState.value = _uiState.value.copy(
-                        conversation = conv.toUiModel(uid, ::formatConversationTimestamp)
-                    )
+                    val uiModel = conv.toUiModel(uid, ::formatConversationTimestamp)
+                    _uiState.value = _uiState.value.copy(conversation = uiModel)
+                    // Check friendship status for 1:1 conversations (Requirement 8.4)
+                    if (!uiModel.isGroup && uiModel.otherUserId != null) {
+                        checkFriendshipStatus(uiModel.otherUserId)
+                    }
                 }
+            }
+        }
+    }
+
+    // ─── Friendship Status Check (Task 11.3) ──────────────────────────────────
+
+    /**
+     * Checks whether the other user in a 1:1 conversation is in the caller's friends list.
+     * Used to determine whether to show presence status in the header.
+     *
+     * Requirement 8.4: Hide presence status if other user not in friends list.
+     */
+    private fun checkFriendshipStatus(otherUserId: String) {
+        viewModelScope.launch {
+            try {
+                val status = friendshipRepository.getFriendshipStatus(otherUserId)
+                _uiState.value = _uiState.value.copy(
+                    isOtherUserFriend = status == FriendshipStatus.ACCEPTED
+                )
+            } catch (_: Exception) {
+                // On failure, default to not showing presence (safe default)
+                _uiState.value = _uiState.value.copy(isOtherUserFriend = false)
             }
         }
     }
@@ -207,19 +236,81 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // ─── Typing Observation ───────────────────────────────────────────────────
+    // ─── Typing Observation (Task 6.5) ──────────────────────────────────────────
 
+    /**
+     * Tracks currently typing users: userId → userName.
+     * Used for group chats where multiple users can be typing simultaneously.
+     */
+    private val typingUsers = ConcurrentHashMap<String, String>()
+
+    /**
+     * Timeout jobs per typing user. Each job auto-hides the typing indicator
+     * after [TYPING_TIMEOUT_MS] (5 seconds) of no typing event from that user.
+     *
+     * Requirement 7.5: Auto-hide after 5 seconds of no typing event from a user.
+     */
+    private val typingTimeoutJobs = ConcurrentHashMap<String, Job>()
+
+    /**
+     * Observes incoming typing frames from the WebSocket and manages the typing
+     * indicator state for both 1:1 and group conversations.
+     *
+     * Behavior:
+     * - On typing(true): add user to typingUsers map, start/reset 5s timeout
+     * - On typing(false): remove user from typingUsers map, cancel timeout
+     * - Auto-hide after 5 seconds of no typing event from a user (Requirement 7.5)
+     * - Format display text per Requirement 7.2 and 7.6
+     *
+     * Requirements: 7.1, 7.2, 7.5, 7.6
+     */
     private fun observeTyping() {
         viewModelScope.launch {
             wsClient.incomingFrames.collect { frame ->
                 if (frame is ServerFrame.UserTyping) {
-                    _uiState.value = _uiState.value.copy(
-                        typingUserId = if (frame.isTyping) frame.userId else null,
-                        typingUserName = if (frame.isTyping) frame.userName else null
-                    )
+                    // Ignore typing events from the current user
+                    if (frame.userId == currentUserId) return@collect
+
+                    if (frame.isTyping) {
+                        // Add user to typing map
+                        typingUsers[frame.userId] = frame.userName
+
+                        // Cancel existing timeout for this user and start a new one
+                        typingTimeoutJobs[frame.userId]?.cancel()
+                        typingTimeoutJobs[frame.userId] = viewModelScope.launch {
+                            delay(TYPING_TIMEOUT_MS)
+                            // Auto-hide after 5 seconds of no typing event (Requirement 7.5)
+                            typingUsers.remove(frame.userId)
+                            typingTimeoutJobs.remove(frame.userId)
+                            updateTypingIndicatorState()
+                        }
+                    } else {
+                        // Remove user from typing map
+                        typingUsers.remove(frame.userId)
+                        typingTimeoutJobs[frame.userId]?.cancel()
+                        typingTimeoutJobs.remove(frame.userId)
+                    }
+
+                    updateTypingIndicatorState()
                 }
             }
         }
+    }
+
+    /**
+     * Updates the UI state with the current typing indicator text.
+     * Formats the text based on the number of currently typing users.
+     *
+     * Requirements: 7.2, 7.6
+     */
+    private fun updateTypingIndicatorState() {
+        val typerNames = typingUsers.values.toList()
+        val typingText = formatTypingIndicatorText(typerNames)
+        _uiState.value = _uiState.value.copy(
+            typingIndicatorText = typingText,
+            typingUserId = typerNames.firstOrNull()?.let { typingUsers.keys.firstOrNull() },
+            typingUserName = typerNames.firstOrNull()
+        )
     }
 
     // ─── Connection State Observation and Reconnection UI (Task 6.7) ──────────
@@ -397,7 +488,7 @@ class ChatViewModel @Inject constructor(
         val convId = state.conversationId ?: return
         if (state.isLoadingMore || !state.hasMoreMessages) return
 
-        _uiState.value = state.copy(isLoadingMore = true)
+        _uiState.value = state.copy(isLoadingMore = true, paginationError = false)
 
         viewModelScope.launch {
             try {
@@ -409,17 +500,28 @@ class ChatViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     paginationCursor = page.nextCursor,
                     hasMoreMessages = page.hasMore,
-                    isLoadingMore = false
+                    isLoadingMore = false,
+                    paginationError = false
                 )
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isLoadingMore = false)
+                _uiState.value = _uiState.value.copy(
+                    isLoadingMore = false,
+                    paginationError = true
+                )
             }
         }
     }
 
     fun onInputChange(text: String) {
         _uiState.value = _uiState.value.copy(inputText = text)
-        viewModelScope.launch { wsClient.sendTyping(text.isNotEmpty()) }
+        // Use TypingIndicatorManager for debounced outgoing typing events (300ms throttle)
+        // Requirement 7.1: Emit at most one typing event per 300ms window
+        if (text.isNotEmpty()) {
+            wsClient.typingIndicatorManager.onKeystroke()
+        } else {
+            // Input cleared: emit stop-typing immediately (Requirement 7.4)
+            wsClient.typingIndicatorManager.onMessageSentOrInputCleared()
+        }
     }
 
     // ─── Message Send with Reply Clearing and Offline Queue Rejection (Task 6.3) ──
@@ -450,6 +552,9 @@ class ChatViewModel @Inject constructor(
             replyingToMessage = null,
             isSending = false
         )
+
+        // Emit stop-typing immediately on message send (Requirement 7.4)
+        wsClient.typingIndicatorManager.onMessageSentOrInputCleared()
 
         viewModelScope.launch {
             val result = messageRepositoryImpl.sendMessage(convId, text, replyToId = replyToId)
@@ -685,6 +790,29 @@ class ChatViewModel @Inject constructor(
         wsClient.disconnect()
     }
 
+    // ─── Lifecycle: App Backgrounding/Foregrounding (Task 16.2) ───────────────
+
+    /**
+     * Called when the app returns to foreground while ChatScreen is active.
+     * Reconnects the WebSocket with the current conversationId and Firebase token.
+     *
+     * Requirements: 13.4, 13.5
+     */
+    fun onForeground() {
+        val convId = _uiState.value.conversationId ?: return
+        connectWebSocket(convId)
+    }
+
+    /**
+     * Called when the app goes to background while ChatScreen is active.
+     * Disconnects the WebSocket to conserve resources and battery.
+     *
+     * Requirement: 13.1
+     */
+    fun onBackground() {
+        wsClient.disconnect()
+    }
+
     companion object {
         /** Number of messages to load on initial page and each subsequent page. */
         const val INITIAL_PAGE_SIZE = 30
@@ -766,6 +894,8 @@ data class ChatUiState(
     val isLoadingMore: Boolean = false,
     val typingUserId: String? = null,
     val typingUserName: String? = null,
+    /** Formatted typing indicator text for display (e.g., "{name} is typing…" or "{name1}, {name2} +N are typing…"). */
+    val typingIndicatorText: String? = null,
     /** The message currently being replied to (shown in reply preview bar). */
     val replyingToMessage: MessageUiModel? = null,
     /** Whether the offline queue is full (50 messages) — messaging unavailable indicator. */
@@ -785,5 +915,11 @@ data class ChatUiState(
     /** True when the UI should request location permission from the system (Requirement 15.5). */
     val locationPermissionNeeded: Boolean = false,
     /** True when a transient location error should be displayed (Requirement 15.6). */
-    val locationError: Boolean = false
+    val locationError: Boolean = false,
+    // ─── Pagination Error State (Task 11.1) ───────────────────────────────────
+    /** Whether the last pagination request failed (show inline retry at top of list). */
+    val paginationError: Boolean = false,
+    // ─── Header State (Task 11.3) ─────────────────────────────────────────────
+    /** Whether the other user in a 1:1 conversation is in the caller's friends list (Requirement 8.4). */
+    val isOtherUserFriend: Boolean = false
 )

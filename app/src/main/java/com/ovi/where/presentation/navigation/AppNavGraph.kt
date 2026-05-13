@@ -274,6 +274,9 @@ fun AppNavGraph(
                 onNavigateToUserProfile = { userId ->
                     navController.navigate(Screen.UserProfile.createRoute(userId))
                 },
+                onNavigateToGroupInfo = { groupId ->
+                    navController.navigate(Screen.GroupDetails.createRoute(groupId))
+                },
                 onNavigateToGroupMap = { groupId ->
                     navController.navigate(Screen.GroupMap.createRoute(groupId))
                 }

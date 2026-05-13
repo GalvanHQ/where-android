@@ -202,6 +202,19 @@ class ConversationRepositoryImpl @Inject constructor(
     }
 
     /**
+     * Deletes a conversation from the local Room database.
+     * The conversation will reappear on next Firestore sync if it still exists server-side.
+     */
+    override suspend fun deleteConversation(conversationId: String): Resource<Unit> {
+        return try {
+            conversationDao.deleteById(conversationId)
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to delete conversation")
+        }
+    }
+
+    /**
      * Starts the Firestore snapshot listener if not already running.
      *
      * The listener is scoped to conversation metadata fields only (Requirement 12.2):

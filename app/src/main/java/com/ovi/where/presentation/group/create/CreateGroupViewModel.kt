@@ -247,7 +247,7 @@ class CreateGroupViewModel @Inject constructor(
             }
 
             // Step 2: Create the group via REST API
-            when (val result = createGroupUseCase(state.name, state.description)) {
+            when (val result = createGroupUseCase(state.name, state.description, avatarUrl)) {
                 is Resource.Success -> {
                     val group = result.data
                     if (group != null) {

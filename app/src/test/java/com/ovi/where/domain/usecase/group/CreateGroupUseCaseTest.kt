@@ -4,8 +4,8 @@ import com.ovi.where.core.common.Resource
 import com.ovi.where.domain.model.Group
 import com.ovi.where.domain.repository.GroupRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
-import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -34,13 +34,13 @@ class CreateGroupUseCaseTest {
             createdBy = "user123"
         )
         
-        coEvery { groupRepository.createGroup(name, description) } returns Resource.Success(group)
+        coEvery { groupRepository.createGroup(name, description, null) } returns Resource.Success(group)
 
         val result = createGroupUseCase(name, description)
 
         assertTrue(result is Resource.Success)
-        assertEquals((result as Resource.Success).data.name, name)
-        verify { groupRepository.createGroup(name, description) }
+        assertEquals((result as Resource.Success).data?.name, name)
+        coVerify { groupRepository.createGroup(name, description, null) }
     }
 
     @Test
@@ -48,7 +48,7 @@ class CreateGroupUseCaseTest {
         val name = "Test Group"
         val description = "Test Description"
         
-        coEvery { groupRepository.createGroup(name, description) } returns Resource.Error("Name required")
+        coEvery { groupRepository.createGroup(name, description, null) } returns Resource.Error("Name required")
 
         val result = createGroupUseCase(name, description)
 
@@ -61,7 +61,7 @@ class CreateGroupUseCaseTest {
         val name = "Test Group"
         val description = "Test Description"
         
-        coEvery { groupRepository.createGroup(name, description) } returns Resource.Error("Network error")
+        coEvery { groupRepository.createGroup(name, description, null) } returns Resource.Error("Network error")
 
         val result = createGroupUseCase(name, description)
 

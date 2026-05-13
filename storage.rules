@@ -10,5 +10,17 @@ service firebase.storage {
       allow delete: if request.auth != null 
                    && request.auth.uid == userId;
     }
+
+    match /chat_images/{conversationId}/{userId}/{fileName} {
+      // Any authenticated user can read chat images
+      allow read: if request.auth != null;
+      // Only the uploader can write, max 10MB, must be an image
+      allow create, update: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null
+                   && request.auth.uid == userId;
+    }
   }
 }

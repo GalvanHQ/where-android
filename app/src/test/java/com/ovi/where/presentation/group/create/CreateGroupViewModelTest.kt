@@ -288,7 +288,7 @@ class CreateGroupViewModelTest {
         val conversation = Conversation(
             id = "conv1", name = "ABC", type = ConversationType.GROUP, participantIds = listOf("user1", currentUserId)
         )
-        coEvery { createGroupUseCase("ABC", "") } returns Resource.Success(group)
+        coEvery { createGroupUseCase("ABC", "", null) } returns Resource.Success(group)
         coEvery { createGroupConversationUseCase(any(), any(), any()) } returns Resource.Success(conversation)
 
         viewModel.onCreateGroup()
@@ -309,7 +309,7 @@ class CreateGroupViewModelTest {
         val conversation = Conversation(
             id = "conv1", name = name50, type = ConversationType.GROUP, participantIds = listOf("user1", currentUserId)
         )
-        coEvery { createGroupUseCase(name50, "") } returns Resource.Success(group)
+        coEvery { createGroupUseCase(name50, "", null) } returns Resource.Success(group)
         coEvery { createGroupConversationUseCase(any(), any(), any()) } returns Resource.Success(conversation)
 
         viewModel.onCreateGroup()
@@ -372,7 +372,7 @@ class CreateGroupViewModelTest {
         val conversation = Conversation(
             id = "conv1", name = "My Group", type = ConversationType.GROUP, participantIds = listOf("user1", currentUserId)
         )
-        coEvery { createGroupUseCase("My Group", "") } returns Resource.Success(group)
+        coEvery { createGroupUseCase("My Group", "", null) } returns Resource.Success(group)
         coEvery { createGroupConversationUseCase("g1", "My Group", listOf("user1", currentUserId)) } returns Resource.Success(conversation)
 
         viewModel.onCreateGroup()
@@ -396,7 +396,7 @@ class CreateGroupViewModelTest {
         viewModel.onNameChange("My Group")
         viewModel.onDescriptionChange("A description")
 
-        coEvery { createGroupUseCase("My Group", "A description") } returns Resource.Error("Server error")
+        coEvery { createGroupUseCase("My Group", "A description", null) } returns Resource.Error("Server error")
 
         viewModel.onCreateGroup()
         advanceTimeBy(100)
@@ -424,5 +424,61 @@ class CreateGroupViewModelTest {
         // Changing name clears the error
         viewModel.onNameChange("ABC")
         assertNull(viewModel.uiState.value.nameError)
+    }
+
+    // --- Share Invite Code Tests ---
+
+    @Test
+    fun `share invite code emits ShareContent event`() = runTest {
+        val alice = User(id = "user1", displayName = "Alice", username = "alice")
+        viewModel.onMemberSelected(alice)
+        viewModel.onNameChange("My Group")
+
+        val group = Group(id = "g1", name = "My Group", inviteCode = "ABC123")
+        val conversation = Conversation(
+            id = "conv1", name = "My Group", type = ConversationType.GROUP, participantIds = listOf("user1", currentUserId)
+        )
+        coEvery { createGroupUseCase("My Group", "", null) } returns Resource.Success(group)
+        coEvery { createGroupConversationUseCase("g1", "My Group", listOf("user1", currentUserId)) } returns Resource.Success(conversation)
+
+        viewModel.onCreateGroup()
+        advanceTimeBy(100)
+
+        // Now share the invite code
+        viewModel.onShareInviteCode()
+        advanceTimeBy(100)
+
+        val event = viewModel.uiEvent.first()
+        assertTrue(event is UiEvent.ShareContent)
+        val shareEvent = event as UiEvent.ShareContent
+        assertTrue(shareEvent.content.contains("ABC123"))
+    }
+
+    // --- Navigate to Group Chat Tests ---
+
+    @Test
+    fun `navigate to group chat emits Navigate event with correct route`() = runTest {
+        val alice = User(id = "user1", displayName = "Alice", username = "alice")
+        viewModel.onMemberSelected(alice)
+        viewModel.onNameChange("My Group")
+
+        val group = Group(id = "g1", name = "My Group", inviteCode = "ABC123")
+        val conversation = Conversation(
+            id = "conv1", name = "My Group", type = ConversationType.GROUP, participantIds = listOf("user1", currentUserId)
+        )
+        coEvery { createGroupUseCase("My Group", "", null) } returns Resource.Success(group)
+        coEvery { createGroupConversationUseCase("g1", "My Group", listOf("user1", currentUserId)) } returns Resource.Success(conversation)
+
+        viewModel.onCreateGroup()
+        advanceTimeBy(100)
+
+        // Navigate to the group chat
+        viewModel.onNavigateToGroupChat()
+        advanceTimeBy(100)
+
+        val event = viewModel.uiEvent.first()
+        assertTrue(event is UiEvent.Navigate)
+        val navEvent = event as UiEvent.Navigate
+        assertEquals("chat/conv1", navEvent.route)
     }
 }

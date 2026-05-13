@@ -6,6 +6,7 @@ import com.ovi.where.data.remote.chat.ChatSocketIoClient
 import com.ovi.where.data.remote.chat.ServerFrame
 import com.ovi.where.domain.model.Conversation
 import com.ovi.where.domain.model.ConversationType
+import com.ovi.where.domain.repository.ConversationRepository
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
 import com.ovi.where.domain.usecase.chat.ObserveConversationsUseCase
 import io.kotest.core.spec.style.StringSpec
@@ -32,6 +33,7 @@ class ChatsViewModelTest : StringSpec({
     lateinit var chatSocketIoClient: ChatSocketIoClient
     lateinit var firebaseAuth: FirebaseAuth
     lateinit var firebaseUser: FirebaseUser
+    lateinit var conversationRepository: ConversationRepository
     lateinit var incomingFrames: MutableSharedFlow<ServerFrame>
     lateinit var connectionState: MutableStateFlow<ChatSocketIoClient.ConnectionState>
 
@@ -44,6 +46,7 @@ class ChatsViewModelTest : StringSpec({
         chatSocketIoClient = mockk(relaxed = true)
         firebaseAuth = mockk(relaxed = true)
         firebaseUser = mockk(relaxed = true)
+        conversationRepository = mockk(relaxed = true)
         incomingFrames = MutableSharedFlow(extraBufferCapacity = 64)
         connectionState = MutableStateFlow(ChatSocketIoClient.ConnectionState.CONNECTED)
 
@@ -89,7 +92,8 @@ class ChatsViewModelTest : StringSpec({
                 observeConversationsUseCase,
                 getOrCreateDirectConversationUseCase,
                 chatSocketIoClient,
-                firebaseAuth
+                firebaseAuth,
+                conversationRepository
             )
             advanceUntilIdle()
 
@@ -116,7 +120,8 @@ class ChatsViewModelTest : StringSpec({
                 observeConversationsUseCase,
                 getOrCreateDirectConversationUseCase,
                 chatSocketIoClient,
-                firebaseAuth
+                firebaseAuth,
+                conversationRepository
             )
             advanceUntilIdle()
 
@@ -142,7 +147,8 @@ class ChatsViewModelTest : StringSpec({
                 observeConversationsUseCase,
                 getOrCreateDirectConversationUseCase,
                 chatSocketIoClient,
-                firebaseAuth
+                firebaseAuth,
+                conversationRepository
             )
             advanceUntilIdle()
 
@@ -168,7 +174,8 @@ class ChatsViewModelTest : StringSpec({
                 observeConversationsUseCase,
                 getOrCreateDirectConversationUseCase,
                 chatSocketIoClient,
-                firebaseAuth
+                firebaseAuth,
+                conversationRepository
             )
             advanceUntilIdle()
 
@@ -190,7 +197,8 @@ class ChatsViewModelTest : StringSpec({
                 observeConversationsUseCase,
                 getOrCreateDirectConversationUseCase,
                 chatSocketIoClient,
-                firebaseAuth
+                firebaseAuth,
+                conversationRepository
             )
             advanceUntilIdle()
 
@@ -214,7 +222,8 @@ class ChatsViewModelTest : StringSpec({
                 observeConversationsUseCase,
                 getOrCreateDirectConversationUseCase,
                 chatSocketIoClient,
-                firebaseAuth
+                firebaseAuth,
+                conversationRepository
             )
             advanceUntilIdle()
 
@@ -239,7 +248,8 @@ class ChatsViewModelTest : StringSpec({
                 observeConversationsUseCase,
                 getOrCreateDirectConversationUseCase,
                 chatSocketIoClient,
-                firebaseAuth
+                firebaseAuth,
+                conversationRepository
             )
             advanceUntilIdle()
 
@@ -271,7 +281,8 @@ class ChatsViewModelTest : StringSpec({
                 observeConversationsUseCase,
                 getOrCreateDirectConversationUseCase,
                 chatSocketIoClient,
-                firebaseAuth
+                firebaseAuth,
+                conversationRepository
             )
             advanceUntilIdle()
 

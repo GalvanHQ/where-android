@@ -6,7 +6,7 @@ import com.ovi.where.domain.model.GroupMember
 import kotlinx.coroutines.flow.Flow
 
 interface GroupRepository {
-    suspend fun createGroup(name: String, description: String): Resource<Group>
+    suspend fun createGroup(name: String, description: String, avatarUrl: String? = null): Resource<Group>
     suspend fun getGroup(groupId: String): Resource<Group>
     suspend fun getUserGroups(): Resource<List<Group>>
     suspend fun joinGroupWithCode(inviteCode: String): Resource<Group>

@@ -27,7 +27,7 @@ class GroupRepositoryImpl @Inject constructor(
     private val currentUid: String?
         get() = firebaseAuth.currentUser?.uid
 
-    override suspend fun createGroup(name: String, description: String): Resource<Group> {
+    override suspend fun createGroup(name: String, description: String, avatarUrl: String?): Resource<Group> {
         return try {
             val uid = currentUid ?: return Resource.Error("Not authenticated")
             val groupId = UUID.randomUUID().toString()
@@ -41,7 +41,8 @@ class GroupRepositoryImpl @Inject constructor(
                 createdBy = uid,
                 createdAt = now,
                 memberCount = 1,
-                inviteCode = inviteCode
+                inviteCode = inviteCode,
+                avatarUrl = avatarUrl
             )
             
             val batch = firestore.batch()

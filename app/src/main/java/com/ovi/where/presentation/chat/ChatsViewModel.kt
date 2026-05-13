@@ -8,6 +8,7 @@ import com.ovi.where.data.remote.chat.ChatSocketIoClient
 import com.ovi.where.data.remote.chat.ServerFrame
 import com.ovi.where.domain.model.Conversation
 import com.ovi.where.domain.model.ConversationType
+import com.ovi.where.domain.repository.ConversationRepository
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
 import com.ovi.where.domain.usecase.chat.ObserveConversationsUseCase
 import com.ovi.where.presentation.model.ConversationUiModel
@@ -25,7 +26,8 @@ class ChatsViewModel @Inject constructor(
     private val observeConversationsUseCase: ObserveConversationsUseCase,
     private val getOrCreateDirectConversationUseCase: GetOrCreateDirectConversationUseCase,
     private val chatSocketIoClient: ChatSocketIoClient,
-    private val firebaseAuth: FirebaseAuth
+    private val firebaseAuth: FirebaseAuth,
+    private val conversationRepository: ConversationRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatsUiState())
@@ -40,8 +42,42 @@ class ChatsViewModel @Inject constructor(
     private val onlineUserIds = mutableSetOf<String>()
 
     init {
-        observeConversations()
+        performInitialLoad()
         observePresenceUpdates()
+    }
+
+    // ── Initial Load (Task 16.3) ────────────────────────────────────────────
+
+    /**
+     * Performs the initial load sequence:
+     * 1. Fetch initial conversations from REST if Room is empty (Requirement 12.7)
+     * 2. Start observing conversations from Room (which triggers Firestore listener)
+     *
+     * This ensures data is available from REST before the Firestore listener starts
+     * incremental updates on first launch.
+     */
+    private fun performInitialLoad() {
+        viewModelScope.launch {
+            // Requirement 12.7: On first launch (no Room records), fetch from REST first
+            conversationRepository.fetchInitialConversationsIfNeeded()
+            // Now start observing — this also starts the Firestore listener
+            observeConversations()
+        }
+    }
+
+    // ── Foreground Sync (Task 16.3) ─────────────────────────────────────────
+
+    /**
+     * Triggers foreground sync of unread counts on app resume.
+     * Called from ChatsScreen lifecycle observer when the app returns to foreground.
+     *
+     * Requirement 12.5: Sync unread counts via single REST call on app foreground.
+     * Requirement 12.6: On failure/timeout, retain Room-cached counts.
+     */
+    fun onForegroundSync() {
+        viewModelScope.launch {
+            conversationRepository.syncUnreadCounts()
+        }
     }
 
     // ── Observation ─────────────────────────────────────────────────────────
@@ -156,6 +192,18 @@ class ChatsViewModel @Inject constructor(
                 is Resource.Success -> onResult(result.data?.id)
                 else -> onResult(null)
             }
+        }
+    }
+
+    // ── Delete Conversation ─────────────────────────────────────────────────
+
+    /**
+     * Deletes a conversation from the local database.
+     * Removes it from Room so it disappears from the list immediately.
+     */
+    fun deleteConversation(conversationId: String) {
+        viewModelScope.launch {
+            conversationRepository.deleteConversation(conversationId)
         }
     }
 }

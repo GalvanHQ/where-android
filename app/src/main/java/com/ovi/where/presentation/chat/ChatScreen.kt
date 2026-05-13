@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -33,6 +32,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -45,7 +45,9 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -53,30 +55,48 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.presentation.model.BubbleDirection
 import com.ovi.where.presentation.model.MessageUiModel
-import com.ovi.where.presentation.common.WhereTopAppBar
 import com.ovi.where.core.utils.showToast
+import kotlinx.coroutines.flow.distinctUntilChanged
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * ChatScreen — Individual conversation view with DESIGN.md-compliant bubble styling.
+ *
+ * Task 11.1: Message list with bubble styling per DESIGN.md
+ * - Sent bubbles: Accent Primary (MaterialTheme.colorScheme.primary), Radius Large (16dp) all corners
+ *   except bottom-right which uses Radius XS (4dp) for the tail effect.
+ * - Received bubbles: Background Elevated (surfaceContainerHigh), Radius Large (16dp) all corners
+ *   except bottom-left which uses Radius XS (4dp) for the mirrored tail.
+ * - Max bubble width: 75% of screen width.
+ * - LazyColumn items keyed by message ID.
+ * - Scroll position maintained on prepend (pagination).
+ * - Loading indicator at top during pagination.
+ * - Inline retry button on pagination failure.
+ *
+ * Requirements: 16.1, 2.5, 2.3, 2.7, 14.1
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     conversationId: String,
     onNavigateBack: () -> Unit = {},
     onNavigateToUserProfile: (String) -> Unit = {},
+    onNavigateToGroupInfo: (String) -> Unit = {},
     onNavigateToGroupMap: (String) -> Unit = {},
     viewModel: ChatViewModel = hiltViewModel()
 ) {
@@ -103,35 +123,67 @@ fun ChatScreen(
         viewModel.init(conversationId)
     }
 
+    // ── Task 16.2: Wire ChatSocketIoClient lifecycle to ChatScreen ─────────────
+    // Connect on foreground, disconnect on background (Requirements 13.1, 13.4, 13.5)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, conversationId) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    // Reconnect when app returns to foreground
+                    viewModel.onForeground()
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    // Disconnect when app goes to background
+                    viewModel.onBackground()
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     // Mark read when screen is shown
     LaunchedEffect(uiState.messages.size) {
         viewModel.markRead()
     }
 
-    // Auto-scroll to bottom when new messages arrive
+    // Auto-scroll to bottom when new messages arrive (only if already near bottom)
     LaunchedEffect(uiState.messages.size) {
         if (uiState.messages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.messages.size - 1)
+            val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val totalItems = listState.layoutInfo.totalItemsCount
+            // Auto-scroll only if user is near the bottom (within 5 items)
+            if (totalItems - lastVisibleIndex <= 5) {
+                listState.animateScrollToItem(uiState.messages.size - 1)
+            }
+        }
+    }
+
+    // Pagination trigger: load older messages when scrolled within 5 items of top
+    // Requirement 2.2: Trigger when user scrolls within 5 items of top
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            listState.firstVisibleItemIndex
+        }.distinctUntilChanged().collect { firstVisibleIndex ->
+            if (firstVisibleIndex <= 5 && !uiState.isLoadingMore && uiState.hasMoreMessages && !uiState.isLoading) {
+                viewModel.loadOlderMessages()
+            }
         }
     }
 
     Scaffold(
         topBar = {
-            WhereTopAppBar(
-                title = uiState.conversation?.title ?: "Chat",
+            ChatHeader(
+                conversation = uiState.conversation,
+                isOtherUserFriend = uiState.isOtherUserFriend,
                 onNavigateBack = onNavigateBack,
-                actions = {
-                    val groupId = uiState.conversation?.groupId
-                    if (groupId != null) {
-                        IconButton(onClick = { onNavigateToGroupMap(groupId) }) {
-                            Icon(
-                                Icons.Default.LocationOn,
-                                contentDescription = "Group Map",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
+                onNavigateToUserProfile = onNavigateToUserProfile,
+                onNavigateToGroupInfo = onNavigateToGroupInfo,
+                onNavigateToGroupMap = onNavigateToGroupMap
             )
         }
     ) { paddingValues ->
@@ -147,6 +199,9 @@ fun ChatScreen(
                 if (uiState.isLoading) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 } else {
+                    // Requirement 2.5: Maintain scroll position on prepend (pagination)
+                    // LazyColumn with reverseLayout=false; items keyed by message ID ensures
+                    // Compose maintains scroll position when items are prepended.
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
@@ -156,12 +211,56 @@ fun ChatScreen(
                         ),
                         verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
                     ) {
+                        // ── Pagination loading indicator at top (Requirement 2.3) ──
+                        if (uiState.isLoadingMore) {
+                            item(key = "__pagination_loading__") {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = Dimens.spaceMedium),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                }
+                            }
+                        }
+
+                        // ── Pagination error with inline retry (Requirement 2.7) ──
+                        if (uiState.paginationError) {
+                            item(key = "__pagination_error__") {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = Dimens.spaceSmall),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    TextButton(onClick = { viewModel.loadOlderMessages() }) {
+                                        Icon(
+                                            Icons.Default.Refresh,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(Modifier.width(Dimens.spaceSmall))
+                                        Text(
+                                            text = "Failed to load. Tap to retry",
+                                            style = MaterialTheme.typography.labelMedium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── Messages grouped by date ──────────────────────────────
                         // Group messages by pre-computed dateKey from MessageUiModel
                         val grouped = uiState.messages.groupBy { it.dateKey }
-                        grouped.forEach { (_, messages) ->
-                            item {
-                                DateSeparator(date = formatDateHeader(messages.first().dateKey))
+                        grouped.forEach { (dateKey, messages) ->
+                            item(key = "date_separator_$dateKey") {
+                                DateSeparator(date = formatDateHeader(dateKey))
                             }
+                            // Requirement 14.1: Key items by message ID for stable identity
                             items(items = messages, key = { it.id }) { message ->
                                 MessageBubble(
                                     message = message,
@@ -186,7 +285,7 @@ fun ChatScreen(
                 exit = fadeOut() + scaleOut()
             ) {
                 Text(
-                    text = "${uiState.typingUserName} is typing…",
+                    text = uiState.typingIndicatorText ?: "${uiState.typingUserName} is typing…",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall)
@@ -215,6 +314,30 @@ fun ChatScreen(
     }
 }
 
+// ── Bubble shape per DESIGN.md Section 6.7 ────────────────────────────────────
+// Requirement 16.1:
+// - Sent: Radius Large (16dp) all corners except bottom-right = Radius XS (4dp)
+// - Received: Radius Large (16dp) all corners except bottom-left = Radius XS (4dp)
+
+private val BubbleRadiusLarge = 16.dp
+private val BubbleRadiusTail = 4.dp
+
+private val SentBubbleShape = RoundedCornerShape(
+    topStart = BubbleRadiusLarge,
+    topEnd = BubbleRadiusLarge,
+    bottomStart = BubbleRadiusLarge,
+    bottomEnd = BubbleRadiusTail  // tail on sent side (bottom-right)
+)
+
+private val ReceivedBubbleShape = RoundedCornerShape(
+    topStart = BubbleRadiusLarge,
+    topEnd = BubbleRadiusLarge,
+    bottomStart = BubbleRadiusTail,  // tail on received side (bottom-left)
+    bottomEnd = BubbleRadiusLarge
+)
+
+private fun bubbleShape(isSent: Boolean) = if (isSent) SentBubbleShape else ReceivedBubbleShape
+
 // ── Message bubble ────────────────────────────────────────────────────────────
 
 @Composable
@@ -225,6 +348,24 @@ private fun MessageBubble(
     onLocationTap: () -> Unit
 ) {
     val isSent = message.direction == BubbleDirection.SENT
+
+    // Requirement 16.1: Sent = Accent Primary (primary), Received = Background Elevated (surfaceContainerHigh)
+    val bubbleColor = if (isSent) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val textColor = if (isSent) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    val secondaryTextColor = if (isSent) {
+        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isSent) Arrangement.End else Arrangement.Start,
@@ -248,7 +389,7 @@ private fun MessageBubble(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text  = message.senderName.take(1).uppercase(),
+                        text = message.senderName.take(1).uppercase(),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -264,37 +405,43 @@ private fun MessageBubble(
         ) {
             if (!isSent && showAvatar) {
                 Text(
-                    text     = message.senderName,
-                    style    = MaterialTheme.typography.labelSmall,
-                    color    = MaterialTheme.colorScheme.primary,
+                    text = message.senderName,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(start = Dimens.spaceSmall, bottom = 2.dp)
                 )
             }
 
             if (message.isLocation) {
                 Surface(
-                    shape    = bubbleShape(isSent),
-                    color    = if (isSent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.widthIn(max = maxWidth).clip(bubbleShape(isSent)).clickableIf(true) { onLocationTap() }
+                    shape = bubbleShape(isSent),
+                    color = bubbleColor,
+                    modifier = Modifier
+                        .widthIn(max = maxWidth)
+                        .clip(bubbleShape(isSent))
+                        .clickableIf(true) { onLocationTap() }
                 ) {
-                    Row(modifier = Modifier.padding(Dimens.spaceLarge), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.padding(Dimens.spaceLarge),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
                             Icons.Default.LocationOn, null,
                             modifier = Modifier.size(Dimens.iconSizeMedium),
-                            tint = if (isSent) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+                            tint = textColor
                         )
                         Spacer(Modifier.width(Dimens.spaceSmall))
                         Column {
                             Text(
-                                text  = message.text,
+                                text = message.text,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (isSent) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                color = textColor
                             )
                             if (message.locationLabel != null) {
                                 Text(
-                                    text  = message.locationLabel,
+                                    text = message.locationLabel,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (isSent) MaterialTheme.colorScheme.onPrimary.copy(0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = secondaryTextColor
                                 )
                             }
                         }
@@ -302,40 +449,28 @@ private fun MessageBubble(
                 }
             } else {
                 Surface(
-                    shape    = bubbleShape(isSent),
-                    color    = if (isSent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                    shape = bubbleShape(isSent),
+                    color = bubbleColor,
                     modifier = Modifier.widthIn(max = maxWidth)
                 ) {
                     Text(
-                        text     = message.text,
-                        style    = MaterialTheme.typography.bodyMedium,
-                        color    = if (isSent) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium)
+                        text = message.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = textColor,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
                     )
                 }
             }
 
             // Pre-computed time from MessageUiModel — no formatting in the composable
             Text(
-                text     = message.formattedTime,
-                style    = MaterialTheme.typography.labelSmall,
-                color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = message.formattedTime,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = 2.dp)
             )
         }
     }
-}
-
-private fun bubbleShape(isSent: Boolean) = if (isSent) {
-    RoundedCornerShape(
-        topStart = 18.dp, topEnd = 18.dp,
-        bottomStart = 18.dp, bottomEnd = 4.dp   // "tail" on sent side
-    )
-} else {
-    RoundedCornerShape(
-        topStart = 18.dp, topEnd = 18.dp,
-        bottomStart = 4.dp, bottomEnd = 18.dp   // "tail" on received side
-    )
 }
 
 private fun Modifier.clickableIf(enabled: Boolean, onClick: () -> Unit): Modifier =
@@ -437,13 +572,13 @@ private fun InputBar(
  */
 private fun formatDateHeader(dateKey: String): String {
     return try {
-        val sdf    = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val date   = sdf.parse(dateKey) ?: return dateKey
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val date = sdf.parse(dateKey) ?: return dateKey
         val millis = date.time
         when {
-            isToday(millis)     -> "Today"
+            isToday(millis) -> "Today"
             isYesterday(millis) -> "Yesterday"
-            else                -> SimpleDateFormat("EEEE, d MMM", Locale.getDefault()).format(date)
+            else -> SimpleDateFormat("EEEE, d MMM", Locale.getDefault()).format(date)
         }
     } catch (e: Exception) {
         dateKey
@@ -454,10 +589,17 @@ private fun isToday(timestamp: Long): Boolean {
     val now = java.util.Calendar.getInstance()
     val cal = java.util.Calendar.getInstance().apply { time = Date(timestamp) }
     return now.get(java.util.Calendar.DATE) == cal.get(java.util.Calendar.DATE)
+            && now.get(java.util.Calendar.MONTH) == cal.get(java.util.Calendar.MONTH)
+            && now.get(java.util.Calendar.YEAR) == cal.get(java.util.Calendar.YEAR)
 }
 
 private fun isYesterday(timestamp: Long): Boolean {
     val now = java.util.Calendar.getInstance()
+    val yesterday = java.util.Calendar.getInstance().apply {
+        add(java.util.Calendar.DATE, -1)
+    }
     val cal = java.util.Calendar.getInstance().apply { time = Date(timestamp) }
-    return now.get(java.util.Calendar.DATE) - cal.get(java.util.Calendar.DATE) == 1
+    return yesterday.get(java.util.Calendar.DATE) == cal.get(java.util.Calendar.DATE)
+            && yesterday.get(java.util.Calendar.MONTH) == cal.get(java.util.Calendar.MONTH)
+            && yesterday.get(java.util.Calendar.YEAR) == cal.get(java.util.Calendar.YEAR)
 }

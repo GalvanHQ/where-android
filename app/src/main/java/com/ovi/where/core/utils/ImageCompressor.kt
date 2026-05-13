@@ -7,7 +7,6 @@ import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
 import android.util.Log
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import javax.inject.Inject
@@ -120,7 +119,6 @@ class ImageCompressor @Inject constructor() {
             }
             bitmap.recycle()
 
-            Log.d(TAG, "Compressed image: ${finalWidth}x${finalHeight}, size: ${compressedFile.length()} bytes")
             CompressionResult.Success(compressedFile, finalWidth, finalHeight)
         } catch (e: Exception) {
             bitmap.recycle()

@@ -21,8 +21,8 @@ service cloud.firestore {
       allow write: if isSelf(userId);
 
       // ── Friends subcollection (denormalized summary) ──
-      // Phase 0 permissive: owner OR admin can write (dual-write period).
-      // Phase 3 cutover will restrict write to admin-only.
+      // Development: owner OR admin can write.
+      // Switch to admin-only when Cloud Functions handle all friendship writes.
       match /friends/{friendUid} {
         allow read: if isSelf(userId);
         allow write: if isSelf(userId) || isAdmin();
@@ -48,6 +48,33 @@ service cloud.firestore {
       match /blocks/{blockedUid} {
         allow read, write: if isSelf(userId);
       }
+    }
+
+    // ===== FRIENDSHIPS =====
+    match /friendships/{friendshipId} {
+      // Read: pair members (supports both new `members` array and legacy requesterId/receiverId)
+      allow read: if isAuthenticated()
+        && (request.auth.uid in resource.data.members
+            || request.auth.uid == resource.data.requesterId
+            || request.auth.uid == resource.data.receiverId);
+
+      // Create: requester or admin
+      allow create: if isAuthenticated()
+        && (request.auth.uid == request.resource.data.requesterId || isAdmin());
+
+      // Update: involved parties or admin
+      allow update: if isAuthenticated()
+        && (request.auth.uid in resource.data.members
+            || request.auth.uid == resource.data.requesterId
+            || request.auth.uid == resource.data.receiverId
+            || isAdmin());
+
+      // Delete: involved parties or admin
+      allow delete: if isAuthenticated()
+        && (request.auth.uid in resource.data.members
+            || request.auth.uid == resource.data.requesterId
+            || request.auth.uid == resource.data.receiverId
+            || isAdmin());
     }
 
     // ===== GROUPS =====
@@ -93,37 +120,6 @@ service cloud.firestore {
           && request.auth.uid in get(/databases/$(database)/documents/directLocationShares/$(shareId)).data.participantIds;
         allow write: if isAuthenticated() && request.auth.uid == userId;
       }
-    }
-
-    // ===== CANONICAL FRIENDSHIP PAIR DOCS =====
-    // Legacy friendshipId-based docs still live here during migration.
-    // New pairId-based docs also live here.
-    // Phase 0 permissive: involved parties can still read/write (legacy compat).
-    // Phase 3 cutover will restrict writes to admin-only.
-    match /friendships/{friendshipId} {
-      // Read: pair members (new model uses `members` array; legacy uses requesterId/receiverId)
-      allow read: if isAuthenticated()
-        && (request.auth.uid in resource.data.members
-            || request.auth.uid == resource.data.requesterId
-            || request.auth.uid == resource.data.receiverId);
-
-      // Create: requester or admin
-      allow create: if isAuthenticated()
-        && (request.auth.uid == request.resource.data.requesterId || isAdmin());
-
-      // Update: involved parties or admin
-      allow update: if isAuthenticated()
-        && (request.auth.uid in resource.data.members
-            || request.auth.uid == resource.data.requesterId
-            || request.auth.uid == resource.data.receiverId
-            || isAdmin());
-
-      // Delete: involved parties or admin
-      allow delete: if isAuthenticated()
-        && (request.auth.uid in resource.data.members
-            || request.auth.uid == resource.data.requesterId
-            || request.auth.uid == resource.data.receiverId
-            || isAdmin());
     }
 
     // ===== CONSOLIDATED ACTIVE LOCATIONS =====

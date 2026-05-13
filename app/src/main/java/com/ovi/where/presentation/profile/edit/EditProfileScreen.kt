@@ -144,11 +144,11 @@ fun EditProfileScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = Dimens.spaceXLarge)
+                .padding(horizontal = Dimens.spaceLarge)
                 .alpha(contentAlpha.value),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
+            Spacer(modifier = Modifier.height(Dimens.spaceLarge))
 
             // ── Avatar with gradient ring + camera badge ─────────────────
             Box(contentAlignment = Alignment.BottomEnd) {

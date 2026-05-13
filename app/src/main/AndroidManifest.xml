@@ -14,7 +14,7 @@
 
     <application
         android:name=".WhereApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/data_backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -29,7 +29,7 @@
             android:exported="true"
             android:label="@string/app_name"
             android:launchMode="singleTop"
-            android:theme="@style/Theme.Where">
+            android:theme="@style/Theme.Where.Splash">
 
             <!-- Launcher intent -->
             <intent-filter>
@@ -38,15 +38,47 @@
             </intent-filter>
 
             <!--
-                Deep-link intent filter for notification taps.
+                Deep-link intent filter for notification taps and external links.
                 Scheme: where://
-                Examples:
-                  where://chat/CONV_ID          → open ChatScreen
-                  where://friend_requests       → open FriendRequestsScreen
-                  where://user_profile/USER_ID  → open UserProfileScreen
-                  where://group_map/GROUP_ID    → open GroupMapScreen
-                  where://group_details/GROUP_ID→ open GroupDetailsScreen
+                Registered routes:
+                  where://chat/{id}             → ChatScreen
+                  where://user_profile/{id}     → UserProfileScreen
+                  where://group_details/{id}    → GroupDetailsScreen
+                  where://group_map/{id}        → GroupMapScreen
+                  where://friend_requests       → FriendRequestsScreen
+                Unrecognized paths are silently discarded in navigateToDeepLink().
             -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="where" android:host="chat" android:pathPattern="/.*" />
+            </intent-filter>
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="where" android:host="user_profile" android:pathPattern="/.*" />
+            </intent-filter>
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="where" android:host="group_details" android:pathPattern="/.*" />
+            </intent-filter>
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="where" android:host="group_map" android:pathPattern="/.*" />
+            </intent-filter>
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="where" android:host="friend_requests" />
+            </intent-filter>
+            <!-- Catch-all for unrecognized where:// URIs — handled gracefully in code -->
             <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -58,7 +90,7 @@
 
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyDJbR4z0SfSEBqMcCgFTXz2zW2OGFQGUPI" />
+            android:value="${MAPS_API_KEY}" />
 
         <service
             android:name=".service.LocationTrackingService"
@@ -74,6 +106,23 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- App Startup: Initializers for Firebase, Timber, and Coil -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="com.ovi.where.startup.FirebaseInitializer"
+                android:value="androidx.startup" />
+            <meta-data
+                android:name="com.ovi.where.startup.TimberInitializer"
+                android:value="androidx.startup" />
+            <meta-data
+                android:name="com.ovi.where.startup.CoilInitializer"
+                android:value="androidx.startup" />
+        </provider>
 
     </application>
 

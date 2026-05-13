@@ -104,7 +104,7 @@ fun CompleteProfileScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
                 .imePadding()
-                .padding(horizontal = Dimens.spaceXLarge)
+                .padding(horizontal = Dimens.spaceLarge)
                 .alpha(contentAlpha.value),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center

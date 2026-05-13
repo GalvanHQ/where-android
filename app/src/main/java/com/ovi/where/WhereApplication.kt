@@ -23,7 +23,9 @@ class WhereApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        if (BuildConfig.DEBUG) {
+        // Timber, Firebase, and Coil are initialized via App Startup (InitializationProvider).
+        // This fallback ensures Timber is available if App Startup hasn't run yet.
+        if (Timber.treeCount == 0 && BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
         // Fetch and save FCM token on app start
@@ -71,7 +73,7 @@ class WhereApplication : Application() {
                         .document(uid)
                         .update("fcmToken", token)
                         .await()
-                    Timber.d("FCM token saved on app start")
+                    // FCM token saved successfully
                 }
             } catch (e: Exception) {
                 Timber.w(e, "Failed to fetch/save FCM token")

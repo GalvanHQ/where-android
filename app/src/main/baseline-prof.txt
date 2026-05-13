@@ -1,0 +1,55 @@
+# Baseline Profile Rules for Where App
+# These rules define classes and methods to be pre-compiled at install time
+# for improved app startup and key user journey performance.
+
+# ── App Startup ──────────────────────────────────────────────────────────────
+HSPLcom/ovi/where/WhereApplication;->onCreate()V
+HSPLcom/ovi/where/WhereApplication;->newImageLoader()Lcoil/ImageLoader;
+HSPLcom/ovi/where/presentation/navigation/AppNavGraphKt;->**(**)**
+HSPLcom/ovi/where/presentation/navigation/MainScaffoldKt;->**(**)**
+
+# ── Navigation / Screen sealed class ─────────────────────────────────────────
+HSPLcom/ovi/where/presentation/navigation/Screen;->**(**)**
+HSPLcom/ovi/where/presentation/navigation/Screen$*;->**(**)**
+
+# ── Map Screen (key journey) ─────────────────────────────────────────────────
+HSPLcom/ovi/where/presentation/map/GlobalMapScreenKt;->**(**)**
+HSPLcom/ovi/where/presentation/map/GlobalMapViewModel;->**(**)**
+HSPLcom/ovi/where/presentation/map/MapScreenKt;->**(**)**
+HSPLcom/ovi/where/presentation/map/MapViewModel;->**(**)**
+HSPLcom/ovi/where/presentation/map/MapUtilsKt;->**(**)**
+
+# ── Chats Screen (key journey) ───────────────────────────────────────────────
+HSPLcom/ovi/where/presentation/chat/ChatsScreenKt;->**(**)**
+HSPLcom/ovi/where/presentation/chat/ChatsViewModel;->**(**)**
+HSPLcom/ovi/where/presentation/chat/ChatScreenKt;->**(**)**
+HSPLcom/ovi/where/presentation/chat/ChatViewModel;->**(**)**
+
+# ── People Screen (key journey) ──────────────────────────────────────────────
+HSPLcom/ovi/where/presentation/people/PeopleScreenKt;->**(**)**
+HSPLcom/ovi/where/presentation/people/PeopleViewModel;->**(**)**
+HSPLcom/ovi/where/presentation/people/FriendRequestsScreenKt;->**(**)**
+HSPLcom/ovi/where/presentation/people/FriendRequestsViewModel;->**(**)**
+
+# ── Core Theme (used on every screen) ────────────────────────────────────────
+HSPLcom/ovi/where/core/theme/ThemeKt;->**(**)**
+HSPLcom/ovi/where/core/theme/ColorKt;->**(**)**
+HSPLcom/ovi/where/core/theme/TypeKt;->**(**)**
+
+# ── Common Components (used across screens) ──────────────────────────────────
+HSPLcom/ovi/where/presentation/common/**;->**(**)**
+
+# ── DI / Hilt ────────────────────────────────────────────────────────────────
+HSPLcom/ovi/where/di/AppModule;->**(**)**
+HSPLcom/ovi/where/di/NetworkModule;->**(**)**
+HSPLcom/ovi/where/di/RepositoryModule;->**(**)**
+
+# ── Data Layer (repositories used during startup) ────────────────────────────
+HSPLcom/ovi/where/data/repository/**;->**(**)**
+HSPLcom/ovi/where/data/network/NetworkConnectivityObserver;->**(**)**
+
+# ── Coil Image Loading ───────────────────────────────────────────────────────
+HSPLcoil/compose/**;->**(**)**
+HSPLcoil/memory/**;->**(**)**
+HSPLcoil/disk/**;->**(**)**
+HSPLcoil/**;->**(**)**

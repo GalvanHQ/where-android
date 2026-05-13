@@ -11,7 +11,8 @@ import javax.inject.Singleton
  *   data model (users/{uid}/friends, inbox, outbox, summary). When false, it
  *   falls back to the legacy `friendships/{uuid}` collection.
  *
- * Default: `false` (legacy model). Flipped to `true` during the staged rollout.
+ * Default: `true` (new model). No legacy users exist, so the new model is active
+ * from the start. The flag remains available for emergency rollback if needed.
  * Min fetch interval: 30 min in release, 0 s in debug (for testing).
  */
 @Singleton

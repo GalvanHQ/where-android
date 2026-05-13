@@ -4,6 +4,7 @@ import com.ovi.where.core.common.Resource
 import com.ovi.where.domain.model.Group
 import com.ovi.where.domain.model.GroupMember
 import kotlinx.coroutines.flow.Flow
+import com.ovi.where.core.common.DataResource
 
 interface GroupRepository {
     suspend fun createGroup(name: String, description: String, avatarUrl: String? = null): Resource<Group>
@@ -18,4 +19,16 @@ interface GroupRepository {
     suspend fun addMember(groupId: String, userId: String): Resource<Unit>
     suspend fun removeMember(groupId: String, userId: String): Resource<Unit>
     suspend fun updateMemberRole(groupId: String, userId: String, role: com.ovi.where.domain.model.MemberRole): Resource<Unit>
+
+    /**
+     * Returns group members using the NetworkBoundResource pattern:
+     * 1. Serves cached members immediately (Loading state)
+     * 2. Checks staleness via CacheStalenessChecker
+     * 3. Fetches from Firestore if stale
+     * 4. Saves to local cache on success (Success state)
+     * 5. Serves stale cache on failure (Error state with cached data)
+     *
+     * Requirements: 11.1, 11.2, 11.3, 11.6
+     */
+    fun getGroupMembersResource(groupId: String): Flow<DataResource<List<GroupMember>>>
 }

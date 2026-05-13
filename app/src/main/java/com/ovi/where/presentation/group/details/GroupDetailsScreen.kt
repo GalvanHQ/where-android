@@ -47,6 +47,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -57,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -114,6 +116,9 @@ fun GroupDetailsScreen(
     val shareTitle = stringResource(R.string.action_share_invite_code)
     val shareMessage = stringResource(R.string.msg_share_group_invite, uiState.groupName, uiState.inviteCode)
     val inviteCodeCopied = stringResource(R.string.toast_invite_code_copied)
+
+    // Scroll behavior for collapsing top app bar (Requirement 5.1)
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
     // ── Confirmation Dialogs ────────────────────────────────────────────────────
 
@@ -192,10 +197,12 @@ fun GroupDetailsScreen(
     // ── Screen Content ──────────────────────────────────────────────────────────
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             WhereTopAppBar(
                 title = uiState.group?.name ?: stringResource(R.string.title_group_details),
                 onNavigateBack = onNavigateBack,
+                scrollBehavior = scrollBehavior,
                 actions = {
                     IconButton(onClick = onNavigateToMap) {
                         Icon(Icons.Default.Map, contentDescription = stringResource(R.string.cd_view_map))

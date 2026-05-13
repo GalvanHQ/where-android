@@ -13,6 +13,12 @@ import com.ovi.where.R
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.common.UiEvent
 import com.ovi.where.core.common.UiText
+import com.ovi.where.core.constants.AppConstants.DISTANCE_KM_THRESHOLD_METERS
+import com.ovi.where.core.constants.AppConstants.MILLIS_PER_DAY
+import com.ovi.where.core.constants.AppConstants.MILLIS_PER_HOUR
+import com.ovi.where.core.constants.AppConstants.MILLIS_PER_MINUTE
+import com.ovi.where.core.constants.AppConstants.TIME_AGO_REFRESH_INTERVAL_MS
+import com.ovi.where.core.constants.AppConstants.USER_FETCH_DEBOUNCE_MS
 import com.ovi.where.data.local.prefs.UserPreferences
 import com.ovi.where.data.location.LocationManager
 import com.ovi.where.domain.model.SharedLocation
@@ -304,7 +310,7 @@ class GlobalMapViewModel @Inject constructor(
         synchronized(pendingUserFetchIds) { pendingUserFetchIds.addAll(ids) }
         userFetchJob?.cancel()
         userFetchJob = viewModelScope.launch {
-            delay(200)
+            delay(USER_FETCH_DEBOUNCE_MS)
             val toFetch: List<String>
             synchronized(pendingUserFetchIds) {
                 toFetch = pendingUserFetchIds.toList()
@@ -332,7 +338,7 @@ class GlobalMapViewModel @Inject constructor(
         timeAgoRefreshJob?.cancel()
         timeAgoRefreshJob = viewModelScope.launch {
             while (true) {
-                delay(30_000)
+                delay(TIME_AGO_REFRESH_INTERVAL_MS)
                 val current = _uiState.value
                 if (current.friendLocations.isNotEmpty()) {
                     _uiState.value = current.copy(
@@ -477,8 +483,8 @@ class GlobalMapViewModel @Inject constructor(
     fun formatDistance(meters: Float?): String {
         if (meters == null) return ""
         return when {
-            meters < 1000 -> "${meters.toInt()}m away"
-            else -> String.format("%.1fkm away", meters / 1000)
+            meters < DISTANCE_KM_THRESHOLD_METERS.toFloat() -> "${meters.toInt()}m away"
+            else -> String.format("%.1fkm away", meters / DISTANCE_KM_THRESHOLD_METERS.toFloat())
         }
     }
 
@@ -497,10 +503,10 @@ class GlobalMapViewModel @Inject constructor(
         val ctx = getApplication<Application>()
         val diff = System.currentTimeMillis() - timestamp
         return when {
-            diff < 60_000     -> ctx.getString(R.string.time_just_now)
-            diff < 3_600_000  -> ctx.getString(R.string.time_minutes_ago, diff / 60_000)
-            diff < 86_400_000 -> ctx.getString(R.string.time_hours_ago, diff / 3_600_000)
-            else              -> ctx.getString(R.string.time_days_ago, diff / 86_400_000)
+            diff < MILLIS_PER_MINUTE  -> ctx.getString(R.string.time_just_now)
+            diff < MILLIS_PER_HOUR    -> ctx.getString(R.string.time_minutes_ago, diff / MILLIS_PER_MINUTE)
+            diff < MILLIS_PER_DAY     -> ctx.getString(R.string.time_hours_ago, diff / MILLIS_PER_HOUR)
+            else                      -> ctx.getString(R.string.time_days_ago, diff / MILLIS_PER_DAY)
         }
     }
 

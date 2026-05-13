@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -80,13 +81,13 @@ class ChatSocketIoClient @Inject constructor() {
             socket = IO.socket(ChatApiClient.WS_BASE_URL, options)
 
             socket?.on(Socket.EVENT_CONNECT) {
-                Log.d(TAG, "Socket.IO connected")
+                Timber.i("Socket.IO connected")
                 _connectionState.value = ConnectionState.CONNECTED
                 resetReconnectionState()
             }
 
             socket?.on(Socket.EVENT_DISCONNECT) {
-                Log.d(TAG, "Socket.IO disconnected")
+                Timber.i("Socket.IO disconnected")
                 _connectionState.value = ConnectionState.DISCONNECTED
                 if (!isManualDisconnect) {
                     startReconnection()
@@ -281,7 +282,7 @@ class ChatSocketIoClient @Inject constructor() {
         reconnectionJob = scope.launch {
             while (reconnectAttempt < MAX_RECONNECT_ATTEMPTS) {
                 val delayMs = calculateBackoffDelay(reconnectAttempt)
-                Log.d(TAG, "Reconnection attempt ${reconnectAttempt + 1}/$MAX_RECONNECT_ATTEMPTS in ${delayMs}ms")
+                Timber.i("Reconnection attempt ${reconnectAttempt + 1}/$MAX_RECONNECT_ATTEMPTS in ${delayMs}ms")
 
                 delay(delayMs)
 
@@ -323,7 +324,7 @@ class ChatSocketIoClient @Inject constructor() {
             socket = IO.socket(ChatApiClient.WS_BASE_URL, options)
 
             socket?.on(Socket.EVENT_CONNECT) {
-                Log.d(TAG, "Socket.IO reconnected")
+                Timber.i("Socket.IO reconnected")
                 _connectionState.value = ConnectionState.CONNECTED
                 resetReconnectionState()
                 reconnectionJob?.cancel()
@@ -331,7 +332,7 @@ class ChatSocketIoClient @Inject constructor() {
             }
 
             socket?.on(Socket.EVENT_DISCONNECT) {
-                Log.d(TAG, "Socket.IO disconnected during reconnection")
+                Timber.w("Socket.IO disconnected during reconnection")
                 _connectionState.value = ConnectionState.DISCONNECTED
             }
 

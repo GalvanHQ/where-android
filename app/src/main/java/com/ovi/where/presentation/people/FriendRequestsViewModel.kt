@@ -85,6 +85,15 @@ class FriendRequestsViewModel @Inject constructor(
     }
 
     /**
+     * Triggers a refresh of the friend requests data.
+     * Called from pull-to-refresh gesture.
+     */
+    fun refresh() {
+        _uiState.value = _uiState.value.copy(isLoading = true)
+        observeRequests()
+    }
+
+    /**
      * Optimistically accepts an incoming friend request.
      * Removes the row immediately, calls the use case, and emits a snackbar with undo.
      * On failure: reverts the removal and emits an error snackbar.

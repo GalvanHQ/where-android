@@ -3,7 +3,6 @@ package com.ovi.where.presentation.people
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.functions.FirebaseFunctionsException
 import com.ovi.where.core.common.Resource
 import com.ovi.where.domain.repository.FriendshipRepository
 import com.ovi.where.domain.repository.UserRepository

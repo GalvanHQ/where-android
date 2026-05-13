@@ -11,7 +11,6 @@ import com.ovi.where.data.remote.chat.ChatSocketIoClient
 import com.ovi.where.data.remote.chat.ServerFrame
 import com.ovi.where.data.repository.MessageRepositoryImpl
 import com.ovi.where.domain.model.Message
-import com.ovi.where.domain.model.MessageStatus
 import com.ovi.where.domain.model.FriendshipStatus
 import com.ovi.where.domain.repository.FriendshipRepository
 import com.ovi.where.domain.usecase.chat.MarkConversationReadUseCase

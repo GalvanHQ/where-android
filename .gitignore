@@ -2,6 +2,10 @@
 .gradle/
 build/
 
+# Build log artifacts
+*_output.txt
+*_output*.txt
+
 # Local configuration file (sdk path, etc)
 local.properties
 

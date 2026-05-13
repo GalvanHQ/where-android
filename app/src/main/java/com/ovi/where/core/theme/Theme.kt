@@ -8,89 +8,92 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+import com.ovi.where.core.utils.LocalReducedMotion
+import com.ovi.where.core.utils.rememberReducedMotion
 
 // ── Light colour scheme ───────────────────────────────────────────────────────
 private val LightColorScheme = lightColorScheme(
-    primary                = Pink40,
+    primary                = Primary40,
     onPrimary              = Color.White,
-    primaryContainer       = Pink90,
-    onPrimaryContainer     = Pink10,
+    primaryContainer       = Primary90,
+    onPrimaryContainer     = Primary10,
 
-    secondary              = Green40,
+    secondary              = Secondary40,
     onSecondary            = Color.White,
-    secondaryContainer     = Green90,
-    onSecondaryContainer   = Green10,
+    secondaryContainer     = Secondary90,
+    onSecondaryContainer   = Secondary10,
 
-    tertiary               = Purple40,
+    tertiary               = Tertiary40,
     onTertiary             = Color.White,
-    tertiaryContainer      = Purple90,
-    onTertiaryContainer    = Purple10,
+    tertiaryContainer      = Tertiary90,
+    onTertiaryContainer    = Tertiary10,
 
-    error                  = Red40,
+    error                  = Error40,
     onError                = Color.White,
-    errorContainer         = Red90,
-    onErrorContainer       = Red10,
+    errorContainer         = Error90,
+    onErrorContainer       = Error10,
 
     background             = Neutral99,
-    onBackground           = Neutral6,
+    onBackground           = Neutral10,
 
     surface                = Neutral99,
-    onSurface              = Neutral6,
+    onSurface              = Neutral10,
     surfaceVariant         = NeutralVar90,
     onSurfaceVariant       = NeutralVar30,
 
-    outline                = NeutralVar50,
+    outline                = NeutralVar40,
     outlineVariant         = NeutralVar80,
 
-    inverseSurface         = Neutral22,
+    inverseSurface         = Neutral20,
     inverseOnSurface       = Neutral94,
-    inversePrimary         = Pink80,
+    inversePrimary         = Primary80,
 
     scrim                  = Color.Black,
 )
 
 // ── Dark colour scheme ────────────────────────────────────────────────────────
 private val DarkColorScheme = darkColorScheme(
-    primary                = Pink80,
-    onPrimary              = Pink20,
-    primaryContainer       = Pink30,
-    onPrimaryContainer     = Pink90,
+    primary                = Primary80,
+    onPrimary              = Primary20,
+    primaryContainer       = Primary30,
+    onPrimaryContainer     = Primary90,
 
-    secondary              = Green80,
-    onSecondary            = Green20,
-    secondaryContainer     = Green30,
-    onSecondaryContainer   = Green90,
+    secondary              = Secondary80,
+    onSecondary            = Secondary20,
+    secondaryContainer     = Secondary30,
+    onSecondaryContainer   = Secondary90,
 
-    tertiary               = Purple80,
-    onTertiary             = Purple20,
-    tertiaryContainer      = Purple30,
-    onTertiaryContainer    = Purple90,
+    tertiary               = Tertiary80,
+    onTertiary             = Tertiary20,
+    tertiaryContainer      = Tertiary30,
+    onTertiaryContainer    = Tertiary90,
 
-    error                  = Red80,
-    onError                = Red10,
-    errorContainer         = Red40,
-    onErrorContainer       = Red90,
+    error                  = Error80,
+    onError                = Error10,
+    errorContainer         = Error40,
+    onErrorContainer       = Error90,
 
-    background             = Neutral6,
-    onBackground           = Neutral94,
+    background             = Neutral10,
+    onBackground           = Neutral90,
 
-    surface                = Neutral6,
-    onSurface              = Neutral94,
+    surface                = Neutral10,
+    onSurface              = Neutral90,
     surfaceVariant         = NeutralVar30,
     onSurfaceVariant       = NeutralVar80,
 
-    outline                = NeutralVar60,
+    outline                = NeutralVar80,
     outlineVariant         = NeutralVar30,
 
-    inverseSurface         = Neutral94,
-    inverseOnSurface       = Neutral17,
-    inversePrimary         = Pink40,
+    inverseSurface         = Neutral90,
+    inverseOnSurface       = Neutral20,
+    inversePrimary         = Primary40,
 
     scrim                  = Color.Black,
 )
@@ -111,6 +114,7 @@ fun WhereTheme(
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val reducedMotion = rememberReducedMotion()
 
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -127,10 +131,12 @@ fun WhereTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography  = Typography,
-        shapes      = WhereShapes,
-        content     = content
-    )
+    CompositionLocalProvider(LocalReducedMotion provides reducedMotion) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography  = Typography,
+            shapes      = WhereShapes,
+            content     = content
+        )
+    }
 }

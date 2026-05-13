@@ -6,25 +6,19 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -168,76 +162,64 @@ private fun WhereBottomBar(
     profilePhotoUrl: String?,
     onTabClick: (BottomTab) -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+    NavigationBar(
+        containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 3.dp
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .height(60.dp)
-                .padding(horizontal = 18.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            bottomTabs.forEach { tab ->
-                val selected = currentRoute == tab.route
-                val containerColor =
-                    if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-                val contentColor =
-                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                Surface(
-                    onClick = { onTabClick(tab) },
-                    modifier = Modifier.size(width = 72.dp, height = 44.dp),
-                    shape = MaterialTheme.shapes.extraLarge,
-                    color = containerColor,
-                    contentColor = contentColor
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (tab == BottomTab.Profile && !profilePhotoUrl.isNullOrEmpty()) {
-                            val selectedBorderModifier =
-                                if (selected) {
-                                    Modifier.border(
-                                        width = 2.dp,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        shape = CircleShape
-                                    )
-                                } else {
-                                    Modifier
-                                }
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(profilePhotoUrl)
-                                    .crossfade(true)
-                                    .memoryCacheKey(profilePhotoUrl)
-                                    .diskCacheKey(profilePhotoUrl)
-                                    .memoryCachePolicy(CachePolicy.ENABLED)
-                                    .diskCachePolicy(CachePolicy.ENABLED)
-                                    .size(128)
-                                    .build(),
-                                contentDescription = tab.label,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                                    .then(selectedBorderModifier)
-                            )
-                        } else {
-                            val iconResId =
-                                if (selected) tab.selectedIconResId else tab.unselectedIconResId
-                            Icon(
-                                painter = painterResource(id = iconResId),
-                                contentDescription = tab.label,
-                                modifier = Modifier.size(25.dp)
-                            )
-                        }
+        bottomTabs.forEach { tab ->
+            val selected = currentRoute == tab.route
+            NavigationBarItem(
+                selected = selected,
+                onClick = { onTabClick(tab) },
+                icon = {
+                    if (tab == BottomTab.Profile && !profilePhotoUrl.isNullOrEmpty()) {
+                        val selectedBorderModifier =
+                            if (selected) {
+                                Modifier.border(
+                                    width = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = CircleShape
+                                )
+                            } else {
+                                Modifier
+                            }
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(profilePhotoUrl)
+                                .crossfade(true)
+                                .memoryCacheKey(profilePhotoUrl)
+                                .diskCacheKey(profilePhotoUrl)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .diskCachePolicy(CachePolicy.ENABLED)
+                                .size(128)
+                                .build(),
+                            contentDescription = tab.label,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .then(selectedBorderModifier)
+                        )
+                    } else {
+                        val iconResId =
+                            if (selected) tab.selectedIconResId else tab.unselectedIconResId
+                        Icon(
+                            painter = painterResource(id = iconResId),
+                            contentDescription = tab.label,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
-                }
-            }
+                },
+                label = { Text(text = tab.label) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            )
         }
     }
 }

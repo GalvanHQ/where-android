@@ -20,8 +20,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -32,7 +30,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,7 +38,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.InputChipDefaults
 import androidx.compose.material3.ListItem
@@ -67,7 +63,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.ovi.where.R
@@ -160,7 +155,7 @@ fun CreateGroupScreen(
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .imePadding()
-                        .padding(Dimens.spaceXLarge),
+                        .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceLarge),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // ── Avatar Picker ────────────────────────────────────────
@@ -441,7 +436,7 @@ private fun InviteCodeDisplay(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(Dimens.spaceXLarge),
+            .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceLarge),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {

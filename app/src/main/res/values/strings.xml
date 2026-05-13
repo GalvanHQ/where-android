@@ -153,6 +153,9 @@
     <string name="settings_app_section">App</string>
     <string name="settings_account_section">Account</string>
 
+    <!-- Connectivity -->
+    <string name="banner_offline">You are offline</string>
+
     <!-- Status Text -->
     <string name="status_sharing">Sharing</string>
     <string name="status_not_sharing">Not Sharing</string>

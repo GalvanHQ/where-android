@@ -12,9 +12,6 @@ import com.ovi.where.domain.repository.AuthRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -29,9 +26,6 @@ constructor(
         private val firestore: FirebaseFirestore,
         @ApplicationContext private val context: Context
 ) : AuthRepository {
-
-    /** Background scope for non-critical Firestore writes (profile creation, token save). */
-    private val bgScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override val currentUserId: String?
         get() = firebaseAuth.currentUser?.uid

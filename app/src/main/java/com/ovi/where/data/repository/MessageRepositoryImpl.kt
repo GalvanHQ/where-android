@@ -7,6 +7,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.storage.FirebaseStorage
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.utils.ImageCompressor
+import com.ovi.where.data.local.CacheStalenessChecker
 import com.ovi.where.data.local.dao.MessageDao
 import com.ovi.where.data.local.entity.MessageEntity
 import com.ovi.where.data.local.entity.toDomain
@@ -15,6 +16,7 @@ import com.ovi.where.data.remote.chat.ChatApiClient
 import com.ovi.where.data.remote.chat.ChatSocketIoClient
 import com.ovi.where.data.remote.chat.MessageDto
 import com.ovi.where.data.remote.chat.ServerFrame
+import com.ovi.where.data.util.networkBoundResource
 import com.ovi.where.domain.model.Message
 import com.ovi.where.domain.model.MessagePage
 import com.ovi.where.domain.model.MessageStatus
@@ -40,6 +42,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import javax.inject.Inject
 import javax.inject.Singleton
+import timber.log.Timber
+import com.ovi.where.data.util.Resource as DataResource
 
 private const val TAG = "MessageRepositoryImpl"
 
@@ -60,6 +64,7 @@ class MessageRepositoryImpl @Inject constructor(
     private val messageDao: MessageDao,
     private val firebaseStorage: FirebaseStorage,
     private val imageCompressor: ImageCompressor,
+    private val cacheStalenessChecker: CacheStalenessChecker,
     @ApplicationContext private val context: Context
 ) : MessageRepository {
 
@@ -1042,6 +1047,52 @@ class MessageRepositoryImpl @Inject constructor(
         return readBy.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
     }
 
+    // ─── NetworkBoundResource Pattern (Requirements 11.1, 11.2, 11.3, 11.6) ───
+
+    /**
+     * Returns messages for a conversation using the NetworkBoundResource pattern:
+     * 1. Query Room for cached messages
+     * 2. Check staleness via CacheStalenessChecker (5-minute threshold)
+     * 3. Fetch from network if stale
+     * 4. Save to Room on success
+     * 5. Serve stale cache on failure, retry after ≤60 seconds
+     *
+     * This method should only be called from ViewModel init blocks or explicit user actions,
+     * NOT from Compose recomposition (Requirement 11.1).
+     */
+    override fun getMessagesResource(conversationId: String): Flow<DataResource<List<Message>>> {
+        val cacheKey = "messages_$conversationId"
+        return networkBoundResource(
+            query = {
+                messageDao.observeByConversation(conversationId).map { entities ->
+                    entities.map { it.toDomain() }
+                }
+            },
+            fetch = {
+                val token = getIdToken()
+                ChatApiClient.apiService.getMessages("Bearer $token", conversationId)
+            },
+            saveFetchResult = { messageDtos ->
+                val entities = messageDtos.map { it.toDomainEntity(conversationId) }
+                if (entities.isNotEmpty()) {
+                    messageDao.upsertAll(entities)
+                }
+                cacheStalenessChecker.updateMetadata(cacheKey)
+            },
+            shouldFetch = { cachedData ->
+                cachedData.isNullOrEmpty() || cacheStalenessChecker.shouldFetch(cacheKey)
+            },
+            onFetchFailed = { throwable ->
+                Timber.w(throwable, "Failed to fetch messages for $conversationId, serving stale cache")
+                // Schedule retry after ≤60 seconds (Requirement 11.6)
+                scope.launch {
+                    delay(RETRY_DELAY_MS)
+                    cacheStalenessChecker.updateMetadata(cacheKey, currentTimeMs = 0L)
+                }
+            }
+        )
+    }
+
     companion object {
         /** Ack timeout: 10 seconds (Requirement 1.3) */
         const val ACK_TIMEOUT_MS = 10_000L
@@ -1066,6 +1117,9 @@ class MessageRepositoryImpl @Inject constructor(
 
         /** Delay before retrying missed messages fetch (Requirement 13.6) */
         const val MISSED_MESSAGES_RETRY_DELAY_MS = 2_000L
+
+        /** Maximum delay before retrying a failed fetch of stale data (Requirement 11.6) */
+        const val RETRY_DELAY_MS = 60_000L
     }
 }
 

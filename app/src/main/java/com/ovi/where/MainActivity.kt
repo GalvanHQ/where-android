@@ -2,32 +2,64 @@ package com.ovi.where
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.navigation.compose.rememberNavController
 import com.ovi.where.core.theme.WhereTheme
 import com.ovi.where.presentation.navigation.AppNavGraph
+import com.ovi.where.presentation.settings.AppearanceViewModel
+import com.ovi.where.presentation.settings.ThemeMode
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.map
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var dataStore: DataStore<Preferences>
 
     // Stores the deep-link route that should be opened after authentication.
     // Set when the Activity is launched/resumed via a notification tap.
     private var pendingDeepLinkRoute: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Install the splash screen before calling super.onCreate().
+        // The keep-on-screen condition ensures the splash is shown for at most 1000ms.
+        val splashStartTime = SystemClock.elapsedRealtime()
+        val splashScreen = installSplashScreen()
+        splashScreen.setKeepOnScreenCondition {
+            val elapsed = SystemClock.elapsedRealtime() - splashStartTime
+            elapsed < MAX_SPLASH_DURATION_MS
+        }
+
         super.onCreate(savedInstanceState)
         // Extract deep link from the launch intent (notification tap while app was closed)
         pendingDeepLinkRoute = extractDeepLinkRoute(intent)
         enableEdgeToEdge()
         setContent {
-            WhereTheme {
+            // Observe theme preference from DataStore to apply immediately without restart
+            val themeMode by dataStore.data
+                .map { preferences ->
+                    ThemeMode.fromKey(preferences[AppearanceViewModel.THEME_MODE_KEY])
+                }
+                .collectAsState(initial = ThemeMode.SYSTEM)
+
+            val darkTheme = when (themeMode) {
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            }
+
+            WhereTheme(darkTheme = darkTheme) {
                 val navController = rememberNavController()
                 // Pass the pending deep-link route to the nav graph.
                 // AppNavGraph resolves it after the auth/splash check.
@@ -56,7 +88,7 @@ class MainActivity : ComponentActivity() {
      *
      * Supports two delivery mechanisms:
      *  1. [EXTRA_DEEP_LINK_ROUTE] string extra set by [FcmMessagingService] — highest priority.
-     *  2. `where://` URI scheme carried in `Intent.data`.
+     *  2. `where://` URI scheme carried in `Intent.data` — parsed via [DeepLinkManager.parseWhereUri].
      */
     private fun extractDeepLinkRoute(intent: Intent?): String? {
         if (intent == null) return null
@@ -66,18 +98,14 @@ class MainActivity : ComponentActivity() {
         if (!extraRoute.isNullOrBlank()) return extraRoute
 
         // 2. URI scheme  e.g. where://chat/CONV_ID
-        val uri = intent.data
-        if (uri != null && uri.scheme == "where") {
-            // Strip the leading "//" host + path → "chat/CONV_ID"
-            val host = uri.host ?: return null
-            val path = uri.path?.removePrefix("/") ?: ""
-            return if (path.isBlank()) host else "$host/$path"
-        }
-        return null
+        return DeepLinkManager.parseWhereUri(intent.data)
     }
 
     companion object {
         /** Intent extra key used by FcmMessagingService to carry the target nav route. */
         const val EXTRA_DEEP_LINK_ROUTE = "extra_deep_link_route"
+
+        /** Maximum duration (ms) the splash screen stays visible before transitioning. */
+        private const val MAX_SPLASH_DURATION_MS = 1000L
     }
 }

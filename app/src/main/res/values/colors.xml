@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- App colours are defined in core/theme/Color.kt and managed entirely by MaterialTheme. -->
+
+    <!-- Splash screen background (matches the app surface/primary color) -->
+    <color name="splash_background">#FFFEFBFF</color>
 </resources>

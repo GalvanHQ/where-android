@@ -7,6 +7,9 @@ import com.ovi.where.R
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.common.UiEvent
 import com.ovi.where.core.common.UiText
+import com.ovi.where.core.constants.AppConstants.MILLIS_PER_DAY
+import com.ovi.where.core.constants.AppConstants.MILLIS_PER_HOUR
+import com.ovi.where.core.constants.AppConstants.MILLIS_PER_MINUTE
 import com.ovi.where.data.location.LocationManager
 import com.ovi.where.domain.repository.LocationRepository
 import com.ovi.where.domain.usecase.location.ObserveGroupLocationsUseCase
@@ -151,10 +154,10 @@ class MapViewModel @Inject constructor(
         val ctx = getApplication<Application>()
         val diff = System.currentTimeMillis() - timestamp
         return when {
-            diff < 60_000     -> ctx.getString(R.string.time_just_now)
-            diff < 3_600_000  -> ctx.getString(R.string.time_minutes_ago, diff / 60_000)
-            diff < 86_400_000 -> ctx.getString(R.string.time_hours_ago, diff / 3_600_000)
-            else              -> ctx.getString(R.string.time_days_ago, diff / 86_400_000)
+            diff < MILLIS_PER_MINUTE  -> ctx.getString(R.string.time_just_now)
+            diff < MILLIS_PER_HOUR    -> ctx.getString(R.string.time_minutes_ago, diff / MILLIS_PER_MINUTE)
+            diff < MILLIS_PER_DAY     -> ctx.getString(R.string.time_hours_ago, diff / MILLIS_PER_HOUR)
+            else                      -> ctx.getString(R.string.time_days_ago, diff / MILLIS_PER_DAY)
         }
     }
 }

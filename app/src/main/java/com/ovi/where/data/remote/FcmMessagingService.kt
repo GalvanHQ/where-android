@@ -5,11 +5,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import androidx.core.app.Person
-import androidx.core.app.NotificationManagerCompat
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -35,11 +32,14 @@ class FcmMessagingService : FirebaseMessagingService() {
     @Inject
     lateinit var authRepository: AuthRepository
 
+    @Inject
+    lateinit var notificationPreferencesRepository: com.ovi.where.data.repository.NotificationPreferencesRepository
+
     // ── Token refresh ─────────────────────────────────────────────────────────
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        Timber.d("FCM Token refreshed")
+        Timber.i("FCM Token refreshed")
         saveTokenToFirestore(token)
     }
 
@@ -52,7 +52,7 @@ class FcmMessagingService : FirebaseMessagingService() {
                     .document(userId)
                     .update("fcmToken", token)
                     .await()
-                Timber.d("FCM token saved for user $userId")
+                Timber.i("FCM token saved for user $userId")
             } catch (e: Exception) {
                 Timber.e(e, "Failed to save FCM token")
             }
@@ -63,7 +63,7 @@ class FcmMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
-        Timber.d("FCM message received: type=${message.data["type"]}")
+        Timber.i("FCM message received: type=${message.data["type"]}")
 
         val data  = message.data
         val type  = data["type"] ?: return
@@ -74,14 +74,41 @@ class FcmMessagingService : FirebaseMessagingService() {
             getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         createAllChannels(notificationManager)
 
-        when (type) {
-            TYPE_NEW_MESSAGE      -> handleNewMessage(data, notificationManager)
-            TYPE_FRIEND_REQUEST   -> handleFriendRequest(data, title, body, notificationManager)
-            TYPE_FRIEND_ACCEPTED  -> handleFriendAccepted(data, title, body, notificationManager)
-            TYPE_LOCATION_UPDATE  -> handleLocationUpdate(data, title, body, notificationManager)
-            TYPE_MEMBER_JOINED    -> handleGroupActivity(data, title, body, notificationManager)
-            TYPE_MEMBER_LEFT      -> handleGroupActivity(data, title, body, notificationManager)
-            else                  -> showSimpleNotification(title, body, null, CHANNEL_DEFAULT, notificationManager)
+        // Resolve the target channel for this message type.
+        // Unrecognized types are routed to the general channel (Requirement 12.7).
+        val channelId = resolveChannelForType(type)
+
+        // Check user preference for the target channel before posting (Requirement 12.6).
+        serviceScope.launch {
+            val isEnabled = notificationPreferencesRepository.isChannelEnabledSync(channelId)
+            if (!isEnabled) {
+                Timber.i("Channel '$channelId' disabled by user — suppressing FCM notification type=$type")
+                return@launch
+            }
+
+            when (type) {
+                TYPE_NEW_MESSAGE      -> handleNewMessage(data, notificationManager)
+                TYPE_FRIEND_REQUEST   -> handleFriendRequest(data, title, body, notificationManager)
+                TYPE_FRIEND_ACCEPTED  -> handleFriendAccepted(data, title, body, notificationManager)
+                TYPE_LOCATION_UPDATE  -> handleLocationUpdate(data, title, body, notificationManager)
+                TYPE_MEMBER_JOINED    -> handleGroupActivity(data, title, body, notificationManager)
+                TYPE_MEMBER_LEFT      -> handleGroupActivity(data, title, body, notificationManager)
+                else                  -> showSimpleNotification(title, body, null, CHANNEL_DEFAULT, notificationManager)
+            }
+        }
+    }
+
+    /**
+     * Resolves the appropriate notification channel for a given FCM message type.
+     * Unrecognized types are routed to the general channel (Requirement 12.7).
+     */
+    private fun resolveChannelForType(type: String?): String {
+        return when (type) {
+            TYPE_NEW_MESSAGE -> CHANNEL_MESSAGES
+            TYPE_FRIEND_REQUEST, TYPE_FRIEND_ACCEPTED -> CHANNEL_SOCIAL
+            TYPE_LOCATION_UPDATE -> CHANNEL_LOCATION_UPDATES
+            TYPE_MEMBER_JOINED, TYPE_MEMBER_LEFT -> CHANNEL_GROUP_ACTIVITY
+            else -> CHANNEL_DEFAULT
         }
     }
 

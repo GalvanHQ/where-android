@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.common.UiEvent
-import com.ovi.where.core.common.UiText
 import com.ovi.where.domain.usecase.group.JoinGroupUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel

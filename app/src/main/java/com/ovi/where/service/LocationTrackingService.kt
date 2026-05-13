@@ -9,9 +9,9 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import com.google.firebase.firestore.FirebaseFirestore
 import com.ovi.where.R
 import com.ovi.where.core.constants.AppConstants
+import com.ovi.where.core.constants.AppConstants.MILLIS_PER_MINUTE
 import com.ovi.where.data.location.LocationManager
 import com.ovi.where.domain.repository.LocationRepository
 import dagger.hilt.android.AndroidEntryPoint
@@ -49,7 +49,7 @@ class LocationTrackingService : Service() {
                 currentGroupId = intent.getStringExtra(EXTRA_GROUP_ID)
                 val duration = intent.getLongExtra(EXTRA_DURATION_MINUTES, -1L)
                 expiresAt = if (duration > 0) {
-                    System.currentTimeMillis() + duration * 60_000
+                    System.currentTimeMillis() + duration * MILLIS_PER_MINUTE
                 } else {
                     null
                 }
@@ -78,7 +78,7 @@ class LocationTrackingService : Service() {
                 .collect { location ->
                     val currentExpiry = expiresAt
                     if (currentExpiry != null && System.currentTimeMillis() > currentExpiry) {
-                        Timber.d("Location tracking session expired")
+                        Timber.i("Location tracking session expired")
                         serviceScope.launch {
                             locationRepository.stopLocationSharing(groupId)
                         }
@@ -86,8 +86,6 @@ class LocationTrackingService : Service() {
                         return@collect
                     }
 
-                    Timber.d("Location update: lat=${location.latitude}, lng=${location.longitude}")
-                    
                     locationRepository.updateLocation(
                         groupId = groupId,
                         latitude = location.latitude,

@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.ovi.where.data.util.Resource as DataResource
 
 @HiltViewModel
 class ChatsViewModel @Inject constructor(
@@ -42,26 +43,56 @@ class ChatsViewModel @Inject constructor(
     private val onlineUserIds = mutableSetOf<String>()
 
     init {
-        performInitialLoad()
+        // Network requests are initiated ONLY from this init block (Requirement 11.1)
+        // This ensures no duplicate API calls from Compose recomposition
+        loadConversationsWithNetworkBoundResource()
         observePresenceUpdates()
     }
 
-    // ── Initial Load (Task 16.3) ────────────────────────────────────────────
+    // ── Initial Load (NetworkBoundResource Requirement 11.2) ────────────────
 
     /**
-     * Performs the initial load sequence:
-     * 1. Fetch initial conversations from REST if Room is empty (Requirement 12.7)
-     * 2. Start observing conversations from Room (which triggers Firestore listener)
+     * Loads conversations using the NetworkBoundResource pattern:
+     * 1. Serves Room cache immediately (Loading state with cached data)
+     * 2. Checks staleness and fetches from network if stale
+     * 3. Updates Room on success, serves stale cache on failure
      *
-     * This ensures data is available from REST before the Firestore listener starts
-     * incremental updates on first launch.
+     * Network request is triggered ONLY from this init block, not from
+     * Compose recomposition (Requirement 11.1).
      */
-    private fun performInitialLoad() {
+    private fun loadConversationsWithNetworkBoundResource() {
         viewModelScope.launch {
-            // Requirement 12.7: On first launch (no Room records), fetch from REST first
-            conversationRepository.fetchInitialConversationsIfNeeded()
-            // Now start observing — this also starts the Firestore listener
-            observeConversations()
+            conversationRepository.getConversationsResource().collect { resource ->
+                when (resource) {
+                    is DataResource.Loading -> {
+                        val conversations = resource.data ?: emptyList()
+                        allConversations = conversations
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = conversations.isEmpty(),
+                            errorMessage = null
+                        )
+                        applySearchFilter()
+                    }
+                    is DataResource.Success -> {
+                        allConversations = resource.data
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            errorMessage = null
+                        )
+                        applySearchFilter()
+                    }
+                    is DataResource.Error -> {
+                        // Serve stale cache on failure (Requirement 11.3)
+                        val conversations = resource.data ?: emptyList()
+                        allConversations = conversations
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            errorMessage = resource.throwable.message
+                        )
+                        applySearchFilter()
+                    }
+                }
+            }
         }
     }
 
@@ -80,20 +111,39 @@ class ChatsViewModel @Inject constructor(
         }
     }
 
-    // ── Observation ─────────────────────────────────────────────────────────
-
     /**
-     * Observes conversations from ConversationRepository.
-     * The DAO already returns them sorted by lastMessageTimestamp DESC (Requirement 9.1).
+     * Explicit user-triggered refresh (e.g., pull-to-refresh).
+     * Bypasses staleness check and always fetches from network (Requirement 11.1).
      */
-    private fun observeConversations() {
+    fun onRefresh() {
         viewModelScope.launch {
-            observeConversationsUseCase().collect { conversations ->
-                allConversations = conversations
-                applySearchFilter()
+            _uiState.value = _uiState.value.copy(isRefreshing = true)
+            conversationRepository.refreshConversations().collect { resource ->
+                when (resource) {
+                    is DataResource.Loading -> { /* Already showing refresh indicator */ }
+                    is DataResource.Success -> {
+                        allConversations = resource.data
+                        _uiState.value = _uiState.value.copy(
+                            isRefreshing = false,
+                            errorMessage = null
+                        )
+                        applySearchFilter()
+                    }
+                    is DataResource.Error -> {
+                        val conversations = resource.data ?: emptyList()
+                        allConversations = conversations
+                        _uiState.value = _uiState.value.copy(
+                            isRefreshing = false,
+                            errorMessage = resource.throwable.message
+                        )
+                        applySearchFilter()
+                    }
+                }
             }
         }
     }
+
+    // ── Observation ─────────────────────────────────────────────────────────
 
     /**
      * Observes presence frames from ChatSocketIoClient to track online status
@@ -211,5 +261,7 @@ class ChatsViewModel @Inject constructor(
 data class ChatsUiState(
     val conversations: List<ConversationUiModel> = emptyList(),
     val searchQuery: String = "",
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
+    val errorMessage: String? = null
 )

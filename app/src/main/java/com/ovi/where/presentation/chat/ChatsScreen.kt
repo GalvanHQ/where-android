@@ -1,6 +1,7 @@
 package com.ovi.where.presentation.chat
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,17 +39,22 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.semantics.contentDescription
@@ -61,10 +67,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
+import com.ovi.where.core.constants.AppConstants.PULL_TO_REFRESH_TIMEOUT_MS
+import com.ovi.where.presentation.common.LIST_ITEM_ANIMATION_DURATION_MS
 import com.ovi.where.presentation.common.PrimaryButton
-import com.ovi.where.presentation.common.WhereTabHeader
+import com.ovi.where.presentation.common.WhereTopAppBar
 import com.ovi.where.presentation.common.WhereTextField
 import com.ovi.where.presentation.model.ConversationUiModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,7 +90,6 @@ fun ChatsScreen(
     var showSearchField by remember { mutableStateOf(false) }
 
     // ── Task 16.3: Wire foreground sync on app resume ─────────────────────────
-    // Requirement 12.5: Trigger foreground sync on app resume
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -94,9 +103,35 @@ fun ChatsScreen(
         }
     }
 
+    // Scroll behavior for collapsing top app bar (Requirement 5.1)
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+
+    // Pull-to-refresh state (Requirement 5.4)
+    var isRefreshing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
     Scaffold(
+        modifier = Modifier
+            .padding(contentPadding)
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            WhereTopAppBar(
+                title = "Chats",
+                scrollBehavior = scrollBehavior,
+                actions = {
+                    IconButton(onClick = { showSearchField = !showSearchField }) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            )
+        },
         floatingActionButton = {
+            // Requirement 5.8: FAB for "Start Conversation" on Chats screen
             FloatingActionButton(
                 onClick = onNavigateToSearchPeople,
                 modifier = Modifier.padding(bottom = 88.dp),
@@ -105,7 +140,7 @@ fun ChatsScreen(
             ) {
                 Icon(
                     Icons.Default.Edit,
-                    contentDescription = "New message",
+                    contentDescription = "Start Conversation",
                     tint = MaterialTheme.colorScheme.onPrimary
                 )
             }
@@ -115,19 +150,7 @@ fun ChatsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(contentPadding)
         ) {
-            // ── Header ──────────────────────────────────────────────────────
-            WhereTabHeader(title = "Chats") {
-                IconButton(onClick = { showSearchField = !showSearchField }) {
-                    Icon(
-                        Icons.Default.Search,
-                        contentDescription = "Search",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-
             // ── Search field ────────────────────────────────────────────────
             if (showSearchField) {
                 WhereTextField(
@@ -142,34 +165,59 @@ fun ChatsScreen(
 
             Spacer(Modifier.height(Dimens.spaceSmall))
 
-            // ── Conversation list ────────────────────────────────────────────
-            when {
-                uiState.isLoading -> {
-                    com.ovi.where.presentation.common.ShimmerGroupList()
+            // ── Conversation list with pull-to-refresh (Requirement 5.4) ─────
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = {
+                    isRefreshing = true
+                    viewModel.onRefresh()
+                    scope.launch {
+                        // 10s timeout for pull-to-refresh
+                        delay(PULL_TO_REFRESH_TIMEOUT_MS)
+                        isRefreshing = false
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Stop refresh indicator when data arrives
+                if (isRefreshing && !uiState.isLoading) {
+                    LaunchedEffect(Unit) { isRefreshing = false }
                 }
-                uiState.conversations.isEmpty() -> {
-                    ChatsEmptyState(onNavigateToSearchPeople = onNavigateToSearchPeople)
-                }
-                else -> {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(
-                            items = uiState.conversations,
-                            key = { it.id }
-                        ) { conv ->
-                            val isOnline = viewModel.isConversationOnline(conv)
-                            SwipeableConversationRow(
-                                conversation = conv,
-                                isOnline = isOnline,
-                                onClick = { onNavigateToChat(conv.id) },
-                                onArchive = { /* archive action placeholder */ },
-                                onMute = { /* mute action placeholder */ },
-                                onDelete = { viewModel.deleteConversation(conv.id) }
-                            )
-                            HorizontalDivider(
-                                modifier = Modifier.padding(start = 80.dp),
-                                thickness = Dimens.dividerThickness,
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                            )
+
+                when {
+                    uiState.isLoading && !isRefreshing -> {
+                        com.ovi.where.presentation.common.ShimmerGroupList()
+                    }
+                    uiState.conversations.isEmpty() -> {
+                        ChatsEmptyState(onNavigateToSearchPeople = onNavigateToSearchPeople)
+                    }
+                    else -> {
+                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            items(
+                                items = uiState.conversations,
+                                key = { it.id }
+                            ) { conv ->
+                                val isOnline = viewModel.isConversationOnline(conv)
+                                Column(modifier = Modifier.animateItem(
+                                    fadeInSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
+                                    placementSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
+                                    fadeOutSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS)
+                                )) {
+                                    SwipeableConversationRow(
+                                        conversation = conv,
+                                        isOnline = isOnline,
+                                        onClick = { onNavigateToChat(conv.id) },
+                                        onArchive = { /* archive action placeholder */ },
+                                        onMute = { /* mute action placeholder */ },
+                                        onDelete = { viewModel.deleteConversation(conv.id) }
+                                    )
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(start = 80.dp),
+                                        thickness = Dimens.dividerThickness,
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                    )
+                                }
+                            }
                         }
                     }
                 }

@@ -56,7 +56,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -340,7 +339,7 @@ fun MapScreen(
                                     Text(
                                         text = location.displayName.take(1).uppercase(),
                                         style = MaterialTheme.typography.titleSmall,
-                                        color = Color.White,
+                                        color = MaterialTheme.colorScheme.onPrimary,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }

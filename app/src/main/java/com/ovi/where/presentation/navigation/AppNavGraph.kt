@@ -1,6 +1,6 @@
 package com.ovi.where.presentation.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -21,6 +21,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.ovi.where.DeepLinkManager
+import com.ovi.where.core.crash.ActiveScreenTracker
 import com.ovi.where.presentation.auth.complete.CompleteProfileScreen
 import com.ovi.where.presentation.auth.forgotpassword.ForgotPasswordScreen
 import com.ovi.where.presentation.auth.login.LoginScreen
@@ -38,10 +39,16 @@ import com.ovi.where.presentation.people.FriendRequestsScreen
 import com.ovi.where.presentation.people.SearchUsersScreen
 import com.ovi.where.presentation.people.UserProfileScreen
 import com.ovi.where.presentation.profile.edit.EditProfileScreen
+import com.ovi.where.presentation.settings.AppearanceScreen
+import com.ovi.where.presentation.settings.DataStorageScreen
+import com.ovi.where.presentation.settings.NotificationPreferencesScreen
+import com.ovi.where.presentation.settings.SecurityScreen
 import com.ovi.where.presentation.settings.SettingsScreen
+import com.ovi.where.presentation.settings.PrivacyScreen
+import com.ovi.where.presentation.settings.HelpScreen
+import com.ovi.where.presentation.settings.AboutScreen
 
-private const val NAV_ANIM_DURATION = 300
-private const val GATEKEEPER_ROUTE = "gatekeeper"
+private const val NAV_ANIM_DURATION = 350
 
 /**
  * Root navigation graph.
@@ -59,7 +66,7 @@ private const val GATEKEEPER_ROUTE = "gatekeeper"
 fun AppNavGraph(
     modifier: Modifier = Modifier,
     navController: NavHostController,
-    startDestination: String = GATEKEEPER_ROUTE,
+    startDestination: String = Screen.Gatekeeper.route,
     deepLinkRoute: String? = null
 ) {
     // ── Handle deep links delivered via onNewIntent (app already running) ─────
@@ -72,26 +79,34 @@ fun AppNavGraph(
         }
     }
 
+    // ── Track active screen route for crash reporting ─────────────────────────
+    LaunchedEffect(navController) {
+        navController.currentBackStackEntryFlow.collect { entry ->
+            val route = entry.destination.route ?: "unknown"
+            ActiveScreenTracker.setActiveRoute(route)
+        }
+    }
+
     NavHost(
         navController    = navController,
         startDestination = startDestination,
         modifier         = modifier,
         enterTransition = {
-            slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(NAV_ANIM_DURATION))
+            fadeIn(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
         },
         exitTransition = {
-            slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(NAV_ANIM_DURATION))
+            fadeOut(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
         },
         popEnterTransition = {
-            slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(NAV_ANIM_DURATION))
+            fadeIn(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
         },
         popExitTransition = {
-            slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(NAV_ANIM_DURATION))
+            fadeOut(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
         }
     ) {
         // ── Gatekeeper (replaces custom SplashScreen) ─────────────────────────
         composable(
-            GATEKEEPER_ROUTE,
+            Screen.Gatekeeper.route,
             enterTransition = { fadeIn(tween(0)) },
             exitTransition  = { fadeOut(tween(300)) }
         ) {
@@ -115,7 +130,8 @@ fun AppNavGraph(
                         else                        -> Screen.Main.route
                     }
                     navController.navigate(target) {
-                        popUpTo(GATEKEEPER_ROUTE) { inclusive = true }
+                        popUpTo(Screen.Gatekeeper.route) { inclusive = true }
+                        launchSingleTop = true
                     }
                     if (target == Screen.Main.route && deepLinkRoute != null) {
                         navigateToDeepLink(navController, deepLinkRoute)
@@ -134,6 +150,7 @@ fun AppNavGraph(
                 onFinish = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             )
@@ -142,10 +159,15 @@ fun AppNavGraph(
         // ── Login ─────────────────────────────────────────────────────────────
         composable(Screen.Login.route) {
             LoginScreen(
-                onNavigateToSignUp = { navController.navigate(Screen.SignUp.route) },
+                onNavigateToSignUp = {
+                    navController.navigate(Screen.SignUp.route) {
+                        launchSingleTop = true
+                    }
+                },
                 onLoginSuccess = {
                     navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
+                        launchSingleTop = true
                     }
                     if (deepLinkRoute != null) {
                         navigateToDeepLink(navController, deepLinkRoute)
@@ -154,14 +176,20 @@ fun AppNavGraph(
                 onNavigateToEmailVerification = {
                     navController.navigate(Screen.EmailVerification.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
+                        launchSingleTop = true
                     }
                 },
                 onNavigateToCompleteProfile = {
                     navController.navigate(Screen.CompleteProfile.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
+                        launchSingleTop = true
                     }
                 },
-                onNavigateToForgotPassword = { navController.navigate(Screen.ForgotPassword.route) }
+                onNavigateToForgotPassword = {
+                    navController.navigate(Screen.ForgotPassword.route) {
+                        launchSingleTop = true
+                    }
+                }
             )
         }
 
@@ -172,6 +200,7 @@ fun AppNavGraph(
                 onNavigateToEmailVerification = {
                     navController.navigate(Screen.EmailVerification.route) {
                         popUpTo(Screen.SignUp.route) { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             )
@@ -187,13 +216,15 @@ fun AppNavGraph(
             EmailVerificationScreen(
                 onVerified = {
                     // Route through gatekeeper to check profile completeness
-                    navController.navigate(GATEKEEPER_ROUTE) {
+                    navController.navigate(Screen.Gatekeeper.route) {
                         popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
                     }
                 },
                 onSignOut = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             )
@@ -205,6 +236,7 @@ fun AppNavGraph(
                 onProfileComplete = {
                     navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.CompleteProfile.route) { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             )
@@ -218,26 +250,59 @@ fun AppNavGraph(
         ) {
             MainScaffold(
                 onNavigateToChat = { convId ->
-                    navController.navigate(Screen.Chat.createRoute(convId))
+                    navController.navigate(Screen.Chat.createRoute(convId)) {
+                        launchSingleTop = true
+                    }
                 },
                 onNavigateToUserProfile = { userId ->
-                    navController.navigate(Screen.UserProfile.createRoute(userId))
+                    navController.navigate(Screen.UserProfile.createRoute(userId)) {
+                        launchSingleTop = true
+                    }
                 },
                 onNavigateToGroupDetails = { groupId ->
-                    navController.navigate(Screen.GroupDetails.createRoute(groupId))
+                    navController.navigate(Screen.GroupDetails.createRoute(groupId)) {
+                        launchSingleTop = true
+                    }
                 },
                 onNavigateToGroupMap = { groupId ->
-                    navController.navigate(Screen.GroupMap.createRoute(groupId))
+                    navController.navigate(Screen.GroupMap.createRoute(groupId)) {
+                        launchSingleTop = true
+                    }
                 },
-                onNavigateToCreateGroup   = { navController.navigate(Screen.CreateGroup.route) },
-                onNavigateToJoinGroup     = { navController.navigate(Screen.JoinGroup.route) },
-                onNavigateToFriendRequests = { navController.navigate(Screen.FriendRequests.route) },
-                onNavigateToSearchPeople  = { navController.navigate(Screen.SearchPeople.route) },
-                onNavigateToEditProfile   = { navController.navigate(Screen.EditProfile.route) },
-                onNavigateToSettings      = { navController.navigate(Screen.Settings.route) },
+                onNavigateToCreateGroup = {
+                    navController.navigate(Screen.CreateGroup.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToJoinGroup = {
+                    navController.navigate(Screen.JoinGroup.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToFriendRequests = {
+                    navController.navigate(Screen.FriendRequests.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToSearchPeople = {
+                    navController.navigate(Screen.SearchPeople.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToEditProfile = {
+                    navController.navigate(Screen.EditProfile.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToSettings = {
+                    navController.navigate(Screen.Settings.route) {
+                        launchSingleTop = true
+                    }
+                },
                 onLogout = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             )
@@ -257,14 +322,105 @@ fun AppNavGraph(
                 onSignOut = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToNotificationPreferences = {
+                    navController.navigate(Screen.NotificationPreferences.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToAppearance = {
+                    navController.navigate(Screen.Appearance.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToDataStorage = {
+                    navController.navigate(Screen.DataStorage.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToSecurity = {
+                    navController.navigate(Screen.Security.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToPrivacy = {
+                    navController.navigate(Screen.Privacy.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToHelp = {
+                    navController.navigate(Screen.Help.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToAbout = {
+                    navController.navigate(Screen.About.route) {
+                        launchSingleTop = true
                     }
                 }
             )
         }
 
+        // ── Notification Preferences ──────────────────────────────────────────
+        composable(Screen.NotificationPreferences.route) {
+            NotificationPreferencesScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // ── Appearance ────────────────────────────────────────────────────────
+        composable(Screen.Appearance.route) {
+            AppearanceScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // ── Data & Storage ────────────────────────────────────────────────────
+        composable(Screen.DataStorage.route) {
+            DataStorageScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // ── Security ──────────────────────────────────────────────────────────
+        composable(Screen.Security.route) {
+            SecurityScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToOnboarding = {
+                    navController.navigate(Screen.Onboarding.route) {
+                        popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        // ── Privacy ───────────────────────────────────────────────────────────
+        composable(Screen.Privacy.route) {
+            PrivacyScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // ── Help & Support ────────────────────────────────────────────────────
+        composable(Screen.Help.route) {
+            HelpScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // ── About ─────────────────────────────────────────────────────────────
+        composable(Screen.About.route) {
+            AboutScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
         // ── Chat ──────────────────────────────────────────────────────────────
         composable(
-            route     = Screen.Chat.route,
+            route     = Screen.Chat.ROUTE,
             arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
         ) { back ->
             val conversationId = back.arguments?.getString("conversationId") ?: return@composable
@@ -272,20 +428,26 @@ fun AppNavGraph(
                 conversationId       = conversationId,
                 onNavigateBack       = { navController.popBackStack() },
                 onNavigateToUserProfile = { userId ->
-                    navController.navigate(Screen.UserProfile.createRoute(userId))
+                    navController.navigate(Screen.UserProfile.createRoute(userId)) {
+                        launchSingleTop = true
+                    }
                 },
                 onNavigateToGroupInfo = { groupId ->
-                    navController.navigate(Screen.GroupDetails.createRoute(groupId))
+                    navController.navigate(Screen.GroupDetails.createRoute(groupId)) {
+                        launchSingleTop = true
+                    }
                 },
                 onNavigateToGroupMap = { groupId ->
-                    navController.navigate(Screen.GroupMap.createRoute(groupId))
+                    navController.navigate(Screen.GroupMap.createRoute(groupId)) {
+                        launchSingleTop = true
+                    }
                 }
             )
         }
 
         // ── UserProfile ───────────────────────────────────────────────────────
         composable(
-            route     = Screen.UserProfile.route,
+            route     = Screen.UserProfile.ROUTE,
             arguments = listOf(navArgument("userId") { type = NavType.StringType })
         ) { back ->
             val userId = back.arguments?.getString("userId") ?: return@composable
@@ -293,7 +455,9 @@ fun AppNavGraph(
                 userId         = userId,
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToChat = { convId ->
-                    navController.navigate(Screen.Chat.createRoute(convId))
+                    navController.navigate(Screen.Chat.createRoute(convId)) {
+                        launchSingleTop = true
+                    }
                 }
             )
         }
@@ -308,32 +472,48 @@ fun AppNavGraph(
             SearchUsersScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToUserProfile = { userId ->
-                    navController.navigate(Screen.UserProfile.createRoute(userId))
+                    navController.navigate(Screen.UserProfile.createRoute(userId)) {
+                        launchSingleTop = true
+                    }
                 },
                 onNavigateToChat = { convId ->
-                    navController.navigate(Screen.Chat.createRoute(convId))
+                    navController.navigate(Screen.Chat.createRoute(convId)) {
+                        launchSingleTop = true
+                    }
                 }
             )
         }
 
         // ── Group Details ─────────────────────────────────────────────────────
         composable(
-            route     = Screen.GroupDetails.route,
+            route     = Screen.GroupDetails.ROUTE,
             arguments = listOf(navArgument("groupId") { type = NavType.StringType })
         ) { back ->
             val groupId = back.arguments?.getString("groupId") ?: return@composable
             GroupDetailsScreen(
                 groupId             = groupId,
                 onNavigateBack      = { navController.popBackStack() },
-                onNavigateToMap     = { navController.navigate(Screen.GroupMap.createRoute(groupId)) },
-                onNavigateToChat    = { convId -> navController.navigate(Screen.Chat.createRoute(convId)) },
-                onNavigateToEditGroup = { navController.navigate(Screen.EditGroup.createRoute(groupId)) }
+                onNavigateToMap     = {
+                    navController.navigate(Screen.GroupMap.createRoute(groupId)) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToChat    = { convId ->
+                    navController.navigate(Screen.Chat.createRoute(convId)) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToEditGroup = {
+                    navController.navigate(Screen.EditGroup.createRoute(groupId)) {
+                        launchSingleTop = true
+                    }
+                }
             )
         }
 
         // ── Group Map ─────────────────────────────────────────────────────────
         composable(
-            route     = Screen.GroupMap.route,
+            route     = Screen.GroupMap.ROUTE,
             arguments = listOf(navArgument("groupId") { type = NavType.StringType })
         ) { back ->
             val groupId = back.arguments?.getString("groupId") ?: return@composable
@@ -358,6 +538,7 @@ fun AppNavGraph(
                 onGroupJoined  = { groupId ->
                     navController.navigate(Screen.GroupMap.createRoute(groupId)) {
                         popUpTo(Screen.Main.route)
+                        launchSingleTop = true
                     }
                 }
             )
@@ -365,7 +546,7 @@ fun AppNavGraph(
 
         // ── Edit Group ────────────────────────────────────────────────────────
         composable(
-            route     = Screen.EditGroup.route,
+            route     = Screen.EditGroup.ROUTE,
             arguments = listOf(navArgument("groupId") { type = NavType.StringType })
         ) { back ->
             val groupId = back.arguments?.getString("groupId") ?: return@composable
@@ -382,25 +563,54 @@ fun AppNavGraph(
 /**
  * Parses a plain route string (e.g. "chat/CONV_ID", "friend_requests") and
  * navigates to the corresponding destination in the back stack.
+ *
+ * Registered deep link URI patterns (scheme "where://"):
+ *   - chat/{id}           → Chat screen
+ *   - user_profile/{id}   → UserProfile screen
+ *   - group_details/{id}  → GroupDetails screen
+ *   - group_map/{id}      → GroupMap screen
+ *   - friend_requests     → FriendRequests screen
+ *
+ * **Authentication gatekeeper**: This function is only called AFTER the
+ * [AuthGatekeeperViewModel] resolves successfully and the user reaches the
+ * Main screen. Deep links received before auth completes are held in
+ * [deepLinkRoute] parameter or [DeepLinkManager.pending] and processed
+ * only after navigation to Main.
+ *
+ * **Unrecognized URIs**: Any route that does not match the registered patterns
+ * is silently discarded (no crash, no navigation change).
  */
-private fun navigateToDeepLink(navController: NavHostController, route: String) {
+internal fun navigateToDeepLink(navController: NavHostController, route: String) {
     val segments = route.split("/")
     when {
-        segments.size == 2 && segments[0] == "chat" -> {
-            navController.navigate(Screen.Chat.createRoute(segments[1]))
+        segments.size == 2 && segments[0] == "chat" && segments[1].isNotBlank() -> {
+            navController.navigate(Screen.Chat.createRoute(segments[1])) {
+                launchSingleTop = true
+            }
         }
         route == "friend_requests" -> {
-            navController.navigate(Screen.FriendRequests.route)
+            navController.navigate(Screen.FriendRequests.route) {
+                launchSingleTop = true
+            }
         }
-        segments.size == 2 && segments[0] == "user_profile" -> {
-            navController.navigate(Screen.UserProfile.createRoute(segments[1]))
+        segments.size == 2 && segments[0] == "user_profile" && segments[1].isNotBlank() -> {
+            navController.navigate(Screen.UserProfile.createRoute(segments[1])) {
+                launchSingleTop = true
+            }
         }
-        segments.size == 2 && segments[0] == "group_map" -> {
-            navController.navigate(Screen.GroupMap.createRoute(segments[1]))
+        segments.size == 2 && segments[0] == "group_map" && segments[1].isNotBlank() -> {
+            navController.navigate(Screen.GroupMap.createRoute(segments[1])) {
+                launchSingleTop = true
+            }
         }
-        segments.size == 2 && segments[0] == "group_details" -> {
-            navController.navigate(Screen.GroupDetails.createRoute(segments[1]))
+        segments.size == 2 && segments[0] == "group_details" && segments[1].isNotBlank() -> {
+            navController.navigate(Screen.GroupDetails.createRoute(segments[1])) {
+                launchSingleTop = true
+            }
         }
-        else -> { /* Unknown route — no-op */ }
+        else -> {
+            // Unrecognized deep link URI — discard silently without crashing.
+            // Other navigation operations continue to function normally.
+        }
     }
 }

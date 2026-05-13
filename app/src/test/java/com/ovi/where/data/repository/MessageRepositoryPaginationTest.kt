@@ -6,6 +6,7 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GetTokenResult
 import com.google.firebase.storage.FirebaseStorage
 import com.ovi.where.core.utils.ImageCompressor
+import com.ovi.where.data.local.CacheStalenessChecker
 import com.ovi.where.data.local.dao.MessageDao
 import com.ovi.where.data.local.entity.MessageEntity
 import com.ovi.where.data.remote.chat.ChatApiClient
@@ -45,6 +46,7 @@ class MessageRepositoryPaginationTest : StringSpec({
     lateinit var apiService: ChatApiService
     lateinit var firebaseStorage: FirebaseStorage
     lateinit var imageCompressor: ImageCompressor
+    lateinit var cacheStalenessChecker: CacheStalenessChecker
     lateinit var context: Context
     lateinit var incomingFrames: MutableSharedFlow<ServerFrame>
     lateinit var connectionState: MutableStateFlow<ChatSocketIoClient.ConnectionState>
@@ -57,6 +59,7 @@ class MessageRepositoryPaginationTest : StringSpec({
         apiService = mockk(relaxed = true)
         firebaseStorage = mockk(relaxed = true)
         imageCompressor = mockk(relaxed = true)
+        cacheStalenessChecker = mockk(relaxed = true)
         context = mockk(relaxed = true)
         incomingFrames = MutableSharedFlow(extraBufferCapacity = 64)
         connectionState = MutableStateFlow(ChatSocketIoClient.ConnectionState.CONNECTED)
@@ -82,7 +85,7 @@ class MessageRepositoryPaginationTest : StringSpec({
         every { ChatApiClient.apiService } returns apiService
     }
 
-    fun createRepo() = MessageRepositoryImpl(wsClient, firebaseAuth, messageDao, firebaseStorage, imageCompressor, context)
+    fun createRepo() = MessageRepositoryImpl(wsClient, firebaseAuth, messageDao, firebaseStorage, imageCompressor, cacheStalenessChecker, context)
 
     afterEach {
         unmockkObject(ChatApiClient)

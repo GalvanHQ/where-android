@@ -1,6 +1,5 @@
 package com.ovi.where.domain.usecase.auth
 
-import com.ovi.where.core.common.Resource
 import com.ovi.where.domain.model.User
 import com.ovi.where.domain.repository.AuthRepository
 import kotlinx.coroutines.flow.Flow

@@ -117,7 +117,7 @@ fun SignUpScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .imePadding()
-                .padding(horizontal = Dimens.spaceXLarge)
+                .padding(horizontal = Dimens.spaceLarge)
                 .alpha(contentAlpha.value),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

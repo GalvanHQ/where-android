@@ -231,10 +231,7 @@ object ImageUploadUtil {
                 outputStream.flush()
                 outputStream.close()
                 
-                Log.d(TAG, "Compressed with quality $quality, size: ${tempFile.length()} bytes")
-                
                 if (tempFile.length() <= MAX_FILE_SIZE) {
-                    Log.d(TAG, "Achieved target size with quality: $quality")
                     return tempFile
                 }
             }
@@ -262,15 +259,12 @@ object ImageUploadUtil {
                 compressedData = outputStream.toByteArray()
                 outputStream.close()
                 
-                Log.d(TAG, "ByteArray compression with quality $quality, size: ${compressedData.size} bytes")
-                
                 if (compressedData.size <= MAX_FILE_SIZE) {
                     // Write to file
                     val fileOutputStream = FileOutputStream(targetFile)
                     fileOutputStream.write(compressedData)
                     fileOutputStream.close()
                     
-                    Log.d(TAG, "Final compression successful with quality: $quality")
                     return targetFile
                 }
                 

@@ -28,7 +28,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Group
@@ -40,7 +39,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -109,11 +107,13 @@ fun ProfileScreen(
         // Header
         WhereTabHeader(title = "Profile")
 
+        Spacer(modifier = Modifier.height(Dimens.spaceLarge))
+
         // ── Avatar + Name + Username ─────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Dimens.spaceXLarge),
+                .padding(horizontal = Dimens.spaceLarge),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Avatar with animated gradient ring
@@ -204,7 +204,7 @@ fun ProfileScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Dimens.space2XLarge),
+                .padding(horizontal = Dimens.spaceLarge),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             ProfileStat(
@@ -230,7 +230,7 @@ fun ProfileScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Dimens.spaceXLarge),
+                .padding(horizontal = Dimens.spaceLarge),
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
         ) {
             Button(

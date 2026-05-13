@@ -8,12 +8,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ovi.where.core.theme.Dimens
@@ -35,6 +42,7 @@ fun UserProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val navigateToChat by viewModel.navigateToChat.collectAsState()
+    var showBlockDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(userId) { viewModel.loadUser(userId) }
 
@@ -106,7 +114,7 @@ fun UserProfileScreen(
                             onDecline = { viewModel.declineFriendRequest(userId) },
                             onMessage = { viewModel.openOrCreateDm(userId) },
                             onUnfriend = { viewModel.removeFriend(userId) },
-                            onBlock = { /* Block flow is task 26.x */ }
+                            onBlock = { showBlockDialog = true }
                         )
 
                         Spacer(Modifier.height(Dimens.spaceXLarge))
@@ -114,5 +122,36 @@ fun UserProfileScreen(
                 }
             }
         }
+    }
+
+    // Block confirmation dialog
+    if (showBlockDialog) {
+        AlertDialog(
+            onDismissRequest = { showBlockDialog = false },
+            title = { Text("Block user?") },
+            text = {
+                Text(
+                    "Blocking this user will remove them from your friends and prevent them from contacting you. This action can be undone later."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.blockUser(userId)
+                        showBlockDialog = false
+                    }
+                ) {
+                    Text(
+                        "Block",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBlockDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

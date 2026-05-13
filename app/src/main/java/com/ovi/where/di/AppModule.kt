@@ -57,7 +57,7 @@ object AppModule {
     fun provideFirebaseRemoteConfig(): FirebaseRemoteConfig {
         val config = FirebaseRemoteConfig.getInstance()
         val defaults = mapOf(
-            FeatureFlags.KEY_USE_NEW_FRIENDSHIP_MODEL to false
+            FeatureFlags.KEY_USE_NEW_FRIENDSHIP_MODEL to true
         )
         config.setDefaultsAsync(defaults)
         return config

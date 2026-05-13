@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicReference
  * Read by the crash reporter to attach as a custom key.
  */
 object ActiveScreenTracker {
-    private val currentRoute = AtomicReference<String>("unknown")
+    private val currentRoute = AtomicReference("unknown")
 
     fun setActiveRoute(route: String) {
         currentRoute.set(route)

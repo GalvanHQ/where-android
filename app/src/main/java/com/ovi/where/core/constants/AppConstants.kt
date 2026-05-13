@@ -4,13 +4,6 @@ object AppConstants {
     // Location
     const val LOCATION_UPDATE_INTERVAL = 5000L
     const val LOCATION_FASTEST_INTERVAL = 3000L
-    const val DEFAULT_ZOOM_LEVEL = 15f
-
-    // Sharing durations
-    const val SHARING_DURATION_15_MIN = 15L
-    const val SHARING_DURATION_1_HOUR = 60L
-    const val SHARING_DURATION_CUSTOM = -1L
-    const val SHARING_DURATION_CONTINUOUS = 0L
 
     // Notifications
     const val NOTIFICATION_ID = 1001
@@ -23,21 +16,11 @@ object AppConstants {
     const val FIRESTORE_COLLECTION_LOCATIONS = "locations"
     const val FIRESTORE_COLLECTION_MEMBERS = "members"
     const val FIRESTORE_COLLECTION_CONVERSATIONS = "conversations"
-    const val FIRESTORE_COLLECTION_MESSAGES = "messages"
-    const val FIRESTORE_COLLECTION_FRIENDSHIPS = "friendships"
     const val FIRESTORE_COLLECTION_DIRECT_LOCATION_SHARES = "directLocationShares"
     const val FIRESTORE_COLLECTION_ACTIVE_LOCATIONS = "activeLocations"
 
     // Write throttle (ms) — skip Firestore writes if less than this since last write
     const val LOCATION_WRITE_THROTTLE_MS = 15_000L
-
-    // DataStore
-    const val DATASTORE_USER_PREFERENCES = "user_preferences"
-
-    // Validation
-    const val USERNAME_MIN_LENGTH = 3
-    const val USERNAME_MAX_LENGTH = 20
-    const val BIO_MAX_LENGTH = 150
 
     // ── Time Constants ────────────────────────────────────────────────────────
 
@@ -52,9 +35,6 @@ object AppConstants {
 
     /** Milliseconds per week. */
     const val MILLIS_PER_WEEK = 604_800_000L
-
-    /** Seconds per minute. */
-    const val SECONDS_PER_MINUTE = 60L
 
     /** Seconds per hour. */
     const val SECONDS_PER_HOUR = 3600L

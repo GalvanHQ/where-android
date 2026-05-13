@@ -27,11 +27,4 @@ sealed class UiText {
             is StringResource -> context.getString(resId, *args)
         }
     }
-    
-    companion object {
-        fun fromString(value: String): UiText = DynamicString(value)
-        
-        fun fromResource(@StringRes resId: Int, vararg args: Any): UiText = 
-            StringResource(resId, *args)
-    }
 }

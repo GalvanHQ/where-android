@@ -1,6 +1,7 @@
 package com.ovi.where.core.notification
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -8,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -124,6 +126,7 @@ class NotificationHelper @Inject constructor(
      * @param channelId The notification channel ID to check preferences for.
      * @param notification The built [NotificationCompat.Builder] ready to post.
      */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     suspend fun postNotification(
         notificationId: Int,
         channelId: String,
@@ -141,16 +144,17 @@ class NotificationHelper @Inject constructor(
     }
 
     /**
-     * Posts a pre-built [android.app.Notification] after verifying permission and preferences.
+     * Posts a pre-built [Notification] after verifying permission and preferences.
      *
      * @param notificationId Unique ID for this notification.
      * @param channelId The notification channel ID to check preferences for.
      * @param notification The already-built notification object.
      */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     suspend fun postNotification(
         notificationId: Int,
         channelId: String,
-        notification: android.app.Notification
+        notification: Notification
     ) {
         if (!canPostNotifications()) {
             Timber.w("POST_NOTIFICATIONS permission not granted — discarding notification id=$notificationId")
@@ -169,6 +173,7 @@ class NotificationHelper @Inject constructor(
      *
      * Use this for cases where preference checking is handled externally or not applicable.
      */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun postNotificationDirect(notificationId: Int, notification: NotificationCompat.Builder) {
         if (!canPostNotifications()) {
             Timber.w("POST_NOTIFICATIONS permission not granted — discarding notification id=$notificationId")
@@ -331,6 +336,7 @@ class NotificationHelper @Inject constructor(
      * Posts a summary notification that groups all active message notifications.
      * Displayed when 2+ distinct conversations have active notifications.
      */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     private fun postSummaryNotification() {
         val summaryText = "${activeConversationIds.size} conversations"
 

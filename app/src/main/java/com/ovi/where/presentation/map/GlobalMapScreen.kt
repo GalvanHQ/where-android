@@ -47,7 +47,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
@@ -64,14 +63,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -83,7 +78,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -570,18 +564,13 @@ fun GlobalMapScreen(
                         }
                     },
                     dismissButton = {
-                        IconButton(
+                        TextButton(
                             onClick = {
                                 viewModel.showLocationOffDialog(false)
                                 viewModel.setLocationOffDialogShown()
                             }
                         ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = stringResource(R.string.action_cancel),
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(Dimens.iconSizeMedium)
-                            )
+                            Text("Not now")
                         }
                     }
                 )
@@ -593,7 +582,7 @@ fun GlobalMapScreen(
                     .align(Alignment.BottomEnd)
                     .padding(
                         end = Dimens.spaceLarge,
-                        bottom = if (uiState.friendLocations.isNotEmpty()) 220.dp else 96.dp
+                        bottom = if (uiState.friendLocations.isNotEmpty()) 220.dp else 160.dp
                     ),
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
@@ -658,6 +647,15 @@ fun GlobalMapScreen(
                     FloatingActionButton(
                         onClick = {
                             when {
+                                !locationGranted -> {
+                                    permissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                }
+
                                 uiState.groups.isEmpty() && uiState.directTargets.isEmpty() -> {
                                     scope.launch {
                                         snackbarHostState.showSnackbar("Add friends or join a group first")
@@ -685,7 +683,7 @@ fun GlobalMapScreen(
                 Card(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 96.dp),
+                        .padding(bottom = 84.dp, start = 48.dp, end = 48.dp),
                     shape = MaterialTheme.shapes.large,
                     elevation = CardDefaults.cardElevation(2.dp),
                     colors = CardDefaults.cardColors(
@@ -1074,52 +1072,36 @@ private fun GroupFilterSheet(
     activeFilter: GroupFilter?,
     onSelect: (GroupFilter?) -> Unit
 ) {
-    var query by remember { mutableStateOf("") }
-    val filteredGroups = groups.filter { it.name.contains(query, ignoreCase = true) }
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(Dimens.spaceXLarge)
             .navigationBarsPadding()
     ) {
-        Text("Map filter", style = MaterialTheme.typography.headlineSmall)
-        Text(
-            "Choose which circle appears on the map.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text("Filter", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(Dimens.spaceLarge))
-
-        if (groups.size > 6) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                leadingIcon = { Icon(Icons.Default.Groups, null) },
-                placeholder = { Text("Search groups") },
-                shape = MaterialTheme.shapes.extraLarge
-            )
-            Spacer(Modifier.height(Dimens.spaceMedium))
-        }
 
         LazyColumn(
             modifier = Modifier.heightIn(max = 420.dp),
-            verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceXSmall)
         ) {
             item {
                 FilterRow(
                     title = "All friends",
-                    subtitle = "${groups.size} groups",
                     selected = activeFilter == null,
                     onClick = { onSelect(null) }
                 )
             }
-            items(filteredGroups, key = { it.id }) { group ->
+            item {
+                Spacer(Modifier.height(Dimens.spaceXSmall))
+                androidx.compose.material3.HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+                Spacer(Modifier.height(Dimens.spaceXSmall))
+            }
+            items(groups, key = { it.id }) { group ->
                 FilterRow(
                     title = group.name,
-                    subtitle = "Group locations",
                     selected = activeFilter?.id == group.id,
                     onClick = { onSelect(group) }
                 )
@@ -1133,36 +1115,39 @@ private fun GroupFilterSheet(
 @Composable
 private fun FilterRow(
     title: String,
-    subtitle: String,
     selected: Boolean,
     onClick: () -> Unit
 ) {
     Surface(
         onClick = onClick,
         shape = MaterialTheme.shapes.large,
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Dimens.spaceLarge),
+                .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Groups, null, tint = MaterialTheme.colorScheme.primary)
+            Icon(
+                Icons.Default.Groups, null,
+                modifier = Modifier.size(Dimens.iconSizeMedium),
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(Modifier.width(Dimens.spaceLarge))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                modifier = Modifier.weight(1f)
+            )
+            if (selected) {
+                Icon(
+                    Icons.Default.Check, null,
+                    modifier = Modifier.size(Dimens.iconSizeMedium),
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
-            RadioButton(selected = selected, onClick = onClick)
         }
     }
 }
@@ -1176,11 +1161,6 @@ private fun ShareTargetSheet(
     val targets = groups + directTargets
     var selectedTargetId by remember { mutableStateOf(targets.firstOrNull()?.id.orEmpty()) }
     var selectedDuration by remember { mutableLongStateOf(60L) }
-    var customDuration by remember { mutableFloatStateOf(60f) }
-    var query by remember { mutableStateOf("") }
-    val effectiveDuration =
-        if (selectedDuration == -1L) customDuration.toLong() else selectedDuration
-    val filteredTargets = targets.filter { it.name.contains(query, ignoreCase = true) }
 
     Column(
         modifier = Modifier
@@ -1188,12 +1168,7 @@ private fun ShareTargetSheet(
             .padding(Dimens.spaceXLarge)
             .navigationBarsPadding()
     ) {
-        Text("Share live location", style = MaterialTheme.typography.headlineSmall)
-        Text(
-            "Choose who can see you and when sharing stops.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text("Share Location", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(Dimens.spaceLarge))
 
         Text(
@@ -1203,24 +1178,11 @@ private fun ShareTargetSheet(
         )
         Spacer(Modifier.height(Dimens.spaceMedium))
 
-        if (targets.size > 6) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                leadingIcon = { Icon(Icons.Default.Person, null) },
-                placeholder = { Text("Search people or groups") },
-                shape = MaterialTheme.shapes.extraLarge
-            )
-            Spacer(Modifier.height(Dimens.spaceMedium))
-        }
-
         LazyColumn(
-            modifier = Modifier.heightIn(max = 320.dp),
+            modifier = Modifier.heightIn(max = 280.dp),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
         ) {
-            items(filteredTargets, key = { it.id }) { target ->
+            items(targets, key = { it.id }) { target ->
                 val selected = selectedTargetId == target.id
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -1229,35 +1191,49 @@ private fun ShareTargetSheet(
                     color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
                 ) {
                     Row(
-                        modifier = Modifier.padding(Dimens.spaceLarge),
+                        modifier = Modifier.padding(
+                            horizontal = Dimens.spaceLarge,
+                            vertical = Dimens.spaceMedium
+                        ),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         TargetAvatar(target)
-                        Spacer(Modifier.width(Dimens.spaceLarge))
-                        Column(modifier = Modifier.weight(1f)) {
+                        Spacer(Modifier.width(Dimens.spaceMedium))
+                        Text(
+                            target.name,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = if (target.isDirect) MaterialTheme.colorScheme.tertiaryContainer
+                            else MaterialTheme.colorScheme.secondaryContainer
+                        ) {
                             Text(
-                                target.name,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                if (target.isDirect) "Private share" else "Group share",
+                                text = if (target.isDirect) "Direct" else "Group",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                color = if (target.isDirect) MaterialTheme.colorScheme.onTertiaryContainer
+                                else MaterialTheme.colorScheme.onSecondaryContainer
                             )
                         }
-                        if (selected) Icon(
-                            Icons.Default.Check,
-                            null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                        if (selected) {
+                            Spacer(Modifier.width(Dimens.spaceSmall))
+                            Icon(
+                                Icons.Default.Check,
+                                null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(Dimens.iconSizeMedium)
+                            )
+                        }
                     }
                 }
             }
-            if (filteredTargets.isEmpty()) {
+            if (targets.isEmpty()) {
                 item {
                     Text(
-                        "No matches",
+                        "No targets available",
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(Dimens.spaceLarge),
@@ -1275,25 +1251,16 @@ private fun ShareTargetSheet(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(Dimens.spaceMedium))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)) {
-            item { DurationChip("15m", selectedDuration == 15L) { selectedDuration = 15L } }
-            item { DurationChip("1h", selectedDuration == 60L) { selectedDuration = 60L } }
-            item { DurationChip("Custom", selectedDuration == -1L) { selectedDuration = -1L } }
-            item { DurationChip("Until stop", selectedDuration == 0L) { selectedDuration = 0L } }
-        }
-        if (selectedDuration == -1L) {
-            Spacer(Modifier.height(Dimens.spaceLarge))
-            Slider(
-                value = customDuration,
-                onValueChange = { customDuration = it },
-                valueRange = 15f..480f,
-                steps = 30
-            )
-            Text(
-                "${customDuration.toLong()} minutes",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary
-            )
+
+        // Segmented button row with 4 options
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
+        ) {
+            DurationSegment("15m", selectedDuration == 15L, Modifier.weight(1f)) { selectedDuration = 15L }
+            DurationSegment("1h", selectedDuration == 60L, Modifier.weight(1f)) { selectedDuration = 60L }
+            DurationSegment("4h", selectedDuration == 240L, Modifier.weight(1f)) { selectedDuration = 240L }
+            DurationSegment("Until I stop", selectedDuration == 0L, Modifier.weight(1f)) { selectedDuration = 0L }
         }
 
         Spacer(Modifier.height(Dimens.spaceXLarge))
@@ -1301,7 +1268,7 @@ private fun ShareTargetSheet(
             onClick = {
                 if (selectedTargetId.isNotBlank()) onStart(
                     selectedTargetId,
-                    effectiveDuration
+                    selectedDuration
                 )
             },
             modifier = Modifier
@@ -1310,14 +1277,15 @@ private fun ShareTargetSheet(
             shape = MaterialTheme.shapes.extraLarge
         ) {
             Icon(
-                imageVector = ImageVector.vectorResource(id = R.drawable.paper_plane),
+                Icons.Default.LocationOn,
                 contentDescription = null,
                 modifier = Modifier.size(Dimens.iconSizeMedium)
             )
             Spacer(Modifier.width(Dimens.spaceSmall))
             Text(
-                text = "Start sharing",
-                style = MaterialTheme.typography.labelLarge
+                text = "Start Sharing",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
             )
         }
 
@@ -1326,21 +1294,25 @@ private fun ShareTargetSheet(
 }
 
 @Composable
-private fun DurationChip(text: String, selected: Boolean, onClick: () -> Unit) {
+private fun DurationSegment(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = MaterialTheme.shapes.extraLarge,
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
         color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
         contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
     ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(
-                horizontal = Dimens.spaceLarge,
-                vertical = Dimens.spaceMedium
-            ),
-            style = MaterialTheme.typography.labelLarge
-        )
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.padding(vertical = Dimens.spaceMedium)
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                maxLines = 1
+            )
+        }
     }
 }
 

@@ -450,6 +450,9 @@ fun MapScreen(
                             items(items = uiState.locations, key = { it.id }) { location ->
                                 MemberLocationItem(
                                     location = location,
+                                    myLatitude = uiState.myLatitude,
+                                    myLongitude = uiState.myLongitude,
+                                    hasMyLocation = uiState.hasMyLocation,
                                     onClick = {
                                         if (location.hasValidLocation) {
                                             scope.launch {
@@ -530,9 +533,13 @@ private fun formatDuration(context: android.content.Context, minutes: Long): Str
 @Composable
 fun MemberLocationItem(
     location: MemberLocationUiModel,
+    myLatitude: Double = 0.0,
+    myLongitude: Double = 0.0,
+    hasMyLocation: Boolean = false,
     onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Row(
         modifier = modifier
             .clickable(onClick = onClick)
@@ -581,6 +588,22 @@ fun MemberLocationItem(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+
+        // Distance label
+        if (hasMyLocation && myLatitude != 0.0 && myLongitude != 0.0 &&
+            location.hasValidLocation
+        ) {
+            val distance = com.ovi.where.core.utils.LocationUtils.calculateDistance(
+                myLatitude, myLongitude,
+                location.latitude, location.longitude
+            )
+            Text(
+                text = com.ovi.where.core.utils.LocationUtils.formatDistance(context, distance),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.width(Dimens.spaceSmall))
         }
 
         if (location.isActive) {

@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
@@ -266,6 +267,22 @@ fun GlobalMapScreen(
         } else {
             sharingSecondsRemaining = null
         }
+    }
+
+    // ── Quick-share state (remembers last-used target) ──────────────────────
+    var lastShareTargetId by remember { mutableStateOf<String?>(null) }
+    var lastShareTargetName by remember { mutableStateOf<String?>(null) }
+    var lastShareDuration by remember { mutableLongStateOf(60L) }
+
+    // ── Sharing start/stop visual feedback ────────────────────────────────────
+    var wasSharing by remember { mutableStateOf(uiState.isSharing) }
+    LaunchedEffect(uiState.isSharing) {
+        if (uiState.isSharing && !wasSharing) {
+            snackbarHostState.showSnackbar("\uD83D\uDCCD Sharing your location")
+        } else if (!uiState.isSharing && wasSharing) {
+            snackbarHostState.showSnackbar("Location sharing stopped")
+        }
+        wasSharing = uiState.isSharing
     }
 
     var mapType by remember { mutableStateOf(MapType.NORMAL) }
@@ -813,7 +830,15 @@ fun GlobalMapScreen(
             ShareTargetSheet(
                 groups = uiState.groups,
                 directTargets = uiState.directTargets,
+                lastShareTargetId = lastShareTargetId,
+                lastShareTargetName = lastShareTargetName,
+                lastShareDuration = lastShareDuration,
                 onStart = { targetId, durationMinutes ->
+                    // Save last-used target for quick-share
+                    val allTargets = uiState.groups + uiState.directTargets
+                    lastShareTargetId = targetId
+                    lastShareTargetName = allTargets.firstOrNull { it.id == targetId }?.name
+                    lastShareDuration = durationMinutes
                     viewModel.showShareSheet(false)
                     viewModel.startSharing(targetId, durationMinutes)
                 }
@@ -1277,6 +1302,9 @@ private fun FilterRow(
 private fun ShareTargetSheet(
     groups: List<GroupFilter>,
     directTargets: List<GroupFilter>,
+    lastShareTargetId: String? = null,
+    lastShareTargetName: String? = null,
+    lastShareDuration: Long = 60L,
     onStart: (String, Long) -> Unit
 ) {
     val targets = groups + directTargets
@@ -1291,6 +1319,61 @@ private fun ShareTargetSheet(
     ) {
         Text("Share Location", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(Dimens.spaceLarge))
+
+        // ── Quick-share option (when a previous target exists) ────────────
+        if (lastShareTargetId != null && lastShareTargetName != null) {
+            val durationLabel = when (lastShareDuration) {
+                15L -> "15m"
+                60L -> "1h"
+                240L -> "4h"
+                0L -> "until stopped"
+                else -> "${lastShareDuration}m"
+            }
+            Surface(
+                onClick = { onStart(lastShareTargetId, lastShareDuration) },
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.tertiaryContainer
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.NearMe,
+                        contentDescription = null,
+                        modifier = Modifier.size(Dimens.iconSizeMedium),
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    Spacer(Modifier.width(Dimens.spaceMedium))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Quick share",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Text(
+                            text = "with $lastShareTargetName for $durationLabel",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                        )
+                    }
+                    Icon(
+                        Icons.Default.LocationOn,
+                        contentDescription = null,
+                        modifier = Modifier.size(Dimens.iconSizeSmall),
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+            }
+            Spacer(Modifier.height(Dimens.spaceMedium))
+            androidx.compose.material3.HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+            Spacer(Modifier.height(Dimens.spaceMedium))
+        }
 
         Text(
             "Share with",

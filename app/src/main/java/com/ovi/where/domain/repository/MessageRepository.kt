@@ -6,7 +6,7 @@ import com.ovi.where.domain.model.Message
 import com.ovi.where.domain.model.MessagePage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
-import com.ovi.where.data.util.Resource as DataResource
+import com.ovi.where.core.common.DataResource
 
 interface MessageRepository {
     fun observeMessages(conversationId: String): Flow<List<Message>>

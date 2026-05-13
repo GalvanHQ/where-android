@@ -3,7 +3,7 @@ package com.ovi.where.domain.repository
 import com.ovi.where.core.common.Resource
 import com.ovi.where.domain.model.Conversation
 import kotlinx.coroutines.flow.Flow
-import com.ovi.where.data.util.Resource as DataResource
+import com.ovi.where.core.common.DataResource
 
 interface ConversationRepository {
     fun observeConversations(): Flow<List<Conversation>>

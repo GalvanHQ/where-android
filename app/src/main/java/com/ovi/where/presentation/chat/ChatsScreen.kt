@@ -170,8 +170,8 @@ fun ChatsScreen(
                 isRefreshing = isRefreshing,
                 onRefresh = {
                     isRefreshing = true
+                    viewModel.onRefresh()
                     scope.launch {
-                        viewModel.onForegroundSync()
                         // 10s timeout for pull-to-refresh
                         delay(PULL_TO_REFRESH_TIMEOUT_MS)
                         isRefreshing = false

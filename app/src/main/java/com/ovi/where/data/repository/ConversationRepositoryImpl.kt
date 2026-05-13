@@ -309,7 +309,7 @@ class ConversationRepositoryImpl @Inject constructor(
      * Returns conversations using the NetworkBoundResource pattern:
      * 1. Query Room for cached conversations
      * 2. Check staleness via CacheStalenessChecker (5-minute threshold)
-     * 3. Fetch from network if stale (with ETag/If-None-Match support)
+     * 3. Fetch from network if stale
      * 4. Save to Room on success
      * 5. Serve stale cache on failure, retry after ≤60 seconds
      *
@@ -325,9 +325,6 @@ class ConversationRepositoryImpl @Inject constructor(
             },
             fetch = {
                 val token = getIdToken()
-                val eTag = cacheStalenessChecker.getETag(CACHE_KEY_CONVERSATIONS)
-                // Fetch conversations from REST API
-                // ETag support: If we have a cached ETag, the server may return 304
                 ChatApiClient.apiService.getConversations("Bearer $token")
             },
             saveFetchResult = { conversations ->
@@ -358,14 +355,20 @@ class ConversationRepositoryImpl @Inject constructor(
             },
             onFetchFailed = { throwable ->
                 Timber.w(throwable, "Failed to fetch conversations from network, serving stale cache")
-                // Schedule retry after ≤60 seconds (Requirement 11.6)
+                // Schedule retry after ≤60 seconds (Requirement 11.6).
+                // We record the failure time and only invalidate if no successful fetch
+                // has occurred in the meantime (avoids race with concurrent success).
+                val failedAt = System.currentTimeMillis()
                 repositoryScope.launch {
                     delay(RETRY_DELAY_MS)
-                    // Invalidate cache metadata so next access triggers a re-fetch
-                    cacheStalenessChecker.updateMetadata(
-                        CACHE_KEY_CONVERSATIONS,
-                        currentTimeMs = 0L // Force staleness on next check
-                    )
+                    val metadata = cacheStalenessChecker.getETag(CACHE_KEY_CONVERSATIONS)
+                    // Only invalidate if metadata hasn't been refreshed since the failure
+                    if (cacheStalenessChecker.shouldFetch(CACHE_KEY_CONVERSATIONS, failedAt + RETRY_DELAY_MS)) {
+                        cacheStalenessChecker.updateMetadata(
+                            CACHE_KEY_CONVERSATIONS,
+                            currentTimeMs = failedAt - CacheStalenessChecker.STALENESS_THRESHOLD_MS - 1
+                        )
+                    }
                 }
             }
         )
@@ -410,14 +413,8 @@ class ConversationRepositoryImpl @Inject constructor(
             shouldFetch = { true }, // Always fetch on explicit refresh
             onFetchFailed = { throwable ->
                 Timber.w(throwable, "Failed to refresh conversations from network")
-                // Schedule retry after ≤60 seconds (Requirement 11.6)
-                repositoryScope.launch {
-                    delay(RETRY_DELAY_MS)
-                    cacheStalenessChecker.updateMetadata(
-                        CACHE_KEY_CONVERSATIONS,
-                        currentTimeMs = 0L
-                    )
-                }
+                // On explicit refresh failure, just log — the user can pull-to-refresh again.
+                // No delayed invalidation needed since this was already a forced refresh.
             }
         )
     }

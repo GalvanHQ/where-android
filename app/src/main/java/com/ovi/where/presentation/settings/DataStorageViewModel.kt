@@ -31,9 +31,9 @@ class DataStorageViewModel @Inject constructor(
     fun calculateCacheSize() {
         viewModelScope.launch {
             val size = withContext(Dispatchers.IO) {
-                val internalCacheSize = getDirSize(context.cacheDir)
-                val coilCacheSize = context.imageLoader.diskCache?.size ?: 0L
-                internalCacheSize + coilCacheSize
+                // cacheDir already includes Coil's disk cache (at cacheDir/image_cache),
+                // so we only walk cacheDir to avoid double-counting.
+                getDirSize(context.cacheDir)
             }
             _uiState.update { it.copy(cacheSizeBytes = size, isLoading = false) }
         }
@@ -51,9 +51,7 @@ class DataStorageViewModel @Inject constructor(
             }
             // Recalculate after clearing
             val newSize = withContext(Dispatchers.IO) {
-                val internalCacheSize = getDirSize(context.cacheDir)
-                val coilCacheSize = context.imageLoader.diskCache?.size ?: 0L
-                internalCacheSize + coilCacheSize
+                getDirSize(context.cacheDir)
             }
             _uiState.update {
                 it.copy(

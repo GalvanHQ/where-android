@@ -4,7 +4,7 @@ import com.ovi.where.core.common.Resource
 import com.ovi.where.domain.model.Group
 import com.ovi.where.domain.model.GroupMember
 import kotlinx.coroutines.flow.Flow
-import com.ovi.where.data.util.Resource as DataResource
+import com.ovi.where.core.common.DataResource
 
 interface GroupRepository {
     suspend fun createGroup(name: String, description: String, avatarUrl: String? = null): Resource<Group>

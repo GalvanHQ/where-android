@@ -81,10 +81,11 @@ class OfflineQueueWorker @AssistedInject constructor(
      */
     private suspend fun executeOperation(type: String, payload: String): Boolean {
         return try {
-            // Operation execution will be implemented by specific operation handlers.
-            // Each OperationType maps to a specific repository call.
-            // For now, this is a placeholder that will be wired to actual network calls.
-            true
+            // TODO: Wire each OperationType to its corresponding repository/network call.
+            // Returning false until real handlers are implemented so operations remain
+            // pending and are retried rather than silently marked as completed.
+            Timber.w("OfflineQueueWorker: executeOperation not yet implemented for type=$type — operation will be retried")
+            false
         } catch (e: Exception) {
             Timber.w(e, "Failed to execute offline operation of type: $type")
             false

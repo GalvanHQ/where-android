@@ -15,6 +15,66 @@ const requireAuth = (req, res, next) => {
 
 router.use(requireAuth);
 
+// GET /api/conversations — List all conversations for the authenticated user
+router.get('/', async (req, res) => {
+    try {
+        const uid = req.user.uid;
+
+        const snapshot = await db.collection('conversations')
+            .where('participantIds', 'array-contains', uid)
+            .orderBy('lastMessageTimestamp', 'desc')
+            .get();
+
+        const conversations = snapshot.docs.map(doc => {
+            const data = doc.data();
+            const unreadCounts = data.unreadCounts || {};
+            return {
+                id: doc.id,
+                type: data.type || 'direct',
+                participantIds: data.participantIds || [],
+                groupId: data.groupId || null,
+                name: data.name || '',
+                photoUrl: data.photoUrl || null,
+                lastMessageText: data.lastMessageText || '',
+                lastMessageSenderId: data.lastMessageSenderId || '',
+                lastMessageTimestamp: data.lastMessageTimestamp || 0,
+                unreadCount: unreadCounts[uid] || 0,
+                createdAt: data.createdAt || 0
+            };
+        });
+
+        res.json(conversations);
+    } catch (error) {
+        console.error('Error fetching conversations:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// GET /api/conversations/unread-counts — Get unread counts for all user's conversations
+router.get('/unread-counts', async (req, res) => {
+    try {
+        const uid = req.user.uid;
+
+        const snapshot = await db.collection('conversations')
+            .where('participantIds', 'array-contains', uid)
+            .get();
+
+        const unreadCounts = snapshot.docs.map(doc => {
+            const data = doc.data();
+            const counts = data.unreadCounts || {};
+            return {
+                conversationId: doc.id,
+                unreadCount: counts[uid] || 0
+            };
+        });
+
+        res.json(unreadCounts);
+    } catch (error) {
+        console.error('Error fetching unread counts:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // GET /api/conversations/:conversationId/messages
 router.get('/:conversationId/messages', async (req, res) => {
     try {
@@ -30,6 +90,92 @@ router.get('/:conversationId/messages', async (req, res) => {
             return res.status(403).json({ error: 'Not a participant' });
         }
 
+        const { before, after, limit } = req.query;
+        const messageLimit = parseInt(limit) || 30;
+
+        // If 'after' param is provided, return messages after that timestamp (for reconnection catch-up)
+        if (after) {
+            const afterTimestamp = parseInt(after);
+            const snapshot = await db.collection('messages')
+                .where('conversationId', '==', conversationId)
+                .where('timestamp', '>', afterTimestamp)
+                .orderBy('timestamp', 'asc')
+                .limit(messageLimit)
+                .get();
+
+            const messages = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+            return res.json(messages);
+        }
+
+        // If 'before' param is provided, return paginated response
+        if (before) {
+            const beforeTimestamp = parseInt(before);
+            const snapshot = await db.collection('messages')
+                .where('conversationId', '==', conversationId)
+                .where('timestamp', '<', beforeTimestamp)
+                .orderBy('timestamp', 'desc')
+                .limit(messageLimit + 1)
+                .get();
+
+            const docs = snapshot.docs;
+            const hasMore = docs.length > messageLimit;
+            const resultDocs = hasMore ? docs.slice(0, messageLimit) : docs;
+
+            const messages = resultDocs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+            // Reverse to return in ascending order
+            messages.reverse();
+
+            const nextCursor = hasMore && messages.length > 0
+                ? String(messages[0].timestamp)
+                : null;
+
+            return res.json({
+                messages,
+                nextCursor,
+                hasMore
+            });
+        }
+
+        // Default: if limit param is explicitly provided (without before), return paginated from latest
+        if (req.query.limit) {
+            const snapshot = await db.collection('messages')
+                .where('conversationId', '==', conversationId)
+                .orderBy('timestamp', 'desc')
+                .limit(messageLimit + 1)
+                .get();
+
+            const docs = snapshot.docs;
+            const hasMore = docs.length > messageLimit;
+            const resultDocs = hasMore ? docs.slice(0, messageLimit) : docs;
+
+            const messages = resultDocs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+            // Reverse to return in ascending order
+            messages.reverse();
+
+            const nextCursor = hasMore && messages.length > 0
+                ? String(messages[0].timestamp)
+                : null;
+
+            return res.json({
+                messages,
+                nextCursor,
+                hasMore
+            });
+        }
+
+        // Backward compatible: no params, return all messages as flat array
         const snapshot = await db.collection('messages')
             .where('conversationId', '==', conversationId)
             .orderBy('timestamp', 'asc')

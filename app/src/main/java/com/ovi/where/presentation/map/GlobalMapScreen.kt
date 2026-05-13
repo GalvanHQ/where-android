@@ -646,23 +646,15 @@ fun GlobalMapScreen(
                 } else {
                     FloatingActionButton(
                         onClick = {
-                            when {
-                                !locationGranted -> {
-                                    permissionLauncher.launch(
-                                        arrayOf(
-                                            Manifest.permission.ACCESS_FINE_LOCATION,
-                                            Manifest.permission.ACCESS_COARSE_LOCATION
-                                        )
+                            if (!locationGranted) {
+                                permissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
                                     )
-                                }
-
-                                uiState.groups.isEmpty() && uiState.directTargets.isEmpty() -> {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("Add friends or join a group first")
-                                    }
-                                }
-
-                                else -> viewModel.showShareSheet(true)
+                                )
+                            } else {
+                                viewModel.showShareSheet(true)
                             }
                         },
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -683,7 +675,7 @@ fun GlobalMapScreen(
                 Card(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 84.dp, start = 48.dp, end = 48.dp),
+                        .padding(bottom = 120.dp, start = 48.dp, end = 48.dp),
                     shape = MaterialTheme.shapes.large,
                     elevation = CardDefaults.cardElevation(2.dp),
                     colors = CardDefaults.cardColors(
@@ -1232,19 +1224,39 @@ private fun ShareTargetSheet(
             }
             if (targets.isEmpty()) {
                 item {
-                    Text(
-                        "No targets available",
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(Dimens.spaceLarge),
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                            .padding(vertical = Dimens.spaceXLarge),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.Groups,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Spacer(Modifier.height(Dimens.spaceMedium))
+                        Text(
+                            "No one to share with yet",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(Modifier.height(Dimens.spaceSmall))
+                        Text(
+                            "Add friends or join a group to start sharing your location",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
 
-        Spacer(Modifier.height(Dimens.spaceLarge))
+        // Only show duration and start button when there are targets
+        if (targets.isNotEmpty()) {
+            Spacer(Modifier.height(Dimens.spaceLarge))
         Text(
             "Duration",
             style = MaterialTheme.typography.labelLarge,
@@ -1287,6 +1299,9 @@ private fun ShareTargetSheet(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold
             )
+        }
+
+        Spacer(Modifier.height(Dimens.spaceLarge))
         }
 
         Spacer(Modifier.height(Dimens.spaceLarge))

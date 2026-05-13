@@ -270,6 +270,7 @@ fun GlobalMapScreen(
 
     var mapType by remember { mutableStateOf(MapType.NORMAL) }
     var showMapTypeSheet by remember { mutableStateOf(false) }
+    var showMyProfileSheet by remember { mutableStateOf(false) }
 
     // ── Bottom sheet state ────────────────────────────────────────────────────
     val friendSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
@@ -331,7 +332,12 @@ fun GlobalMapScreen(
                         keys = arrayOf(myAvatarBitmap ?: Unit),
                         state = myMarkerState,
                         title = "My Location",
-                        zIndex = 10f
+                        zIndex = 10f,
+                        onClick = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            showMyProfileSheet = true
+                            true
+                        }
                     ) {
                         MyLocationMarkerContent(
                             avatarBitmap = myAvatarBitmap
@@ -827,6 +833,129 @@ fun GlobalMapScreen(
                     showMapTypeSheet = false
                 }
             )
+        }
+    }
+
+    // ── My profile bottom sheet (tap own marker) ──────────────────────────────
+    if (showMyProfileSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showMyProfileSheet = false }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(Dimens.spaceXLarge)
+                    .navigationBarsPadding(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Avatar
+                if (!uiState.myPhotoUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = uiState.myPhotoUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(Dimens.avatarSizeXLarge)
+                            .clip(CircleShape)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(Dimens.avatarSizeXLarge)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(Dimens.iconSizeLarge),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(Dimens.spaceLarge))
+
+                Text(
+                    text = "You",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(Modifier.height(Dimens.spaceSmall))
+
+                // Coordinates
+                if (uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
+                    Text(
+                        text = "%.5f, %.5f".format(uiState.myLatitude, uiState.myLongitude),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(Modifier.height(Dimens.spaceMedium))
+
+                // Sharing status
+                if (uiState.isSharing) {
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.tertiaryContainer
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = Dimens.spaceSmall),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            SharingPulseDot()
+                            Spacer(Modifier.width(Dimens.spaceSmall))
+                            Text(
+                                text = "Sharing live",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "Not sharing location",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(Modifier.height(Dimens.spaceXLarge))
+
+                // Action: Start/Stop sharing
+                if (uiState.isSharing) {
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.stopSharing()
+                            showMyProfileSheet = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Icon(Icons.Rounded.Stop, null, modifier = Modifier.size(Dimens.iconSizeMedium))
+                        Spacer(Modifier.width(Dimens.spaceSmall))
+                        Text("Stop Sharing")
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            showMyProfileSheet = false
+                            viewModel.showShareSheet(true)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(Dimens.iconSizeMedium))
+                        Spacer(Modifier.width(Dimens.spaceSmall))
+                        Text("Share My Location")
+                    }
+                }
+
+                Spacer(Modifier.height(Dimens.spaceLarge))
+            }
         }
     }
 }

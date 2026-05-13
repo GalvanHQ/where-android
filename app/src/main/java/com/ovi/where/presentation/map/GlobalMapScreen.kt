@@ -245,8 +245,12 @@ fun GlobalMapScreen(
             ) {
                 // ── My location marker (inside GoogleMap → sticks to LatLng) ──
                 if (uiState.hasMyLocation && uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
-                    val myMarkerState = remember(uiState.myLatitude, uiState.myLongitude) {
+                    // ⚡ Bolt: Use a stable remember block and manually update the marker position
+                    // to prevent unnecessary marker object recreation and UI flickering during movements
+                    val myMarkerState = remember {
                         MarkerState(position = LatLng(uiState.myLatitude, uiState.myLongitude))
+                    }.apply {
+                        position = LatLng(uiState.myLatitude, uiState.myLongitude)
                     }
 
                     // Pre-load my profile bitmap for marker
@@ -287,10 +291,13 @@ fun GlobalMapScreen(
                     it.latitude != 0.0 && it.longitude != 0.0
                 }
                 validFriends.forEach { friend ->
-                    val friendMarkerState =
-                        remember(friend.userId, friend.latitude, friend.longitude) {
-                            MarkerState(position = LatLng(friend.latitude, friend.longitude))
-                        }
+                    // ⚡ Bolt: Remember MarkerState by userId only, updating position directly
+                    // This prevents recreating the entire MarkerState when coordinates change
+                    val friendMarkerState = remember(friend.userId) {
+                        MarkerState(position = LatLng(friend.latitude, friend.longitude))
+                    }.apply {
+                        position = LatLng(friend.latitude, friend.longitude)
+                    }
 
                     // Pre-load friend avatar bitmap for marker
                     var friendAvatarBitmap by remember(friend.userId) { mutableStateOf<Bitmap?>(null) }

@@ -268,10 +268,13 @@ fun MapScreen(
                 // Member markers — geo-anchored via MarkerComposable
                 val validLocations = uiState.locations.filter { it.hasValidLocation }
                 validLocations.forEach { location ->
-                    val markerState =
-                        remember(location.userId, location.latitude, location.longitude) {
-                            MarkerState(position = LatLng(location.latitude, location.longitude))
-                        }
+                    // ⚡ Bolt: Remember MarkerState by userId only, and update position directly
+                    // This prevents recreating the entire MarkerState (and marker UI) on every location update
+                    val markerState = remember(location.userId) {
+                        MarkerState(position = LatLng(location.latitude, location.longitude))
+                    }.apply {
+                        position = LatLng(location.latitude, location.longitude)
+                    }
                     val avatarColor =
                         AvatarColors[location.userId.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
                     MarkerComposable(

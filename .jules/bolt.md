@@ -1,0 +1,3 @@
+## 2024-05-18 - [Jetpack Compose Maps: MarkerState Recreation Bottleneck]
+**Learning:** Keying `remember` blocks to dynamic coordinates (`latitude`, `longitude`) for `MarkerState` causes a completely new `MarkerState` object to be recreated on every single location update. This forces the underlying Google Maps SDK to destroy the old marker and allocate a new one, causing UI flickering and heavy garbage collection.
+**Action:** Always key `remember { MarkerState(...) }` to a stable identifier (like `userId` or just `remember {}` for static components) and manually update the mutable `position` property directly to smoothly animate marker movements without recreation.

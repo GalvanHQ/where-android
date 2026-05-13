@@ -6,6 +6,7 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.constants.AppConstants
+import com.ovi.where.core.constants.AppConstants.MILLIS_PER_MINUTE
 import com.ovi.where.domain.model.SharedLocation
 import com.ovi.where.domain.repository.LocationRepository
 import kotlinx.coroutines.channels.awaitClose
@@ -46,7 +47,7 @@ class LocationRepositoryImpl @Inject constructor(
         return try {
             val uid = currentUid ?: return Resource.Error("Not authenticated")
             val expiryTime = if (durationMinutes > 0) {
-                System.currentTimeMillis() + (durationMinutes * 60 * 1000)
+                System.currentTimeMillis() + (durationMinutes * MILLIS_PER_MINUTE)
             } else {
                 Long.MAX_VALUE
             }
@@ -181,7 +182,6 @@ class LocationRepositoryImpl @Inject constructor(
             // Throttle writes — skip if within throttle window
             val shouldThrottle = (now - lastWriteTimestamp) < AppConstants.LOCATION_WRITE_THROTTLE_MS
             if (shouldThrottle) {
-                Timber.d("Write throttled — skipping Firestore update (${now - lastWriteTimestamp}ms since last)")
                 return Resource.Success(Unit)
             }
             lastWriteTimestamp = now

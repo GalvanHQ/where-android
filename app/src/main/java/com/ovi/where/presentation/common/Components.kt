@@ -1,11 +1,14 @@
 package com.ovi.where.presentation.common
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +30,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
@@ -52,6 +56,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,8 +84,11 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.ovi.where.R
 import com.ovi.where.core.theme.Dimens
+import com.ovi.where.data.network.ConnectivityObserver
+import kotlinx.coroutines.delay
 
 // ── Loading ───────────────────────────────────────────────────────────────────
 
@@ -111,6 +120,15 @@ fun LoadingIndicator(
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 
+/**
+ * Displays an empty state with an icon, a descriptive message (max 120 characters),
+ * and an optional action button when a list has zero items.
+ *
+ * @param message Descriptive message, truncated to 120 characters maximum.
+ * @param icon Optional icon displayed above the message.
+ * @param action Optional callback for the action button.
+ * @param actionLabel Label for the action button.
+ */
 @Composable
 fun EmptyState(
     message: String,
@@ -119,6 +137,8 @@ fun EmptyState(
     action: (() -> Unit)? = null,
     actionLabel: String? = null
 ) {
+    val truncatedMessage = if (message.length > 120) message.take(120) else message
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -136,10 +156,12 @@ fun EmptyState(
             Spacer(modifier = Modifier.height(Dimens.spaceLarge))
         }
         Text(
-            text = message,
+            text = truncatedMessage,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis
         )
         action?.let {
             Spacer(modifier = Modifier.height(Dimens.spaceLarge))
@@ -153,6 +175,13 @@ fun EmptyState(
 
 // ── Error view ────────────────────────────────────────────────────────────────
 
+/**
+ * Displays an error state with an error message describing the failure reason
+ * and a retry button that re-triggers the failed request.
+ *
+ * @param message Error message describing the failure reason.
+ * @param onRetry Callback invoked when the retry button is tapped, re-triggering the failed request.
+ */
 @Composable
 fun ErrorView(
     message: String,
@@ -201,7 +230,8 @@ fun PrimaryButton(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .height(Dimens.buttonHeight),
+            .height(Dimens.buttonHeight)
+            .pressAnimation(),
         enabled = enabled && !isLoading,
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
@@ -231,7 +261,7 @@ fun SecondaryButton(
 ) {
     ElevatedButton(
         onClick   = onClick,
-        modifier  = modifier.fillMaxWidth().height(Dimens.buttonHeight),
+        modifier  = modifier.fillMaxWidth().height(Dimens.buttonHeight).pressAnimation(),
         enabled   = enabled && !isLoading,
         shape     = MaterialTheme.shapes.medium
     ) {
@@ -256,7 +286,7 @@ fun TonalButton(
 ) {
     FilledTonalButton(
         onClick  = onClick,
-        modifier = modifier.height(Dimens.buttonHeightSmall),
+        modifier = modifier.height(Dimens.buttonHeightSmall).pressAnimation(),
         enabled  = enabled && !isLoading,
         shape    = MaterialTheme.shapes.medium
     ) {
@@ -657,6 +687,13 @@ fun AnnotatedClickableText(
 
 // ── Shimmer loading placeholders ──────────────────────────────────────────────
 
+/**
+ * Creates a shimmer brush with a 900ms linear gradient sweep that repeats
+ * until loading completes. Used for skeleton placeholder content.
+ *
+ * @param showShimmer Whether to show the shimmer animation or a transparent brush.
+ * @param targetValue The end offset for the gradient sweep animation.
+ */
 @Composable
 fun shimmerBrush(showShimmer: Boolean = true, targetValue: Float = 1000f): Brush {
     return if (showShimmer) {
@@ -683,6 +720,24 @@ fun shimmerBrush(showShimmer: Boolean = true, targetValue: Float = 1000f): Brush
     } else {
         Brush.linearGradient(colors = listOf(Color.Transparent, Color.Transparent))
     }
+}
+
+/**
+ * A generic shimmer placeholder composable that can match expected content layout
+ * dimensions. Displays a 900ms linear gradient sweep repeating until loading completes.
+ *
+ * @param modifier Modifier to control the size and shape of the placeholder.
+ */
+@Composable
+fun ShimmerPlaceholder(
+    modifier: Modifier = Modifier
+) {
+    val brush = shimmerBrush()
+    Box(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.small)
+            .background(brush)
+    )
 }
 
 @Composable
@@ -830,7 +885,7 @@ fun WhereTabHeader(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(start = Dimens.spaceXLarge, end = Dimens.spaceMedium, top = Dimens.spaceXLarge, bottom = Dimens.spaceMedium),
+            .padding(start = Dimens.spaceLarge, end = Dimens.spaceMedium, top = Dimens.spaceLarge, bottom = Dimens.spaceMedium),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -847,5 +902,70 @@ fun WhereTabHeader(
             horizontalArrangement = Arrangement.End,
             content = actions
         )
+    }
+}
+
+// ── Offline banner ────────────────────────────────────────────────────────────
+
+/**
+ * Displays a non-obscuring banner at the top of the screen indicating offline status.
+ * The banner does not exceed 48dp in height and auto-dismisses within 3 seconds
+ * after connectivity is restored.
+ *
+ * @param connectivityObserver The [ConnectivityObserver] providing network state.
+ * @param modifier Optional modifier for the banner container.
+ */
+@Composable
+fun OfflineBanner(
+    connectivityObserver: ConnectivityObserver,
+    modifier: Modifier = Modifier
+) {
+    val isConnected by connectivityObserver.isConnected.collectAsState()
+    var showBanner by remember { mutableStateOf(!isConnected) }
+
+    // When connectivity is restored, dismiss the banner after 3 seconds
+    LaunchedEffect(isConnected) {
+        if (isConnected) {
+            delay(3000L)
+            showBanner = false
+        } else {
+            showBanner = true
+        }
+    }
+
+    AnimatedVisibility(
+        visible = showBanner,
+        enter = expandVertically(),
+        exit = shrinkVertically(),
+        modifier = modifier
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 48.dp),
+            color = MaterialTheme.colorScheme.errorContainer,
+            tonalElevation = 2.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CloudOff,
+                    contentDescription = null,
+                    modifier = Modifier.size(Dimens.iconSizeMedium),
+                    tint = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Spacer(modifier = Modifier.width(Dimens.spaceMedium))
+                Text(
+                    text = stringResource(R.string.banner_offline),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
     }
 }

@@ -24,6 +24,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import com.ovi.where.data.util.Resource as DataResource
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatsViewModelTest : StringSpec({
@@ -78,6 +79,12 @@ class ChatsViewModelTest : StringSpec({
         unreadCounts = unreadCounts
     )
 
+    /** Helper to mock getConversationsResource with a Success result */
+    fun mockConversationsResource(conversations: List<Conversation>) {
+        every { conversationRepository.getConversationsResource() } returns
+            flowOf(DataResource.Success(conversations))
+    }
+
     "conversations are sorted by lastMessageTimestamp DESC from repository" {
         runTest(testDispatcher) {
             val conversations = listOf(
@@ -86,7 +93,7 @@ class ChatsViewModelTest : StringSpec({
                 createConversation("c3", "Charlie", lastMessageTimestamp = 2000L)
             ).sortedByDescending { it.lastMessageTimestamp }
 
-            every { observeConversationsUseCase() } returns flowOf(conversations)
+            mockConversationsResource(conversations)
 
             val vm = ChatsViewModel(
                 observeConversationsUseCase,
@@ -114,7 +121,7 @@ class ChatsViewModelTest : StringSpec({
                 createConversation("c3", "ALICE Smith", lastMessageTimestamp = 1000L)
             )
 
-            every { observeConversationsUseCase() } returns flowOf(conversations)
+            mockConversationsResource(conversations)
 
             val vm = ChatsViewModel(
                 observeConversationsUseCase,
@@ -141,7 +148,7 @@ class ChatsViewModelTest : StringSpec({
                 createConversation("c2", "Bob", lastMessageText = "Goodbye", lastMessageTimestamp = 1000L)
             )
 
-            every { observeConversationsUseCase() } returns flowOf(conversations)
+            mockConversationsResource(conversations)
 
             val vm = ChatsViewModel(
                 observeConversationsUseCase,
@@ -168,7 +175,7 @@ class ChatsViewModelTest : StringSpec({
                 createConversation("c2", "Bob", lastMessageTimestamp = 1000L)
             )
 
-            every { observeConversationsUseCase() } returns flowOf(conversations)
+            mockConversationsResource(conversations)
 
             val vm = ChatsViewModel(
                 observeConversationsUseCase,
@@ -191,7 +198,7 @@ class ChatsViewModelTest : StringSpec({
 
     "formatUnreadCount caps at 99+" {
         runTest(testDispatcher) {
-            every { observeConversationsUseCase() } returns flowOf(emptyList())
+            mockConversationsResource(emptyList())
 
             val vm = ChatsViewModel(
                 observeConversationsUseCase,
@@ -216,7 +223,7 @@ class ChatsViewModelTest : StringSpec({
                 createConversation("c1", "Alice", lastMessageTimestamp = 1000L, participantIds = listOf("user1", "user2"))
             )
 
-            every { observeConversationsUseCase() } returns flowOf(conversations)
+            mockConversationsResource(conversations)
 
             val vm = ChatsViewModel(
                 observeConversationsUseCase,
@@ -242,7 +249,7 @@ class ChatsViewModelTest : StringSpec({
                 createConversation("c1", "Alice", lastMessageTimestamp = 1000L, participantIds = listOf("user1", "user2"))
             )
 
-            every { observeConversationsUseCase() } returns flowOf(conversations)
+            mockConversationsResource(conversations)
 
             val vm = ChatsViewModel(
                 observeConversationsUseCase,
@@ -275,7 +282,7 @@ class ChatsViewModelTest : StringSpec({
                 )
             )
 
-            every { observeConversationsUseCase() } returns flowOf(conversations)
+            mockConversationsResource(conversations)
 
             val vm = ChatsViewModel(
                 observeConversationsUseCase,

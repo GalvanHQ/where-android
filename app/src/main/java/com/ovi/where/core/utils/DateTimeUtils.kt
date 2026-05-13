@@ -3,6 +3,11 @@ package com.ovi.where.core.utils
 import android.content.Context
 import com.google.firebase.Timestamp
 import com.ovi.where.R
+import com.ovi.where.core.constants.AppConstants.MILLIS_PER_DAY
+import com.ovi.where.core.constants.AppConstants.MILLIS_PER_HOUR
+import com.ovi.where.core.constants.AppConstants.MILLIS_PER_MINUTE
+import com.ovi.where.core.constants.AppConstants.MILLIS_PER_WEEK
+import com.ovi.where.core.constants.AppConstants.MINUTES_PER_DAY
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -30,17 +35,17 @@ object DateTimeUtils {
         val diff = now - timestamp
         
         return when {
-            diff < 60_000 -> context.getString(R.string.time_just_now)
-            diff < 3600_000 -> {
-                val minutes = (diff / 60_000).toInt()
+            diff < MILLIS_PER_MINUTE -> context.getString(R.string.time_just_now)
+            diff < MILLIS_PER_HOUR -> {
+                val minutes = (diff / MILLIS_PER_MINUTE).toInt()
                 context.resources.getQuantityString(R.plurals.time_ago_minutes, minutes, minutes)
             }
-            diff < 86_400_000 -> {
-                val hours = (diff / 3_600_000).toInt()
+            diff < MILLIS_PER_DAY -> {
+                val hours = (diff / MILLIS_PER_HOUR).toInt()
                 context.resources.getQuantityString(R.plurals.time_ago_hours, hours, hours)
             }
-            diff < 604_800_000 -> {
-                val days = (diff / 86_400_000).toInt()
+            diff < MILLIS_PER_WEEK -> {
+                val days = (diff / MILLIS_PER_DAY).toInt()
                 context.resources.getQuantityString(R.plurals.time_ago_days, days, days)
             }
             else -> formatDate(timestamp)
@@ -54,22 +59,22 @@ object DateTimeUtils {
         if (diff <= 0) return context.getString(R.string.time_expired)
         
         return when {
-            diff < 60_000 -> {
+            diff < MILLIS_PER_MINUTE -> {
                 val seconds = diff / 1000
                 context.getString(R.string.time_seconds_remaining, seconds)
             }
-            diff < 3_600_000 -> {
-                val minutes = diff / 60_000
-                val remainingSeconds = (diff % 60_000) / 1000
+            diff < MILLIS_PER_HOUR -> {
+                val minutes = diff / MILLIS_PER_MINUTE
+                val remainingSeconds = (diff % MILLIS_PER_MINUTE) / 1000
                 if (remainingSeconds == 0L) {
                     context.getString(R.string.time_minutes_remaining, minutes)
                 } else {
                     context.getString(R.string.time_minutes_seconds_remaining, minutes, remainingSeconds)
                 }
             }
-            diff < 86_400_000 -> {
-                val hours = diff / 3_600_000
-                val minutes = (diff % 3_600_000) / 60_000
+            diff < MILLIS_PER_DAY -> {
+                val hours = diff / MILLIS_PER_HOUR
+                val minutes = (diff % MILLIS_PER_HOUR) / MILLIS_PER_MINUTE
                 if (minutes == 0L) {
                     context.getString(R.string.time_hours_remaining, hours)
                 } else {
@@ -77,8 +82,8 @@ object DateTimeUtils {
                 }
             }
             else -> {
-                val days = diff / 86_400_000
-                val hours = (diff % 86_400_000) / 3_600_000
+                val days = diff / MILLIS_PER_DAY
+                val hours = (diff % MILLIS_PER_DAY) / MILLIS_PER_HOUR
                 if (hours == 0L) {
                     context.getString(R.string.time_days_remaining, days)
                 } else {
@@ -92,19 +97,19 @@ object DateTimeUtils {
         return System.currentTimeMillis() > timestamp
     }
     
-    fun isExpiringSoon(timestamp: Long, thresholdMs: Long = 60_000): Boolean {
+    fun isExpiringSoon(timestamp: Long, thresholdMs: Long = MILLIS_PER_MINUTE): Boolean {
         val now = System.currentTimeMillis()
         return (timestamp - now) in 1..thresholdMs
     }
     
     fun formatDurationMinutes(context: Context, minutes: Long): String {
         return when {
-            minutes < 60 -> {
+            minutes < SECONDS_PER_MINUTE -> {
                 context.resources.getQuantityString(R.plurals.duration_format_minutes, minutes.toInt(), minutes.toInt())
             }
-            minutes < 1440 -> {
-                val hours = minutes / 60
-                val remainingMinutes = minutes % 60
+            minutes < MINUTES_PER_DAY -> {
+                val hours = minutes / SECONDS_PER_MINUTE
+                val remainingMinutes = minutes % SECONDS_PER_MINUTE
                 if (remainingMinutes == 0L) {
                     context.resources.getQuantityString(R.plurals.duration_format_hours, hours.toInt(), hours.toInt())
                 } else {
@@ -114,7 +119,7 @@ object DateTimeUtils {
                 }
             }
             else -> {
-                val days = minutes / 1440
+                val days = minutes / MINUTES_PER_DAY
                 context.resources.getQuantityString(R.plurals.duration_format_days, days.toInt(), days.toInt())
             }
         }
@@ -125,4 +130,7 @@ object DateTimeUtils {
     }
     
     fun now(): Long = System.currentTimeMillis()
+
+    /** Minutes per hour (used for duration formatting). */
+    private const val SECONDS_PER_MINUTE = 60L
 }

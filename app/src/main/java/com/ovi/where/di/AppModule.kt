@@ -18,6 +18,7 @@ import com.google.firebase.storage.FirebaseStorage
 import com.ovi.where.core.config.FeatureFlags
 import com.ovi.where.data.local.db.AppDatabase
 import com.ovi.where.data.local.prefs.UserPreferences
+import com.ovi.where.data.repository.NotificationPreferencesRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -94,9 +95,22 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideCacheMetadataDao(database: AppDatabase) = database.cacheMetadataDao()
+
+    @Provides
+    @Singleton
+    fun provideOfflineOperationDao(database: AppDatabase) = database.offlineOperationDao()
+
+    @Provides
+    @Singleton
     fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> = context.dataStore
 
     @Provides
     @Singleton
     fun provideUserPreferences(dataStore: DataStore<Preferences>): UserPreferences = UserPreferences(dataStore)
+
+    @Provides
+    @Singleton
+    fun provideNotificationPreferencesRepository(dataStore: DataStore<Preferences>): NotificationPreferencesRepository =
+        NotificationPreferencesRepository(dataStore)
 }

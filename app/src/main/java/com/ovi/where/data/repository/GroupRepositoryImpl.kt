@@ -6,26 +6,45 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.constants.AppConstants
+import com.ovi.where.data.local.CacheStalenessChecker
 import com.ovi.where.domain.model.Group
 import com.ovi.where.domain.model.GroupMember
 import com.ovi.where.domain.model.MemberRole
 import com.ovi.where.domain.repository.GroupRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import timber.log.Timber
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.ovi.where.data.util.Resource as DataResource
 
 @Singleton
 class GroupRepositoryImpl @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val cacheStalenessChecker: CacheStalenessChecker
 ) : GroupRepository {
 
     private val currentUid: String?
         get() = firebaseAuth.currentUser?.uid
+
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** In-memory cache for group members (since no Room entity exists for group members) */
+    private val groupMembersCache = ConcurrentHashMap<String, MutableStateFlow<List<GroupMember>>>()
 
     override suspend fun createGroup(name: String, description: String, avatarUrl: String?): Resource<Group> {
         return try {
@@ -308,5 +327,72 @@ class GroupRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to update member role")
         }
+    }
+
+    // ─── NetworkBoundResource Pattern (Requirements 11.1, 11.2, 11.3, 11.6) ───
+
+    /**
+     * Returns group members using the NetworkBoundResource pattern:
+     * 1. Serves in-memory cached members immediately (Loading state)
+     * 2. Checks staleness via CacheStalenessChecker (5-minute threshold)
+     * 3. Fetches from Firestore if stale
+     * 4. Updates in-memory cache on success (Success state)
+     * 5. Serves stale cache on failure (Error state with cached data)
+     *
+     * Since there's no Room entity for group members, we use an in-memory
+     * MutableStateFlow as the cache layer, backed by CacheStalenessChecker
+     * for staleness tracking.
+     *
+     * This method should only be called from ViewModel init blocks or explicit user actions,
+     * NOT from Compose recomposition (Requirement 11.1).
+     */
+    override fun getGroupMembersResource(groupId: String): Flow<DataResource<List<GroupMember>>> {
+        val cacheKey = "group_members_$groupId"
+        val cachedFlow = groupMembersCache.getOrPut(groupId) {
+            MutableStateFlow(emptyList())
+        }
+
+        return flow {
+            // Step 1: Emit Loading with current cached data
+            val cachedData = cachedFlow.value
+            emit(DataResource.Loading(cachedData))
+
+            // Step 2: Check if we should fetch
+            val shouldFetch = cachedData.isEmpty() || cacheStalenessChecker.shouldFetch(cacheKey)
+
+            if (shouldFetch) {
+                try {
+                    // Step 3: Fetch from Firestore
+                    val members = firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
+                        .document(groupId)
+                        .collection(AppConstants.FIRESTORE_COLLECTION_MEMBERS)
+                        .get()
+                        .await()
+                        .toObjects(GroupMember::class.java)
+
+                    // Step 4: Update cache on success
+                    cachedFlow.value = members
+                    cacheStalenessChecker.updateMetadata(cacheKey)
+                    emit(DataResource.Success(members))
+                } catch (throwable: Throwable) {
+                    // Step 5: Serve stale cache on failure
+                    Timber.w(throwable, "Failed to fetch group members for $groupId, serving stale cache")
+                    emit(DataResource.Error(throwable, cachedData))
+                    // Schedule retry after ≤60 seconds (Requirement 11.6)
+                    repositoryScope.launch {
+                        delay(RETRY_DELAY_MS)
+                        cacheStalenessChecker.updateMetadata(cacheKey, currentTimeMs = 0L)
+                    }
+                }
+            } else {
+                // Cache is fresh, serve it directly
+                emit(DataResource.Success(cachedData))
+            }
+        }
+    }
+
+    companion object {
+        /** Maximum delay before retrying a failed fetch of stale data (Requirement 11.6) */
+        private const val RETRY_DELAY_MS = 60_000L
     }
 }

@@ -1,7 +1,7 @@
 package com.ovi.where.presentation.people
 
 import android.text.format.DateUtils
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,22 +23,32 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ovi.where.core.theme.Dimens
+import com.ovi.where.core.constants.AppConstants.PULL_TO_REFRESH_TIMEOUT_MS
+import com.ovi.where.presentation.common.LIST_ITEM_ANIMATION_DURATION_MS
 import com.ovi.where.presentation.common.WhereTopAppBar
 import com.ovi.where.presentation.model.FriendRequestUiModel
 import com.ovi.where.presentation.people.components.LiveRingAvatar
 import com.ovi.where.presentation.people.components.RequestsEmptyState
 import com.ovi.where.presentation.people.components.RequestsSkeleton
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,11 +61,20 @@ fun FriendRequestsScreen(
 
     val tabs = listOf("Incoming", "Sent")
 
+    // Scroll behavior for collapsing top app bar
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+
+    // Pull-to-refresh state
+    var isRefreshing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             WhereTopAppBar(
                 title = "Friend Requests",
-                onNavigateBack = onNavigateBack
+                onNavigateBack = onNavigateBack,
+                scrollBehavior = scrollBehavior
             )
         }
     ) { paddingValues ->
@@ -64,6 +83,8 @@ fun FriendRequestsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            Spacer(modifier = Modifier.height(Dimens.spaceLarge))
+
             // Segmented tab control
             TabRow(selectedTabIndex = selectedTab) {
                 tabs.forEachIndexed { index, title ->
@@ -75,52 +96,82 @@ fun FriendRequestsScreen(
                 }
             }
 
-            // Content per tab
-            when {
-                uiState.isLoading -> {
-                    RequestsSkeleton()
+            // Content per tab with pull-to-refresh
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = {
+                    isRefreshing = true
+                    scope.launch {
+                        // Trigger re-observation of requests
+                        viewModel.refresh()
+                        // 10s timeout for pull-to-refresh
+                        delay(PULL_TO_REFRESH_TIMEOUT_MS)
+                        isRefreshing = false
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Stop refresh indicator when data arrives
+                if (isRefreshing && !uiState.isLoading) {
+                    LaunchedEffect(Unit) { isRefreshing = false }
                 }
-                selectedTab == 0 -> {
-                    // Incoming tab
-                    if (uiState.requests.isEmpty()) {
-                        RequestsEmptyState(tab = "incoming")
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(Dimens.spaceLarge),
-                            verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
-                        ) {
-                            items(
-                                items = uiState.requests,
-                                key = { it.pairId }
-                            ) { request ->
-                                IncomingRequestRow(
-                                    request = request,
-                                    onAccept = { viewModel.acceptRequest(request.requesterId) },
-                                    onDecline = { viewModel.declineRequest(request.requesterId) }
-                                )
+
+                when {
+                    uiState.isLoading && !isRefreshing -> {
+                        RequestsSkeleton()
+                    }
+                    selectedTab == 0 -> {
+                        // Incoming tab
+                        if (uiState.requests.isEmpty()) {
+                            RequestsEmptyState(tab = "incoming")
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(Dimens.spaceLarge),
+                                verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
+                            ) {
+                                items(
+                                    items = uiState.requests,
+                                    key = { it.pairId }
+                                ) { request ->
+                                    IncomingRequestRow(
+                                        request = request,
+                                        onAccept = { viewModel.acceptRequest(request.requesterId) },
+                                        onDecline = { viewModel.declineRequest(request.requesterId) },
+                                        modifier = Modifier.animateItem(
+                                            fadeInSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
+                                            placementSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
+                                            fadeOutSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS)
+                                        )
+                                    )
+                                }
                             }
                         }
                     }
-                }
-                selectedTab == 1 -> {
-                    // Sent tab
-                    if (uiState.outgoingRequests.isEmpty()) {
-                        RequestsEmptyState(tab = "outgoing")
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(Dimens.spaceLarge),
-                            verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
-                        ) {
-                            items(
-                                items = uiState.outgoingRequests,
-                                key = { it.pairId }
-                            ) { request ->
-                                OutgoingRequestRow(
-                                    request = request,
-                                    onCancel = { viewModel.cancelRequest(request.requesterId) }
-                                )
+                    selectedTab == 1 -> {
+                        // Sent tab
+                        if (uiState.outgoingRequests.isEmpty()) {
+                            RequestsEmptyState(tab = "outgoing")
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(Dimens.spaceLarge),
+                                verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
+                            ) {
+                                items(
+                                    items = uiState.outgoingRequests,
+                                    key = { it.pairId }
+                                ) { request ->
+                                    OutgoingRequestRow(
+                                        request = request,
+                                        onCancel = { viewModel.cancelRequest(request.requesterId) },
+                                        modifier = Modifier.animateItem(
+                                            fadeInSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
+                                            placementSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
+                                            fadeOutSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS)
+                                        )
+                                    )
+                                }
                             }
                         }
                     }
@@ -134,10 +185,11 @@ fun FriendRequestsScreen(
 private fun IncomingRequestRow(
     request: FriendRequestUiModel,
     onAccept: () -> Unit,
-    onDecline: () -> Unit
+    onDecline: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = Dimens.spaceSmall),
         verticalAlignment = Alignment.CenterVertically
@@ -190,10 +242,11 @@ private fun IncomingRequestRow(
 @Composable
 private fun OutgoingRequestRow(
     request: FriendRequestUiModel,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = Dimens.spaceSmall),
         verticalAlignment = Alignment.CenterVertically

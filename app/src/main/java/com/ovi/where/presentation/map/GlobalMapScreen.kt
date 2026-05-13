@@ -1415,8 +1415,13 @@ private fun Life360PinMarker(
     avatarBitmap: Bitmap?,
     fallbackLabel: String,
     accentColor: Color,
-    borderColor: Color = Color.White
+    borderColor: Color = Color.Unspecified
 ) {
+    val resolvedBorderColor = if (borderColor == Color.Unspecified) {
+        MaterialTheme.colorScheme.surface
+    } else {
+        borderColor
+    }
     val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
 
     Column(
@@ -1433,7 +1438,7 @@ private fun Life360PinMarker(
                     ambientColor = accentColor.copy(alpha = 0.25f),
                     spotColor = accentColor.copy(alpha = 0.35f)
                 )
-                .background(borderColor, CircleShape)
+                .background(resolvedBorderColor, CircleShape)
                 .padding(PIN_BORDER_WIDTH)
                 .clip(CircleShape)
                 .background(accentColor)
@@ -1451,7 +1456,7 @@ private fun Life360PinMarker(
             } else {
                 Text(
                     text = fallbackLabel,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.ExtraBold
                 )

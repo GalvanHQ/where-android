@@ -38,4 +38,58 @@ object AppConstants {
     const val USERNAME_MIN_LENGTH = 3
     const val USERNAME_MAX_LENGTH = 20
     const val BIO_MAX_LENGTH = 150
+
+    // ── Time Constants ────────────────────────────────────────────────────────
+
+    /** Milliseconds per minute. */
+    const val MILLIS_PER_MINUTE = 60_000L
+
+    /** Milliseconds per hour. */
+    const val MILLIS_PER_HOUR = 3_600_000L
+
+    /** Milliseconds per day. */
+    const val MILLIS_PER_DAY = 86_400_000L
+
+    /** Milliseconds per week. */
+    const val MILLIS_PER_WEEK = 604_800_000L
+
+    /** Seconds per minute. */
+    const val SECONDS_PER_MINUTE = 60L
+
+    /** Seconds per hour. */
+    const val SECONDS_PER_HOUR = 3600L
+
+    /** Seconds for two hours. */
+    const val SECONDS_PER_TWO_HOURS = 7200L
+
+    /** Minutes per day (used for duration formatting). */
+    const val MINUTES_PER_DAY = 1440L
+
+    // ── UI Timing Constants ───────────────────────────────────────────────────
+
+    /** Debounce delay for search input in milliseconds. */
+    const val SEARCH_DEBOUNCE_MS = 300L
+
+    /** Minimum query length before triggering a search. */
+    const val MIN_SEARCH_QUERY_LENGTH = 2
+
+    /** Pull-to-refresh timeout in milliseconds. */
+    const val PULL_TO_REFRESH_TIMEOUT_MS = 10_000L
+
+    /** Time-ago refresh ticker interval in milliseconds. */
+    const val TIME_AGO_REFRESH_INTERVAL_MS = 30_000L
+
+    /** Debounce delay for batched user fetches in milliseconds. */
+    const val USER_FETCH_DEBOUNCE_MS = 200L
+
+    /** Standard ViewModel StateFlow subscription timeout in milliseconds. */
+    const val STATE_FLOW_SUBSCRIBE_TIMEOUT_MS = 5_000L
+
+    // ── Distance Constants ────────────────────────────────────────────────────
+
+    /** Threshold in meters for switching from meters to kilometers display. */
+    const val DISTANCE_KM_THRESHOLD_METERS = 1000.0
+
+    /** Threshold in meters for switching from decimal km to rounded km display. */
+    const val DISTANCE_ROUNDED_KM_THRESHOLD_METERS = 10_000.0
 }

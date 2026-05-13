@@ -60,6 +60,7 @@ fun UserProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .padding(top = Dimens.spaceLarge)
         ) {
             when {
                 uiState.isLoading -> {
@@ -83,6 +84,7 @@ fun UserProfileScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
+                            .padding(horizontal = Dimens.spaceLarge)
                     ) {
                         ProfileHeader(
                             profile = profile,

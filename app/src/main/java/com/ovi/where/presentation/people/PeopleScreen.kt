@@ -1,5 +1,7 @@
 package com.ovi.where.presentation.people
 
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -15,8 +17,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,10 +29,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ovi.where.core.theme.Dimens
+import com.ovi.where.core.constants.AppConstants.PULL_TO_REFRESH_TIMEOUT_MS
+import com.ovi.where.presentation.common.LIST_ITEM_ANIMATION_DURATION_MS
 import com.ovi.where.presentation.common.WhereTopAppBar
 import com.ovi.where.presentation.model.FriendUiModel
 import com.ovi.where.presentation.people.components.ErrorInfoCard
@@ -36,6 +45,8 @@ import com.ovi.where.presentation.people.components.FriendsSectionHeader
 import com.ovi.where.presentation.people.components.PeopleEmptyState
 import com.ovi.where.presentation.people.components.PeopleSkeleton
 import com.ovi.where.presentation.people.components.RequestsInboxCard
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,66 +73,100 @@ fun PeopleScreen(
     var selectedFriendForSheet by remember { mutableStateOf<FriendUiModel?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    Column(
+    // Scroll behavior for collapsing top app bar
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+
+    // Pull-to-refresh state
+    var isRefreshing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    Scaffold(
         modifier = Modifier
-            .fillMaxSize()
             .padding(contentPadding)
-    ) {
-        // Top app bar with search icon
-        WhereTopAppBar(
-            title = "People",
-            actions = {
-                IconButton(onClick = onNavigateToSearchPeople) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search people"
-                    )
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            WhereTopAppBar(
+                title = "People",
+                scrollBehavior = scrollBehavior,
+                actions = {
+                    IconButton(onClick = onNavigateToSearchPeople) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search people"
+                        )
+                    }
                 }
-            }
-        )
-
-        // Loading state
-        if (uiState.isLoading) {
-            PeopleSkeleton()
-            return@Column
-        }
-
-        // Error state
-        if (uiState.error != null) {
-            ErrorInfoCard(
-                message = uiState.error ?: "Something went wrong",
-                onRetry = { viewModel.onRetry() },
-                modifier = Modifier.padding(
-                    horizontal = Dimens.spaceLarge,
-                    vertical = Dimens.spaceMedium
-                )
             )
         }
-
-        // Empty state: no friends and no pending requests
-        if (uiState.friends.isEmpty() && uiState.pendingRequestCount == 0) {
-            PeopleEmptyState(onFindFriends = onNavigateToSearchPeople)
-            return@Column
-        }
-
-        // Content: LazyColumn with sections
-        val activeFriends = uiState.friends.filter { it.isOnline }
-        val allFriends = uiState.friends
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = Dimens.spaceLarge)
+    ) { innerPadding ->
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                scope.launch {
+                    viewModel.onRetry()
+                    // 10s timeout for pull-to-refresh
+                    delay(PULL_TO_REFRESH_TIMEOUT_MS)
+                    isRefreshing = false
+                }
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
         ) {
+            // Loading state
+            if (uiState.isLoading && !isRefreshing) {
+                PeopleSkeleton()
+                return@PullToRefreshBox
+            }
+
+            // Stop refresh indicator when data arrives
+            if (isRefreshing && !uiState.isLoading) {
+                LaunchedEffect(Unit) { isRefreshing = false }
+            }
+
+            // Error state
+            if (uiState.error != null) {
+                ErrorInfoCard(
+                    message = uiState.error ?: "Something went wrong",
+                    onRetry = { viewModel.onRetry() },
+                    modifier = Modifier.padding(
+                        horizontal = Dimens.spaceLarge,
+                        vertical = Dimens.spaceMedium
+                    )
+                )
+            }
+
+            // Empty state: no friends and no pending requests
+            if (!uiState.isLoading && uiState.friends.isEmpty() && uiState.pendingRequestCount == 0) {
+                PeopleEmptyState(onFindFriends = onNavigateToSearchPeople)
+                return@PullToRefreshBox
+            }
+
+            // Content: LazyColumn with sections
+            val activeFriends = uiState.friends.filter { it.isOnline }
+            val allFriends = uiState.friends
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = Dimens.spaceLarge)
+            ) {
             // Requests inbox card
             if (uiState.pendingRequestCount > 0) {
                 item(key = "requests_inbox") {
                     RequestsInboxCard(
                         count = uiState.pendingRequestCount,
                         onClick = onNavigateToFriendRequests,
-                        modifier = Modifier.padding(
-                            horizontal = Dimens.spaceLarge,
-                            vertical = Dimens.spaceMedium
-                        )
+                        modifier = Modifier
+                            .animateItem(
+                                fadeInSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
+                                placementSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
+                                fadeOutSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS)
+                            )
+                            .padding(
+                                horizontal = Dimens.spaceLarge,
+                                vertical = Dimens.spaceMedium
+                            )
                     )
                 }
             }
@@ -143,7 +188,12 @@ fun PeopleScreen(
                         friend = friend,
                         onTap = { onNavigateToUserProfile(friend.userId) },
                         onMessage = { viewModel.openOrCreateDm(friend.userId) },
-                        onLongPress = { selectedFriendForSheet = friend }
+                        onLongPress = { selectedFriendForSheet = friend },
+                        modifier = Modifier.animateItem(
+                            fadeInSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
+                            placementSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
+                            fadeOutSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS)
+                        )
                     )
                 }
             }
@@ -163,13 +213,19 @@ fun PeopleScreen(
                     friend = friend,
                     onTap = { onNavigateToUserProfile(friend.userId) },
                     onMessage = { viewModel.openOrCreateDm(friend.userId) },
-                    onLongPress = { selectedFriendForSheet = friend }
+                    onLongPress = { selectedFriendForSheet = friend },
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
+                        placementSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
+                        fadeOutSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS)
+                    )
                 )
             }
 
             item(key = "bottom_spacer") {
                 Spacer(Modifier.height(Dimens.spaceLarge))
             }
+        }
         }
     }
 

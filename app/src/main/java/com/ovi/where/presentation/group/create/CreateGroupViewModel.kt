@@ -9,6 +9,8 @@ import com.ovi.where.R
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.common.UiEvent
 import com.ovi.where.core.common.UiText
+import com.ovi.where.core.constants.AppConstants.MIN_SEARCH_QUERY_LENGTH
+import com.ovi.where.core.constants.AppConstants.SEARCH_DEBOUNCE_MS
 import com.ovi.where.core.utils.ImageUploadUtil
 import com.ovi.where.domain.model.User
 import com.ovi.where.domain.repository.UserRepository
@@ -72,9 +74,9 @@ class CreateGroupViewModel @Inject constructor(
         // Debounced member search: 300ms debounce, minimum 2 characters
         viewModelScope.launch {
             memberSearchQuery
-                .debounce(300)
+                .debounce(SEARCH_DEBOUNCE_MS)
                 .distinctUntilChanged()
-                .filter { it.length >= 2 }
+                .filter { it.length >= MIN_SEARCH_QUERY_LENGTH }
                 .collect { query -> executeMemberSearch(query) }
         }
     }

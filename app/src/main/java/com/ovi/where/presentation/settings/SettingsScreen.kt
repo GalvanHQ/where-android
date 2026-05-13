@@ -59,6 +59,13 @@ import com.ovi.where.core.theme.Dimens
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onSignOut: () -> Unit,
+    onNavigateToNotificationPreferences: () -> Unit = {},
+    onNavigateToAppearance: () -> Unit = {},
+    onNavigateToDataStorage: () -> Unit = {},
+    onNavigateToSecurity: () -> Unit = {},
+    onNavigateToPrivacy: () -> Unit = {},
+    onNavigateToHelp: () -> Unit = {},
+    onNavigateToAbout: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -105,7 +112,7 @@ fun SettingsScreen(
                 .alpha(contentAlpha.value)
                 .padding(horizontal = Dimens.spaceLarge)
         ) {
-            Spacer(modifier = Modifier.height(Dimens.spaceMedium))
+            Spacer(modifier = Modifier.height(Dimens.spaceLarge))
 
             // ── General section ──────────────────────────────────────────
             SettingsSectionHeader("General")
@@ -122,21 +129,21 @@ fun SettingsScreen(
                         icon = Icons.Outlined.Notifications,
                         title = "Notifications",
                         subtitle = "Push notifications & sounds",
-                        onClick = { /* TODO */ }
+                        onClick = onNavigateToNotificationPreferences
                     )
                     SettingsDivider()
                     SettingsRow(
                         icon = Icons.Outlined.DarkMode,
                         title = "Appearance",
                         subtitle = "Theme & display settings",
-                        onClick = { /* TODO */ }
+                        onClick = onNavigateToAppearance
                     )
                     SettingsDivider()
                     SettingsRow(
                         icon = Icons.Outlined.Storage,
                         title = "Data & Storage",
                         subtitle = "Network usage & storage",
-                        onClick = { /* TODO */ }
+                        onClick = onNavigateToDataStorage
                     )
                 }
             }
@@ -158,14 +165,14 @@ fun SettingsScreen(
                         icon = Icons.Outlined.Lock,
                         title = "Account Security",
                         subtitle = "Password & two-factor authentication",
-                        onClick = { /* TODO */ }
+                        onClick = onNavigateToSecurity
                     )
                     SettingsDivider()
                     SettingsRow(
                         icon = Icons.Outlined.PrivacyTip,
                         title = "Privacy",
                         subtitle = "Location sharing & visibility",
-                        onClick = { /* TODO */ }
+                        onClick = onNavigateToPrivacy
                     )
                 }
             }
@@ -187,14 +194,14 @@ fun SettingsScreen(
                         icon = Icons.AutoMirrored.Outlined.HelpOutline,
                         title = "Help & Support",
                         subtitle = "FAQ, contact us",
-                        onClick = { /* TODO */ }
+                        onClick = onNavigateToHelp
                     )
                     SettingsDivider()
                     SettingsRow(
                         icon = Icons.Outlined.Info,
                         title = "About Where",
                         subtitle = "Version, licenses",
-                        onClick = { /* TODO */ }
+                        onClick = onNavigateToAbout
                     )
                 }
             }

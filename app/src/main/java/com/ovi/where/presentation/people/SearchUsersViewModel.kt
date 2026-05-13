@@ -5,14 +5,14 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.ovi.where.core.common.Resource
 import com.ovi.where.domain.repository.UserRepository
-import com.ovi.where.domain.usecase.friend.GetFriendshipStatusUseCase
 import com.ovi.where.domain.usecase.friend.ObserveFriendsUseCase
 import com.ovi.where.domain.usecase.friend.ObserveOutgoingRequestsUseCase
 import com.ovi.where.domain.usecase.friend.SendFriendRequestUseCase
 import com.ovi.where.domain.usecase.friend.CancelFriendRequestUseCase
 import com.ovi.where.presentation.model.FriendshipActionUiModel
 import com.ovi.where.presentation.model.SearchUserUiModel
-import com.ovi.where.presentation.model.toSearchUiModel
+import com.ovi.where.core.constants.AppConstants.MIN_SEARCH_QUERY_LENGTH
+import com.ovi.where.core.constants.AppConstants.SEARCH_DEBOUNCE_MS
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,9 +54,9 @@ class SearchUsersViewModel @Inject constructor(
         // Debounced search
         viewModelScope.launch {
             queryFlow
-                .debounce(300)
+                .debounce(SEARCH_DEBOUNCE_MS)
                 .distinctUntilChanged()
-                .filter { it.length >= 2 }
+                .filter { it.length >= MIN_SEARCH_QUERY_LENGTH }
                 .collect { query -> executeSearch(query) }
         }
     }
@@ -72,7 +72,7 @@ class SearchUsersViewModel @Inject constructor(
     /** Bypass debounce — triggered by IME Search action (Requirement 16.3). */
     fun onSearchImmediate() {
         val query = _uiState.value.query
-        if (query.length >= 2) {
+        if (query.length >= MIN_SEARCH_QUERY_LENGTH) {
             viewModelScope.launch { executeSearch(query) }
         }
     }

@@ -6,6 +6,7 @@ import com.ovi.where.domain.model.Message
 import com.ovi.where.domain.model.MessagePage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import com.ovi.where.data.util.Resource as DataResource
 
 interface MessageRepository {
     fun observeMessages(conversationId: String): Flow<List<Message>>
@@ -31,4 +32,16 @@ interface MessageRepository {
 
     /** Observes upload progress for a given message tempId (0-100) */
     fun observeUploadProgress(tempId: String): StateFlow<Int>?
+
+    /**
+     * Returns messages for a conversation using the NetworkBoundResource pattern:
+     * 1. Serves Room cache immediately (Loading state with cached data)
+     * 2. Checks staleness via CacheStalenessChecker
+     * 3. Fetches from network if stale
+     * 4. Saves to Room on success (Success state with fresh data)
+     * 5. Serves stale cache on failure (Error state with cached data)
+     *
+     * Requirements: 11.1, 11.2, 11.3, 11.6
+     */
+    fun getMessagesResource(conversationId: String): Flow<DataResource<List<Message>>>
 }

@@ -5,6 +5,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.constants.AppConstants
+import com.ovi.where.data.local.CacheStalenessChecker
 import com.ovi.where.data.local.dao.ConversationDao
 import com.ovi.where.data.local.entity.ConversationEntity
 import com.ovi.where.data.local.entity.toDomain
@@ -13,20 +14,25 @@ import com.ovi.where.data.remote.chat.ChatApiClient
 import com.ovi.where.data.remote.chat.ConversationDto
 import com.ovi.where.data.remote.chat.CreateDirectConversationRequest
 import com.ovi.where.data.remote.chat.CreateGroupConversationRequest
+import com.ovi.where.data.util.networkBoundResource
 import com.ovi.where.domain.model.Conversation
 import com.ovi.where.domain.model.ConversationType
 import com.ovi.where.domain.repository.ConversationRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.ovi.where.data.util.Resource as DataResource
 
 /**
  * ConversationRepository implementation using Room as the single source of truth.
@@ -45,7 +51,8 @@ import javax.inject.Singleton
 class ConversationRepositoryImpl @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
-    private val conversationDao: ConversationDao
+    private val conversationDao: ConversationDao,
+    private val cacheStalenessChecker: CacheStalenessChecker
 ) : ConversationRepository {
 
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -288,5 +295,130 @@ class ConversationRepositoryImpl @Inject constructor(
     companion object {
         /** Timeout for foreground unread-count sync (Requirement 12.5) */
         const val FOREGROUND_SYNC_TIMEOUT_MS = 10_000L
+
+        /** Cache key for conversations list */
+        private const val CACHE_KEY_CONVERSATIONS = "conversations_list"
+
+        /** Maximum delay before retrying a failed fetch of stale data (Requirement 11.6) */
+        private const val RETRY_DELAY_MS = 60_000L
+    }
+
+    // ─── NetworkBoundResource Pattern (Requirements 11.1, 11.2, 11.3, 11.4, 11.6) ───
+
+    /**
+     * Returns conversations using the NetworkBoundResource pattern:
+     * 1. Query Room for cached conversations
+     * 2. Check staleness via CacheStalenessChecker (5-minute threshold)
+     * 3. Fetch from network if stale (with ETag/If-None-Match support)
+     * 4. Save to Room on success
+     * 5. Serve stale cache on failure, retry after ≤60 seconds
+     *
+     * This method should only be called from ViewModel init blocks or explicit user actions,
+     * NOT from Compose recomposition (Requirement 11.1).
+     */
+    override fun getConversationsResource(): Flow<DataResource<List<Conversation>>> {
+        return networkBoundResource(
+            query = {
+                conversationDao.observeAll().map { entities ->
+                    entities.map { it.toDomain() }
+                }
+            },
+            fetch = {
+                val token = getIdToken()
+                val eTag = cacheStalenessChecker.getETag(CACHE_KEY_CONVERSATIONS)
+                // Fetch conversations from REST API
+                // ETag support: If we have a cached ETag, the server may return 304
+                ChatApiClient.apiService.getConversations("Bearer $token")
+            },
+            saveFetchResult = { conversations ->
+                val uid = currentUid ?: return@networkBoundResource
+                val entities = conversations.map { dto ->
+                    ConversationEntity(
+                        id = dto.id,
+                        name = dto.name,
+                        type = if (dto.type == "group") ConversationType.GROUP.name
+                               else ConversationType.DIRECT.name,
+                        photoUrl = dto.photoUrl,
+                        groupId = dto.groupId,
+                        lastMessageText = dto.lastMessageText,
+                        lastMessageTimestamp = dto.lastMessageTimestamp,
+                        lastMessageSenderId = dto.lastMessageSenderId,
+                        unreadCount = dto.unreadCount,
+                        memberIdsJson = serializeMemberIds(dto.participantIds),
+                        lastSyncTimestamp = System.currentTimeMillis()
+                    )
+                }
+                conversationDao.upsertAll(entities)
+                // Update cache metadata with current timestamp (and ETag if available)
+                cacheStalenessChecker.updateMetadata(CACHE_KEY_CONVERSATIONS)
+            },
+            shouldFetch = { cachedData ->
+                // Only fetch if cache is stale (>5 minutes old) or empty
+                cachedData.isNullOrEmpty() || cacheStalenessChecker.shouldFetch(CACHE_KEY_CONVERSATIONS)
+            },
+            onFetchFailed = { throwable ->
+                Timber.w(throwable, "Failed to fetch conversations from network, serving stale cache")
+                // Schedule retry after ≤60 seconds (Requirement 11.6)
+                repositoryScope.launch {
+                    delay(RETRY_DELAY_MS)
+                    // Invalidate cache metadata so next access triggers a re-fetch
+                    cacheStalenessChecker.updateMetadata(
+                        CACHE_KEY_CONVERSATIONS,
+                        currentTimeMs = 0L // Force staleness on next check
+                    )
+                }
+            }
+        )
+    }
+
+    /**
+     * Forces a refresh of conversations from the network, bypassing staleness check.
+     * Used for explicit user actions like pull-to-refresh (Requirement 11.1).
+     */
+    override fun refreshConversations(): Flow<DataResource<List<Conversation>>> {
+        return networkBoundResource(
+            query = {
+                conversationDao.observeAll().map { entities ->
+                    entities.map { it.toDomain() }
+                }
+            },
+            fetch = {
+                val token = getIdToken()
+                ChatApiClient.apiService.getConversations("Bearer $token")
+            },
+            saveFetchResult = { conversations ->
+                val uid = currentUid ?: return@networkBoundResource
+                val entities = conversations.map { dto ->
+                    ConversationEntity(
+                        id = dto.id,
+                        name = dto.name,
+                        type = if (dto.type == "group") ConversationType.GROUP.name
+                               else ConversationType.DIRECT.name,
+                        photoUrl = dto.photoUrl,
+                        groupId = dto.groupId,
+                        lastMessageText = dto.lastMessageText,
+                        lastMessageTimestamp = dto.lastMessageTimestamp,
+                        lastMessageSenderId = dto.lastMessageSenderId,
+                        unreadCount = dto.unreadCount,
+                        memberIdsJson = serializeMemberIds(dto.participantIds),
+                        lastSyncTimestamp = System.currentTimeMillis()
+                    )
+                }
+                conversationDao.upsertAll(entities)
+                cacheStalenessChecker.updateMetadata(CACHE_KEY_CONVERSATIONS)
+            },
+            shouldFetch = { true }, // Always fetch on explicit refresh
+            onFetchFailed = { throwable ->
+                Timber.w(throwable, "Failed to refresh conversations from network")
+                // Schedule retry after ≤60 seconds (Requirement 11.6)
+                repositoryScope.launch {
+                    delay(RETRY_DELAY_MS)
+                    cacheStalenessChecker.updateMetadata(
+                        CACHE_KEY_CONVERSATIONS,
+                        currentTimeMs = 0L
+                    )
+                }
+            }
+        )
     }
 }

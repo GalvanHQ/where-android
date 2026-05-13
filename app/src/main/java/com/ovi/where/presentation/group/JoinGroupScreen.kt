@@ -147,7 +147,7 @@ fun JoinGroupScreen(
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .imePadding()
-                        .padding(Dimens.spaceXLarge),
+                        .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceLarge),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Spacer(modifier = Modifier.height(Dimens.space2XLarge))

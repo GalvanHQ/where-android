@@ -85,7 +85,6 @@ fun MainScaffold(
     onNavigateToCreateGroup: () -> Unit,
     onNavigateToJoinGroup: () -> Unit,
     onNavigateToFriendRequests: () -> Unit,
-    onNavigateToSearchPeople: () -> Unit,
     onNavigateToSearch: (String) -> Unit,
     onNavigateToEditProfile: () -> Unit,
     onNavigateToSettings: () -> Unit,
@@ -145,7 +144,6 @@ fun MainScaffold(
                     onNavigateToUserProfile = onNavigateToUserProfile,
                     onNavigateToChat = onNavigateToChat,
                     onNavigateToFriendRequests = onNavigateToFriendRequests,
-                    onNavigateToSearchPeople = onNavigateToSearchPeople,
                     onNavigateToSearch = { onNavigateToSearch("people") }
                 )
             }

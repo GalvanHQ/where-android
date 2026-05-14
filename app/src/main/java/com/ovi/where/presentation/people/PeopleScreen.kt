@@ -63,7 +63,6 @@ fun PeopleScreen(
     onNavigateToUserProfile: (String) -> Unit = {},
     onNavigateToChat: (String) -> Unit = {},
     onNavigateToFriendRequests: () -> Unit = {},
-    onNavigateToSearchPeople: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
     viewModel: PeopleViewModel = hiltViewModel()
 ) {

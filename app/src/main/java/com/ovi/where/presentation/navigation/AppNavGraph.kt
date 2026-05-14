@@ -40,7 +40,6 @@ import com.ovi.where.presentation.map.MapScreen
 import com.ovi.where.presentation.navigation.gatekeeper.AuthGatekeeperViewModel
 import com.ovi.where.presentation.onboarding.OnboardingScreen
 import com.ovi.where.presentation.people.FriendRequestsScreen
-import com.ovi.where.presentation.people.SearchUsersScreen
 import com.ovi.where.presentation.people.UserProfileScreen
 import com.ovi.where.presentation.profile.edit.EditProfileScreen
 import com.ovi.where.presentation.search.SearchScreen
@@ -301,11 +300,6 @@ fun AppNavGraph(
                         launchSingleTop = true
                     }
                 },
-                onNavigateToSearchPeople = {
-                    navController.navigate(Screen.SearchPeople.route) {
-                        launchSingleTop = true
-                    }
-                },
                 onNavigateToSearch = { source ->
                     navController.navigate(Screen.Search.createRoute(source)) {
                         launchSingleTop = true
@@ -487,23 +481,6 @@ fun AppNavGraph(
         // ── Friend Requests ───────────────────────────────────────────────────
         composable(Screen.FriendRequests.route) {
             FriendRequestsScreen(onNavigateBack = { navController.popBackStack() })
-        }
-
-        // ── Search People ─────────────────────────────────────────────────────
-        composable(Screen.SearchPeople.route) {
-            SearchUsersScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToUserProfile = { userId ->
-                    navController.navigate(Screen.UserProfile.createRoute(userId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToChat = { convId ->
-                    navController.navigate(Screen.Chat.createRoute(convId)) {
-                        launchSingleTop = true
-                    }
-                }
-            )
         }
 
         // ── Full-Screen Search (People / Chats) ──────────────────────────────

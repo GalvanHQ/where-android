@@ -33,7 +33,7 @@ import javax.inject.Inject
 
 /**
  * ViewModel for the full-screen search screen.
- * - "people" source: searches ALL users via Firestore (same as SearchUsersViewModel)
+ * - "people" source: searches ALL users via Firestore
  * - "chats" source: filters local conversations list
  */
 @HiltViewModel

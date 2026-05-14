@@ -20,7 +20,7 @@ fun FriendshipStatus?.toActionUiModel(): FriendshipActionUiModel = when (this) {
 }
 
 /**
- * Presentation model for a user result in SearchUsersScreen.
+ * Presentation model for a user result in SearchScreen.
  * Pre-merges User + FriendshipStatus — no parallel map lookups in the composable.
  */
 data class SearchUserUiModel(

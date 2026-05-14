@@ -94,9 +94,6 @@ sealed class Screen(val route: String) {
     @Serializable
     data object FriendRequests : Screen("friend_requests")
 
-    @Serializable
-    data object SearchPeople : Screen("search_people")
-
     // ── Search (full-screen) ──────────────────────────────────────────────
 
     @Serializable

@@ -340,7 +340,7 @@ private fun IdleContent(
 
             items(
                 items = suggestions,
-                key = { "suggested_${it.userId}" }
+                key = { suggestion -> "suggested_${suggestion.userId}_${suggestions.indexOf(suggestion)}" }
             ) { suggestion ->
                 SuggestedRow(
                     suggestion = suggestion,
@@ -374,7 +374,7 @@ private fun RecentSearchesGrid(
     ) {
         items(
             items = suggestions,
-            key = { "grid_${it.userId}" }
+            key = { suggestion -> "grid_${suggestion.userId}_${suggestions.indexOf(suggestion)}" }
         ) { suggestion ->
             RecentSearchGridItem(
                 suggestion = suggestion,

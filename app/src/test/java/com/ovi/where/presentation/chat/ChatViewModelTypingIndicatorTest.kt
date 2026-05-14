@@ -61,6 +61,7 @@ class ChatViewModelTypingIndicatorTest : StringSpec({
     lateinit var incomingFrames: MutableSharedFlow<ServerFrame>
     lateinit var typingIndicatorManager: TypingIndicatorManager
     lateinit var friendshipRepository: com.ovi.where.domain.repository.FriendshipRepository
+    lateinit var interactionRepository: com.ovi.where.domain.repository.InteractionRepository
 
     val testDispatcher = StandardTestDispatcher()
 
@@ -80,6 +81,7 @@ class ChatViewModelTypingIndicatorTest : StringSpec({
         locationManager = mockk(relaxed = true)
         typingIndicatorManager = mockk(relaxed = true)
         friendshipRepository = mockk(relaxed = true)
+        interactionRepository = mockk(relaxed = true)
 
         every { firebaseAuth.currentUser } returns firebaseUser
         every { firebaseUser.uid } returns "user123"
@@ -126,7 +128,8 @@ class ChatViewModelTypingIndicatorTest : StringSpec({
             messageRepositoryImpl,
             firebaseAuth,
             locationManager,
-            friendshipRepository
+            friendshipRepository,
+            interactionRepository
         )
     }
 

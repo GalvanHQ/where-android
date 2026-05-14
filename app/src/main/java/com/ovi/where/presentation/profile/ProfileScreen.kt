@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -60,7 +61,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.presentation.common.WhereTabHeader
 
 /**
  * Professional Profile screen with compact header + stats inline,
@@ -105,138 +105,134 @@ fun ProfileScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding)
+            .statusBarsPadding()
             .alpha(contentAlpha.value),
         contentPadding = PaddingValues(bottom = Dimens.space3XLarge)
     ) {
-        // ── Header ───────────────────────────────────────────────────────
-        item {
-            WhereTabHeader(title = "Profile")
-        }
-
-        // ── Profile Card: Avatar + Info + Stats (Instagram-style) ────────
-        item {
-            ProfileHeaderCard(
-                displayName = profile?.displayName ?: "—",
-                username = profile?.username,
-                bio = profile?.bio,
-                photoUrl = profile?.photoUrl,
-                groupCount = uiState.groupCount,
-                friendCount = uiState.friendCount,
-                sharedCount = uiState.sharedLocations,
-                ringAlpha = ringAlpha
-            )
-        }
-
-        // ── Action Buttons ───────────────────────────────────────────────
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = Dimens.spaceLarge,
-                        vertical = Dimens.spaceLarge
-                    ),
-                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
-            ) {
-                Button(
-                    onClick = onNavigateToEditProfile,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(44.dp),
-                    shape = RoundedCornerShape(Dimens.cornerSmall),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                ) {
-                    Icon(
-                        Icons.Outlined.Edit,
-                        contentDescription = null,
-                        modifier = Modifier.size(Dimens.iconSizeSmall)
-                    )
-                    Spacer(modifier = Modifier.width(Dimens.spaceMedium))
-                    Text("Edit Profile", style = MaterialTheme.typography.labelLarge)
-                }
-
-                OutlinedButton(
-                    onClick = onNavigateToSettings,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(44.dp),
-                    shape = RoundedCornerShape(Dimens.cornerSmall),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onSurface
-                    )
-                ) {
-                    Icon(
-                        Icons.Outlined.Settings,
-                        contentDescription = null,
-                        modifier = Modifier.size(Dimens.iconSizeSmall)
-                    )
-                    Spacer(modifier = Modifier.width(Dimens.spaceMedium))
-                    Text("Settings", style = MaterialTheme.typography.labelLarge)
-                }
-            }
-        }
-
-        // ── Section: Shortcuts ───────────────────────────────────────────
-        item {
-            Text(
-                text = "Shortcuts",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(
-                    start = Dimens.spaceLarge,
-                    end = Dimens.spaceLarge,
-                    top = Dimens.spaceMedium,
-                    bottom = Dimens.spaceMedium
+            // ── Profile Card: Avatar + Info + Stats (Instagram-style) ────────
+            item {
+                ProfileHeaderCard(
+                    displayName = profile?.displayName ?: "—",
+                    username = profile?.username,
+                    bio = profile?.bio,
+                    photoUrl = profile?.photoUrl,
+                    groupCount = uiState.groupCount,
+                    friendCount = uiState.friendCount,
+                    sharedCount = uiState.sharedLocations,
+                    ringAlpha = ringAlpha
                 )
-            )
-        }
+            }
 
-        item {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Dimens.spaceLarge),
-                shape = RoundedCornerShape(Dimens.cornerMedium),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                tonalElevation = 0.dp
-            ) {
-                Column {
-                    QuickActionRow(
-                        icon = Icons.AutoMirrored.Outlined.Chat,
-                        title = "Messages",
-                        subtitle = "Your conversations",
-                        onClick = onNavigateToMessages
+            // ── Action Buttons ───────────────────────────────────────────────
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = Dimens.spaceLarge,
+                            vertical = Dimens.spaceLarge
+                        ),
+                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
+                ) {
+                    Button(
+                        onClick = onNavigateToEditProfile,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
+                        shape = RoundedCornerShape(Dimens.cornerSmall),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Icon(
+                            Icons.Outlined.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(Dimens.iconSizeSmall)
+                        )
+                        Spacer(modifier = Modifier.width(Dimens.spaceMedium))
+                        Text("Edit Profile", style = MaterialTheme.typography.labelLarge)
+                    }
+
+                    OutlinedButton(
+                        onClick = onNavigateToSettings,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
+                        shape = RoundedCornerShape(Dimens.cornerSmall),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Icon(
+                            Icons.Outlined.Settings,
+                            contentDescription = null,
+                            modifier = Modifier.size(Dimens.iconSizeSmall)
+                        )
+                        Spacer(modifier = Modifier.width(Dimens.spaceMedium))
+                        Text("Settings", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+
+            // ── Section: Shortcuts ───────────────────────────────────────────
+            item {
+                Text(
+                    text = "Shortcuts",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(
+                        start = Dimens.spaceLarge,
+                        end = Dimens.spaceLarge,
+                        top = Dimens.spaceMedium,
+                        bottom = Dimens.spaceMedium
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                    )
-                    QuickActionRow(
-                        icon = Icons.Outlined.Group,
-                        title = "Groups",
-                        subtitle = "Manage your groups",
-                        onClick = onNavigateToGroups
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                    )
-                    QuickActionRow(
-                        icon = Icons.Outlined.LocationOn,
-                        title = "Location Sharing",
-                        subtitle = "Active sharing sessions",
-                        onClick = onNavigateToLocationSharing
-                    )
+                )
+            }
+
+            item {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Dimens.spaceLarge),
+                    shape = RoundedCornerShape(Dimens.cornerMedium),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    tonalElevation = 0.dp
+                ) {
+                    Column {
+                        QuickActionRow(
+                            icon = Icons.AutoMirrored.Outlined.Chat,
+                            title = "Messages",
+                            subtitle = "Your conversations",
+                            onClick = onNavigateToMessages
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 56.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                        )
+                        QuickActionRow(
+                            icon = Icons.Outlined.Group,
+                            title = "Groups",
+                            subtitle = "Manage your groups",
+                            onClick = onNavigateToGroups
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 56.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                        )
+                        QuickActionRow(
+                            icon = Icons.Outlined.LocationOn,
+                            title = "Location Sharing",
+                            subtitle = "Active sharing sessions",
+                            onClick = onNavigateToLocationSharing
+                        )
+                    }
                 }
             }
         }
-    }
 }
 
 // ── Profile Header Card (Avatar left, Stats right — Instagram-style) ─────────

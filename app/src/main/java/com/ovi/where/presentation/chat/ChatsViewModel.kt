@@ -4,31 +4,48 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.ovi.where.core.common.Resource
+import com.ovi.where.data.local.prefs.RecentSearchesStore
 import com.ovi.where.data.remote.chat.ChatSocketIoClient
 import com.ovi.where.data.remote.chat.ServerFrame
 import com.ovi.where.domain.model.Conversation
 import com.ovi.where.domain.model.ConversationType
 import com.ovi.where.domain.repository.ConversationRepository
+import com.ovi.where.domain.usecase.GetSuggestionsUseCase
+import com.ovi.where.domain.usecase.SearchChatsUseCase
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
 import com.ovi.where.domain.usecase.chat.ObserveConversationsUseCase
+import com.ovi.where.presentation.common.search.SearchUiState
+import com.ovi.where.presentation.common.search.SuggestionUiModel
 import com.ovi.where.presentation.model.ConversationUiModel
 import com.ovi.where.presentation.model.formatConversationTimestamp
 import com.ovi.where.presentation.model.toUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.ovi.where.data.util.Resource as DataResource
 
+@OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ChatsViewModel @Inject constructor(
     private val observeConversationsUseCase: ObserveConversationsUseCase,
     private val getOrCreateDirectConversationUseCase: GetOrCreateDirectConversationUseCase,
     private val chatSocketIoClient: ChatSocketIoClient,
     private val firebaseAuth: FirebaseAuth,
-    private val conversationRepository: ConversationRepository
+    private val conversationRepository: ConversationRepository,
+    private val searchChatsUseCase: SearchChatsUseCase,
+    private val recentSearchesStore: RecentSearchesStore,
+    private val getSuggestionsUseCase: GetSuggestionsUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatsUiState())
@@ -41,6 +58,52 @@ class ChatsViewModel @Inject constructor(
 
     /** Tracks which user IDs are currently online (from presence events). */
     private val onlineUserIds = mutableSetOf<String>()
+
+    // ── Search State ────────────────────────────────────────────────────────
+
+    private val _query = MutableStateFlow("")
+    private val _isFocused = MutableStateFlow(false)
+
+    /**
+     * Debounced search results flow.
+     * Waits 300ms after the last keystroke, filters out blank queries,
+     * then invokes SearchChatsUseCase against the current conversation list.
+     */
+    private val debouncedSearchResults: StateFlow<List<Conversation>> =
+        _query
+            .debounce(300L)
+            .flatMapLatest { query ->
+                if (query.isBlank()) {
+                    flowOf(emptyList())
+                } else {
+                    flowOf(searchChatsUseCase(query, allConversations))
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    /**
+     * Combined search UI state exposed to the Chats screen.
+     * Merges query, focus, recent searches, suggestions, and debounced search results.
+     */
+    val searchUiState: StateFlow<SearchUiState> = combine(
+        _query,
+        _isFocused,
+        recentSearchesStore.getRecentSearches("chats"),
+        getSuggestionsUseCase(),
+        debouncedSearchResults
+    ) { query, focused, recentSearches, suggestions, results ->
+        val uid = currentUserId ?: ""
+        SearchUiState(
+            query = query,
+            isFocused = focused,
+            isLoading = query.isNotBlank() && results.isEmpty() && allConversations.isNotEmpty(),
+            recentSearches = recentSearches,
+            suggestions = suggestions,
+            searchResults = if (query.isBlank()) emptyList()
+            else results.map { it.toUiModel(uid, ::formatConversationTimestamp) },
+            showEmptyState = query.isNotBlank() && results.isEmpty() && allConversations.isNotEmpty()
+        )
+    }.stateIn(viewModelScope, SharingStarted.Lazily, SearchUiState())
 
     init {
         // Network requests are initiated ONLY from this init block (Requirement 11.1)
@@ -176,6 +239,84 @@ class ChatsViewModel @Inject constructor(
     fun onSearchQueryChanged(query: String) {
         _uiState.value = _uiState.value.copy(searchQuery = query)
         applySearchFilter()
+    }
+
+    // ── Messenger-Style Search Actions ──────────────────────────────────────
+
+    /**
+     * Called when the user types in the search bar.
+     * Empty/whitespace-only queries cancel pending searches.
+     */
+    fun onQueryChanged(query: String) {
+        _query.value = query
+        // Also update the legacy search filter for backward compatibility
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+        applySearchFilter()
+    }
+
+    /**
+     * Called when the user submits the search query (e.g., presses enter).
+     * Persists the trimmed query to recent searches if non-blank.
+     */
+    fun onQuerySubmitted(query: String) {
+        val trimmed = query.trim()
+        if (trimmed.isBlank()) return
+        viewModelScope.launch {
+            recentSearchesStore.addSearch("chats", trimmed)
+        }
+    }
+
+    /**
+     * Called when the user taps the clear button in the search bar.
+     * Resets the query and cancels any pending search.
+     */
+    fun onClearQuery() {
+        _query.value = ""
+        _uiState.value = _uiState.value.copy(searchQuery = "")
+        applySearchFilter()
+    }
+
+    /**
+     * Called when the search bar focus state changes.
+     */
+    fun onFocusChanged(focused: Boolean) {
+        _isFocused.value = focused
+    }
+
+    /**
+     * Called when the user taps a recent search chip.
+     * Sets the query and triggers a search.
+     */
+    fun onRecentSearchTapped(query: String) {
+        _query.value = query
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+        applySearchFilter()
+    }
+
+    /**
+     * Called when the user deletes a single recent search entry.
+     */
+    fun onRecentSearchDeleted(query: String) {
+        viewModelScope.launch {
+            recentSearchesStore.removeSearch("chats", query)
+        }
+    }
+
+    /**
+     * Called when the user taps "Clear all" on recent searches.
+     */
+    fun onClearAllRecentSearches() {
+        viewModelScope.launch {
+            recentSearchesStore.clearAll("chats")
+        }
+    }
+
+    /**
+     * Called when the user taps a suggestion avatar.
+     * Navigates to the conversation with that user.
+     */
+    fun onSuggestionTapped(suggestion: SuggestionUiModel) {
+        getOrCreateDirectChat(suggestion.userId) { /* navigation handled by screen */ }
     }
 
     /**

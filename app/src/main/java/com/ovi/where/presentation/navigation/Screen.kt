@@ -97,6 +97,16 @@ sealed class Screen(val route: String) {
     @Serializable
     data object SearchPeople : Screen("search_people")
 
+    // ── Search (full-screen) ──────────────────────────────────────────────
+
+    @Serializable
+    data class Search(val source: String) : Screen("search/${source}") {
+        companion object {
+            const val ROUTE = "search/{source}"
+            fun createRoute(source: String) = "search/$source"
+        }
+    }
+
     // ── Group routes ──────────────────────────────────────────────────────────
 
     @Serializable

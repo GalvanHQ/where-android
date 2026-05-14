@@ -2,6 +2,7 @@ package com.ovi.where.presentation.chat
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,9 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -39,7 +39,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
@@ -53,10 +52,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -66,12 +66,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
-import com.ovi.where.core.theme.Dimens
+import com.ovi.where.R
 import com.ovi.where.core.constants.AppConstants.PULL_TO_REFRESH_TIMEOUT_MS
+import com.ovi.where.core.theme.Dimens
 import com.ovi.where.presentation.common.LIST_ITEM_ANIMATION_DURATION_MS
-import com.ovi.where.presentation.common.PrimaryButton
-import com.ovi.where.presentation.common.WhereTopAppBar
-import com.ovi.where.presentation.common.WhereTextField
+import com.ovi.where.presentation.common.search.SearchBarTapTarget
 import com.ovi.where.presentation.model.ConversationUiModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -81,13 +80,12 @@ import kotlinx.coroutines.launch
 fun ChatsScreen(
     contentPadding: PaddingValues = PaddingValues(),
     onNavigateToChat: (String) -> Unit = {},
-    onNavigateToSearchPeople: () -> Unit = {},
     onNavigateToCreateGroup: () -> Unit = {},
     onNavigateToJoinGroup: () -> Unit = {},
+    onNavigateToSearch: () -> Unit = {},
     viewModel: ChatsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showSearchField by remember { mutableStateOf(false) }
 
     // ── Task 16.3: Wire foreground sync on app resume ─────────────────────────
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -103,38 +101,18 @@ fun ChatsScreen(
         }
     }
 
-    // Scroll behavior for collapsing top app bar (Requirement 5.1)
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-
-    // Pull-to-refresh state (Requirement 5.4)
+    // Pull-to-refresh state
     var isRefreshing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Scaffold(
-        modifier = Modifier
-            .padding(contentPadding)
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = Modifier.padding(contentPadding),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            WhereTopAppBar(
-                title = "Chats",
-                scrollBehavior = scrollBehavior,
-                actions = {
-                    IconButton(onClick = { showSearchField = !showSearchField }) {
-                        Icon(
-                            Icons.Default.Search,
-                            contentDescription = "Search",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            )
-        },
         floatingActionButton = {
-            // Requirement 5.8: FAB for "Start Conversation" on Chats screen
+            // FAB for "Start Conversation" on Chats screen
             FloatingActionButton(
-                onClick = onNavigateToSearchPeople,
-                modifier = Modifier.padding(bottom = 88.dp),
+                onClick = onNavigateToSearch,
+                //modifier = Modifier.padding(bottom = 88.dp),
                 containerColor = MaterialTheme.colorScheme.primary,
                 shape = MaterialTheme.shapes.large
             ) {
@@ -150,22 +128,18 @@ fun ChatsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .statusBarsPadding()
         ) {
-            // ── Search field ────────────────────────────────────────────────
-            if (showSearchField) {
-                WhereTextField(
-                    value = uiState.searchQuery,
-                    onValueChange = viewModel::onSearchQueryChanged,
-                    label = "Search chats",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium)
-                )
-            }
+            // ── Search bar tap target — navigates to full-screen search ─────
+            SearchBarTapTarget(
+                placeholderText = "Search chats...",
+                onClick = onNavigateToSearch,
+                modifier = Modifier.padding(horizontal = Dimens.spaceLarge)
+            )
 
             Spacer(Modifier.height(Dimens.spaceSmall))
 
-            // ── Conversation list with pull-to-refresh (Requirement 5.4) ─────
+            // ── Conversation list with pull-to-refresh (Requirement 3.4) ─────
             PullToRefreshBox(
                 isRefreshing = isRefreshing,
                 onRefresh = {
@@ -189,7 +163,7 @@ fun ChatsScreen(
                         com.ovi.where.presentation.common.ShimmerGroupList()
                     }
                     uiState.conversations.isEmpty() -> {
-                        ChatsEmptyState(onNavigateToSearchPeople = onNavigateToSearchPeople)
+                        ChatsEmptyState()
                     }
                     else -> {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -229,7 +203,7 @@ fun ChatsScreen(
 // ── Empty State ─────────────────────────────────────────────────────────────────
 
 @Composable
-private fun ChatsEmptyState(onNavigateToSearchPeople: () -> Unit) {
+private fun ChatsEmptyState() {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -238,10 +212,11 @@ private fun ChatsEmptyState(onNavigateToSearchPeople: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(Dimens.spaceXLarge)
         ) {
-            Icon(
-                Icons.Default.Forum, null,
-                modifier = Modifier.size(Dimens.iconSizeXXLarge),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f)
+            Image(
+                painter = painterResource(id = R.drawable.dialogue),
+                contentDescription = null,
+                modifier = Modifier.size(140.dp) .alpha(0.9f),
+                contentScale = ContentScale.Fit
             )
             Spacer(Modifier.height(Dimens.spaceLarge))
             Text(
@@ -251,15 +226,9 @@ private fun ChatsEmptyState(onNavigateToSearchPeople: () -> Unit) {
             )
             Spacer(Modifier.height(Dimens.spaceMedium))
             Text(
-                "Find friends and start a conversation",
+                "Start a conversation with friends",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f)
-            )
-            Spacer(Modifier.height(Dimens.spaceXLarge))
-            PrimaryButton(
-                text = "Find People",
-                onClick = onNavigateToSearchPeople,
-                modifier = Modifier.fillMaxWidth(0.6f)
             )
         }
     }

@@ -12,7 +12,9 @@ import com.ovi.where.data.remote.chat.ServerFrame
 import com.ovi.where.data.repository.MessageRepositoryImpl
 import com.ovi.where.domain.model.Message
 import com.ovi.where.domain.model.FriendshipStatus
+import com.ovi.where.domain.model.InteractionType
 import com.ovi.where.domain.repository.FriendshipRepository
+import com.ovi.where.domain.repository.InteractionRepository
 import com.ovi.where.domain.usecase.chat.MarkConversationReadUseCase
 import com.ovi.where.domain.usecase.chat.ObserveConversationsUseCase
 import com.ovi.where.domain.usecase.chat.ObserveMessagesUseCase
@@ -68,7 +70,8 @@ class ChatViewModel @Inject constructor(
     private val messageRepositoryImpl: MessageRepositoryImpl,
     private val firebaseAuth: FirebaseAuth,
     private val locationManager: LocationManager,
-    private val friendshipRepository: FriendshipRepository
+    private val friendshipRepository: FriendshipRepository,
+    private val interactionRepository: InteractionRepository
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -566,6 +569,8 @@ class ChatViewModel @Inject constructor(
                 if (_uiState.value.isOfflineQueueFull) {
                     _uiState.value = _uiState.value.copy(isOfflineQueueFull = false)
                 }
+                // Record interaction for suggestions (fire-and-forget, 1:1 chats only)
+                recordMessageInteraction()
             }
         }
     }
@@ -612,6 +617,35 @@ class ChatViewModel @Inject constructor(
             )
             // Reset counter after showing snackbar so it can trigger again on further failures
             consecutiveFailureCount = 0
+        }
+    }
+
+    /**
+     * Records a MESSAGE_SENT interaction for the recipient in a 1:1 conversation.
+     * Fire-and-forget: does not block the send flow or surface errors to the user.
+     * Skipped for group chats (otherUserId is null for groups).
+     *
+     * Requirement 8.3: Record interaction when a message is sent.
+     */
+    private fun recordMessageInteraction() {
+        val conversation = _uiState.value.conversation ?: return
+        // Only record for 1:1 (direct) conversations
+        if (conversation.isGroup) return
+        val recipientId = conversation.otherUserId ?: return
+        val displayName = conversation.title
+        val photoUrl = conversation.photoUrl
+
+        viewModelScope.launch {
+            try {
+                interactionRepository.recordInteraction(
+                    userId = recipientId,
+                    displayName = displayName,
+                    photoUrl = photoUrl,
+                    type = InteractionType.MESSAGE_SENT
+                )
+            } catch (_: Exception) {
+                // Fire-and-forget: silently ignore failures
+            }
         }
     }
 

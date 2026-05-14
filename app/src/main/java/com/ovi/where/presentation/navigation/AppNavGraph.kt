@@ -4,9 +4,13 @@ import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -39,6 +43,7 @@ import com.ovi.where.presentation.people.FriendRequestsScreen
 import com.ovi.where.presentation.people.SearchUsersScreen
 import com.ovi.where.presentation.people.UserProfileScreen
 import com.ovi.where.presentation.profile.edit.EditProfileScreen
+import com.ovi.where.presentation.search.SearchScreen
 import com.ovi.where.presentation.settings.AppearanceScreen
 import com.ovi.where.presentation.settings.DataStorageScreen
 import com.ovi.where.presentation.settings.NotificationPreferencesScreen
@@ -48,7 +53,7 @@ import com.ovi.where.presentation.settings.PrivacyScreen
 import com.ovi.where.presentation.settings.HelpScreen
 import com.ovi.where.presentation.settings.AboutScreen
 
-private const val NAV_ANIM_DURATION = 350
+private const val NAV_ANIM_DURATION = 300
 
 /**
  * Root navigation graph.
@@ -90,18 +95,30 @@ fun AppNavGraph(
     NavHost(
         navController    = navController,
         startDestination = startDestination,
-        modifier         = modifier,
+        modifier         = modifier.background(MaterialTheme.colorScheme.background),
         enterTransition = {
-            fadeIn(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
+            slideInHorizontally(
+                initialOffsetX = { fullWidth -> fullWidth },
+                animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut)
+            ) + fadeIn(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
         },
         exitTransition = {
-            fadeOut(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
+            slideOutHorizontally(
+                targetOffsetX = { fullWidth -> -fullWidth / 4 },
+                animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut)
+            ) + fadeOut(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
         },
         popEnterTransition = {
-            fadeIn(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
+            slideInHorizontally(
+                initialOffsetX = { fullWidth -> -fullWidth / 4 },
+                animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut)
+            ) + fadeIn(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
         },
         popExitTransition = {
-            fadeOut(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
+            slideOutHorizontally(
+                targetOffsetX = { fullWidth -> fullWidth },
+                animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut)
+            ) + fadeOut(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
         }
     ) {
         // ── Gatekeeper (replaces custom SplashScreen) ─────────────────────────
@@ -286,6 +303,11 @@ fun AppNavGraph(
                 },
                 onNavigateToSearchPeople = {
                     navController.navigate(Screen.SearchPeople.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToSearch = { source ->
+                    navController.navigate(Screen.Search.createRoute(source)) {
                         launchSingleTop = true
                     }
                 },
@@ -478,6 +500,28 @@ fun AppNavGraph(
                 },
                 onNavigateToChat = { convId ->
                     navController.navigate(Screen.Chat.createRoute(convId)) {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        // ── Full-Screen Search (People / Chats) ──────────────────────────────
+        composable(
+            route = Screen.Search.ROUTE,
+            arguments = listOf(navArgument("source") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val source = backStackEntry.arguments?.getString("source") ?: "people"
+            SearchScreen(
+                source = source,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToUserProfile = { userId ->
+                    navController.navigate(Screen.UserProfile.createRoute(userId)) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToChat = { conversationId ->
+                    navController.navigate(Screen.Chat.createRoute(conversationId)) {
                         launchSingleTop = true
                     }
                 }

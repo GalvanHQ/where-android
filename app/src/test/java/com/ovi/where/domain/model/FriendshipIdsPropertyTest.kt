@@ -92,7 +92,7 @@ class FriendshipIdsPropertyTest : StringSpec({
         init {
             // Lock the seed so counter-examples are reproducible across runs.
             // Any failure will include this seed in the Kotest report.
-            PropertyTesting.defaultSeed = 0xC0FFEE_L
+            PropertyTesting.defaultSeed = 0xC0FFEEL
         }
     }
 }

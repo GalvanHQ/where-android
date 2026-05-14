@@ -1,26 +1,21 @@
 package com.ovi.where.presentation.people
 
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -32,12 +27,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.constants.AppConstants.PULL_TO_REFRESH_TIMEOUT_MS
 import com.ovi.where.presentation.common.LIST_ITEM_ANIMATION_DURATION_MS
-import com.ovi.where.presentation.common.WhereTopAppBar
+import com.ovi.where.presentation.common.search.SearchBarTapTarget
 import com.ovi.where.presentation.model.FriendUiModel
 import com.ovi.where.presentation.people.components.ErrorInfoCard
 import com.ovi.where.presentation.people.components.FriendRow
@@ -56,6 +50,7 @@ fun PeopleScreen(
     onNavigateToChat: (String) -> Unit = {},
     onNavigateToFriendRequests: () -> Unit = {},
     onNavigateToSearchPeople: () -> Unit = {},
+    onNavigateToSearch: () -> Unit = {},
     viewModel: PeopleViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -73,32 +68,23 @@ fun PeopleScreen(
     var selectedFriendForSheet by remember { mutableStateOf<FriendUiModel?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Scroll behavior for collapsing top app bar
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-
     // Pull-to-refresh state
     var isRefreshing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    Scaffold(
+    Column(
         modifier = Modifier
+            .fillMaxSize()
             .padding(contentPadding)
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            WhereTopAppBar(
-                title = "People",
-                scrollBehavior = scrollBehavior,
-                actions = {
-                    IconButton(onClick = onNavigateToSearchPeople) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search people"
-                        )
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
+            .statusBarsPadding()
+    ) {
+        // Search bar tap target — navigates to full-screen search
+        SearchBarTapTarget(
+            placeholderText = "Search people...",
+            onClick = onNavigateToSearch,
+            modifier = Modifier.padding(horizontal = Dimens.spaceLarge)
+        )
+
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {
@@ -110,9 +96,7 @@ fun PeopleScreen(
                     isRefreshing = false
                 }
             },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+            modifier = Modifier.fillMaxSize()
         ) {
             // Loading state
             if (uiState.isLoading && !isRefreshing) {
@@ -139,7 +123,7 @@ fun PeopleScreen(
 
             // Empty state: no friends and no pending requests
             if (!uiState.isLoading && uiState.friends.isEmpty() && uiState.pendingRequestCount == 0) {
-                PeopleEmptyState(onFindFriends = onNavigateToSearchPeople)
+                PeopleEmptyState(onFindFriends = onNavigateToSearch)
                 return@PullToRefreshBox
             }
 

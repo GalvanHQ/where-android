@@ -1,5 +1,6 @@
 package com.ovi.where.presentation.people.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -9,19 +10,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import com.ovi.where.R
 import com.ovi.where.core.theme.Dimens
 
 /**
@@ -39,28 +45,28 @@ fun PeopleEmptyState(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            imageVector = Icons.Default.Group,
+        Image(
+            painter = painterResource(id = R.drawable.best_friend),
             contentDescription = null,
-            modifier = Modifier.size(Dimens.iconSizeXXLarge),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            modifier = Modifier.size(140.dp) .alpha(0.9f),
+            contentScale = ContentScale.Fit
         )
         Spacer(Modifier.height(Dimens.spaceLarge))
         Text(
-            text = "Find your people",
-            style = MaterialTheme.typography.headlineSmall,
+            text = "No friends yet",
+            style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(Dimens.spaceMedium))
         Text(
-            text = "Add friends to see them here and share your location with each other.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = "Find people and add them as friends",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(Dimens.spaceXLarge))
-        Button(onClick = onFindFriends) {
+        OutlinedButton(onClick = onFindFriends) {
             Text("Find Friends")
         }
     }

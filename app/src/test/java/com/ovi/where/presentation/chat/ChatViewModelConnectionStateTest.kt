@@ -60,6 +60,7 @@ class ChatViewModelConnectionStateTest : StringSpec({
     lateinit var locationManager: LocationManager
     lateinit var connectionStateFlow: MutableStateFlow<ChatSocketIoClient.ConnectionState>
     lateinit var friendshipRepository: com.ovi.where.domain.repository.FriendshipRepository
+    lateinit var interactionRepository: com.ovi.where.domain.repository.InteractionRepository
 
     val testDispatcher = StandardTestDispatcher()
 
@@ -78,6 +79,7 @@ class ChatViewModelConnectionStateTest : StringSpec({
         firebaseUser = mockk(relaxed = true)
         locationManager = mockk(relaxed = true)
         friendshipRepository = mockk(relaxed = true)
+        interactionRepository = mockk(relaxed = true)
 
         every { firebaseAuth.currentUser } returns firebaseUser
         every { firebaseUser.uid } returns "user123"
@@ -123,7 +125,8 @@ class ChatViewModelConnectionStateTest : StringSpec({
             messageRepositoryImpl,
             firebaseAuth,
             locationManager,
-            friendshipRepository
+            friendshipRepository,
+            interactionRepository
         )
     }
 

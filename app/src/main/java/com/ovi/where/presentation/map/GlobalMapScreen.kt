@@ -1813,7 +1813,7 @@ private fun Life360PinMarker(
                         )
                         close()
                     }
-                    drawPath(path, color = borderColor)
+                    drawPath(path, color = resolvedBorderColor)
                 }
         )
     }

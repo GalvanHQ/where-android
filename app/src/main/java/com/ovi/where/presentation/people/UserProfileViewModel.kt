@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.ovi.where.core.common.Resource
+import com.ovi.where.domain.model.InteractionType
 import com.ovi.where.domain.repository.FriendshipRepository
+import com.ovi.where.domain.repository.InteractionRepository
 import com.ovi.where.domain.repository.UserRepository
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
 import com.ovi.where.domain.usecase.friend.AcceptFriendRequestUseCase
@@ -43,6 +45,7 @@ import javax.inject.Inject
 class UserProfileViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val friendshipRepository: FriendshipRepository,
+    private val interactionRepository: InteractionRepository,
     private val getFriendshipStatusUseCase: GetFriendshipStatusUseCase,
     private val sendFriendRequestUseCase: SendFriendRequestUseCase,
     private val cancelFriendRequestUseCase: CancelFriendRequestUseCase,
@@ -64,6 +67,9 @@ class UserProfileViewModel @Inject constructor(
     /** One-shot snackbar events for error/success messages (design §7). */
     private val _snackbarEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val snackbarEvent: SharedFlow<String> = _snackbarEvent.asSharedFlow()
+
+    /** Ensures profile view interaction is recorded only once per ViewModel instance. */
+    private var hasRecordedProfileView = false
 
     private val callerUid: String?
         get() = firebaseAuth.currentUser?.uid
@@ -89,6 +95,18 @@ class UserProfileViewModel @Inject constructor(
                         ),
                         isLoading = false
                     )
+                    // Record profile view interaction once per ViewModel instance
+                    if (!hasRecordedProfileView) {
+                        hasRecordedProfileView = true
+                        viewModelScope.launch {
+                            interactionRepository.recordInteraction(
+                                userId = userId,
+                                displayName = user.displayName,
+                                photoUrl = user.photoUrl,
+                                type = InteractionType.PROFILE_VIEWED
+                            )
+                        }
+                    }
                 }
                 is Resource.Error -> {
                     _uiState.value = _uiState.value.copy(isLoading = false, error = result.message)

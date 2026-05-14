@@ -86,6 +86,7 @@ fun MainScaffold(
     onNavigateToJoinGroup: () -> Unit,
     onNavigateToFriendRequests: () -> Unit,
     onNavigateToSearchPeople: () -> Unit,
+    onNavigateToSearch: (String) -> Unit,
     onNavigateToEditProfile: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onLogout: () -> Unit,
@@ -117,6 +118,7 @@ fun MainScaffold(
         NavHost(
             navController = bottomNavController,
             startDestination = BottomTab.Map.route,
+            modifier = Modifier.background(MaterialTheme.colorScheme.background),
             enterTransition = { fadeIn(tween(200)) },
             exitTransition = { fadeOut(tween(200)) }
         ) {
@@ -132,9 +134,9 @@ fun MainScaffold(
                 ChatsScreen(
                     contentPadding = paddingValues,
                     onNavigateToChat = onNavigateToChat,
-                    onNavigateToSearchPeople = onNavigateToSearchPeople,
                     onNavigateToCreateGroup = onNavigateToCreateGroup,
-                    onNavigateToJoinGroup = onNavigateToJoinGroup
+                    onNavigateToJoinGroup = onNavigateToJoinGroup,
+                    onNavigateToSearch = { onNavigateToSearch("chats") }
                 )
             }
             composable(BottomTab.People.route) {
@@ -143,7 +145,8 @@ fun MainScaffold(
                     onNavigateToUserProfile = onNavigateToUserProfile,
                     onNavigateToChat = onNavigateToChat,
                     onNavigateToFriendRequests = onNavigateToFriendRequests,
-                    onNavigateToSearchPeople = onNavigateToSearchPeople
+                    onNavigateToSearchPeople = onNavigateToSearchPeople,
+                    onNavigateToSearch = { onNavigateToSearch("people") }
                 )
             }
             composable(BottomTab.Profile.route) {

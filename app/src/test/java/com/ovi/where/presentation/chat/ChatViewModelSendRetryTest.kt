@@ -62,6 +62,7 @@ class ChatViewModelSendRetryTest : StringSpec({
     lateinit var firebaseUser: FirebaseUser
     lateinit var locationManager: LocationManager
     lateinit var friendshipRepository: com.ovi.where.domain.repository.FriendshipRepository
+    lateinit var interactionRepository: com.ovi.where.domain.repository.InteractionRepository
 
     val testDispatcher = StandardTestDispatcher()
 
@@ -80,6 +81,7 @@ class ChatViewModelSendRetryTest : StringSpec({
         firebaseUser = mockk(relaxed = true)
         locationManager = mockk(relaxed = true)
         friendshipRepository = mockk(relaxed = true)
+        interactionRepository = mockk(relaxed = true)
 
         every { firebaseAuth.currentUser } returns firebaseUser
         every { firebaseUser.uid } returns "user123"
@@ -127,7 +129,8 @@ class ChatViewModelSendRetryTest : StringSpec({
             messageRepositoryImpl,
             firebaseAuth,
             locationManager,
-            friendshipRepository
+            friendshipRepository,
+            interactionRepository
         )
     }
 

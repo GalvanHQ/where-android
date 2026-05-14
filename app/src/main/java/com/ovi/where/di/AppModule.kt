@@ -17,6 +17,8 @@ import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import com.google.firebase.storage.FirebaseStorage
 import com.ovi.where.core.config.FeatureFlags
 import com.ovi.where.data.local.db.AppDatabase
+import com.ovi.where.data.local.dao.InteractionDao
+import com.ovi.where.data.local.prefs.RecentSearchesStore
 import com.ovi.where.data.local.prefs.UserPreferences
 import com.ovi.where.data.repository.NotificationPreferencesRepository
 import dagger.Module
@@ -71,14 +73,13 @@ object AppModule {
 
     @Provides
     @Singleton
-    @Suppress("DEPRECATION")
     fun provideAppDatabase(
         @ApplicationContext context: Context
     ): AppDatabase = Room.databaseBuilder(
         context,
         AppDatabase::class.java,
         "nearby_database"
-    ).fallbackToDestructiveMigration()
+    ).addMigrations(AppDatabase.MIGRATION_5_6)
         .build()
 
     @Provides
@@ -103,11 +104,19 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideInteractionDao(database: AppDatabase) = database.interactionDao()
+
+    @Provides
+    @Singleton
     fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> = context.dataStore
 
     @Provides
     @Singleton
     fun provideUserPreferences(dataStore: DataStore<Preferences>): UserPreferences = UserPreferences(dataStore)
+
+    @Provides
+    @Singleton
+    fun provideRecentSearchesStore(dataStore: DataStore<Preferences>): RecentSearchesStore = RecentSearchesStore(dataStore)
 
     @Provides
     @Singleton

@@ -4,6 +4,7 @@ import com.ovi.where.data.repository.AuthRepositoryImpl
 import com.ovi.where.data.repository.ConversationRepositoryImpl
 import com.ovi.where.data.repository.FriendshipRepositoryImpl
 import com.ovi.where.data.repository.GroupRepositoryImpl
+import com.ovi.where.data.repository.InteractionRepositoryImpl
 import com.ovi.where.data.repository.LocationRepositoryImpl
 import com.ovi.where.data.repository.MessageRepositoryImpl
 import com.ovi.where.data.repository.UserRepositoryImpl
@@ -11,6 +12,7 @@ import com.ovi.where.domain.repository.AuthRepository
 import com.ovi.where.domain.repository.ConversationRepository
 import com.ovi.where.domain.repository.FriendshipRepository
 import com.ovi.where.domain.repository.GroupRepository
+import com.ovi.where.domain.repository.InteractionRepository
 import com.ovi.where.domain.repository.LocationRepository
 import com.ovi.where.domain.repository.MessageRepository
 import com.ovi.where.domain.repository.UserRepository
@@ -31,4 +33,5 @@ abstract class RepositoryModule {
     @Binds @Singleton abstract fun bindFriendshipRepository(impl: FriendshipRepositoryImpl): FriendshipRepository
     @Binds @Singleton abstract fun bindConversationRepository(impl: ConversationRepositoryImpl): ConversationRepository
     @Binds @Singleton abstract fun bindMessageRepository(impl: MessageRepositoryImpl): MessageRepository
+    @Binds @Singleton abstract fun bindInteractionRepository(impl: InteractionRepositoryImpl): InteractionRepository
 }

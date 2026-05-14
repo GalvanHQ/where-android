@@ -149,7 +149,29 @@ fun MainScaffold(
             composable(BottomTab.Profile.route) {
                 ProfileScreen(
                     onNavigateToEditProfile = onNavigateToEditProfile,
-                    onNavigateToSettings = onNavigateToSettings
+                    onNavigateToSettings = onNavigateToSettings,
+                    contentPadding = paddingValues,
+                    onNavigateToMessages = {
+                        bottomNavController.navigate(BottomTab.Chats.route) {
+                            popUpTo(BottomTab.Map.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onNavigateToGroups = {
+                        bottomNavController.navigate(BottomTab.People.route) {
+                            popUpTo(BottomTab.Map.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onNavigateToLocationSharing = {
+                        bottomNavController.navigate(BottomTab.Map.route) {
+                            popUpTo(BottomTab.Map.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
                 )
             }
         }

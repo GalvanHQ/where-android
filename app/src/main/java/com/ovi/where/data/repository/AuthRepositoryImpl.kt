@@ -5,6 +5,7 @@ import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.constants.AppConstants
 import com.ovi.where.domain.model.User
@@ -32,68 +33,90 @@ constructor(
 
     override val currentUser: Flow<User?>
         get() = callbackFlow {
+            var snapshotRegistration: ListenerRegistration? = null
+
             val authListener =
                     FirebaseAuth.AuthStateListener { auth ->
                         val firebaseUser = auth.currentUser
+                        // Remove previous snapshot listener on any auth state change
+                        snapshotRegistration?.remove()
+                        snapshotRegistration = null
+
                         if (firebaseUser != null) {
-                            firestore
-                                    .collection(AppConstants.FIRESTORE_COLLECTION_USERS)
-                                    .document(firebaseUser.uid)
-                                    .get()
-                                    .addOnSuccessListener { doc ->
-                                        val user = doc.toObject(User::class.java)
-                                        // Merge email-verified flag from Firebase Auth
-                                        val merged =
-                                                (user
-                                                                ?: User(
-                                                                        id = firebaseUser.uid,
-                                                                        displayName =
-                                                                                firebaseUser
-                                                                                        .displayName
-                                                                                        ?: "",
-                                                                        email = firebaseUser.email
-                                                                                        ?: "",
-                                                                        photoUrl =
-                                                                                firebaseUser
-                                                                                        .photoUrl
-                                                                                        ?.toString()
-                                                                ))
-                                                        .copy(
-                                                                isEmailVerified =
-                                                                        firebaseUser.isEmailVerified
-                                                        )
-                                        trySend(merged).isSuccess
-                                    }
-                                    .addOnFailureListener {
-                                        // Firestore unavailable — emit minimal user from Firebase
-                                        // Auth so the
-                                        // app can still navigate to the main screen.
-                                        Timber.w(
-                                                it,
-                                                "currentUser Firestore read failed, using Auth data"
-                                        )
-                                        trySend(
-                                                        User(
-                                                                id = firebaseUser.uid,
-                                                                displayName =
-                                                                        firebaseUser.displayName
-                                                                                ?: "",
-                                                                email = firebaseUser.email ?: "",
-                                                                photoUrl =
-                                                                        firebaseUser.photoUrl
-                                                                                ?.toString(),
-                                                                isEmailVerified =
-                                                                        firebaseUser.isEmailVerified
-                                                        )
-                                                )
-                                                .isSuccess
-                                    }
+                            // Attach real-time snapshot listener on user document
+                            snapshotRegistration =
+                                    firestore
+                                            .collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                                            .document(firebaseUser.uid)
+                                            .addSnapshotListener { snapshot, error ->
+                                                if (error != null) {
+                                                    Timber.w(
+                                                            error,
+                                                            "Snapshot listener error, falling back to Auth data"
+                                                    )
+                                                    trySend(
+                                                                    User(
+                                                                            id = firebaseUser.uid,
+                                                                            displayName =
+                                                                                    firebaseUser
+                                                                                            .displayName
+                                                                                            ?: "",
+                                                                            email =
+                                                                                    firebaseUser
+                                                                                            .email
+                                                                                            ?: "",
+                                                                            photoUrl =
+                                                                                    firebaseUser
+                                                                                            .photoUrl
+                                                                                            ?.toString(),
+                                                                            isEmailVerified =
+                                                                                    firebaseUser
+                                                                                            .isEmailVerified
+                                                                    )
+                                                            )
+                                                            .isSuccess
+                                                    return@addSnapshotListener
+                                                }
+                                                if (snapshot != null && snapshot.exists()) {
+                                                    val user =
+                                                            snapshot.toObject(User::class.java)
+                                                    val merged =
+                                                            (user
+                                                                            ?: User(
+                                                                                    id =
+                                                                                            firebaseUser
+                                                                                                    .uid,
+                                                                                    displayName =
+                                                                                            firebaseUser
+                                                                                                    .displayName
+                                                                                                    ?: "",
+                                                                                    email =
+                                                                                            firebaseUser
+                                                                                                    .email
+                                                                                                    ?: "",
+                                                                                    photoUrl =
+                                                                                            firebaseUser
+                                                                                                    .photoUrl
+                                                                                                    ?.toString()
+                                                                            ))
+                                                                    .copy(
+                                                                            isEmailVerified =
+                                                                                    firebaseUser
+                                                                                            .isEmailVerified
+                                                                    )
+                                                    trySend(merged).isSuccess
+                                                }
+                                            }
                         } else {
                             trySend(null).isSuccess
                         }
                     }
+
             firebaseAuth.addAuthStateListener(authListener)
-            awaitClose { firebaseAuth.removeAuthStateListener(authListener) }
+            awaitClose {
+                snapshotRegistration?.remove()
+                firebaseAuth.removeAuthStateListener(authListener)
+            }
         }
 
     // ── Email sign-in ─────────────────────────────────────────────────────────

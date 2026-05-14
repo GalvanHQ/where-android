@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.ovi.where.core.theme.Dimens
 
@@ -38,6 +39,7 @@ fun SearchBarTapTarget(
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(Dimens.cornerRound))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(Dimens.cornerRound),
         color = MaterialTheme.colorScheme.surfaceContainerHigh

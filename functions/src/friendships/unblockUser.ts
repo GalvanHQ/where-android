@@ -19,9 +19,14 @@ export const unblockUser = onCall(async (request) => {
   const pair = pairId(callerUid, userId);
 
   await db.runTransaction(async (tx) => {
-    // Read friendship doc
+    // ── ALL READS FIRST ──────────────────────────────────────────────
     const friendshipRef = db.doc(friendshipDoc(pair));
     const friendshipSnap = await tx.get(friendshipRef);
+
+    const callerSummaryRef = db.doc(summaryDoc(callerUid));
+    const callerSummarySnap = await tx.get(callerSummaryRef);
+
+    // ── ALL WRITES AFTER ─────────────────────────────────────────────
 
     // Delete friendship doc only if status == BLOCKED and requesterId == caller (blocker)
     if (friendshipSnap.exists) {
@@ -35,8 +40,6 @@ export const unblockUser = onCall(async (request) => {
     tx.delete(db.doc(blockDoc(callerUid, userId)));
 
     // Decrement caller's blockedCount (floored at 0)
-    const callerSummaryRef = db.doc(summaryDoc(callerUid));
-    const callerSummarySnap = await tx.get(callerSummaryRef);
     const callerSummary = (callerSummarySnap.data() as SocialSummary) || {
       friendsCount: 0,
       pendingIncomingCount: 0,

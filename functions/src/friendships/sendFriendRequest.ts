@@ -20,12 +20,33 @@ export const sendFriendRequest = onCall(async (request) => {
   const mems = members(callerUid, receiverId);
 
   const result = await db.runTransaction(async (tx) => {
+    // ── ALL READS FIRST ──────────────────────────────────────────────
+    
     // Check blocks
     await assertNotBlocked(tx, db, callerUid, receiverId);
 
-    // Rate limit: max 20 sends per rolling hour
+    // Rate limit doc
     const ratePath = `users/${callerUid}/summary/rate`;
     const rateSnap = await tx.get(db.doc(ratePath));
+
+    // Existing friendship doc
+    const friendshipRef = db.doc(friendshipDoc(pair));
+    const existingSnap = await tx.get(friendshipRef);
+
+    // Sender and receiver profiles
+    const senderSnap = await tx.get(db.doc(`users/${callerUid}`));
+    const receiverSnap = await tx.get(db.doc(`users/${receiverId}`));
+
+    // Both summaries
+    const receiverSummaryRef = db.doc(summaryDoc(receiverId));
+    const receiverSummarySnap = await tx.get(receiverSummaryRef);
+
+    const senderSummaryRef = db.doc(summaryDoc(callerUid));
+    const senderSummarySnap = await tx.get(senderSummaryRef);
+
+    // ── VALIDATION (uses read data) ──────────────────────────────────
+
+    // Rate limit check
     const rateData = rateSnap.data() as { sends?: { ts: number }[] } | undefined;
     const now = Date.now();
     const windowMs = 60 * 60 * 1000; // 1 hour
@@ -36,10 +57,7 @@ export const sendFriendRequest = onCall(async (request) => {
       throw new HttpsError("resource-exhausted", "Too many friend requests. Try again later.");
     }
 
-    // Read existing friendship doc
-    const friendshipRef = db.doc(friendshipDoc(pair));
-    const existingSnap = await tx.get(friendshipRef);
-
+    // Check existing friendship
     if (existingSnap.exists) {
       const existing = existingSnap.data() as FriendshipDoc;
       if (
@@ -51,9 +69,7 @@ export const sendFriendRequest = onCall(async (request) => {
       }
     }
 
-    // Fetch sender and receiver display fields
-    const senderSnap = await tx.get(db.doc(`users/${callerUid}`));
-    const receiverSnap = await tx.get(db.doc(`users/${receiverId}`));
+    // ── ALL WRITES AFTER ─────────────────────────────────────────────
 
     const senderData = senderSnap.data() || {};
     const receiverData = receiverSnap.data() || {};
@@ -101,9 +117,7 @@ export const sendFriendRequest = onCall(async (request) => {
       { merge: true }
     );
 
-    // Increment receiver's pendingIncomingCount
-    const receiverSummaryRef = db.doc(summaryDoc(receiverId));
-    const receiverSummarySnap = await tx.get(receiverSummaryRef);
+    // Update receiver summary
     const receiverSummary = (receiverSummarySnap.data() as SocialSummary) || {
       friendsCount: 0,
       pendingIncomingCount: 0,
@@ -117,9 +131,7 @@ export const sendFriendRequest = onCall(async (request) => {
       updatedAt: now,
     });
 
-    // Increment sender's pendingOutgoingCount
-    const senderSummaryRef = db.doc(summaryDoc(callerUid));
-    const senderSummarySnap = await tx.get(senderSummaryRef);
+    // Update sender summary
     const senderSummary = (senderSummarySnap.data() as SocialSummary) || {
       friendsCount: 0,
       pendingIncomingCount: 0,

@@ -19,9 +19,17 @@ export const removeFriend = onCall(async (request) => {
   const pair = pairId(callerUid, friendId);
 
   await db.runTransaction(async (tx) => {
+    // ── ALL READS FIRST ──────────────────────────────────────────────
     const friendshipRef = db.doc(friendshipDoc(pair));
     const snap = await tx.get(friendshipRef);
 
+    const callerSummaryRef = db.doc(summaryDoc(callerUid));
+    const callerSummarySnap = await tx.get(callerSummaryRef);
+
+    const friendSummaryRef = db.doc(summaryDoc(friendId));
+    const friendSummarySnap = await tx.get(friendSummaryRef);
+
+    // ── VALIDATION ───────────────────────────────────────────────────
     // Idempotent: if doc doesn't exist or status != ACCEPTED, return success
     if (!snap.exists) {
       return;
@@ -32,6 +40,23 @@ export const removeFriend = onCall(async (request) => {
       return;
     }
 
+    const callerSummary = (callerSummarySnap.data() as SocialSummary) || {
+      friendsCount: 0,
+      pendingIncomingCount: 0,
+      pendingOutgoingCount: 0,
+      blockedCount: 0,
+      updatedAt: 0,
+    };
+
+    const friendSummary = (friendSummarySnap.data() as SocialSummary) || {
+      friendsCount: 0,
+      pendingIncomingCount: 0,
+      pendingOutgoingCount: 0,
+      blockedCount: 0,
+      updatedAt: 0,
+    };
+
+    // ── ALL WRITES AFTER ─────────────────────────────────────────────
     // Delete friendship doc
     tx.delete(friendshipRef);
 
@@ -40,30 +65,12 @@ export const removeFriend = onCall(async (request) => {
     tx.delete(db.doc(friendsDoc(friendId, callerUid)));
 
     // Decrement both friendsCount (floored at 0)
-    const callerSummaryRef = db.doc(summaryDoc(callerUid));
-    const callerSummarySnap = await tx.get(callerSummaryRef);
-    const callerSummary = (callerSummarySnap.data() as SocialSummary) || {
-      friendsCount: 0,
-      pendingIncomingCount: 0,
-      pendingOutgoingCount: 0,
-      blockedCount: 0,
-      updatedAt: 0,
-    };
     tx.set(callerSummaryRef, {
       ...callerSummary,
       friendsCount: Math.max(0, callerSummary.friendsCount - 1),
       updatedAt: Date.now(),
     });
 
-    const friendSummaryRef = db.doc(summaryDoc(friendId));
-    const friendSummarySnap = await tx.get(friendSummaryRef);
-    const friendSummary = (friendSummarySnap.data() as SocialSummary) || {
-      friendsCount: 0,
-      pendingIncomingCount: 0,
-      pendingOutgoingCount: 0,
-      blockedCount: 0,
-      updatedAt: 0,
-    };
     tx.set(friendSummaryRef, {
       ...friendSummary,
       friendsCount: Math.max(0, friendSummary.friendsCount - 1),

@@ -66,6 +66,9 @@ data class OtherUserProfileUiModel(
     val bio: String,
     val photoUrl: String?,
     val avatarInitial: String,
+    val isOnline: Boolean,
+    val lastSeen: Long,
+    val createdAt: Long,
     val friendshipAction: ProfileFriendshipAction
 )
 
@@ -81,5 +84,8 @@ fun User.toOtherProfileUiModel(
         bio              = bio,
         photoUrl         = photoUrl,
         avatarInitial    = displayName.take(1).uppercase().ifEmpty { "?" },
+        isOnline         = isOnline,
+        lastSeen         = lastSeen,
+        createdAt        = createdAt,
         friendshipAction = status.toProfileAction(callerUid, requesterId)
     )

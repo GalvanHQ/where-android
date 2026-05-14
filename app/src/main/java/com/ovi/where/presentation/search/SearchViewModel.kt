@@ -12,16 +12,21 @@ import com.ovi.where.domain.usecase.GetSuggestionsUseCase
 import com.ovi.where.domain.usecase.SearchChatsUseCase
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
 import com.ovi.where.domain.usecase.chat.ObserveConversationsUseCase
+import com.ovi.where.domain.usecase.friend.ObserveFriendsUseCase
+import com.ovi.where.domain.usecase.friend.ObserveOutgoingRequestsUseCase
+import com.ovi.where.domain.usecase.friend.SendFriendRequestUseCase
 import com.ovi.where.presentation.common.search.SearchUiState
 import com.ovi.where.presentation.common.search.SuggestionUiModel
+import com.ovi.where.presentation.model.FriendshipActionUiModel
+import com.ovi.where.presentation.model.SearchUserUiModel
 import com.ovi.where.presentation.model.formatConversationTimestamp
-import com.ovi.where.presentation.model.toFriendUiModel
 import com.ovi.where.presentation.model.toUiModel
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -41,6 +46,9 @@ class SearchViewModel @Inject constructor(
     private val getSuggestionsUseCase: GetSuggestionsUseCase,
     private val getOrCreateDirectConversationUseCase: GetOrCreateDirectConversationUseCase,
     private val interactionRepository: InteractionRepository,
+    private val observeFriendsUseCase: ObserveFriendsUseCase,
+    private val observeOutgoingRequestsUseCase: ObserveOutgoingRequestsUseCase,
+    private val sendFriendRequestUseCase: SendFriendRequestUseCase,
     private val firebaseAuth: FirebaseAuth
 ) : ViewModel() {
 
@@ -101,7 +109,29 @@ class SearchViewModel @Inject constructor(
             when (val result = userRepository.searchUsers(query)) {
                 is Resource.Success -> {
                     val users = result.data ?: emptyList()
-                    val uiModels = users.map { it.toFriendUiModel() }
+                    // Derive friendship status from already-subscribed flows
+                    val friendIds = try {
+                        observeFriendsUseCase().first().map { it.friendUid }.toSet()
+                    } catch (_: Exception) { emptySet() }
+                    val outgoingIds = try {
+                        observeOutgoingRequestsUseCase().first().map { it.uid }.toSet()
+                    } catch (_: Exception) { emptySet() }
+
+                    val uiModels = users.map { user ->
+                        val action = when {
+                            user.id in friendIds -> FriendshipActionUiModel.FRIENDS
+                            user.id in outgoingIds -> FriendshipActionUiModel.PENDING
+                            else -> FriendshipActionUiModel.ADD
+                        }
+                        SearchUserUiModel(
+                            userId = user.id,
+                            displayName = user.displayName,
+                            username = user.username,
+                            photoUrl = user.photoUrl,
+                            avatarInitial = user.displayName.take(1).uppercase().ifEmpty { "?" },
+                            friendshipAction = action
+                        )
+                    }
                     Timber.d("SearchVM: people search '$query' -> ${uiModels.size} results")
                     _searchUiState.value = _searchUiState.value.copy(
                         searchResults = uiModels,
@@ -207,6 +237,21 @@ class SearchViewModel @Inject constructor(
 
     fun onSuggestionTapped(suggestion: SuggestionUiModel) {
         // Navigation handled by the screen layer
+    }
+
+    fun sendFriendRequest(userId: String) {
+        viewModelScope.launch {
+            sendFriendRequestUseCase(userId)
+            // Optimistically update the action for this user in results
+            val currentResults = _searchUiState.value.searchResults
+            _searchUiState.value = _searchUiState.value.copy(
+                searchResults = currentResults.map { item ->
+                    if (item is SearchUserUiModel && item.userId == userId) {
+                        item.copy(friendshipAction = FriendshipActionUiModel.PENDING)
+                    } else item
+                }
+            )
+        }
     }
 
     fun getOrCreateDirectChat(otherUserId: String, onResult: (String?) -> Unit) {

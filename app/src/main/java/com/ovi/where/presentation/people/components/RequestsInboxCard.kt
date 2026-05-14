@@ -38,7 +38,7 @@ fun RequestsInboxCard(
         shape = MaterialTheme.shapes.large,
         elevation = CardDefaults.cardElevation(defaultElevation = Dimens.cardElevationHigh),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Row(

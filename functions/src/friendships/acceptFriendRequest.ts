@@ -26,17 +26,26 @@ export const acceptFriendRequest = onCall(async (request) => {
   const now = Date.now();
 
   await db.runTransaction(async (tx) => {
+    // ── ALL READS FIRST ──────────────────────────────────────────────
     const friendshipRef = db.doc(friendshipDoc(pair));
     const snap = await tx.get(friendshipRef);
 
-    // If doc doesn't exist, throw not-found
+    const callerSnap = await tx.get(db.doc(`users/${callerUid}`));
+    const requesterSnap = await tx.get(db.doc(`users/${requesterId}`));
+
+    const callerSummaryRef = db.doc(summaryDoc(callerUid));
+    const callerSummarySnap = await tx.get(callerSummaryRef);
+
+    const requesterSummaryRef = db.doc(summaryDoc(requesterId));
+    const requesterSummarySnap = await tx.get(requesterSummaryRef);
+
+    // ── VALIDATION ───────────────────────────────────────────────────
     if (!snap.exists) {
       throw new HttpsError("not-found", "Friend request not found");
     }
 
     const data = snap.data() as FriendshipDoc;
 
-    // Reject if not PENDING or if caller is the requester (can't accept own request)
     if (data.status !== "PENDING" || data.requesterId === callerUid) {
       throw new HttpsError(
         "failed-precondition",
@@ -44,12 +53,26 @@ export const acceptFriendRequest = onCall(async (request) => {
       );
     }
 
-    // Fetch display fields for both users
-    const callerSnap = await tx.get(db.doc(`users/${callerUid}`));
-    const requesterSnap = await tx.get(db.doc(`users/${requesterId}`));
     const callerData = callerSnap.data() || {};
     const requesterData = requesterSnap.data() || {};
 
+    const callerSummary = (callerSummarySnap.data() as SocialSummary) || {
+      friendsCount: 0,
+      pendingIncomingCount: 0,
+      pendingOutgoingCount: 0,
+      blockedCount: 0,
+      updatedAt: 0,
+    };
+
+    const requesterSummary = (requesterSummarySnap.data() as SocialSummary) || {
+      friendsCount: 0,
+      pendingIncomingCount: 0,
+      pendingOutgoingCount: 0,
+      blockedCount: 0,
+      updatedAt: 0,
+    };
+
+    // ── ALL WRITES AFTER ─────────────────────────────────────────────
     // Update friendship doc to ACCEPTED
     tx.update(friendshipRef, {
       status: "ACCEPTED",
@@ -98,15 +121,6 @@ export const acceptFriendRequest = onCall(async (request) => {
     );
 
     // Update caller's summary: +1 friendsCount, -1 pendingIncomingCount
-    const callerSummaryRef = db.doc(summaryDoc(callerUid));
-    const callerSummarySnap = await tx.get(callerSummaryRef);
-    const callerSummary = (callerSummarySnap.data() as SocialSummary) || {
-      friendsCount: 0,
-      pendingIncomingCount: 0,
-      pendingOutgoingCount: 0,
-      blockedCount: 0,
-      updatedAt: 0,
-    };
     tx.set(callerSummaryRef, {
       ...callerSummary,
       friendsCount: callerSummary.friendsCount + 1,
@@ -115,15 +129,6 @@ export const acceptFriendRequest = onCall(async (request) => {
     });
 
     // Update requester's summary: +1 friendsCount, -1 pendingOutgoingCount
-    const requesterSummaryRef = db.doc(summaryDoc(requesterId));
-    const requesterSummarySnap = await tx.get(requesterSummaryRef);
-    const requesterSummary = (requesterSummarySnap.data() as SocialSummary) || {
-      friendsCount: 0,
-      pendingIncomingCount: 0,
-      pendingOutgoingCount: 0,
-      blockedCount: 0,
-      updatedAt: 0,
-    };
     tx.set(requesterSummaryRef, {
       ...requesterSummary,
       friendsCount: requesterSummary.friendsCount + 1,

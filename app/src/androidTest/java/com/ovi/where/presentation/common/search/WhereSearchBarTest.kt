@@ -44,8 +44,7 @@ class WhereSearchBarTest {
                     onQuerySubmitted = {},
                     onClearQuery = {},
                     placeholderText = "Search...",
-                    isFocused = false,
-                    onFocusChanged = {}
+                    isFocused = false
                 )
             }
         }
@@ -65,8 +64,7 @@ class WhereSearchBarTest {
                     onQuerySubmitted = {},
                     onClearQuery = {},
                     placeholderText = "Search...",
-                    isFocused = true,
-                    onFocusChanged = {}
+                    isFocused = true
                 )
             }
         }
@@ -88,8 +86,7 @@ class WhereSearchBarTest {
                     onQuerySubmitted = {},
                     onClearQuery = { clearInvoked = true },
                     placeholderText = "Search...",
-                    isFocused = true,
-                    onFocusChanged = {}
+                    isFocused = true
                 )
             }
         }
@@ -116,7 +113,6 @@ class WhereSearchBarTest {
                     onClearQuery = {},
                     placeholderText = "Search...",
                     isFocused = true,
-                    onFocusChanged = {},
                     recentSearches = recentSearches,
                     onRecentSearchTapped = {},
                     onRecentSearchDeleted = {},
@@ -153,7 +149,6 @@ class WhereSearchBarTest {
                     onClearQuery = {},
                     placeholderText = "Search...",
                     isFocused = false,
-                    onFocusChanged = {},
                     recentSearches = recentSearches,
                     onRecentSearchTapped = {},
                     onRecentSearchDeleted = {},
@@ -182,8 +177,7 @@ class WhereSearchBarTest {
                     onQuerySubmitted = { submitted = true },
                     onClearQuery = {},
                     placeholderText = "Search...",
-                    isFocused = true,
-                    onFocusChanged = {}
+                    isFocused = true
                 )
             }
         }
@@ -208,8 +202,7 @@ class WhereSearchBarTest {
                     onQuerySubmitted = { submitted = true },
                     onClearQuery = {},
                     placeholderText = "Search...",
-                    isFocused = true,
-                    onFocusChanged = {}
+                    isFocused = true
                 )
             }
         }

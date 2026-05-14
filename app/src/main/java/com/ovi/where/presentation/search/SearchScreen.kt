@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,7 +36,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -58,18 +58,21 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.ovi.where.R
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.presentation.common.LIST_ITEM_ANIMATION_DURATION_MS
 import com.ovi.where.presentation.common.search.SuggestionUiModel
 import com.ovi.where.presentation.model.ConversationUiModel
-import com.ovi.where.presentation.model.FriendUiModel
-import com.ovi.where.presentation.people.components.FriendRow
+import com.ovi.where.presentation.model.FriendshipActionUiModel
+import com.ovi.where.presentation.model.SearchUserUiModel
+import com.ovi.where.presentation.people.components.FriendshipActionPill
 
 /**
  * Full-screen Messenger-style search screen.
@@ -222,8 +225,6 @@ fun SearchScreen(
             query.isBlank() -> {
                 IdleContent(
                     suggestions = searchUiState.suggestions,
-                    recentSearches = searchUiState.recentSearches,
-                    source = source,
                     onClearAllRecentSearches = viewModel::onClearAllRecentSearches,
                     onSuggestionTapped = { suggestion ->
                         when (source) {
@@ -242,7 +243,8 @@ fun SearchScreen(
                 when (source) {
                     "people" -> PeopleSearchResults(
                         results = searchUiState.searchResults,
-                        onNavigateToUserProfile = onNavigateToUserProfile
+                        onNavigateToUserProfile = onNavigateToUserProfile,
+                        onSendFriendRequest = viewModel::sendFriendRequest
                     )
                     "chats" -> ChatsSearchResults(
                         results = searchUiState.searchResults,
@@ -275,8 +277,6 @@ fun SearchScreen(
 @Composable
 private fun IdleContent(
     suggestions: List<SuggestionUiModel>,
-    recentSearches: List<String>,
-    source: String,
     onClearAllRecentSearches: () -> Unit,
     onSuggestionTapped: (SuggestionUiModel) -> Unit
 ) {
@@ -495,7 +495,8 @@ private fun SuggestedRow(
 @Composable
 private fun PeopleSearchResults(
     results: List<Any>,
-    onNavigateToUserProfile: (String) -> Unit
+    onNavigateToUserProfile: (String) -> Unit,
+    onSendFriendRequest: (String) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -503,14 +504,17 @@ private fun PeopleSearchResults(
     ) {
         items(
             items = results,
-            key = { item -> (item as FriendUiModel).userId }
+            key = { item -> (item as SearchUserUiModel).userId }
         ) { item ->
-            val friend = item as FriendUiModel
-            FriendRow(
-                friend = friend,
-                onTap = { onNavigateToUserProfile(friend.userId) },
-                onMessage = { /* No message action in search results */ },
-                onLongPress = { /* No long-press in search */ },
+            val user = item as SearchUserUiModel
+            SearchResultRow(
+                user = user,
+                onRowTap = { onNavigateToUserProfile(user.userId) },
+                onPillTap = {
+                    if (user.friendshipAction == FriendshipActionUiModel.ADD) {
+                        onSendFriendRequest(user.userId)
+                    }
+                },
                 modifier = Modifier.animateItem(
                     fadeInSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
                     placementSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
@@ -518,6 +522,73 @@ private fun PeopleSearchResults(
                 )
             )
         }
+    }
+}
+
+@Composable
+private fun SearchResultRow(
+    user: SearchUserUiModel,
+    onRowTap: () -> Unit,
+    onPillTap: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onRowTap)
+            .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Avatar
+        Box(
+            modifier = Modifier
+                .size(Dimens.avatarSizeMedium)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            if (user.photoUrl != null) {
+                AsyncImage(
+                    model = user.photoUrl,
+                    contentDescription = user.displayName,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(Dimens.avatarSizeMedium)
+                        .clip(CircleShape)
+                )
+            } else {
+                Text(
+                    text = user.avatarInitial,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+
+        Spacer(Modifier.width(Dimens.spaceLarge))
+
+        // Name + username
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = user.displayName,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (user.username.isNotEmpty()) {
+                Text(
+                    text = "@${user.username}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        // Friendship action pill
+        FriendshipActionPill(
+            action = user.friendshipAction,
+            onTap = onPillTap
+        )
     }
 }
 
@@ -623,32 +694,32 @@ private fun ChatSearchResultRow(
 @Composable
 private fun SearchEmptyState() {
     Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        modifier = Modifier.fillMaxSize().padding(top = Dimens.space3XLarge),
+        contentAlignment = Alignment.TopCenter
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = Icons.Outlined.SearchOff,
-                contentDescription = "No results",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            Image(
+                painter = painterResource(id = R.drawable.searching),
+                contentDescription = null,
                 modifier = Modifier
-                    .size(Dimens.iconSizeXLarge)
-                    .alpha(EMPTY_STATE_ICON_ALPHA)
+                    .size(120.dp)
+                    .alpha(EMPTY_STATE_ICON_ALPHA),
+                contentScale = ContentScale.Fit
             )
             Spacer(modifier = Modifier.height(Dimens.spaceLarge))
             Text(
                 text = "No results found",
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(Dimens.spaceMedium))
             Text(
                 text = "Try a different search term",
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
@@ -659,7 +730,7 @@ private fun SearchEmptyState() {
 // ── Constants ────────────────────────────────────────────────────────────────
 
 private const val PLACEHOLDER_ALPHA = 0.6f
-private const val EMPTY_STATE_ICON_ALPHA = 0.5f
+private const val EMPTY_STATE_ICON_ALPHA = 0.9f
 private const val GRID_COLUMNS = 5
 private const val MAX_RECENT_GRID_ITEMS = 10
 private val SEARCH_BAR_HEIGHT = 48.dp

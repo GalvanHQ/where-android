@@ -670,6 +670,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
 
     implementation(libs.hilt.android)
+    implementation(libs.androidx.compose.ui.geometry)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 

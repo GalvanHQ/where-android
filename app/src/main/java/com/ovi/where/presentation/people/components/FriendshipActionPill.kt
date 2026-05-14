@@ -8,6 +8,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -44,7 +46,7 @@ fun FriendshipActionPill(
                 )
             ) {
                 Icon(
-                    imageVector = Icons.Default.PersonAdd,
+                    imageVector = Icons.Rounded.PersonAdd,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp)
                 )
@@ -63,7 +65,7 @@ fun FriendshipActionPill(
                 )
             ) {
                 Icon(
-                    imageVector = Icons.Default.Schedule,
+                    imageVector = Icons.Rounded.Schedule,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp)
                 )

@@ -19,9 +19,17 @@ export const declineFriendRequest = onCall(async (request) => {
   const pair = pairId(callerUid, requesterId);
 
   await db.runTransaction(async (tx) => {
+    // ── ALL READS FIRST ──────────────────────────────────────────────
     const friendshipRef = db.doc(friendshipDoc(pair));
     const snap = await tx.get(friendshipRef);
 
+    const callerSummaryRef = db.doc(summaryDoc(callerUid));
+    const callerSummarySnap = await tx.get(callerSummaryRef);
+
+    const requesterSummaryRef = db.doc(summaryDoc(requesterId));
+    const requesterSummarySnap = await tx.get(requesterSummaryRef);
+
+    // ── VALIDATION ───────────────────────────────────────────────────
     // Idempotent: if doc doesn't exist, return success
     if (!snap.exists) {
       return;
@@ -37,6 +45,23 @@ export const declineFriendRequest = onCall(async (request) => {
       );
     }
 
+    const callerSummary = (callerSummarySnap.data() as SocialSummary) || {
+      friendsCount: 0,
+      pendingIncomingCount: 0,
+      pendingOutgoingCount: 0,
+      blockedCount: 0,
+      updatedAt: 0,
+    };
+
+    const requesterSummary = (requesterSummarySnap.data() as SocialSummary) || {
+      friendsCount: 0,
+      pendingIncomingCount: 0,
+      pendingOutgoingCount: 0,
+      blockedCount: 0,
+      updatedAt: 0,
+    };
+
+    // ── ALL WRITES AFTER ─────────────────────────────────────────────
     // Delete friendship doc
     tx.delete(friendshipRef);
 
@@ -57,15 +82,6 @@ export const declineFriendRequest = onCall(async (request) => {
     );
 
     // Decrement caller's pendingIncomingCount (floored at 0)
-    const callerSummaryRef = db.doc(summaryDoc(callerUid));
-    const callerSummarySnap = await tx.get(callerSummaryRef);
-    const callerSummary = (callerSummarySnap.data() as SocialSummary) || {
-      friendsCount: 0,
-      pendingIncomingCount: 0,
-      pendingOutgoingCount: 0,
-      blockedCount: 0,
-      updatedAt: 0,
-    };
     tx.set(callerSummaryRef, {
       ...callerSummary,
       pendingIncomingCount: Math.max(0, callerSummary.pendingIncomingCount - 1),
@@ -73,15 +89,6 @@ export const declineFriendRequest = onCall(async (request) => {
     });
 
     // Decrement requester's pendingOutgoingCount (floored at 0)
-    const requesterSummaryRef = db.doc(summaryDoc(requesterId));
-    const requesterSummarySnap = await tx.get(requesterSummaryRef);
-    const requesterSummary = (requesterSummarySnap.data() as SocialSummary) || {
-      friendsCount: 0,
-      pendingIncomingCount: 0,
-      pendingOutgoingCount: 0,
-      blockedCount: 0,
-      updatedAt: 0,
-    };
     tx.set(requesterSummaryRef, {
       ...requesterSummary,
       pendingOutgoingCount: Math.max(0, requesterSummary.pendingOutgoingCount - 1),

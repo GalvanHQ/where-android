@@ -186,9 +186,12 @@ class FriendshipRepositoryImpl @Inject constructor(
      */
     private suspend fun callCallable(name: String, data: Map<String, Any>): Resource<Unit> {
         return try {
-            functions.getHttpsCallable(name).call(data).await()
+            timber.log.Timber.d("FriendshipRepo: calling '$name' with data=$data")
+            val result = functions.getHttpsCallable(name).call(data).await()
+            timber.log.Timber.d("FriendshipRepo: '$name' success, result=${result.getData()}")
             Resource.Success(Unit)
         } catch (e: Exception) {
+            timber.log.Timber.e(e, "FriendshipRepo: '$name' FAILED: ${e.message}")
             Resource.Error(e.message ?: "Failed to call $name")
         }
     }

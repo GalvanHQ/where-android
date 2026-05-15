@@ -65,6 +65,11 @@ object Dimens {
     val indicatorWidthSelected = 24.dp   // pager indicator active width
     val indicatorWidthIdle     = 8.dp    // pager indicator idle width
     val indicatorHeight        = 8.dp    // pager indicator height
+    val logoSize               = 64.dp   // app logo on onboarding screens
+    val indicatorIdle          = 8.dp    // onboarding page indicator idle size
+    val indicatorActive        = 24.dp   // onboarding page indicator active pill width
+    val placeholderMinSize     = 120.dp  // image placeholder minimum dimension
+    val placeholderIconSize    = 48.dp   // icon inside image placeholder
 
     // ── Dense icon sizes ─────────────────────────────────────────────────────
     val iconSizeXSmall = 12.dp  // admin badge, dense chip icons

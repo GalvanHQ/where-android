@@ -24,7 +24,7 @@ class FirebaseInitializer : Initializer<Unit> {
             FirebaseApp.initializeApp(context)
 
             // Enable Crashlytics collection (respects debug/release config)
-            FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(true)
+            FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = true
 
             // Install custom uncaught exception handler
             val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()

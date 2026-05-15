@@ -1,39 +1,32 @@
 package com.ovi.where.presentation.common
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -43,21 +36,16 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,142 +67,13 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ovi.where.R
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.data.network.ConnectivityObserver
-import kotlinx.coroutines.delay
 
-// ── Loading ───────────────────────────────────────────────────────────────────
-
-@Composable
-fun LoadingIndicator(
-    modifier: Modifier = Modifier,
-    message: String? = null
-) {
-    Column(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(Dimens.iconSizeXLarge),
-            color = MaterialTheme.colorScheme.primary,
-            strokeWidth = Dimens.strokeWidthThin
-        )
-        message?.let {
-            Spacer(modifier = Modifier.height(Dimens.spaceLarge))
-            Text(
-                text = it,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-// ── Empty state ───────────────────────────────────────────────────────────────
-
-/**
- * Displays an empty state with an icon, a descriptive message (max 120 characters),
- * and an optional action button when a list has zero items.
- *
- * @param message Descriptive message, truncated to 120 characters maximum.
- * @param icon Optional icon displayed above the message.
- * @param action Optional callback for the action button.
- * @param actionLabel Label for the action button.
- */
-@Composable
-fun EmptyState(
-    message: String,
-    modifier: Modifier = Modifier,
-    icon: ImageVector? = null,
-    action: (() -> Unit)? = null,
-    actionLabel: String? = null
-) {
-    val truncatedMessage = if (message.length > 120) message.take(120) else message
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(Dimens.spaceXLarge),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        icon?.let {
-            Icon(
-                imageVector = it,
-                contentDescription = null,
-                modifier = Modifier.size(Dimens.iconSizeXLarge),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(Dimens.spaceLarge))
-        }
-        Text(
-            text = truncatedMessage,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis
-        )
-        action?.let {
-            Spacer(modifier = Modifier.height(Dimens.spaceLarge))
-            PrimaryButton(
-                text = actionLabel ?: stringResource(R.string.msg_default_action),
-                onClick = it
-            )
-        }
-    }
-}
-
-// ── Error view ────────────────────────────────────────────────────────────────
-
-/**
- * Displays an error state with an error message describing the failure reason
- * and a retry button that re-triggers the failed request.
- *
- * @param message Error message describing the failure reason.
- * @param onRetry Callback invoked when the retry button is tapped, re-triggering the failed request.
- */
-@Composable
-fun ErrorView(
-    message: String,
-    modifier: Modifier = Modifier,
-    onRetry: (() -> Unit)? = null
-) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(Dimens.spaceXLarge),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = stringResource(R.string.msg_oops),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.error
-        )
-        Spacer(modifier = Modifier.height(Dimens.spaceMedium))
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-        onRetry?.let {
-            Spacer(modifier = Modifier.height(Dimens.spaceLarge))
-            PrimaryButton(text = stringResource(R.string.action_retry), onClick = it)
-        }
-    }
-}
-
-// ── Buttons ───────────────────────────────────────────────────────────────────
 
 @Composable
 fun PrimaryButton(
@@ -277,63 +136,31 @@ fun SecondaryButton(
 }
 
 @Composable
-fun TonalButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    isLoading: Boolean = false
-) {
-    FilledTonalButton(
-        onClick  = onClick,
-        modifier = modifier.height(Dimens.buttonHeightSmall).pressAnimation(),
-        enabled  = enabled && !isLoading,
-        shape    = MaterialTheme.shapes.medium
-    ) {
-        if (isLoading) {
-            CircularProgressIndicator(
-                modifier    = Modifier.size(Dimens.iconSizeSmall),
-                strokeWidth = Dimens.strokeWidthThin
-            )
-        } else {
-            Text(text = text, style = MaterialTheme.typography.labelMedium)
-        }
-    }
-}
-
-@Composable
-fun TextActionButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true
-) {
-    TextButton(onClick = onClick, modifier = modifier, enabled = enabled) {
-        Text(text = text, style = MaterialTheme.typography.labelLarge)
-    }
-}
-
-@Composable
 fun GoogleSignInButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isLoading: Boolean = false,
     enabled: Boolean = true
 ) {
-    ElevatedButton(
-        onClick   = onClick,
-        modifier  = modifier.fillMaxWidth().height(Dimens.buttonHeight),
-        enabled   = enabled && !isLoading,
-        shape     = MaterialTheme.shapes.medium
+    Button(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth().height(Dimens.buttonHeight),
+        enabled = enabled && !isLoading,
+        shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color.Transparent,
+            contentColor   = MaterialTheme.colorScheme.primary
+        )
     ) {
         if (isLoading) {
             CircularProgressIndicator(
-                modifier    = Modifier.size(Dimens.iconSizeMedium),
+                modifier = Modifier.size(Dimens.iconSizeMedium),
                 strokeWidth = Dimens.strokeWidthThin
             )
         } else {
             Row(
-                verticalAlignment     = Alignment.CenterVertically,
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
                 Icon(
@@ -344,7 +171,7 @@ fun GoogleSignInButton(
                 )
                 Spacer(modifier = Modifier.width(Dimens.spaceMedium))
                 Text(
-                    text  = stringResource(R.string.action_continue_with_google),
+                    text = stringResource(R.string.action_continue_with_google),
                     style = MaterialTheme.typography.labelLarge
                 )
             }
@@ -495,136 +322,6 @@ fun PasswordTextField(
 }
 
 @Composable
-fun NameTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    label: String,
-    enabled: Boolean = true,
-    isError: Boolean = false,
-    errorMessage: String? = null,
-    keyboardActions: KeyboardActions = KeyboardActions.Default,
-    imeAction: ImeAction = ImeAction.Next
-) {
-    WhereTextField(
-        value          = value,
-        onValueChange  = onValueChange,
-        label          = label,
-        modifier       = modifier,
-        keyboardType   = KeyboardType.Text,
-        enabled        = enabled,
-        isError        = isError,
-        errorMessage   = errorMessage,
-        keyboardActions = keyboardActions,
-        imeAction      = imeAction,
-        capitalization = KeyboardCapitalization.Words,
-        leadingIcon    = {
-            Icon(Icons.Default.Person, contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    )
-}
-
-// ── Status indicators ─────────────────────────────────────────────────────────
-
-@Composable
-fun OnlineIndicator(
-    isOnline: Boolean,
-    modifier: Modifier = Modifier,
-    size: Dp = Dimens.spaceSmall + Dimens.spaceXSmall
-) {
-    Box(
-        modifier = modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(
-                if (isOnline) MaterialTheme.colorScheme.tertiary
-                else MaterialTheme.colorScheme.outline
-            )
-    )
-}
-
-@Composable
-fun SharingStatusBadge(
-    isSharing: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape    = MaterialTheme.shapes.small,
-        color    = if (isSharing)
-            MaterialTheme.colorScheme.tertiaryContainer
-        else
-            MaterialTheme.colorScheme.surfaceVariant
-    ) {
-        Text(
-            text = if (isSharing)
-                stringResource(R.string.status_sharing)
-            else
-                stringResource(R.string.status_not_sharing),
-            modifier = Modifier.padding(
-                horizontal = Dimens.spaceMedium,
-                vertical   = Dimens.spaceSmall
-            ),
-            style = MaterialTheme.typography.labelSmall,
-            color = if (isSharing)
-                MaterialTheme.colorScheme.onTertiaryContainer
-            else
-                MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-// ── Info card ─────────────────────────────────────────────────────────────────
-
-enum class InfoCardType { SUCCESS, WARNING, ERROR, INFO }
-
-@Composable
-fun InfoCard(
-    title: String,
-    message: String,
-    modifier: Modifier = Modifier,
-    icon: ImageVector? = null,
-    type: InfoCardType = InfoCardType.INFO
-) {
-    // Map to M3 colour roles — adapts to both light and dark themes
-    val containerColor = when (type) {
-        InfoCardType.SUCCESS -> MaterialTheme.colorScheme.secondaryContainer
-        InfoCardType.WARNING -> MaterialTheme.colorScheme.tertiaryContainer
-        InfoCardType.ERROR   -> MaterialTheme.colorScheme.errorContainer
-        InfoCardType.INFO    -> MaterialTheme.colorScheme.primaryContainer
-    }
-    val contentColor = when (type) {
-        InfoCardType.SUCCESS -> MaterialTheme.colorScheme.onSecondaryContainer
-        InfoCardType.WARNING -> MaterialTheme.colorScheme.onTertiaryContainer
-        InfoCardType.ERROR   -> MaterialTheme.colorScheme.onErrorContainer
-        InfoCardType.INFO    -> MaterialTheme.colorScheme.onPrimaryContainer
-    }
-
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors   = CardDefaults.cardColors(containerColor = containerColor),
-        shape    = MaterialTheme.shapes.medium
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(Dimens.spaceLarge),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            icon?.let {
-                Icon(imageVector = it, contentDescription = null, tint = contentColor)
-                Spacer(modifier = Modifier.width(Dimens.spaceMedium))
-            }
-            Column {
-                Text(text = title,   style = MaterialTheme.typography.titleSmall, color = contentColor)
-                Text(text = message, style = MaterialTheme.typography.bodySmall,  color = contentColor)
-            }
-        }
-    }
-}
-
-// ── Divider with text ─────────────────────────────────────────────────────────
-
-@Composable
 fun DividerText(
     text: String,
     modifier: Modifier = Modifier
@@ -722,24 +419,6 @@ fun shimmerBrush(showShimmer: Boolean = true, targetValue: Float = 1000f): Brush
     }
 }
 
-/**
- * A generic shimmer placeholder composable that can match expected content layout
- * dimensions. Displays a 900ms linear gradient sweep repeating until loading completes.
- *
- * @param modifier Modifier to control the size and shape of the placeholder.
- */
-@Composable
-fun ShimmerPlaceholder(
-    modifier: Modifier = Modifier
-) {
-    val brush = shimmerBrush()
-    Box(
-        modifier = modifier
-            .clip(MaterialTheme.shapes.small)
-            .background(brush)
-    )
-}
-
 @Composable
 fun ShimmerGroupList(modifier: Modifier = Modifier) {
     Column(
@@ -794,44 +473,6 @@ private fun ShimmerGroupCard() {
     }
 }
 
-// ── Generic outlined text field ───────────────────────────────────────────────
-
-@Composable
-fun WhereTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    errorMessage: String? = null,
-    singleLine: Boolean = true,
-    maxLines: Int = 1,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-    keyboardActions: KeyboardActions = KeyboardActions.Default
-) {
-    OutlinedTextField(
-        value         = value,
-        onValueChange = onValueChange,
-        label         = { Text(label) },
-        modifier      = modifier,
-        enabled       = enabled,
-        singleLine    = singleLine,
-        maxLines      = maxLines,
-        isError       = errorMessage != null,
-        supportingText = errorMessage?.let {
-            { Text(it, color = MaterialTheme.colorScheme.error) }
-        },
-        keyboardOptions = keyboardOptions,
-        keyboardActions = keyboardActions,
-        shape           = MaterialTheme.shapes.medium,
-        colors          = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor   = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-            errorBorderColor     = MaterialTheme.colorScheme.error
-        )
-    )
-}
-
 // ── Consistent top app bar ─────────────────────────────────────────────────────
 // All screens share the same surface-coloured bar with correct content colours.
 
@@ -873,99 +514,4 @@ fun WhereTopAppBar(
             actionIconContentColor      = MaterialTheme.colorScheme.onSurfaceVariant
         )
     )
-}
-
-@Composable
-fun WhereTabHeader(
-    title: String,
-    modifier: Modifier = Modifier,
-    actions: @Composable RowScope.() -> Unit = {}
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(start = Dimens.spaceLarge, end = Dimens.spaceMedium, top = Dimens.spaceLarge, bottom = Dimens.spaceMedium),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.End,
-            content = actions
-        )
-    }
-}
-
-// ── Offline banner ────────────────────────────────────────────────────────────
-
-/**
- * Displays a non-obscuring banner at the top of the screen indicating offline status.
- * The banner does not exceed 48dp in height and auto-dismisses within 3 seconds
- * after connectivity is restored.
- *
- * @param connectivityObserver The [ConnectivityObserver] providing network state.
- * @param modifier Optional modifier for the banner container.
- */
-@Composable
-fun OfflineBanner(
-    connectivityObserver: ConnectivityObserver,
-    modifier: Modifier = Modifier
-) {
-    val isConnected by connectivityObserver.isConnected.collectAsState()
-    var showBanner by remember { mutableStateOf(!isConnected) }
-
-    // When connectivity is restored, dismiss the banner after 3 seconds
-    LaunchedEffect(isConnected) {
-        if (isConnected) {
-            delay(3000L)
-            showBanner = false
-        } else {
-            showBanner = true
-        }
-    }
-
-    AnimatedVisibility(
-        visible = showBanner,
-        enter = expandVertically(),
-        exit = shrinkVertically(),
-        modifier = modifier
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 48.dp),
-            color = MaterialTheme.colorScheme.errorContainer,
-            tonalElevation = 2.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.CloudOff,
-                    contentDescription = null,
-                    modifier = Modifier.size(Dimens.iconSizeMedium),
-                    tint = MaterialTheme.colorScheme.onErrorContainer
-                )
-                Spacer(modifier = Modifier.width(Dimens.spaceMedium))
-                Text(
-                    text = stringResource(R.string.banner_offline),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-        }
-    }
 }

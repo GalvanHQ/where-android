@@ -99,6 +99,7 @@ android {
             // via the vintage engine.
             it.useJUnitPlatform()
         }
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -740,6 +741,9 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Compose UI Test for Robolectric-based unit tests
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
     // Kotest property-based testing on the JUnit 5 Platform.
     testImplementation(libs.kotest.property)
     testImplementation(libs.kotest.runner.junit5)

@@ -48,6 +48,15 @@ private val LightColorScheme = lightColorScheme(
     surfaceVariant         = NeutralVar90,
     onSurfaceVariant       = NeutralVar30,
 
+    surfaceTint            = Primary40,
+    surfaceBright          = Neutral99,
+    surfaceDim             = Neutral90,
+    surfaceContainer       = Neutral94,
+    surfaceContainerLow    = Neutral96,
+    surfaceContainerLowest = Neutral99,
+    surfaceContainerHigh   = Neutral92,
+    surfaceContainerHighest = Neutral90,
+
     outline                = NeutralVar40,
     outlineVariant         = NeutralVar80,
 
@@ -80,13 +89,22 @@ private val DarkColorScheme = darkColorScheme(
     errorContainer         = Error40,
     onErrorContainer       = Error90,
 
-    background             = Neutral10,
+    background             = Neutral6,
     onBackground           = Neutral90,
 
-    surface                = Neutral10,
+    surface                = Neutral6,
     onSurface              = Neutral90,
     surfaceVariant         = NeutralVar30,
     onSurfaceVariant       = NeutralVar80,
+
+    surfaceTint            = Primary80,
+    surfaceBright          = Neutral22,
+    surfaceDim             = Neutral4,
+    surfaceContainer       = Neutral12,
+    surfaceContainerLow    = Neutral10,
+    surfaceContainerLowest = Neutral4,
+    surfaceContainerHigh   = Neutral17,
+    surfaceContainerHighest = Neutral22,
 
     outline                = NeutralVar80,
     outlineVariant         = NeutralVar30,

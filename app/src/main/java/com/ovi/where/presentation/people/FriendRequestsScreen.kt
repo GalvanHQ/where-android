@@ -2,6 +2,7 @@ package com.ovi.where.presentation.people
 
 import android.text.format.DateUtils
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -47,6 +48,7 @@ import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.constants.AppConstants.PULL_TO_REFRESH_TIMEOUT_MS
 import com.ovi.where.presentation.common.LIST_ITEM_ANIMATION_DURATION_MS
 import com.ovi.where.presentation.model.FriendRequestUiModel
+import com.ovi.where.presentation.model.SearchUserUiModel
 import com.ovi.where.presentation.people.components.LiveRingAvatar
 import com.ovi.where.presentation.people.components.RequestsEmptyState
 import com.ovi.where.presentation.people.components.RequestsSkeleton
@@ -61,6 +63,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun FriendRequestsScreen(
     onNavigateBack: () -> Unit = {},
+    onNavigateToUserProfile: (String) -> Unit = {},
     viewModel: FriendRequestsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -136,6 +139,7 @@ fun FriendRequestsScreen(
                                     request = request,
                                     onAccept = { viewModel.acceptRequest(request.requesterId) },
                                     onDecline = { viewModel.declineRequest(request.requesterId) },
+                                    onNavigateToUserProfile = onNavigateToUserProfile,
                                     modifier = Modifier.animateItem(
                                         fadeInSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
                                         placementSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
@@ -161,6 +165,7 @@ fun FriendRequestsScreen(
                                 OutgoingRequestItem(
                                     request = request,
                                     onCancel = { viewModel.cancelRequest(request.requesterId) },
+                                    onNavigateToUserProfile = onNavigateToUserProfile,
                                     modifier = Modifier.animateItem(
                                         fadeInSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
                                         placementSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
@@ -213,12 +218,16 @@ private fun IncomingRequestItem(
     request: FriendRequestUiModel,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
+    onNavigateToUserProfile: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = Dimens.spaceLarge, vertical = 10.dp),
+            .padding(horizontal = Dimens.spaceLarge, vertical = 10.dp)
+            .clickable(
+                onClick = { onNavigateToUserProfile(request.requesterId) }
+            ),
         verticalAlignment = Alignment.Top
     ) {
         LiveRingAvatar(
@@ -289,12 +298,16 @@ private fun IncomingRequestItem(
 private fun OutgoingRequestItem(
     request: FriendRequestUiModel,
     onCancel: () -> Unit,
+    onNavigateToUserProfile: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = Dimens.spaceLarge, vertical = 10.dp),
+            .padding(horizontal = Dimens.spaceLarge, vertical = 10.dp)
+            .clickable(
+                onClick = { onNavigateToUserProfile(request.requesterId)}
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         LiveRingAvatar(

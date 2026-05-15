@@ -17,8 +17,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.ovi.where.core.theme.Dimens
 
@@ -34,11 +36,16 @@ fun RequestsInboxCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
+            .clip( MaterialTheme.shapes.large)
             .clickable(onClick = onClick),
         shape = MaterialTheme.shapes.large,
-        elevation = CardDefaults.cardElevation(defaultElevation = Dimens.cardElevationHigh),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 0.dp,
+            pressedElevation = 0.dp
         )
     ) {
         Row(
@@ -75,4 +82,13 @@ fun RequestsInboxCard(
             )
         }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RequestsInboxCardPreview() {
+    RequestsInboxCard(
+        count = 5,
+        onClick = {}
+    )
 }

@@ -52,6 +52,7 @@ import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -95,8 +96,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
@@ -114,6 +117,7 @@ import coil.request.SuccessResult
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapType
@@ -122,14 +126,10 @@ import com.google.maps.android.compose.MarkerComposable
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.ovi.where.R
-import com.google.android.gms.maps.model.LatLngBounds
 import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.LocationUtils
 import com.ovi.where.core.utils.showToast
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 
@@ -554,7 +554,7 @@ fun GlobalMapScreen(
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
 
-            // ── Location off dialog ─────────────────────────────────────────────
+            // ── Location permission dialog ─────────────────────────────────────────────
             if (uiState.showLocationOffDialog && !locationGranted) {
                 AlertDialog(
                     onDismissRequest = {
@@ -563,14 +563,14 @@ fun GlobalMapScreen(
                     },
                     icon = {
                         Icon(
-                            Icons.Default.LocationOff,
+                            Icons.Rounded.LocationOn,
                             contentDescription = null,
                             modifier = Modifier.size(40.dp),
                             tint = MaterialTheme.colorScheme.primary
                         )
                     },
-                    title = { Text(stringResource(R.string.title_location_off)) },
-                    text = { Text(stringResource(R.string.msg_location_off)) },
+                    title = { Text("Location Permission Needed") },
+                    text = { Text("Where needs access to your location to show you on the map and share your position with friends.") },
                     confirmButton = {
                         TextButton(
                             onClick = {
@@ -583,7 +583,7 @@ fun GlobalMapScreen(
                                 viewModel.showLocationOffDialog(false)
                             }
                         ) {
-                            Text(stringResource(R.string.action_enable_location))
+                            Text("Allow")
                         }
                     },
                     dismissButton = {

@@ -480,7 +480,14 @@ fun AppNavGraph(
 
         // ── Friend Requests ───────────────────────────────────────────────────
         composable(Screen.FriendRequests.route) {
-            FriendRequestsScreen(onNavigateBack = { navController.popBackStack() })
+            FriendRequestsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToUserProfile = { userId ->
+                    navController.navigate(Screen.UserProfile.createRoute(userId)) {
+                        launchSingleTop = true
+                    }
+                }
+            )
         }
 
         // ── Full-Screen Search (People / Chats) ──────────────────────────────

@@ -39,8 +39,13 @@ val Error90 = Color(0xFFFFDAD6)      // errorContainer (light)
 val Error99 = Color(0xFFFFFBFF)
 
 // ── Neutral surfaces ─────────────────────────────────────────────────────────
+val Neutral4  = Color(0xFF0F0F12)   // deep background for dark mode
+val Neutral6  = Color(0xFF141417)   // darker background alternative
 val Neutral10 = Color(0xFF1B1B1F)
+val Neutral12 = Color(0xFF1F1F23)   // elevated surface for dark mode
+val Neutral17 = Color(0xFF282830)   // surfaceVariant for dark mode (cards, sheets)
 val Neutral20 = Color(0xFF303034)
+val Neutral22 = Color(0xFF353539)   // surfaceContainerHigh for dark mode
 val Neutral30 = Color(0xFF47464A)
 val Neutral40 = Color(0xFF5F5E62)
 val Neutral80 = Color(0xFFC8C6CA)
@@ -75,6 +80,3 @@ val AvatarColors = listOf(
     Color(0xFFBA1A1A),  // red (hue ~0°)
     Color(0xFF006491),  // cerulean blue (hue ~210°)
 )
-
-// ── Brand constants ──────────────────────────────────────────────────────────
-val GoogleBlue = Color(0xFF4285F4)

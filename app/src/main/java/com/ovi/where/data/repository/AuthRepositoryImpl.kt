@@ -10,6 +10,7 @@ import com.ovi.where.core.common.Resource
 import com.ovi.where.core.constants.AppConstants
 import com.ovi.where.domain.model.User
 import com.ovi.where.domain.repository.AuthRepository
+import dagger.Lazy
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,7 +26,8 @@ class AuthRepositoryImpl
 constructor(
         private val firebaseAuth: FirebaseAuth,
         private val firestore: FirebaseFirestore,
-        @ApplicationContext private val context: Context
+        @ApplicationContext private val context: Context,
+        private val lazyChatSocketIoClient: Lazy<com.ovi.where.data.remote.chat.ChatSocketIoClient>
 ) : AuthRepository {
 
     override val currentUserId: String?
@@ -242,6 +244,10 @@ constructor(
     // ── Sign-out ──────────────────────────────────────────────────────────────
 
     override suspend fun signOut() {
+        // Requirement 21.2: On logout, cancel ChatSocketIoClient scope, disconnect socket,
+        // cancel reconnection job, and reset TypingIndicatorManager.
+        lazyChatSocketIoClient.get().logout()
+
         firebaseAuth.signOut()
         // Also sign out from Google Sign-In client to clear cached account,
         // so the account chooser appears on next Google sign-in attempt.

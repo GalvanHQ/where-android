@@ -32,7 +32,18 @@ fun MessageEntity.toDomain(): Message {
         replyToText = replyToText,
         replyToSenderName = replyToSenderName,
         reactions = parseReactionsJson(reactionsJson),
-        readBy = parseReadByJson(readByJson)
+        readBy = parseReadByJson(readByJson),
+        voiceUrl = voiceUrl,
+        voiceDurationMs = voiceDurationMs,
+        linkPreviewTitle = linkPreviewTitle,
+        linkPreviewDescription = linkPreviewDescription,
+        linkPreviewImageUrl = linkPreviewImageUrl,
+        linkPreviewDomain = linkPreviewDomain,
+        linkPreviewUrl = linkPreviewUrl,
+        mentionedUserIds = parseMentionedUserIdsJson(mentionedUserIdsJson),
+        locationSharingSessionId = locationSharingSessionId,
+        locationSharingDurationMinutes = locationSharingDurationMinutes,
+        forwardedFrom = forwardedFrom
     )
 }
 
@@ -55,7 +66,18 @@ fun Message.toEntity(): MessageEntity {
         replyToText = replyToText,
         replyToSenderName = replyToSenderName,
         reactionsJson = serializeReactions(reactions),
-        readByJson = serializeReadBy(readBy)
+        readByJson = serializeReadBy(readBy),
+        voiceUrl = voiceUrl,
+        voiceDurationMs = voiceDurationMs,
+        linkPreviewTitle = linkPreviewTitle,
+        linkPreviewDescription = linkPreviewDescription,
+        linkPreviewImageUrl = linkPreviewImageUrl,
+        linkPreviewDomain = linkPreviewDomain,
+        linkPreviewUrl = linkPreviewUrl,
+        mentionedUserIdsJson = serializeMentionedUserIds(mentionedUserIds),
+        locationSharingSessionId = locationSharingSessionId,
+        locationSharingDurationMinutes = locationSharingDurationMinutes,
+        forwardedFrom = forwardedFrom
     )
 }
 
@@ -110,5 +132,21 @@ private fun serializeReactions(reactions: Map<String, List<String>>): String {
 private fun serializeReadBy(readBy: List<String>): String {
     if (readBy.isEmpty()) return "[]"
     val jsonArray = JsonArray(readBy.map { JsonPrimitive(it) })
+    return jsonArray.toString()
+}
+
+private fun parseMentionedUserIdsJson(jsonString: String?): List<String> {
+    if (jsonString.isNullOrBlank() || jsonString == "[]") return emptyList()
+    return try {
+        val jsonArray = json.parseToJsonElement(jsonString).jsonArray
+        jsonArray.map { it.jsonPrimitive.content }
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+private fun serializeMentionedUserIds(mentionedUserIds: List<String>): String? {
+    if (mentionedUserIds.isEmpty()) return null
+    val jsonArray = JsonArray(mentionedUserIds.map { JsonPrimitive(it) })
     return jsonArray.toString()
 }

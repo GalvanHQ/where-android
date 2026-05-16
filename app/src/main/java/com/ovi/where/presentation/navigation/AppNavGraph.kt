@@ -32,6 +32,7 @@ import com.ovi.where.presentation.auth.login.LoginScreen
 import com.ovi.where.presentation.auth.signup.SignUpScreen
 import com.ovi.where.presentation.auth.verification.EmailVerificationScreen
 import com.ovi.where.presentation.chat.ChatScreen
+import com.ovi.where.presentation.chat.MediaGalleryScreen
 import com.ovi.where.presentation.group.JoinGroupScreen
 import com.ovi.where.presentation.group.create.CreateGroupScreen
 import com.ovi.where.presentation.group.details.GroupDetailsScreen
@@ -457,6 +458,16 @@ fun AppNavGraph(
                     navController.navigate(Screen.GroupMap.createRoute(groupId)) {
                         launchSingleTop = true
                     }
+                },
+                onNavigateToEditGroup = { groupId ->
+                    navController.navigate(Screen.EditGroup.createRoute(groupId)) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToMediaGallery = { convId ->
+                    navController.navigate(Screen.MediaGallery.createRoute(convId)) {
+                        launchSingleTop = true
+                    }
                 }
             )
         }
@@ -580,6 +591,18 @@ fun AppNavGraph(
             val groupId = back.arguments?.getString("groupId") ?: return@composable
             EditGroupScreen(
                 groupId        = groupId,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // ── Media Gallery ─────────────────────────────────────────────────────
+        composable(
+            route     = Screen.MediaGallery.ROUTE,
+            arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
+        ) { back ->
+            val convId = back.arguments?.getString("conversationId") ?: return@composable
+            MediaGalleryScreen(
+                conversationId = convId,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

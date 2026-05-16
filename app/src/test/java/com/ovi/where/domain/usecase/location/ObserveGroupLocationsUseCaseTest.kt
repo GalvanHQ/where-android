@@ -30,7 +30,7 @@ class ObserveGroupLocationsUseCaseTest {
             SharedLocation(
                 id = "loc1",
                 userId = "user1",
-                userName = "User 1",
+                displayName = "User 1",
                 latitude = 40.7128,
                 longitude = -74.0060,
                 timestamp = System.currentTimeMillis()

@@ -19,6 +19,31 @@ interface LocationRepository {
     /** Single consolidated listener — returns all locations visible to current user. */
     fun observeActiveLocations(): Flow<List<SharedLocation>>
 
+    /**
+     * Observes cached locations from Room database.
+     * Serves cached positions within 100ms of screen open (Requirement 7.2).
+     * Room is the single source of truth for location display.
+     */
+    fun observeCachedLocations(): Flow<List<SharedLocation>>
+
+    /**
+     * Observes locations using Socket.IO as primary source while connected.
+     * Falls back to Firestore snapshot listener after 30s of disconnection.
+     * On reconnect: removes Firestore listener and resumes Socket.IO.
+     * (Requirements 6.4, 6.5)
+     */
+    fun observeLocationsWithSocketFallback(): Flow<List<SharedLocation>>
+
+    /**
+     * Observes locations with Socket.IO as primary source and Firestore as fallback.
+     * If Socket.IO fails to deliver a location update within [fallbackTimeoutMs],
+     * falls back to Firestore listener. All updates are persisted to Room cache.
+     *
+     * Requirement 7.3: Display cached locations within 100ms, subscribe to Socket.IO,
+     * fall back to Firestore after 10s timeout.
+     */
+    fun observeLocationsWithCacheFallback(fallbackTimeoutMs: Long = 10_000L): Flow<List<SharedLocation>>
+
     // Legacy methods kept for backward compat
     fun observeGroupLocations(groupId: String): Flow<List<SharedLocation>>
     fun observeDirectLocationShares(friendIds: List<String>): Flow<List<SharedLocation>>

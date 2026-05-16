@@ -85,7 +85,7 @@ class MessageRepositoryPaginationTest : StringSpec({
         every { ChatApiClient.apiService } returns apiService
     }
 
-    fun createRepo() = MessageRepositoryImpl(wsClient, firebaseAuth, messageDao, firebaseStorage, imageCompressor, cacheStalenessChecker, context)
+    fun createRepo() = MessageRepositoryImpl(dagger.Lazy { wsClient }, firebaseAuth, messageDao, firebaseStorage, imageCompressor, cacheStalenessChecker, context)
 
     afterEach {
         unmockkObject(ChatApiClient)

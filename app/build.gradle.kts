@@ -100,6 +100,7 @@ android {
             it.useJUnitPlatform()
         }
         unitTests.isIncludeAndroidResources = true
+        unitTests.isReturnDefaultValues = true
     }
 }
 
@@ -725,6 +726,9 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.play.services)
+
+    // Kotlinx Collections Immutable (Compose stability)
+    implementation(libs.kotlinx.collections.immutable)
 
     // ── HTTP + WebSocket Clients ─────────────────────────────────────
     implementation(libs.socketio.client)

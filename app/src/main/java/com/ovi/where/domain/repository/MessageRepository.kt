@@ -27,6 +27,18 @@ interface MessageRepository {
      */
     suspend fun fetchMissedMessages(conversationId: String): Resource<Unit>
 
+    /**
+     * Sends a voice message by uploading the audio file and creating a VOICE message.
+     *
+     * @param conversationId The conversation to send the voice message to
+     * @param audioFilePath Local file path of the recorded audio (AAC format)
+     * @param durationMs Duration of the recording in milliseconds
+     * @return Resource containing the created Message or an error
+     *
+     * Requirements: 11.4, 11.6, 11.7
+     */
+    suspend fun sendVoiceMessage(conversationId: String, audioFilePath: String, durationMs: Long): Resource<Message>
+
     /** Returns the current offline queue size */
     val offlineQueueSize: Int
 

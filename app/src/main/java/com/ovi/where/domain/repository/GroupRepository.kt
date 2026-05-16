@@ -31,4 +31,19 @@ interface GroupRepository {
      * Requirements: 11.1, 11.2, 11.3, 11.6
      */
     fun getGroupMembersResource(groupId: String): Flow<DataResource<List<GroupMember>>>
+
+    /**
+     * Mutes a member in a group. The muted member will not be able to send messages
+     * in the group until unmuted by an admin.
+     *
+     * Requirement 15.2, 15.3
+     */
+    suspend fun muteMember(groupId: String, userId: String): Resource<Unit>
+
+    /**
+     * Retrieves the invite link for a group.
+     *
+     * Requirement 15.5, 15.6
+     */
+    suspend fun getInviteLink(groupId: String): Resource<String>
 }

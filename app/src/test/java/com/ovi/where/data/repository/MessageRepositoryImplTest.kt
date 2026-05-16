@@ -69,7 +69,7 @@ class MessageRepositoryImplTest : StringSpec({
         every { wsClient.connectionState } returns connectionState
     }
 
-    fun createRepo() = MessageRepositoryImpl(wsClient, firebaseAuth, messageDao, firebaseStorage, imageCompressor, cacheStalenessChecker, context)
+    fun createRepo() = MessageRepositoryImpl(dagger.Lazy { wsClient }, firebaseAuth, messageDao, firebaseStorage, imageCompressor, cacheStalenessChecker, context)
 
     "sendMessage inserts optimistic message with PENDING status into Room" {
         runTest {

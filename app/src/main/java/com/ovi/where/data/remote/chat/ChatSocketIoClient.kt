@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +27,8 @@ private const val TAG = "ChatSocketIoClient"
 @Singleton
 class ChatSocketIoClient @Inject constructor() {
 
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var supervisorJob = SupervisorJob()
+    private var scope = CoroutineScope(Dispatchers.IO + supervisorJob)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     private val _incomingFrames = MutableSharedFlow<ServerFrame>(extraBufferCapacity = 64)
@@ -51,12 +53,6 @@ class ChatSocketIoClient @Inject constructor() {
     )
 
     enum class ConnectionState { CONNECTING, CONNECTED, DISCONNECTED, ERROR }
-
-    companion object {
-        internal const val INITIAL_BACKOFF_MS = 1000L
-        internal const val MAX_BACKOFF_MS = 30_000L
-        internal const val MAX_RECONNECT_ATTEMPTS = 10
-    }
 
     fun connect(conversationId: String, firebaseToken: String) {
         if (currentConversationId == conversationId &&
@@ -172,6 +168,16 @@ class ChatSocketIoClient @Inject constructor() {
                 }
             }
 
+            socket?.on("location_update") { args ->
+                val data = args[0] as? JSONObject ?: return@on
+                try {
+                    val frame = json.decodeFromString<ServerFrame.LocationUpdate>(data.toString())
+                    scope.launch { _incomingFrames.emit(frame) }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Parse error (location_update): ${e.message}")
+                }
+            }
+
             socket?.on("error") { args ->
                 val data = args[0] as? JSONObject ?: return@on
                 try {
@@ -230,6 +236,16 @@ class ChatSocketIoClient @Inject constructor() {
             put("imageUrl", imageUrl)
         }
         socket?.emit("image_message", payload)
+    }
+
+    suspend fun sendVoiceMessage(conversationId: String, tempId: String, voiceUrl: String, durationMs: Long) {
+        if (_connectionState.value != ConnectionState.CONNECTED) return
+        val payload = JSONObject().apply {
+            put("tempId", tempId)
+            put("voiceUrl", voiceUrl)
+            put("durationMs", durationMs)
+        }
+        socket?.emit("voice_message", payload)
     }
 
     suspend fun sendTyping(isTyping: Boolean) {
@@ -422,6 +438,16 @@ class ChatSocketIoClient @Inject constructor() {
             }
         }
 
+        socket?.on("location_update") { args ->
+            val data = args[0] as? JSONObject ?: return@on
+            try {
+                val frame = json.decodeFromString<ServerFrame.LocationUpdate>(data.toString())
+                scope.launch { _incomingFrames.emit(frame) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Parse error (location_update): ${e.message}")
+            }
+        }
+
         socket?.on("error") { args ->
             val data = args[0] as? JSONObject ?: return@on
             try {
@@ -449,5 +475,124 @@ class ChatSocketIoClient @Inject constructor() {
         reconnectionJob?.cancel()
         reconnectionJob = null
         connect(convId, token)
+    }
+
+    // ─── Lifecycle Management (Requirement 21) ────────────────────────────────
+
+    /**
+     * Called on user logout. Cancels the SupervisorJob-based CoroutineScope,
+     * disconnects the socket, cancels any active reconnection job, and resets
+     * the TypingIndicatorManager. Leaves zero active coroutines and zero open
+     * socket connections owned by this client instance.
+     *
+     * After calling this method, the scope is recreated so the client can be
+     * reused after re-authentication.
+     *
+     * Requirement 21.2: On logout, cancel scope, disconnect, cancel reconnection,
+     * reset TypingIndicatorManager.
+     */
+    fun logout() {
+        Timber.i("ChatSocketIoClient logout: cancelling scope and disconnecting")
+        // Cancel all active coroutines in the scope (including reconnection job)
+        supervisorJob.cancel()
+        reconnectionJob = null
+
+        // Disconnect socket and release reference
+        isManualDisconnect = true
+        typingIndicatorManager.reset()
+        socket?.disconnect()
+        socket?.off()
+        socket = null
+        currentConversationId = null
+        currentToken = null
+        _connectionState.value = ConnectionState.DISCONNECTED
+
+        // Recreate scope for potential reuse after re-authentication
+        supervisorJob = SupervisorJob()
+        scope = CoroutineScope(Dispatchers.IO + supervisorJob)
+    }
+
+    /**
+     * Called when the Application process is destroyed. Cancels the SupervisorJob-based
+     * CoroutineScope and releases the socket reference, ensuring no background threads
+     * or socket connections persist beyond process termination.
+     *
+     * Requirement 21.3: On process destroy, cancel scope and release socket reference.
+     */
+    fun onProcessDestroy() {
+        Timber.i("ChatSocketIoClient onProcessDestroy: releasing all resources")
+        supervisorJob.cancel()
+        reconnectionJob = null
+        typingIndicatorManager.reset()
+        socket?.disconnect()
+        socket?.off()
+        socket = null
+        _connectionState.value = ConnectionState.DISCONNECTED
+    }
+
+    /**
+     * Disconnects the socket for background transition. Does not cancel the scope
+     * so that the client can reconnect when the app returns to foreground.
+     * Sets isManualDisconnect to prevent automatic reconnection.
+     *
+     * Requirement 21.4: On background (onStop, !isChangingConfigurations),
+     * disconnect socket within 5s.
+     */
+    fun disconnectForBackground() {
+        Timber.i("ChatSocketIoClient disconnectForBackground: disconnecting socket")
+        isManualDisconnect = true
+        reconnectionJob?.cancel()
+        reconnectionJob = null
+        typingIndicatorManager.reset()
+        socket?.disconnect()
+        socket?.off()
+        socket = null
+        _connectionState.value = ConnectionState.DISCONNECTED
+    }
+
+    /**
+     * Reconnects the socket after returning from background. Attempts to reach
+     * CONNECTED state within [FOREGROUND_RECONNECT_TIMEOUT_MS]. If the connection
+     * is not established within that time, continues with exponential backoff
+     * without crashing or leaving the connection in an indeterminate state.
+     *
+     * Requirement 21.5: On foreground (onStart), reconnect socket within 2s.
+     * Requirement 21.6: If reconnection doesn't reach CONNECTED within 2s,
+     * continue with exponential backoff.
+     */
+    fun reconnectFromForeground() {
+        val convId = currentConversationId ?: return
+        val token = currentToken ?: return
+
+        Timber.i("ChatSocketIoClient reconnectFromForeground: attempting reconnection")
+        isManualDisconnect = false
+        resetReconnectionState()
+
+        // Attempt connection — if it doesn't reach CONNECTED within 2s,
+        // the normal reconnection logic (exponential backoff) will handle it
+        // via the EVENT_CONNECT_ERROR and EVENT_DISCONNECT handlers.
+        connect(convId, token)
+
+        // Start a timeout job: if not connected within 2s, ensure backoff continues
+        scope.launch {
+            delay(FOREGROUND_RECONNECT_TIMEOUT_MS)
+            if (_connectionState.value != ConnectionState.CONNECTED) {
+                Timber.i("Foreground reconnect did not reach CONNECTED within ${FOREGROUND_RECONNECT_TIMEOUT_MS}ms, continuing with backoff")
+                // The reconnection logic is already running via startReconnection()
+                // triggered by EVENT_CONNECT_ERROR or EVENT_DISCONNECT handlers.
+                // If it hasn't started yet (e.g., connect() is still pending), start it.
+                if (reconnectionJob == null || reconnectionJob?.isActive != true) {
+                    startReconnection()
+                }
+            }
+        }
+    }
+
+    companion object {
+        internal const val INITIAL_BACKOFF_MS = 1000L
+        internal const val MAX_BACKOFF_MS = 30_000L
+        internal const val MAX_RECONNECT_ATTEMPTS = 10
+        /** Timeout for foreground reconnection before falling back to backoff (Requirement 21.6). */
+        internal const val FOREGROUND_RECONNECT_TIMEOUT_MS = 2000L
     }
 }

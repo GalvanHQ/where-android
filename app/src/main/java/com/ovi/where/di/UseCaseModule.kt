@@ -21,12 +21,15 @@ import com.ovi.where.domain.usecase.auth.UpdateBioUseCase
 import com.ovi.where.domain.usecase.auth.UpdateUsernameUseCase
 import com.ovi.where.domain.usecase.auth.UpdateProfileUseCase
 import com.ovi.where.domain.usecase.chat.CreateGroupConversationUseCase
+import com.ovi.where.domain.usecase.chat.FetchLinkPreviewUseCase
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
 import com.ovi.where.domain.usecase.chat.MarkConversationReadUseCase
 import com.ovi.where.domain.usecase.chat.ObserveConversationsUseCase
 import com.ovi.where.domain.usecase.chat.ObserveMessagesUseCase
 import com.ovi.where.domain.usecase.chat.SendLocationMessageUseCase
 import com.ovi.where.domain.usecase.chat.SendMessageUseCase
+import com.ovi.where.domain.usecase.chat.SendVoiceMessageUseCase
+import com.ovi.where.data.local.dao.LinkPreviewCacheDao
 import com.ovi.where.domain.usecase.friend.AcceptFriendRequestUseCase
 import com.ovi.where.domain.usecase.friend.BlockUserUseCase
 import com.ovi.where.domain.usecase.friend.CancelFriendRequestUseCase
@@ -123,4 +126,6 @@ object UseCaseModule {
     @Provides fun provideSendMessageUseCase(r: MessageRepository) = SendMessageUseCase(r)
     @Provides fun provideSendLocationMessageUseCase(r: MessageRepository) = SendLocationMessageUseCase(r)
     @Provides fun provideMarkConversationReadUseCase(r: ConversationRepository) = MarkConversationReadUseCase(r)
+    @Provides fun provideFetchLinkPreviewUseCase(dao: LinkPreviewCacheDao) = FetchLinkPreviewUseCase(dao)
+    @Provides fun provideSendVoiceMessageUseCase(r: MessageRepository) = SendVoiceMessageUseCase(r)
 }

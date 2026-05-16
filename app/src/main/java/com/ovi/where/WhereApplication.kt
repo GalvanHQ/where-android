@@ -8,6 +8,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
 import com.ovi.where.core.constants.AppConstants
+import com.ovi.where.data.remote.chat.ChatProcessLifecycleObserver
+import com.ovi.where.data.sync.BackgroundSyncLifecycleObserver
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,11 +17,18 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import timber.log.Timber
+import javax.inject.Inject
 
 @HiltAndroidApp
 class WhereApplication : Application() {
 
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    @Inject
+    lateinit var chatProcessLifecycleObserver: ChatProcessLifecycleObserver
+
+    @Inject
+    lateinit var backgroundSyncLifecycleObserver: BackgroundSyncLifecycleObserver
 
     override fun onCreate() {
         super.onCreate()
@@ -32,6 +41,10 @@ class WhereApplication : Application() {
         fetchAndSaveFcmToken()
         // Track online status using the process lifecycle
         ProcessLifecycleOwner.get().lifecycle.addObserver(OnlineStatusObserver())
+        // Requirement 21.4, 21.5: Manage socket and Firestore listener on app foreground/background
+        ProcessLifecycleOwner.get().lifecycle.addObserver(chatProcessLifecycleObserver)
+        // Requirement 22.1: Schedule background sync when app is in background > 5 minutes
+        ProcessLifecycleOwner.get().lifecycle.addObserver(backgroundSyncLifecycleObserver)
     }
 
     /**

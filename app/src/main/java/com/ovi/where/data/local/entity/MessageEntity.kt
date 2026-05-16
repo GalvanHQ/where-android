@@ -30,5 +30,21 @@ data class MessageEntity(
     val replyToText: String?,
     val replyToSenderName: String?,
     val reactionsJson: String,
-    val readByJson: String
+    val readByJson: String,
+    // Voice message
+    val voiceUrl: String? = null,
+    val voiceDurationMs: Long? = null,
+    // Link preview
+    val linkPreviewTitle: String? = null,
+    val linkPreviewDescription: String? = null,
+    val linkPreviewImageUrl: String? = null,
+    val linkPreviewDomain: String? = null,
+    val linkPreviewUrl: String? = null,
+    // Mentions (stored as JSON array of user IDs)
+    val mentionedUserIdsJson: String? = null,
+    // Live location sharing
+    val locationSharingSessionId: String? = null,
+    val locationSharingDurationMinutes: Long? = null,
+    // Forward
+    val forwardedFrom: String? = null
 )

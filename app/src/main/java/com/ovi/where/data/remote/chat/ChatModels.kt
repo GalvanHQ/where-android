@@ -60,6 +60,24 @@ data class CreateGroupConversationRequest(
 
 // ─── WebSocket incoming frames (from server) ──────────────────────────────
 
+// ─── Link Preview DTO ─────────────────────────────────────────────────────
+
+/**
+ * Response DTO from the server-side link preview API.
+ * Contains Open Graph metadata for a URL.
+ *
+ * Requirement 12.2: title, description, image URL from Open Graph metadata.
+ */
+@Serializable
+data class LinkPreviewDto(
+    val title: String? = null,
+    val description: String? = null,
+    val imageUrl: String? = null,
+    val url: String = ""
+)
+
+// ─── WebSocket incoming frames (from server) ──────────────────────────────
+
 @Serializable
 sealed class ServerFrame {
     @Serializable @SerialName("message")
@@ -111,4 +129,13 @@ sealed class ServerFrame {
 
     @Serializable @SerialName("connected")
     data class Connected(val conversationId: String = "", val userId: String = "") : ServerFrame()
+
+    @Serializable @SerialName("location_update")
+    data class LocationUpdate(
+        val userId: String = "",
+        val lat: Double = 0.0,
+        val lng: Double = 0.0,
+        val accuracy: Float = 0f,
+        val timestamp: Long = 0L
+    ) : ServerFrame()
 }

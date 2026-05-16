@@ -1,6 +1,7 @@
 package com.ovi.where.presentation.chat.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -30,6 +31,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ovi.where.core.theme.Dimens
+import com.ovi.where.core.utils.LocalReducedMotion
 
 /**
  * The 6 emojis available in the reaction picker.
@@ -42,9 +44,10 @@ val REACTION_EMOJIS = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
  *
  * - Displays 6 emojis in a horizontal row (Requirement 3.1)
  * - Dismisses on tap outside or back gesture (Requirement 3.2)
- * - Appears with scale + fade animation
+ * - Appears with 200ms scale-up 80→100% + fade-in (Requirement 23.6)
+ * - Reduced motion: skip scale animation, apply instantly (Requirement 23.7)
  *
- * Requirements: 3.1, 3.2
+ * Requirements: 3.1, 3.2, 23.6, 23.7
  */
 @Composable
 fun ReactionPickerOverlay(
@@ -53,10 +56,30 @@ fun ReactionPickerOverlay(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val reducedMotion = LocalReducedMotion.current
+
+    // Requirement 23.6: 200ms scale-up from 80% to 100% + fade-in
+    // Requirement 23.7: Skip all slide/scale animations when reduced motion enabled
+    val enterTransition = if (reducedMotion) {
+        fadeIn(animationSpec = snap())
+    } else {
+        fadeIn(tween(REACTION_PICKER_DURATION_MS)) +
+                scaleIn(
+                    animationSpec = tween(REACTION_PICKER_DURATION_MS),
+                    initialScale = REACTION_PICKER_INITIAL_SCALE
+                )
+    }
+
+    val exitTransition = if (reducedMotion) {
+        fadeOut(animationSpec = snap())
+    } else {
+        fadeOut(tween(100)) + scaleOut(tween(150), targetScale = REACTION_PICKER_INITIAL_SCALE)
+    }
+
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(150)) + scaleIn(tween(200), initialScale = 0.8f),
-        exit = fadeOut(tween(100)) + scaleOut(tween(150), targetScale = 0.8f)
+        enter = enterTransition,
+        exit = exitTransition
     ) {
         Box(
             modifier = modifier
@@ -103,6 +126,12 @@ fun ReactionPickerOverlay(
         }
     }
 }
+
+/** Reaction picker animation duration in ms (Requirement 23.6). */
+private const val REACTION_PICKER_DURATION_MS = 200
+
+/** Reaction picker initial scale (Requirement 23.6: 80% → 100%). */
+private const val REACTION_PICKER_INITIAL_SCALE = 0.8f
 
 /**
  * Displays aggregated reaction badges below a message bubble.

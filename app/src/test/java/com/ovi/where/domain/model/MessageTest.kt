@@ -125,4 +125,64 @@ class MessageTest {
         )
         assertTrue(message.isValid())
     }
+
+    @Test
+    fun `VOICE message is valid when voiceUrl is non-null`() {
+        val message = Message(
+            id = "msg1",
+            conversationId = "conv1",
+            senderId = "user1",
+            senderName = "User",
+            text = "",
+            type = MessageType.VOICE,
+            timestamp = 1000L,
+            voiceUrl = "https://example.com/voice.aac"
+        )
+        assertTrue(message.isValid())
+    }
+
+    @Test
+    fun `VOICE message is invalid when voiceUrl is null`() {
+        val message = Message(
+            id = "msg1",
+            conversationId = "conv1",
+            senderId = "user1",
+            senderName = "User",
+            text = "",
+            type = MessageType.VOICE,
+            timestamp = 1000L,
+            voiceUrl = null
+        )
+        assertFalse(message.isValid())
+    }
+
+    @Test
+    fun `LIVE_LOCATION message is valid when locationSharingSessionId is non-null`() {
+        val message = Message(
+            id = "msg1",
+            conversationId = "conv1",
+            senderId = "user1",
+            senderName = "User",
+            text = "",
+            type = MessageType.LIVE_LOCATION,
+            timestamp = 1000L,
+            locationSharingSessionId = "session-123"
+        )
+        assertTrue(message.isValid())
+    }
+
+    @Test
+    fun `LIVE_LOCATION message is invalid when locationSharingSessionId is null`() {
+        val message = Message(
+            id = "msg1",
+            conversationId = "conv1",
+            senderId = "user1",
+            senderName = "User",
+            text = "",
+            type = MessageType.LIVE_LOCATION,
+            timestamp = 1000L,
+            locationSharingSessionId = null
+        )
+        assertFalse(message.isValid())
+    }
 }

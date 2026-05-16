@@ -30,4 +30,13 @@ interface ConversationDao {
 
     @Query("DELETE FROM conversations WHERE id = :conversationId")
     suspend fun deleteById(conversationId: String)
+
+    @Query("SELECT id FROM conversations")
+    suspend fun getAllIds(): List<String>
+
+    @Query("SELECT documentUpdateTime FROM conversations WHERE id = :conversationId")
+    suspend fun getDocumentUpdateTime(conversationId: String): Long?
+
+    @Query("SELECT lastSyncTimestamp FROM conversations WHERE id = :conversationId")
+    suspend fun getLastSyncTimestamp(conversationId: String): Long?
 }

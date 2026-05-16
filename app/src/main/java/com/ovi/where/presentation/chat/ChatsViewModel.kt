@@ -4,16 +4,21 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.ovi.where.core.common.Resource
+import com.ovi.where.data.local.dao.OnlineStatusDao
+import com.ovi.where.data.local.entity.OnlineStatusEntity
 import com.ovi.where.data.local.prefs.RecentSearchesStore
+import com.ovi.where.data.network.ConnectivityObserver
 import com.ovi.where.data.remote.chat.ChatSocketIoClient
 import com.ovi.where.data.remote.chat.ServerFrame
 import com.ovi.where.domain.model.Conversation
 import com.ovi.where.domain.model.ConversationType
+import com.ovi.where.domain.model.SharedLocation
 import com.ovi.where.domain.repository.ConversationRepository
 import com.ovi.where.domain.usecase.GetSuggestionsUseCase
 import com.ovi.where.domain.usecase.SearchChatsUseCase
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
 import com.ovi.where.domain.usecase.chat.ObserveConversationsUseCase
+import com.ovi.where.domain.usecase.location.ObserveActiveLocationsUseCase
 import com.ovi.where.presentation.common.search.SearchUiState
 import com.ovi.where.presentation.common.search.SuggestionUiModel
 import com.ovi.where.presentation.model.ConversationUiModel
@@ -22,16 +27,19 @@ import com.ovi.where.presentation.model.toUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import dagger.Lazy
 import javax.inject.Inject
 import com.ovi.where.data.util.Resource as DataResource
 
@@ -40,14 +48,22 @@ import com.ovi.where.data.util.Resource as DataResource
 class ChatsViewModel @Inject constructor(
     private val observeConversationsUseCase: ObserveConversationsUseCase,
     private val getOrCreateDirectConversationUseCase: GetOrCreateDirectConversationUseCase,
-    private val chatSocketIoClient: ChatSocketIoClient,
+    private val lazyChatSocketIoClient: Lazy<ChatSocketIoClient>,
     private val firebaseAuth: FirebaseAuth,
     private val conversationRepository: ConversationRepository,
     private val searchChatsUseCase: SearchChatsUseCase,
     private val recentSearchesStore: RecentSearchesStore,
-    private val getSuggestionsUseCase: GetSuggestionsUseCase
+    private val getSuggestionsUseCase: GetSuggestionsUseCase,
+    private val onlineStatusDao: OnlineStatusDao,
+    private val connectivityObserver: ConnectivityObserver,
+    private val observeActiveLocationsUseCase: ObserveActiveLocationsUseCase
 ) : ViewModel() {
 
+    /**
+     * Lazily-resolved ChatSocketIoClient instance.
+     * Not instantiated until first access, keeping app startup free of chat initialization (Req 20.1, 20.4, 20.5).
+     */
+    private val chatSocketIoClient: ChatSocketIoClient get() = lazyChatSocketIoClient.get()
     private val _uiState = MutableStateFlow(ChatsUiState())
     val uiState: StateFlow<ChatsUiState> = _uiState.asStateFlow()
 
@@ -58,6 +74,15 @@ class ChatsViewModel @Inject constructor(
 
     /** Tracks which user IDs are currently online (from presence events). */
     private val onlineUserIds = mutableSetOf<String>()
+
+    /** Active location sharing sessions visible to the current user (Req 3.6). */
+    private var activeLocations: List<SharedLocation> = emptyList()
+
+    /**
+     * Debounce job for reverting location sharing status.
+     * Ensures icon/preview removal within 5s of all sessions ending (Req 3.5).
+     */
+    private var locationRevertJob: kotlinx.coroutines.Job? = null
 
     // ── Search State ────────────────────────────────────────────────────────
 
@@ -108,35 +133,70 @@ class ChatsViewModel @Inject constructor(
     init {
         // Network requests are initiated ONLY from this init block (Requirement 11.1)
         // This ensures no duplicate API calls from Compose recomposition
-        loadConversationsWithNetworkBoundResource()
+        loadConversationsWithFastFirstPaint()
         observePresenceUpdates()
+        observeOfflineState()
+        observeLocationSharingStatus()
     }
 
-    // ── Initial Load (NetworkBoundResource Requirement 11.2) ────────────────
+    // ── Initial Load with Fast First Paint (Requirements 20.2, 20.3) ────────
 
     /**
-     * Loads conversations using the NetworkBoundResource pattern:
-     * 1. Serves Room cache immediately (Loading state with cached data)
-     * 2. Checks staleness and fetches from network if stale
-     * 3. Updates Room on success, serves stale cache on failure
+     * Loads conversations with fast first paint optimization:
      *
-     * Network request is triggered ONLY from this init block, not from
-     * Compose recomposition (Requirement 11.1).
+     * - Cache non-empty: emits cached conversations from Room within 200ms of init (Req 20.2)
+     * - Cache empty (first install): emits loading state within 100ms, waits for network
+     *   fetch with a 10-second timeout before showing empty list (Req 20.3)
+     *
+     * Architecture:
+     * 1. Immediately starts collecting from Room's conversation flow (no blocking calls first)
+     * 2. If Room has cached data, it emits within 200ms (Room Flow is synchronous on first emit)
+     * 3. If Room is empty, shows loading and triggers network fetch with timeout
+     * 4. After initial paint, continues with the NetworkBoundResource pattern for staleness checks
      */
-    private fun loadConversationsWithNetworkBoundResource() {
+    private fun loadConversationsWithFastFirstPaint() {
+        // Phase 1: Immediately collect from Room for fast first paint (Req 20.2)
         viewModelScope.launch {
+            var initialEmitHandled = false
+
             conversationRepository.getConversationsResource().collect { resource ->
                 when (resource) {
                     is DataResource.Loading -> {
                         val conversations = resource.data ?: emptyList()
                         allConversations = conversations
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = conversations.isEmpty(),
-                            errorMessage = null
-                        )
-                        applySearchFilter()
+
+                        if (!initialEmitHandled) {
+                            initialEmitHandled = true
+                            if (conversations.isNotEmpty()) {
+                                // Cache non-empty: emit immediately (within 200ms of init) (Req 20.2)
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = false,
+                                    errorMessage = null
+                                )
+                                applySearchFilter()
+                            } else {
+                                // Cache empty: emit loading state within 100ms (Req 20.3)
+                                val shouldShowLoading = !_uiState.value.isOffline
+                                _uiState.value = _uiState.value.copy(
+                                    isLoading = shouldShowLoading,
+                                    errorMessage = null
+                                )
+                                applySearchFilter()
+                                // Start network fetch with 10s timeout (Req 20.3)
+                                startNetworkFetchWithTimeout()
+                            }
+                        } else {
+                            // Subsequent Loading emissions (e.g., during refresh)
+                            val shouldShowLoading = conversations.isEmpty() && !_uiState.value.isOffline
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = shouldShowLoading,
+                                errorMessage = null
+                            )
+                            applySearchFilter()
+                        }
                     }
                     is DataResource.Success -> {
+                        initialEmitHandled = true
                         allConversations = resource.data
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
@@ -145,6 +205,7 @@ class ChatsViewModel @Inject constructor(
                         applySearchFilter()
                     }
                     is DataResource.Error -> {
+                        initialEmitHandled = true
                         // Serve stale cache on failure (Requirement 11.3)
                         val conversations = resource.data ?: emptyList()
                         allConversations = conversations
@@ -159,7 +220,89 @@ class ChatsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Handles the empty-cache scenario (first install):
+     * Fetches initial conversations from network with a 10-second timeout.
+     * If the timeout elapses without data arriving, shows an empty list (Req 20.3).
+     */
+    private fun startNetworkFetchWithTimeout() {
+        viewModelScope.launch {
+            // Trigger the initial fetch (writes to Room, which triggers the flow above)
+            val fetchJob = launch {
+                conversationRepository.fetchInitialConversationsIfNeeded()
+            }
+
+            // 10-second timeout: if no data arrives, stop loading and show empty list
+            val timeoutJob = launch {
+                delay(NETWORK_FETCH_TIMEOUT_MS)
+                if (_uiState.value.isLoading && allConversations.isEmpty()) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = null
+                    )
+                    applySearchFilter()
+                }
+            }
+
+            // Cancel timeout if fetch completes first
+            fetchJob.invokeOnCompletion { timeoutJob.cancel() }
+        }
+    }
+
     // ── Foreground Sync (Task 16.3) ─────────────────────────────────────────
+
+    /**
+     * Observes network connectivity state.
+     * Requirement 7.5: While offline, display all cached data without loading indicators.
+     */
+    private fun observeOfflineState() {
+        viewModelScope.launch {
+            connectivityObserver.isConnected.collect { isConnected ->
+                _uiState.value = _uiState.value.copy(
+                    isOffline = !isConnected
+                )
+                // Requirement 7.5: While offline, suppress loading indicators
+                if (!isConnected && _uiState.value.isLoading) {
+                    _uiState.value = _uiState.value.copy(isLoading = false)
+                }
+            }
+        }
+    }
+
+    // ── Location Sharing Status (Task 3.4, Req 3.1-3.6) ────────────────────
+
+    /**
+     * Observes active location sharing sessions from LocationRepository.
+     * Reuses the existing consolidated observeActiveLocations flow (Req 3.6).
+     * Updates conversation list previews with location sharing status.
+     * Reverts preview within 5s of all sessions ending (Req 3.5).
+     */
+    private fun observeLocationSharingStatus() {
+        viewModelScope.launch {
+            observeActiveLocationsUseCase()
+                .distinctUntilChanged()
+                .collect { locations ->
+                    val previousLocations = activeLocations
+                    activeLocations = locations
+
+                    // Req 3.5: If all sessions just ended, delay removal by up to 5s
+                    if (locations.none { it.isSharingActive } && previousLocations.any { it.isSharingActive }) {
+                        locationRevertJob?.cancel()
+                        locationRevertJob = viewModelScope.launch {
+                            delay(5_000L)
+                            activeLocations = emptyList()
+                            applySearchFilter()
+                        }
+                    } else {
+                        // Cancel any pending revert if new sharing started
+                        if (locations.any { it.isSharingActive }) {
+                            locationRevertJob?.cancel()
+                        }
+                        applySearchFilter()
+                    }
+                }
+        }
+    }
 
     /**
      * Triggers foreground sync of unread counts on app resume.
@@ -211,6 +354,7 @@ class ChatsViewModel @Inject constructor(
     /**
      * Observes presence frames from ChatSocketIoClient to track online status
      * per conversation avatar (Requirement 9.7).
+     * Persists presence state to Room for offline access (Requirement 6.3).
      */
     private fun observePresenceUpdates() {
         viewModelScope.launch {
@@ -222,6 +366,14 @@ class ChatsViewModel @Inject constructor(
                         onlineUserIds.remove(frame.userId)
                     }
                     if (changed) {
+                        // Persist to Room for offline access (Req 6.3)
+                        onlineStatusDao.upsert(
+                            OnlineStatusEntity(
+                                userId = frame.userId,
+                                isOnline = frame.status == "online",
+                                lastUpdatedAt = System.currentTimeMillis()
+                            )
+                        )
                         applySearchFilter()
                     }
                 }
@@ -321,6 +473,7 @@ class ChatsViewModel @Inject constructor(
 
     /**
      * Applies the current search query to the full conversation list and updates UI state.
+     * Pinned conversations are sorted to the top, maintaining timestamp sort within each group (Req 24.4).
      */
     private fun applySearchFilter() {
         val uid = currentUserId ?: ""
@@ -335,10 +488,41 @@ class ChatsViewModel @Inject constructor(
             }
         }
 
+        val uiModels = filtered.map { conversation ->
+            conversation.toUiModel(uid, ::formatConversationTimestamp, activeLocations)
+        }
+
+        // Sort: pinned conversations at top (timestamp sort within pinned group),
+        // then unpinned conversations sorted by timestamp (Req 24.4)
+        val sorted = uiModels.sortedWith(
+            compareByDescending<ConversationUiModel> { it.isPinned }
+                .thenByDescending { it.lastMessageTime } // Already formatted, but we need raw timestamp for proper sort
+        )
+
+        // Re-sort using the raw domain model timestamps for correct ordering
+        val pinnedIds = allConversations
+            .filter { uid in it.pinnedBy }
+            .sortedByDescending { it.lastMessageTimestamp }
+            .map { it.id }
+        val unpinnedIds = allConversations
+            .filter { uid !in it.pinnedBy }
+            .sortedByDescending { it.lastMessageTimestamp }
+            .map { it.id }
+
+        val orderedIds = pinnedIds + unpinnedIds
+        val uiModelMap = uiModels.associateBy { it.id }
+        val orderedUiModels = orderedIds.mapNotNull { id -> uiModelMap[id] }
+            .filter { model ->
+                if (query.isBlank()) true
+                else {
+                    val conv = allConversations.find { it.id == model.id }
+                    conv != null && (conv.name.contains(query, ignoreCase = true) ||
+                        conv.lastMessageText.contains(query, ignoreCase = true))
+                }
+            }
+
         _uiState.value = _uiState.value.copy(
-            conversations = filtered.map { conversation ->
-                conversation.toUiModel(uid, ::formatConversationTimestamp)
-            },
+            conversations = orderedUiModels,
             isLoading = false
         )
     }
@@ -397,6 +581,128 @@ class ChatsViewModel @Inject constructor(
             conversationRepository.deleteConversation(conversationId)
         }
     }
+
+    // ── Pin / Mute / Archive Actions (Requirement 24.3, 24.4, 24.5) ────────
+
+    /**
+     * Shows the long-press context menu for a conversation (Req 24.3).
+     */
+    fun showConversationContextMenu(conversationId: String) {
+        _uiState.value = _uiState.value.copy(contextMenuConversationId = conversationId)
+    }
+
+    /**
+     * Dismisses the conversation context menu.
+     */
+    fun dismissConversationContextMenu() {
+        _uiState.value = _uiState.value.copy(contextMenuConversationId = null)
+    }
+
+    /**
+     * Pins or unpins a conversation (Req 24.4).
+     * Pinned conversations appear at the top of the list (max 3).
+     * Shows error if attempting to pin a 4th conversation.
+     */
+    fun togglePinConversation(conversationId: String) {
+        val conversation = _uiState.value.conversations.find { it.id == conversationId } ?: return
+        viewModelScope.launch {
+            val result = if (conversation.isPinned) {
+                conversationRepository.unpinConversation(conversationId)
+            } else {
+                conversationRepository.pinConversation(conversationId)
+            }
+            when (result) {
+                is Resource.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        pinLimitError = result.message,
+                        contextMenuConversationId = null
+                    )
+                }
+                is Resource.Success -> {
+                    // Update local state optimistically
+                    val updatedConversation = allConversations.find { it.id == conversationId }
+                    if (updatedConversation != null) {
+                        val uid = currentUserId ?: return@launch
+                        val updatedPinnedBy = if (conversation.isPinned) {
+                            updatedConversation.pinnedBy - uid
+                        } else {
+                            updatedConversation.pinnedBy + uid
+                        }
+                        allConversations = allConversations.map {
+                            if (it.id == conversationId) it.copy(pinnedBy = updatedPinnedBy) else it
+                        }
+                        applySearchFilter()
+                    }
+                    _uiState.value = _uiState.value.copy(contextMenuConversationId = null)
+                }
+                else -> {
+                    _uiState.value = _uiState.value.copy(contextMenuConversationId = null)
+                }
+            }
+        }
+    }
+
+    /**
+     * Mutes or unmutes a conversation (Req 24.5).
+     * Muted conversations show a mute icon and no unread badge.
+     */
+    fun toggleMuteConversation(conversationId: String) {
+        val conversation = _uiState.value.conversations.find { it.id == conversationId } ?: return
+        viewModelScope.launch {
+            val result = if (conversation.isMuted) {
+                conversationRepository.unmuteConversation(conversationId)
+            } else {
+                conversationRepository.muteConversation(conversationId)
+            }
+            when (result) {
+                is Resource.Success -> {
+                    val uid = currentUserId ?: return@launch
+                    val updatedConversation = allConversations.find { it.id == conversationId }
+                    if (updatedConversation != null) {
+                        val updatedMutedBy = if (conversation.isMuted) {
+                            updatedConversation.mutedBy - uid
+                        } else {
+                            updatedConversation.mutedBy + uid
+                        }
+                        allConversations = allConversations.map {
+                            if (it.id == conversationId) it.copy(mutedBy = updatedMutedBy) else it
+                        }
+                        applySearchFilter()
+                    }
+                    _uiState.value = _uiState.value.copy(contextMenuConversationId = null)
+                }
+                else -> {
+                    _uiState.value = _uiState.value.copy(contextMenuConversationId = null)
+                }
+            }
+        }
+    }
+
+    /**
+     * Archives a conversation (Req 24.3).
+     * Removes it from the active conversation list.
+     */
+    fun archiveConversation(conversationId: String) {
+        viewModelScope.launch {
+            conversationRepository.archiveConversation(conversationId)
+            _uiState.value = _uiState.value.copy(contextMenuConversationId = null)
+        }
+    }
+
+    /**
+     * Dismisses the pin limit error message.
+     */
+    fun dismissPinLimitError() {
+        _uiState.value = _uiState.value.copy(pinLimitError = null)
+    }
+
+    companion object {
+        /**
+         * Timeout for network fetch when cache is empty (first install).
+         * After this duration, loading state is dismissed and empty list is shown (Req 20.3).
+         */
+        const val NETWORK_FETCH_TIMEOUT_MS = 10_000L
+    }
 }
 
 data class ChatsUiState(
@@ -404,5 +710,11 @@ data class ChatsUiState(
     val searchQuery: String = "",
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    /** Whether the device is currently offline (Requirement 7.5). */
+    val isOffline: Boolean = false,
+    /** Conversation ID for which the context menu is currently shown (Req 24.3). */
+    val contextMenuConversationId: String? = null,
+    /** Error message for pin limit exceeded (Req 24.4). */
+    val pinLimitError: String? = null
 )

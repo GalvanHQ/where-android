@@ -18,6 +18,8 @@ import com.google.firebase.storage.FirebaseStorage
 import com.ovi.where.core.config.FeatureFlags
 import com.ovi.where.data.local.db.AppDatabase
 import com.ovi.where.data.local.dao.InteractionDao
+import com.ovi.where.data.local.dao.LinkPreviewCacheDao
+import com.ovi.where.data.local.dao.VoiceMessageCacheDao
 import com.ovi.where.data.local.prefs.RecentSearchesStore
 import com.ovi.where.data.local.prefs.UserPreferences
 import com.ovi.where.data.repository.NotificationPreferencesRepository
@@ -79,7 +81,7 @@ object AppModule {
         context,
         AppDatabase::class.java,
         "nearby_database"
-    ).addMigrations(AppDatabase.MIGRATION_5_6)
+    ).addMigrations(AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8, AppDatabase.MIGRATION_8_9, AppDatabase.MIGRATION_9_10)
         .build()
 
     @Provides
@@ -105,6 +107,18 @@ object AppModule {
     @Provides
     @Singleton
     fun provideInteractionDao(database: AppDatabase) = database.interactionDao()
+
+    @Provides
+    @Singleton
+    fun provideVoiceMessageCacheDao(database: AppDatabase): VoiceMessageCacheDao = database.voiceMessageCacheDao()
+
+    @Provides
+    @Singleton
+    fun provideLinkPreviewCacheDao(database: AppDatabase): LinkPreviewCacheDao = database.linkPreviewCacheDao()
+
+    @Provides
+    @Singleton
+    fun provideOnlineStatusDao(database: AppDatabase) = database.onlineStatusDao()
 
     @Provides
     @Singleton

@@ -14,7 +14,12 @@ data class ConversationEntity(
     val lastMessageText: String,
     val lastMessageTimestamp: Long,
     val lastMessageSenderId: String,
+    val lastMessageType: String = "TEXT",
+    val lastMessageStatus: String = "SENT",
     val unreadCount: Int,
     val memberIdsJson: String,
-    val lastSyncTimestamp: Long
+    val mutedByJson: String = "[]",
+    val pinnedByJson: String = "[]",
+    val lastSyncTimestamp: Long,
+    val documentUpdateTime: Long = 0L
 )

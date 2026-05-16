@@ -31,6 +31,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -43,6 +45,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import javax.inject.Inject
 import javax.inject.Singleton
 import timber.log.Timber
+import dagger.Lazy
 import com.ovi.where.data.util.Resource as DataResource
 
 private const val TAG = "MessageRepositoryImpl"
@@ -59,7 +62,7 @@ private const val TAG = "MessageRepositoryImpl"
  */
 @Singleton
 class MessageRepositoryImpl @Inject constructor(
-    private val wsClient: ChatSocketIoClient,
+    private val lazyWsClient: Lazy<ChatSocketIoClient>,
     private val firebaseAuth: FirebaseAuth,
     private val messageDao: MessageDao,
     private val firebaseStorage: FirebaseStorage,
@@ -67,6 +70,12 @@ class MessageRepositoryImpl @Inject constructor(
     private val cacheStalenessChecker: CacheStalenessChecker,
     @ApplicationContext private val context: Context
 ) : MessageRepository {
+
+    /**
+     * Lazily-resolved ChatSocketIoClient instance.
+     * Not instantiated until first access, keeping app startup free of chat initialization (Req 20.1, 20.4, 20.5).
+     */
+    private val wsClient: ChatSocketIoClient get() = lazyWsClient.get()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -144,6 +153,111 @@ class MessageRepositoryImpl @Inject constructor(
             timestamp = System.currentTimeMillis(),
             status = MessageStatus.PENDING,
             replyToId = replyToId
+        )
+
+        // Step 1: Insert optimistically into Room with PENDING status
+        messageDao.insert(optimistic.toEntity())
+
+        // Step 2: Send or queue
+        val isConnected = wsClient.connectionState.value == ChatSocketIoClient.ConnectionState.CONNECTED
+        if (isConnected) {
+            emitMessage(tempId, text, replyToId)
+        } else {
+            enqueueMessage(QueuedMessage(tempId, conversationId, text, replyToId, MessageType.TEXT))
+        }
+
+        return Resource.Success(optimistic)
+    }
+
+    /**
+     * Sends a text message with link preview metadata attached.
+     *
+     * This is used when the FetchLinkPreviewUseCase successfully retrieves
+     * Open Graph metadata for a URL in the message text.
+     *
+     * Requirements: 12.1, 12.2
+     */
+    suspend fun sendMessageWithLinkPreview(
+        conversationId: String,
+        text: String,
+        replyToId: String?,
+        linkPreviewUrl: String,
+        linkPreviewTitle: String?,
+        linkPreviewDescription: String?,
+        linkPreviewImageUrl: String?,
+        linkPreviewDomain: String
+    ): Resource<Message> {
+        if (text.isBlank()) {
+            return Resource.Error("Message text cannot be empty")
+        }
+
+        val tempId = UUID.randomUUID().toString()
+        val currentUser = firebaseAuth.currentUser
+        val optimistic = Message(
+            id = tempId,
+            conversationId = conversationId,
+            senderId = currentUser?.uid ?: "",
+            senderName = currentUser?.displayName ?: "",
+            senderPhotoUrl = currentUser?.photoUrl?.toString(),
+            text = text,
+            type = MessageType.TEXT,
+            timestamp = System.currentTimeMillis(),
+            status = MessageStatus.PENDING,
+            replyToId = replyToId,
+            linkPreviewUrl = linkPreviewUrl,
+            linkPreviewTitle = linkPreviewTitle,
+            linkPreviewDescription = linkPreviewDescription,
+            linkPreviewImageUrl = linkPreviewImageUrl,
+            linkPreviewDomain = linkPreviewDomain
+        )
+
+        // Step 1: Insert optimistically into Room with PENDING status
+        messageDao.insert(optimistic.toEntity())
+
+        // Step 2: Send or queue
+        val isConnected = wsClient.connectionState.value == ChatSocketIoClient.ConnectionState.CONNECTED
+        if (isConnected) {
+            emitMessage(tempId, text, replyToId)
+        } else {
+            enqueueMessage(QueuedMessage(tempId, conversationId, text, replyToId, MessageType.TEXT))
+        }
+
+        return Resource.Success(optimistic)
+    }
+
+    /**
+     * Sends a text message with mention metadata attached.
+     *
+     * This is used when the message contains @mention tokens.
+     * The mentionedUserIds are included in the message payload so the server
+     * can trigger push notifications to mentioned users.
+     *
+     * Requirements: 14.3, 14.4
+     */
+    suspend fun sendMessageWithMentions(
+        conversationId: String,
+        text: String,
+        replyToId: String?,
+        mentionedUserIds: List<String>
+    ): Resource<Message> {
+        if (text.isBlank()) {
+            return Resource.Error("Message text cannot be empty")
+        }
+
+        val tempId = UUID.randomUUID().toString()
+        val currentUser = firebaseAuth.currentUser
+        val optimistic = Message(
+            id = tempId,
+            conversationId = conversationId,
+            senderId = currentUser?.uid ?: "",
+            senderName = currentUser?.displayName ?: "",
+            senderPhotoUrl = currentUser?.photoUrl?.toString(),
+            text = text,
+            type = MessageType.TEXT,
+            timestamp = System.currentTimeMillis(),
+            status = MessageStatus.PENDING,
+            replyToId = replyToId,
+            mentionedUserIds = mentionedUserIds
         )
 
         // Step 1: Insert optimistically into Room with PENDING status
@@ -1091,6 +1205,138 @@ class MessageRepositoryImpl @Inject constructor(
                 }
             }
         )
+    }
+
+    // ─── Delete Message (Task 4.2 — Context Menu) ─────────────────────────────
+
+    /**
+     * Deletes a message sent by the current user.
+     * Calls the delete API and removes the message from the local cache.
+     * On API failure, returns an error so the UI can show an error snackbar.
+     *
+     * Requirement 9.7: Confirmation dialog, call delete API, remove from cache.
+     * Requirement 9.8: On API fail, retain message, show error snackbar 4s.
+     */
+    suspend fun deleteMessage(conversationId: String, messageId: String): Resource<Unit> {
+        return try {
+            val token = getIdToken()
+            ChatApiClient.apiService.deleteMessage("Bearer $token", conversationId, messageId)
+            // Remove from local cache on success
+            messageDao.deleteById(messageId)
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete message $messageId: ${e.message}")
+            Resource.Error("Failed to delete message: ${e.message}")
+        }
+    }
+
+    /**
+     * Removes a message from local display only (does not call server API).
+     * Used for "Delete for me" action on messages sent by other users.
+     *
+     * Requirement 9.9: Remove from local display only.
+     */
+    suspend fun deleteMessageLocally(messageId: String) {
+        messageDao.deleteById(messageId)
+    }
+
+    // ─── Message Search (Task 8.1) ────────────────────────────────────────────
+
+    /**
+     * Searches messages in a conversation by case-insensitive substring match.
+     * Returns messages ordered by timestamp ASC (oldest first).
+     *
+     * Requirement 13.2: Query local Room database for messages containing the search text.
+     *
+     * @param conversationId The conversation to search within.
+     * @param query The LIKE query pattern (e.g., "%search term%").
+     * @return List of matching messages as domain models, ordered oldest first.
+     */
+    suspend fun searchMessages(conversationId: String, query: String): List<Message> {
+        return messageDao.searchMessages(conversationId, query).map { it.toDomain() }
+    }
+
+    // ─── Voice Message Send (Task 6.1) ────────────────────────────────────────
+
+    /**
+     * Sends a voice message by uploading the audio file to Firebase Storage
+     * and creating a VOICE message in the conversation.
+     *
+     * Flow:
+     * 1. Insert optimistic PENDING message into Room
+     * 2. Upload audio file to Firebase Storage
+     * 3. Send message via WebSocket with the download URL
+     * 4. Wait for server ack (10s timeout)
+     *
+     * Requirements: 11.4, 11.6, 11.7
+     */
+    override suspend fun sendVoiceMessage(
+        conversationId: String,
+        audioFilePath: String,
+        durationMs: Long
+    ): Resource<Message> {
+        val uid = firebaseAuth.currentUser?.uid ?: return Resource.Error("Not authenticated")
+        val tempId = UUID.randomUUID().toString()
+        val timestamp = System.currentTimeMillis()
+
+        // Create optimistic PENDING message
+        val pendingMessage = Message(
+            id = tempId,
+            conversationId = conversationId,
+            senderId = uid,
+            senderName = firebaseAuth.currentUser?.displayName ?: "",
+            senderPhotoUrl = firebaseAuth.currentUser?.photoUrl?.toString(),
+            text = "",
+            type = MessageType.VOICE,
+            timestamp = timestamp,
+            status = MessageStatus.PENDING,
+            voiceDurationMs = durationMs
+        )
+
+        // Insert into Room as PENDING
+        messageDao.insert(pendingMessage.toEntity())
+
+        return try {
+            // Upload audio file to Firebase Storage
+            val audioFile = java.io.File(audioFilePath)
+            val storageRef = firebaseStorage.reference
+                .child("voice_messages/$conversationId/${tempId}.m4a")
+
+            val uploadUri = android.net.Uri.fromFile(audioFile)
+            withTimeout(UPLOAD_TIMEOUT_MS) {
+                storageRef.putFile(uploadUri).await()
+            }
+            val downloadUrl = storageRef.downloadUrl.await().toString()
+
+            // Clean up local file after successful upload
+            audioFile.delete()
+
+            // Send via WebSocket
+            wsClient.sendVoiceMessage(conversationId, tempId, downloadUrl, durationMs)
+
+            // Wait for ack
+            try {
+                withTimeout(ACK_TIMEOUT_MS) {
+                    wsClient.incomingFrames
+                        .filter { it is ServerFrame.MessageAck && (it as ServerFrame.MessageAck).tempId == tempId }
+                        .first()
+                }
+                // Update status to SENT
+                messageDao.updateStatus(tempId, MessageStatus.SENT.name)
+                val sentMessage = pendingMessage.copy(status = MessageStatus.SENT, voiceUrl = downloadUrl)
+                Resource.Success(sentMessage)
+            } catch (e: Exception) {
+                // Timeout or error — mark as FAILED
+                messageDao.updateStatus(tempId, MessageStatus.FAILED.name)
+                Resource.Error("Voice message send timed out")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to send voice message")
+            messageDao.updateStatus(tempId, MessageStatus.FAILED.name)
+            // Clean up local file on failure
+            try { java.io.File(audioFilePath).delete() } catch (_: Exception) {}
+            Resource.Error("Failed to send voice message: ${e.message}")
+        }
     }
 
     companion object {

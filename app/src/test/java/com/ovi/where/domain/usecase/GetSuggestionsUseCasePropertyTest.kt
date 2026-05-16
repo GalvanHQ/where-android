@@ -150,4 +150,8 @@ private class FakeInteractionRepository(
     ) {
         // No-op for testing
     }
+
+    override suspend fun clearAll() {
+        // No-op for testing
+    }
 }

@@ -2,6 +2,7 @@ package com.ovi.where.presentation.chat
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -11,6 +12,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,25 +53,58 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
+import com.ovi.where.core.utils.LocalReducedMotion
+import com.ovi.where.presentation.chat.components.AnimatedMessageBubble
+import com.ovi.where.presentation.chat.components.MessageAnimationConstants
+import com.ovi.where.presentation.chat.components.NewMessageIndicator
+import com.ovi.where.presentation.chat.components.QueuedForSyncBanner
+import com.ovi.where.presentation.chat.components.ReplyPreviewBar
+import com.ovi.where.presentation.chat.components.SwipeToReplyContainer
+import com.ovi.where.presentation.chat.components.VoiceMessageBubble
+import com.ovi.where.presentation.chat.components.MessageSearchBar
+import com.ovi.where.presentation.chat.components.LinkPreviewCard
+import com.ovi.where.presentation.chat.components.LinkableText
+import com.ovi.where.presentation.chat.components.ReactionPickerOverlay
+import com.ovi.where.presentation.chat.components.ReactionBadges
+import com.ovi.where.presentation.chat.components.ReadReceiptIndicator
+import com.ovi.where.presentation.chat.components.TypingIndicator
+import com.ovi.where.presentation.chat.components.ReconnectionBanner
+import com.ovi.where.presentation.chat.components.ImageMessageBubble
+import com.ovi.where.presentation.chat.components.LocationMessageBubble
 import com.ovi.where.presentation.model.BubbleDirection
 import com.ovi.where.presentation.model.MessageUiModel
 import com.ovi.where.core.utils.showToast
+import com.ovi.where.domain.model.MessageStatus
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -98,13 +133,32 @@ fun ChatScreen(
     onNavigateToUserProfile: (String) -> Unit = {},
     onNavigateToGroupInfo: (String) -> Unit = {},
     onNavigateToGroupMap: (String) -> Unit = {},
+    onNavigateToEditGroup: (String) -> Unit = {},
+    onNavigateToMediaGallery: (String) -> Unit = {},
     viewModel: ChatViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val voicePlaybackState by viewModel.voicePlaybackController.playbackState.collectAsState()
     val listState = rememberLazyListState()
     val currentUserId = viewModel.currentUserId
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val reducedMotion = LocalReducedMotion.current
+    val density = LocalDensity.current
+
+    // ── Message animation state (Task 15.1) ───────────────────────────────────
+    // Track IDs of messages that have just appeared and should animate in.
+    var newMessageIds by remember { mutableStateOf(setOf<String>()) }
+    // Track the previous message count to detect new arrivals.
+    var previousMessageCount by remember { mutableStateOf(0) }
+    // Track whether to show the "new message" indicator (Requirement 23.4).
+    var showNewMessageIndicator by remember { mutableStateOf(false) }
+    // Count of unread messages while scrolled up.
+    var newMessageUnreadCount by remember { mutableStateOf(0) }
+
+    // FocusRequester for the input field — used by swipe-to-reply to focus input (Requirement 8.3)
+    val inputFocusRequester = remember { FocusRequester() }
 
     // Location permission launcher
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -125,6 +179,7 @@ fun ChatScreen(
 
     // ── Task 16.2: Wire ChatSocketIoClient lifecycle to ChatScreen ─────────────
     // Connect on foreground, disconnect on background (Requirements 13.1, 13.4, 13.5)
+    // Pause voice playback on navigate away (Requirement 11.9)
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, conversationId) {
         val observer = LifecycleEventObserver { _, event ->
@@ -134,7 +189,9 @@ fun ChatScreen(
                     viewModel.onForeground()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
-                    // Disconnect when app goes to background
+                    // Pause voice playback and disconnect when app goes to background
+                    // Requirement 11.9: Pause playback when user navigates away
+                    viewModel.pauseVoicePlayback()
                     viewModel.onBackground()
                 }
                 else -> {}
@@ -142,6 +199,8 @@ fun ChatScreen(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
+            // Requirement 11.9: Pause playback when ChatScreen is disposed
+            viewModel.pauseVoicePlayback()
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
@@ -151,14 +210,74 @@ fun ChatScreen(
         viewModel.markRead()
     }
 
-    // Auto-scroll to bottom when new messages arrive (only if already near bottom)
+    // ── Auto-scroll with 150dp threshold (Task 15.1, Requirements 23.3, 23.4) ──
+    // When a new message arrives:
+    // - If within 150dp of last visible: auto-scroll with 300ms decelerate animation
+    // - If > 150dp above: show "new message" indicator instead
     LaunchedEffect(uiState.messages.size) {
-        if (uiState.messages.isNotEmpty()) {
-            val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            val totalItems = listState.layoutInfo.totalItemsCount
-            // Auto-scroll only if user is near the bottom (within 5 items)
-            if (totalItems - lastVisibleIndex <= 5) {
-                listState.animateScrollToItem(uiState.messages.size - 1)
+        val currentCount = uiState.messages.size
+        if (currentCount > previousMessageCount && previousMessageCount > 0) {
+            // New messages arrived — determine if we should auto-scroll or show indicator
+            val newMessages = uiState.messages.takeLast(currentCount - previousMessageCount)
+            val newIds = newMessages.map { it.id }.toSet()
+            newMessageIds = newMessageIds + newIds
+
+            val layoutInfo = listState.layoutInfo
+            val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()
+            val totalItems = layoutInfo.totalItemsCount
+
+            if (lastVisibleItem != null && totalItems > 0) {
+                // Calculate distance from the bottom of the list
+                val viewportEnd = layoutInfo.viewportEndOffset
+                val lastItemEnd = lastVisibleItem.offset + lastVisibleItem.size
+                val distanceFromBottom = (totalItems - 1 - lastVisibleItem.index) *
+                        (lastVisibleItem.size) + (lastItemEnd - viewportEnd)
+
+                val thresholdPx = with(density) {
+                    MessageAnimationConstants.AUTO_SCROLL_THRESHOLD_DP.dp.roundToPx()
+                }
+
+                if (distanceFromBottom <= thresholdPx || lastVisibleItem.index >= totalItems - 3) {
+                    // Within 150dp — auto-scroll with 300ms animation (Requirement 23.3)
+                    if (reducedMotion) {
+                        listState.scrollToItem(totalItems - 1)
+                    } else {
+                        listState.animateScrollToItem(
+                            index = totalItems - 1
+                        )
+                    }
+                    showNewMessageIndicator = false
+                    newMessageUnreadCount = 0
+                } else {
+                    // > 150dp above — show "new message" indicator (Requirement 23.4)
+                    showNewMessageIndicator = true
+                    newMessageUnreadCount += newMessages.size
+                }
+            } else {
+                // No visible items yet, just scroll to bottom
+                if (totalItems > 0) {
+                    listState.scrollToItem(totalItems - 1)
+                }
+            }
+        }
+        previousMessageCount = currentCount
+    }
+
+    // Hide new message indicator when user scrolls to bottom manually
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val layoutInfo = listState.layoutInfo
+            val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()
+            val totalItems = layoutInfo.totalItemsCount
+            if (lastVisibleItem != null && totalItems > 0) {
+                lastVisibleItem.index >= totalItems - 3
+            } else {
+                true
+            }
+        }.distinctUntilChanged().collect { isAtBottom ->
+            if (isAtBottom) {
+                showNewMessageIndicator = false
+                newMessageUnreadCount = 0
             }
         }
     }
@@ -175,15 +294,66 @@ fun ChatScreen(
         }
     }
 
+    // ── Admin Overflow Menu: Invite Link handling (Task 10.1, Requirement 15.5) ──
+    LaunchedEffect(Unit) {
+        viewModel.inviteLinkEvent.collect { link ->
+            // Copy to clipboard
+            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            val clip = android.content.ClipData.newPlainText("Invite Link", link)
+            clipboard.setPrimaryClip(clip)
+            // Show "Link copied" toast for 2 seconds
+            context.showToast("Link copied")
+            // Present system share sheet
+            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(android.content.Intent.EXTRA_TEXT, link)
+            }
+            context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Invite Link"))
+        }
+    }
+
+    // ── Admin Overflow Menu: Member Picker Dialog (Task 10.1, Requirement 15.2) ──
+    if (uiState.showMemberPickerDialog) {
+        com.ovi.where.presentation.chat.components.MemberPickerDialog(
+            members = uiState.groupMembersForPicker,
+            onDismiss = { viewModel.dismissMemberPickerDialog() },
+            onConfirm = { memberId, displayName ->
+                viewModel.muteMember(memberId, displayName)
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             ChatHeader(
                 conversation = uiState.conversation,
                 isOtherUserFriend = uiState.isOtherUserFriend,
+                activeLocationSharingCount = uiState.activeLocationSharingCount,
+                isOtherUserSharingLocation = uiState.isOtherUserSharingLocation,
+                onlineMemberCount = uiState.onlineMemberCount,
+                isCurrentUserAdmin = uiState.isCurrentUserAdmin,
+                showAdminOverflowMenu = uiState.showAdminOverflowMenu,
                 onNavigateBack = onNavigateBack,
                 onNavigateToUserProfile = onNavigateToUserProfile,
                 onNavigateToGroupInfo = onNavigateToGroupInfo,
-                onNavigateToGroupMap = onNavigateToGroupMap
+                onNavigateToGroupMap = onNavigateToGroupMap,
+                onNavigateToEditGroup = onNavigateToEditGroup,
+                onNavigateToMediaGallery = onNavigateToMediaGallery,
+                onSearchTap = {
+                    // Requirement 13.1: Search icon opens search bar
+                    // Requirement 13.7: Save current scroll position before activating search
+                    val scrollIndex = listState.firstVisibleItemIndex
+                    val scrollOffset = listState.firstVisibleItemScrollOffset
+                    viewModel.activateSearch(scrollIndex, scrollOffset)
+                },
+                onAdminOverflowToggle = { viewModel.toggleAdminOverflowMenu() },
+                onAdminOverflowDismiss = { viewModel.dismissAdminOverflowMenu() },
+                onMuteMemberTap = { viewModel.showMuteMemberPicker() },
+                onGroupSettingsTap = {
+                    viewModel.dismissAdminOverflowMenu()
+                    uiState.conversation?.groupId?.let { onNavigateToEditGroup(it) }
+                },
+                onInviteLinkTap = { viewModel.handleInviteLink() }
             )
         }
     ) { paddingValues ->
@@ -194,11 +364,104 @@ fun ChatScreen(
                 .imePadding()
                 .navigationBarsPadding()
         ) {
+            // ── Queued for sync banner (Requirement 7.6) ──────────────────────
+            // Non-modal 48dp banner shown when a write action is attempted while offline.
+            QueuedForSyncBanner(visible = uiState.showQueuedForSyncBanner)
+
+            // ── Reconnection Banner (Task 19.1, Requirement 27.8) ─────────────
+            // Show on showReconnectingBanner=true with spinner; error variant with Retry
+            // on showManualRetryAction; 300ms fade-out on isBannerFadingOut.
+            ReconnectionBanner(
+                showBanner = uiState.showReconnectingBanner,
+                showManualRetry = uiState.showManualRetryAction,
+                isFadingOut = uiState.isBannerFadingOut,
+                onRetry = viewModel::manualRetry
+            )
+
+            // ── Message Search Bar (Task 8.1, Requirements 13.1-13.7) ─────────
+            if (uiState.isSearchActive) {
+                // Requirement 13.7: Back gesture dismisses search and restores scroll position
+                BackHandler {
+                    val (scrollIndex, scrollOffset) = viewModel.dismissSearch()
+                    coroutineScope.launch {
+                        listState.scrollToItem(scrollIndex, scrollOffset)
+                    }
+                }
+
+                MessageSearchBar(
+                    query = uiState.searchQuery,
+                    onQueryChange = viewModel::onSearchQueryChange,
+                    resultCount = uiState.searchResultIds.size,
+                    currentResultIndex = uiState.currentSearchResultIndex,
+                    onNavigateUp = viewModel::navigateSearchPrevious,
+                    onNavigateDown = viewModel::navigateSearchNext,
+                    onDismiss = {
+                        // Requirement 13.7: On dismiss, restore previous scroll position
+                        val (scrollIndex, scrollOffset) = viewModel.dismissSearch()
+                        coroutineScope.launch {
+                            listState.scrollToItem(scrollIndex, scrollOffset)
+                        }
+                    }
+                )
+            }
+
+            // Scroll to current search result when it changes
+            // Requirement 13.3: Scroll to first match (oldest first)
+            // Requirement 13.4/13.5: Scroll to next/previous match on arrow tap
+            LaunchedEffect(uiState.currentSearchResultIndex, uiState.searchResultIds) {
+                if (uiState.isSearchActive && uiState.searchResultIds.isNotEmpty() && uiState.currentSearchResultIndex >= 0) {
+                    val targetMessageId = uiState.searchResultIds[uiState.currentSearchResultIndex]
+                    // Find the index of this message in the flat message list
+                    val messageIndex = uiState.messages.indexOfFirst { it.id == targetMessageId }
+                    if (messageIndex >= 0) {
+                        // Account for date separators and pagination items in the LazyColumn
+                        // We need to find the actual LazyColumn item index
+                        // Since messages are grouped by date, calculate the offset
+                        // Use pre-computed groupedMessages (Requirement 17.7)
+                        var lazyColumnIndex = 0
+                        var found = false
+                        for ((_, messages) in uiState.groupedMessages) {
+                            lazyColumnIndex++ // date separator item
+                            for (msg in messages) {
+                                if (msg.id == targetMessageId) {
+                                    found = true
+                                    break
+                                }
+                                lazyColumnIndex++
+                            }
+                            if (found) break
+                        }
+                        // Add offset for pagination loading/error items at top
+                        if (uiState.isLoadingMore) lazyColumnIndex++
+                        if (uiState.paginationError) lazyColumnIndex++
+
+                        listState.animateScrollToItem(lazyColumnIndex)
+                    }
+                }
+            }
+
             // ── Message list ──────────────────────────────────────────────────
             Box(modifier = Modifier.weight(1f)) {
                 if (uiState.isLoading) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 } else {
+                    // Stable lambda references (Requirement 17.4, 19.6):
+                    // Pre-create remembered lambdas outside the items block to avoid
+                    // allocating new lambda instances on each recomposition/scroll frame.
+                    val onLoadOlderMessages = remember { { viewModel.loadOlderMessages() } }
+                    val onLocationTap = remember {
+                        {
+                            val gId = uiState.conversation?.groupId
+                            if (gId != null) onNavigateToGroupMap(gId)
+                        }
+                    }
+                    val isGroupConversation = uiState.conversation?.groupId != null
+                    val searchQuery = if (uiState.isSearchActive) uiState.searchQuery else null
+                    val searchResultIds = uiState.searchResultIds
+                    val currentSearchResultIndex = uiState.currentSearchResultIndex
+                    // Track new message IDs for entrance animation (Task 15.1)
+                    val animatableNewMessageIds = newMessageIds
+
                     // Requirement 2.5: Maintain scroll position on prepend (pagination)
                     // LazyColumn with reverseLayout=false; items keyed by message ID ensures
                     // Compose maintains scroll position when items are prepended.
@@ -212,8 +475,12 @@ fun ChatScreen(
                         verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
                     ) {
                         // ── Pagination loading indicator at top (Requirement 2.3) ──
+                        // Requirement 19.1: Unique contentType "pagination_indicator" and stable key
                         if (uiState.isLoadingMore) {
-                            item(key = "__pagination_loading__") {
+                            item(
+                                key = "__pagination_loading__",
+                                contentType = "pagination_indicator"
+                            ) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -229,15 +496,19 @@ fun ChatScreen(
                         }
 
                         // ── Pagination error with inline retry (Requirement 2.7) ──
+                        // Requirement 19.1: Unique contentType "pagination_indicator" and stable key
                         if (uiState.paginationError) {
-                            item(key = "__pagination_error__") {
+                            item(
+                                key = "__pagination_error__",
+                                contentType = "pagination_indicator"
+                            ) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = Dimens.spaceSmall),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    TextButton(onClick = { viewModel.loadOlderMessages() }) {
+                                    TextButton(onClick = onLoadOlderMessages) {
                                         Icon(
                                             Icons.Default.Refresh,
                                             contentDescription = null,
@@ -254,41 +525,186 @@ fun ChatScreen(
                         }
 
                         // ── Messages grouped by date ──────────────────────────────
-                        // Group messages by pre-computed dateKey from MessageUiModel
-                        val grouped = uiState.messages.groupBy { it.dateKey }
-                        grouped.forEach { (dateKey, messages) ->
-                            item(key = "date_separator_$dateKey") {
+                        // Requirement 17.7 / 19.1: Use pre-computed groupedMessages from ViewModel.
+                        // No inline collection grouping/sorting/formatting in items block.
+                        uiState.groupedMessages.forEach { (dateKey, messages) ->
+                            // Requirement 17.3 / 19.1: Unique contentType "date_separator" and stable key
+                            item(
+                                key = "date_separator_$dateKey",
+                                contentType = "date_separator"
+                            ) {
                                 DateSeparator(date = formatDateHeader(dateKey))
                             }
-                            // Requirement 14.1: Key items by message ID for stable identity
-                            items(items = messages, key = { it.id }) { message ->
-                                MessageBubble(
-                                    message = message,
-                                    showAvatar = message.direction == BubbleDirection.RECEIVED
-                                            && uiState.conversation?.groupId != null,
-                                    maxWidth = screenWidth * 0.75f,
-                                    onLocationTap = {
-                                        val gId = uiState.conversation?.groupId
-                                        if (gId != null) onNavigateToGroupMap(gId)
+                            // Requirement 17.3 / 19.1: contentType "message_bubble" and key by message ID
+                            // Requirement 19.6: animateItem modifier on each message item
+                            items(
+                                items = messages,
+                                key = { it.id },
+                                contentType = { msg ->
+                                    when {
+                                        msg.isVoice -> "voice_bubble"
+                                        msg.isImage -> "image_bubble"
+                                        msg.isLocation -> "location_bubble"
+                                        else -> "text_bubble"
                                     }
+                                }
+                            ) { message ->
+                                // Determine if this message is a search result and if it's the current focused result
+                                val isSearchHighlighted = searchQuery != null &&
+                                        searchResultIds.contains(message.id)
+                                val isCurrentSearchResult = searchQuery != null &&
+                                        currentSearchResultIndex >= 0 &&
+                                        currentSearchResultIndex < searchResultIds.size &&
+                                        searchResultIds[currentSearchResultIndex] == message.id
+
+                                // Requirement 17.4 / 19.6: Stable lambda references via remember
+                                // to avoid allocating new lambdas inside the item scope.
+                                val onReply = remember(message.id) {
+                                    {
+                                        viewModel.setReplyingTo(message)
+                                        try {
+                                            inputFocusRequester.requestFocus()
+                                        } catch (_: Exception) {}
+                                        Unit
+                                    }
+                                }
+
+                                // Task 19.1, Requirement 27.1: Long-press (500ms) → show ReactionPickerOverlay
+                                val onLongPress = remember(message.id) {
+                                    { viewModel.showReactionPicker(message.id) }
+                                }
+
+                                // Task 19.1, Requirement 27.5: Retry on FAILED image messages
+                                val onRetryMessage = remember(message.id) {
+                                    { viewModel.retryMessage(message.id) }
+                                }
+
+                                // Task 19.1: Reaction badge tap toggles reaction
+                                val onReactionTapHandler = remember(message.id) {
+                                    { emoji: String -> viewModel.toggleReaction(message.id, emoji) }
+                                }
+
+                                val onVoicePlayPause = remember(message.id, message.voiceUrl, message.voiceDurationMs) {
+                                    if (message.isVoice && message.voiceUrl != null && message.voiceDurationMs != null) {
+                                        {
+                                            viewModel.toggleVoicePlayback(
+                                                messageId = message.id,
+                                                audioUrl = message.voiceUrl,
+                                                durationMs = message.voiceDurationMs
+                                            )
+                                        }
+                                    } else null
+                                }
+
+                                val onVoiceSeek = remember(message.id, message.voiceDurationMs) {
+                                    if (message.isVoice && message.voiceDurationMs != null) {
+                                        { progress: Float ->
+                                            viewModel.seekVoiceMessage(
+                                                messageId = message.id,
+                                                progress = progress,
+                                                durationMs = message.voiceDurationMs
+                                            )
+                                        }
+                                    } else null
+                                }
+
+                                // Requirement 8.1-8.7: Swipe-to-reply gesture on message bubbles
+                                // Task 15.1: Wrap with entrance animation (Requirements 23.1, 23.2, 23.7)
+                                AnimatedMessageBubble(
+                                    messageId = message.id,
+                                    direction = message.direction,
+                                    isNewMessage = animatableNewMessageIds.contains(message.id)
+                                ) {
+                                    SwipeToReplyContainer(onReply = onReply) {
+                                        // Voice playback state for this message (from top-level collected state)
+                                        val isThisVoicePlaying = voicePlaybackState.activeMessageId == message.id && voicePlaybackState.isPlaying
+                                        val voiceProgress = if (voicePlaybackState.activeMessageId == message.id) voicePlaybackState.progress else 0f
+                                        val voiceCurrentPos = if (voicePlaybackState.activeMessageId == message.id) voicePlaybackState.currentPositionMs else 0L
+
+                                        MessageBubble(
+                                            message = message,
+                                            showAvatar = message.direction == BubbleDirection.RECEIVED
+                                                    && isGroupConversation,
+                                            maxWidth = screenWidth * 0.75f,
+                                            onLocationTap = onLocationTap,
+                                            onLongPress = onLongPress,
+                                            onRetry = onRetryMessage,
+                                            onReactionTap = onReactionTapHandler,
+                                            onVoicePlayPause = onVoicePlayPause,
+                                            onVoiceSeek = onVoiceSeek,
+                                            isVoicePlaying = isThisVoicePlaying,
+                                            voiceProgress = voiceProgress,
+                                            voiceCurrentPositionMs = voiceCurrentPos,
+                                            searchQuery = searchQuery,
+                                            isSearchHighlighted = isSearchHighlighted,
+                                            isCurrentSearchResult = isCurrentSearchResult
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── Typing indicator inside LazyColumn (Requirement 17.3, 27.4) ──
+                        // Unique contentType "typing_indicator" and stable key
+                        // Uses the TypingIndicator composable with animated 3-dot + formatted text
+                        if (uiState.typingIndicatorText != null) {
+                            item(
+                                key = "__typing_indicator__",
+                                contentType = "typing_indicator"
+                            ) {
+                                TypingIndicator(
+                                    typingText = uiState.typingIndicatorText
                                 )
                             }
                         }
                     }
                 }
+
+                // ── "New message" indicator (Task 15.1, Requirement 23.4) ─────────
+                // Shown when user is scrolled > 150dp above last visible message and
+                // a new message arrives. Tap scrolls to latest with 300ms animation.
+                NewMessageIndicator(
+                    visible = showNewMessageIndicator,
+                    unreadCount = newMessageUnreadCount,
+                    onClick = {
+                        coroutineScope.launch {
+                            val totalItems = listState.layoutInfo.totalItemsCount
+                            if (totalItems > 0) {
+                                if (reducedMotion) {
+                                    // Requirement 23.7: Apply instantly with no transition
+                                    listState.scrollToItem(totalItems - 1)
+                                } else {
+                                    // Requirement 23.4: 300ms decelerate animation
+                                    listState.animateScrollToItem(totalItems - 1)
+                                }
+                            }
+                            showNewMessageIndicator = false
+                            newMessageUnreadCount = 0
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
             }
 
-            // ── Typing indicator ──────────────────────────────────────────────
-            AnimatedVisibility(
-                visible = uiState.typingUserName != null,
-                enter = fadeIn() + scaleIn(),
-                exit = fadeOut() + scaleOut()
-            ) {
-                Text(
-                    text = uiState.typingIndicatorText ?: "${uiState.typingUserName} is typing…",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall)
+            // ── Typing indicator (outside LazyColumn for AnimatedVisibility, Requirement 27.4) ──
+            // Show when typingIndicatorText non-null; animated 3-dot + formatted text
+            TypingIndicator(
+                typingText = if (uiState.typingUserName != null && uiState.typingIndicatorText == null) {
+                    "${uiState.typingUserName} is typing\u2026"
+                } else {
+                    null
+                }
+            )
+
+            // ── Reply preview bar (Requirements 8.1, 8.6, 8.7) ───────────────
+            // Shown when the user swipes a message or taps Reply in context menu.
+            // Requirement 8.6: Dismiss button removes the reply preview bar.
+            // Requirement 8.7: Swiping a new message replaces the existing reply.
+            val replyingTo = uiState.replyingToMessage
+            if (replyingTo != null) {
+                ReplyPreviewBar(
+                    replyingToMessage = replyingTo,
+                    onDismiss = { viewModel.clearReply() }
                 )
             }
 
@@ -308,10 +724,24 @@ fun ChatScreen(
                             arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
                         )
                     }
-                }
+                },
+                focusRequester = inputFocusRequester
             )
         }
     }
+
+    // ── Reaction Picker Overlay (Task 19.1, Requirement 27.1) ─────────────────
+    // Long-press (500ms) message → ReactionPickerOverlay centered with scrim;
+    // on emoji select call toggleReaction, dismiss.
+    // Tap outside/back: dismiss without reaction.
+    if (uiState.showReactionPicker) {
+        BackHandler { viewModel.dismissReactionPicker() }
+    }
+    ReactionPickerOverlay(
+        visible = uiState.showReactionPicker,
+        onEmojiSelected = viewModel::onReactionSelected,
+        onDismiss = viewModel::dismissReactionPicker
+    )
 }
 
 // ── Bubble shape per DESIGN.md Section 6.7 ────────────────────────────────────
@@ -345,7 +775,18 @@ private fun MessageBubble(
     message: MessageUiModel,
     showAvatar: Boolean,
     maxWidth: androidx.compose.ui.unit.Dp,
-    onLocationTap: () -> Unit
+    onLocationTap: () -> Unit,
+    onLongPress: () -> Unit = {},
+    onRetry: () -> Unit = {},
+    onReactionTap: (String) -> Unit = {},
+    onVoicePlayPause: (() -> Unit)? = null,
+    onVoiceSeek: ((Float) -> Unit)? = null,
+    isVoicePlaying: Boolean = false,
+    voiceProgress: Float = 0f,
+    voiceCurrentPositionMs: Long = 0L,
+    searchQuery: String? = null,
+    isSearchHighlighted: Boolean = false,
+    isCurrentSearchResult: Boolean = false
 ) {
     val isSent = message.direction == BubbleDirection.SENT
 
@@ -412,7 +853,33 @@ private fun MessageBubble(
                 )
             }
 
-            if (message.isLocation) {
+            // ── Image message bubble (Task 19.1, Requirement 27.5) ────────────
+            // Progress bar during PENDING, error overlay with retry on FAILED,
+            // 4:3 placeholder while loading.
+            if (message.isImage) {
+                Surface(
+                    shape = bubbleShape(isSent),
+                    color = bubbleColor,
+                    modifier = Modifier
+                        .widthIn(max = maxWidth)
+                        .pointerInput(message.id) {
+                            detectTapGestures(
+                                onLongPress = { onLongPress() }
+                            )
+                        }
+                ) {
+                    ImageMessageBubble(
+                        imageUrl = message.imageUrl,
+                        thumbnailUrl = message.thumbnailUrl,
+                        uploadProgress = message.uploadProgress,
+                        status = message.status,
+                        onRetry = onRetry
+                    )
+                }
+            }
+            // ── Location message bubble (Task 19.1, Requirement 27.6) ─────────
+            // LocationOn icon + text + locationLabel; tap navigates to group map if groupId non-null.
+            else if (message.isLocation) {
                 Surface(
                     shape = bubbleShape(isSent),
                     color = bubbleColor,
@@ -420,46 +887,97 @@ private fun MessageBubble(
                         .widthIn(max = maxWidth)
                         .clip(bubbleShape(isSent))
                         .clickableIf(true) { onLocationTap() }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(Dimens.spaceLarge),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.LocationOn, null,
-                            modifier = Modifier.size(Dimens.iconSizeMedium),
-                            tint = textColor
-                        )
-                        Spacer(Modifier.width(Dimens.spaceSmall))
-                        Column {
-                            Text(
-                                text = message.text,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = textColor
+                        .pointerInput(message.id) {
+                            detectTapGestures(
+                                onLongPress = { onLongPress() }
                             )
-                            if (message.locationLabel != null) {
-                                Text(
-                                    text = message.locationLabel,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = secondaryTextColor
-                                )
-                            }
                         }
-                    }
+                ) {
+                    LocationMessageBubble(
+                        latitude = message.latitude ?: 0.0,
+                        longitude = message.longitude ?: 0.0
+                    )
+                }
+            } else if (message.isVoice && message.voiceDurationMs != null) {
+                // Voice message bubble (Requirements 11.8, 11.9, 11.10)
+                Surface(
+                    shape = bubbleShape(isSent),
+                    color = bubbleColor,
+                    modifier = Modifier
+                        .widthIn(max = maxWidth, min = 200.dp)
+                        .pointerInput(message.id) {
+                            detectTapGestures(
+                                onLongPress = { onLongPress() }
+                            )
+                        }
+                ) {
+                    VoiceMessageBubble(
+                        durationMs = message.voiceDurationMs,
+                        isPlaying = isVoicePlaying,
+                        progress = voiceProgress,
+                        currentPositionMs = voiceCurrentPositionMs,
+                        onPlayPause = { onVoicePlayPause?.invoke() },
+                        onSeek = { progress -> onVoiceSeek?.invoke(progress) },
+                        accentColor = if (isSent) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                        textColor = secondaryTextColor,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
                 }
             } else {
                 Surface(
                     shape = bubbleShape(isSent),
                     color = bubbleColor,
-                    modifier = Modifier.widthIn(max = maxWidth)
+                    modifier = Modifier
+                        .widthIn(max = maxWidth)
+                        .pointerInput(message.id) {
+                            detectTapGestures(
+                                onLongPress = { onLongPress() }
+                            )
+                        }
                 ) {
-                    Text(
-                        text = message.text,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = textColor,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
-                    )
+                    // Requirement 13.3: Highlight matching text with primary color bg at 30% opacity
+                    if (isSearchHighlighted && searchQuery != null && searchQuery.length >= 2) {
+                        val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                        Text(
+                            text = buildHighlightedText(message.text, searchQuery, highlightColor),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = textColor,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                        )
+                    } else {
+                        // Requirement 12.3: Render URLs as tappable hyperlinks
+                        LinkableText(
+                            text = message.text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = textColor,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                        )
+                    }
                 }
+            }
+
+            // Requirement 12.1: Render link preview card below message text
+            if (message.hasLinkPreview && message.linkPreviewUrl != null && message.linkPreviewTitle != null) {
+                LinkPreviewCard(
+                    url = message.linkPreviewUrl,
+                    title = message.linkPreviewTitle,
+                    description = message.linkPreviewDescription,
+                    imageUrl = message.linkPreviewImageUrl,
+                    domain = message.linkPreviewDomain ?: "",
+                    modifier = Modifier.widthIn(max = maxWidth)
+                )
+            }
+
+            // ── Reaction badges below message (Task 19.1) ─────────────────────
+            if (message.reactions.isNotEmpty()) {
+                ReactionBadges(
+                    reactions = message.reactions,
+                    onReactionTap = onReactionTap
+                )
             }
 
             // Pre-computed time from MessageUiModel — no formatting in the composable
@@ -469,6 +987,17 @@ private fun MessageBubble(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = 2.dp)
             )
+
+            // ── Read Receipt Indicator (Task 19.1, Requirement 27.3) ──────────
+            // Below sent messages with readBy >= 1 non-sender;
+            // DoneAll icon primary + up to 3 avatars + "+N"
+            if (isSent && message.readBy.isNotEmpty()) {
+                ReadReceiptIndicator(
+                    readBy = message.readBy,
+                    readByPhotoUrls = message.readByPhotoUrls,
+                    direction = message.direction
+                )
+            }
         }
     }
 }
@@ -503,7 +1032,8 @@ private fun InputBar(
     text: String,
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
-    onLocationSend: () -> Unit
+    onLocationSend: () -> Unit,
+    focusRequester: FocusRequester = remember { FocusRequester() }
 ) {
     Surface(
         tonalElevation = 4.dp,
@@ -524,12 +1054,14 @@ private fun InputBar(
                 )
             }
 
-            // Text field (pill shape)
+            // Text field (pill shape) — with focusRequester for swipe-to-reply (Requirement 8.3)
             OutlinedTextField(
                 value = text,
                 onValueChange = onTextChange,
                 placeholder = { Text("Message") },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester),
                 shape = MaterialTheme.shapes.extraLarge,
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
@@ -562,6 +1094,50 @@ private fun InputBar(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Builds an AnnotatedString with search query matches highlighted.
+ * Highlights all occurrences of the query (case-insensitive) with the given background color.
+ *
+ * Requirement 13.3: Highlight matching text with primary color background at 30% opacity.
+ */
+private fun buildHighlightedText(
+    text: String,
+    query: String,
+    highlightColor: Color
+): AnnotatedString {
+    return buildAnnotatedString {
+        if (query.isBlank()) {
+            append(text)
+            return@buildAnnotatedString
+        }
+
+        val lowerText = text.lowercase()
+        val lowerQuery = query.lowercase()
+        var currentIndex = 0
+
+        while (currentIndex < text.length) {
+            val matchIndex = lowerText.indexOf(lowerQuery, currentIndex)
+            if (matchIndex == -1) {
+                // No more matches — append the rest
+                append(text.substring(currentIndex))
+                break
+            }
+
+            // Append text before the match
+            if (matchIndex > currentIndex) {
+                append(text.substring(currentIndex, matchIndex))
+            }
+
+            // Append the matched text with highlight
+            withStyle(SpanStyle(background = highlightColor)) {
+                append(text.substring(matchIndex, matchIndex + query.length))
+            }
+
+            currentIndex = matchIndex + query.length
         }
     }
 }

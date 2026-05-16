@@ -136,6 +136,14 @@ sealed class Screen(val route: String) {
         }
     }
 
+    @Serializable
+    data class MediaGallery(val conversationId: String) : Screen("media_gallery/${conversationId}") {
+        companion object {
+            const val ROUTE = "media_gallery/{conversationId}"
+            fun createRoute(conversationId: String) = "media_gallery/$conversationId"
+        }
+    }
+
     // ── Gatekeeper (auth state resolver) ──────────────────────────────────────
 
     @Serializable

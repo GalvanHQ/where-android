@@ -395,4 +395,39 @@ class GroupRepositoryImpl @Inject constructor(
         /** Maximum delay before retrying a failed fetch of stale data (Requirement 11.6) */
         private const val RETRY_DELAY_MS = 60_000L
     }
+
+    // ─── Mute Member (Requirement 15.2, 15.3) ────────────────────────────────
+
+    override suspend fun muteMember(groupId: String, userId: String): Resource<Unit> {
+        return try {
+            firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
+                .document(groupId)
+                .collection(AppConstants.FIRESTORE_COLLECTION_MEMBERS)
+                .document(userId)
+                .update("isMuted", true)
+                .await()
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to mute member")
+        }
+    }
+
+    // ─── Invite Link (Requirement 15.5, 15.6) ────────────────────────────────
+
+    override suspend fun getInviteLink(groupId: String): Resource<String> {
+        return try {
+            val doc = firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
+                .document(groupId)
+                .get()
+                .await()
+            val group = doc.toObject(Group::class.java)
+            if (group != null && group.inviteCode.isNotEmpty()) {
+                Resource.Success("https://where.app/join/${group.inviteCode}")
+            } else {
+                Resource.Error("Invite link not available")
+            }
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to retrieve invite link")
+        }
+    }
 }

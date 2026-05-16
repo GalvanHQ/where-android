@@ -2,6 +2,8 @@ package com.ovi.where.data.local.entity
 
 import com.ovi.where.domain.model.Conversation
 import com.ovi.where.domain.model.ConversationType
+import com.ovi.where.domain.model.MessageStatus
+import com.ovi.where.domain.model.MessageType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -21,7 +23,11 @@ fun ConversationEntity.toDomain(): Conversation {
         lastMessageText = lastMessageText,
         lastMessageSenderId = lastMessageSenderId,
         lastMessageTimestamp = lastMessageTimestamp,
-        unreadCounts = mapOf(id to unreadCount)
+        lastMessageType = parseMessageType(lastMessageType),
+        lastMessageStatus = parseMessageStatus(lastMessageStatus),
+        unreadCounts = mapOf(id to unreadCount),
+        mutedBy = parseMemberIdsJson(mutedByJson),
+        pinnedBy = parseMemberIdsJson(pinnedByJson)
     )
 }
 
@@ -35,9 +41,14 @@ fun Conversation.toEntity(): ConversationEntity {
         lastMessageText = lastMessageText,
         lastMessageTimestamp = lastMessageTimestamp,
         lastMessageSenderId = lastMessageSenderId,
+        lastMessageType = lastMessageType.name,
+        lastMessageStatus = lastMessageStatus.name,
         unreadCount = unreadCounts.values.firstOrNull() ?: 0,
         memberIdsJson = serializeMemberIds(participantIds),
-        lastSyncTimestamp = System.currentTimeMillis()
+        mutedByJson = serializeMemberIds(mutedBy),
+        pinnedByJson = serializeMemberIds(pinnedBy),
+        lastSyncTimestamp = System.currentTimeMillis(),
+        documentUpdateTime = 0L
     )
 }
 
@@ -46,6 +57,24 @@ private fun parseConversationType(value: String): ConversationType {
         ConversationType.valueOf(value)
     } catch (_: IllegalArgumentException) {
         ConversationType.DIRECT
+    }
+}
+
+private fun parseMessageType(value: String?): MessageType {
+    if (value.isNullOrBlank()) return MessageType.TEXT
+    return try {
+        MessageType.valueOf(value)
+    } catch (_: IllegalArgumentException) {
+        MessageType.TEXT
+    }
+}
+
+private fun parseMessageStatus(value: String?): MessageStatus {
+    if (value.isNullOrBlank()) return MessageStatus.SENT
+    return try {
+        MessageStatus.valueOf(value)
+    } catch (_: IllegalArgumentException) {
+        MessageStatus.SENT
     }
 }
 

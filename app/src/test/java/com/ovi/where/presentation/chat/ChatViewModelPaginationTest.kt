@@ -56,6 +56,8 @@ class ChatViewModelPaginationTest : StringSpec({
     lateinit var locationManager: LocationManager
     lateinit var friendshipRepository: com.ovi.where.domain.repository.FriendshipRepository
     lateinit var interactionRepository: com.ovi.where.domain.repository.InteractionRepository
+    lateinit var locationRepository: com.ovi.where.domain.repository.LocationRepository
+    lateinit var connectivityObserver: com.ovi.where.data.network.ConnectivityObserver
 
     val testDispatcher = StandardTestDispatcher()
 
@@ -75,6 +77,12 @@ class ChatViewModelPaginationTest : StringSpec({
         locationManager = mockk(relaxed = true)
         friendshipRepository = mockk(relaxed = true)
         interactionRepository = mockk(relaxed = true)
+        locationRepository = mockk(relaxed = true)
+        connectivityObserver = mockk(relaxed = true)
+
+        every { connectivityObserver.isConnected } returns MutableStateFlow(true)
+        every { locationRepository.observeCachedLocations() } returns flowOf(emptyList())
+        every { locationRepository.observeLocationsWithCacheFallback(any()) } returns flowOf(emptyList())
 
         every { firebaseAuth.currentUser } returns firebaseUser
         every { firebaseUser.uid } returns "user123"
@@ -111,12 +119,22 @@ class ChatViewModelPaginationTest : StringSpec({
             sendLocationMessageUseCase,
             markConversationReadUseCase,
             observeConversationsUseCase,
-            wsClient,
+            dagger.Lazy { wsClient },
             messageRepositoryImpl,
             firebaseAuth,
             locationManager,
             friendshipRepository,
-            interactionRepository
+            interactionRepository,
+            mockk(relaxed = true), // groupRepository
+            locationRepository,
+            connectivityObserver,
+            mockk(relaxed = true), // startLocationSharingUseCase
+            mockk(relaxed = true), // stopLocationSharingUseCase
+            mockk(relaxed = true), // fetchLinkPreviewUseCase
+            mockk(relaxed = true), // muteGroupMemberUseCase
+            mockk(relaxed = true), // voiceRecorder
+            mockk(relaxed = true), // onlineStatusDao
+            mockk(relaxed = true)  // userRepository
         )
     }
 

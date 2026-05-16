@@ -10,6 +10,8 @@ data class Conversation(
     val lastMessageText: String = "",
     val lastMessageSenderId: String = "",
     val lastMessageTimestamp: Long = 0L,
+    val lastMessageType: MessageType = MessageType.TEXT,
+    val lastMessageStatus: MessageStatus = MessageStatus.SENT,
     val unreadCounts: Map<String, Int> = emptyMap(),
     val createdAt: Long = 0L,
     // Presence

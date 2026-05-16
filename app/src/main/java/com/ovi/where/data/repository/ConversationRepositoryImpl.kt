@@ -1,6 +1,7 @@
 package com.ovi.where.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.ovi.where.core.common.Resource
@@ -58,6 +59,13 @@ class ConversationRepositoryImpl @Inject constructor(
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private var firestoreListener: ListenerRegistration? = null
+
+    /**
+     * Guards batch fetch execution to ensure at most one batch query set per foreground sync cycle.
+     * Reset to false when the app returns to foreground.
+     */
+    @Volatile
+    private var batchFetchExecutedThisCycle: Boolean = false
 
     private val currentUid: String?
         get() = firebaseAuth.currentUser?.uid
@@ -230,6 +238,8 @@ class ConversationRepositoryImpl @Inject constructor(
      * - unreadCounts
      *
      * No listener is opened on the messages subcollection (Requirement 12.2).
+     * No listener is opened for presence or typing state (Requirement 6.2) —
+     * these ephemeral states are handled exclusively via Socket.IO through ChatSocketIoClient.
      *
      * On snapshot: writes to Room so the UI flow emits within 500ms (Requirement 12.3).
      */
@@ -247,6 +257,9 @@ class ConversationRepositoryImpl @Inject constructor(
                         val myUnread = (unreadMap?.get(uid) as? Long)?.toInt() ?: 0
                         val participantIds = (doc.get("participantIds") as? List<*>)
                             ?.filterIsInstance<String>() ?: emptyList()
+                        val docUpdateTime = doc.getDate("updateTime")?.time
+                            ?: doc.getLong("lastMessageTimestamp")
+                            ?: System.currentTimeMillis()
 
                         ConversationEntity(
                             id = doc.id,
@@ -260,7 +273,8 @@ class ConversationRepositoryImpl @Inject constructor(
                             lastMessageSenderId = doc.getString("lastMessageSenderId") ?: "",
                             unreadCount = myUnread,
                             memberIdsJson = serializeMemberIds(participantIds),
-                            lastSyncTimestamp = System.currentTimeMillis()
+                            lastSyncTimestamp = System.currentTimeMillis(),
+                            documentUpdateTime = docUpdateTime
                         )
                     } catch (_: Exception) { null }
                 } ?: emptyList()
@@ -280,6 +294,118 @@ class ConversationRepositoryImpl @Inject constructor(
         firestoreListener = null
     }
 
+    /**
+     * Restarts the Firestore snapshot listener. Call when the app returns to foreground
+     * to resume receiving real-time conversation updates.
+     *
+     * Requirement 21.5: On foreground (onStart), re-register Firestore listener within 2s.
+     */
+    fun restartFirestoreListener() {
+        startFirestoreListenerIfNeeded()
+    }
+
+    /**
+     * Resets the batch fetch cycle guard. Call when the app returns to foreground
+     * to allow a new batch query set to execute.
+     */
+    fun resetBatchFetchCycle() {
+        batchFetchExecutedThisCycle = false
+    }
+
+    /**
+     * Fetches conversations from Firestore in batches of 30 IDs using `whereIn` queries.
+     *
+     * Behavior:
+     * - Chunks conversation IDs into groups of at most 30 (Firestore `whereIn` limit) (Req 5.1, 5.2)
+     * - Executes at most one batch query set per foreground sync cycle (Req 5.1)
+     * - Skips Firestore re-read for conversations whose lastSyncTimestamp is less than 5 minutes old (Req 7.4)
+     * - Stores document updateTime per conversation in Room (Req 5.7)
+     * - Skips Room write for documents whose stored documentUpdateTime matches incoming snapshot version (Req 5.7)
+     */
+    override suspend fun batchFetchConversations(conversationIds: List<String>): Resource<Unit> =
+        withContext(Dispatchers.IO) {
+            // Guard: at most one batch query set per foreground sync cycle
+            if (batchFetchExecutedThisCycle) {
+                return@withContext Resource.Success(Unit)
+            }
+            batchFetchExecutedThisCycle = true
+
+            val uid = currentUid ?: return@withContext Resource.Error("User not authenticated")
+
+            try {
+                val now = System.currentTimeMillis()
+
+                // Filter out conversations that are still fresh (lastSyncTimestamp < 5 minutes old)
+                val staleIds = conversationIds.filter { id ->
+                    val lastSync = conversationDao.getLastSyncTimestamp(id)
+                    lastSync == null || (now - lastSync) >= STALENESS_THRESHOLD_MS
+                }
+
+                if (staleIds.isEmpty()) {
+                    return@withContext Resource.Success(Unit)
+                }
+
+                // Chunk IDs into groups of 30 for whereIn queries (Firestore limit)
+                val chunks = staleIds.chunked(BATCH_CHUNK_SIZE)
+
+                for (chunk in chunks) {
+                    val snapshot = firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
+                        .whereIn(FieldPath.documentId(), chunk)
+                        .get()
+                        .await()
+
+                    val entitiesToWrite = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            // Get the document's updateTime from Firestore metadata
+                            val incomingUpdateTime = doc.getDate("updateTime")?.time
+                                ?: doc.getLong("lastMessageTimestamp")
+                                ?: System.currentTimeMillis()
+
+                            // Version-based skip: compare with stored documentUpdateTime
+                            val storedUpdateTime = conversationDao.getDocumentUpdateTime(doc.id)
+                            if (storedUpdateTime != null && storedUpdateTime == incomingUpdateTime) {
+                                // Skip Room write — stored version matches incoming snapshot version
+                                return@mapNotNull null
+                            }
+
+                            val unreadMap = doc.get("unreadCounts") as? Map<*, *>
+                            val myUnread = (unreadMap?.get(uid) as? Long)?.toInt() ?: 0
+                            val participantIds = (doc.get("participantIds") as? List<*>)
+                                ?.filterIsInstance<String>() ?: emptyList()
+
+                            ConversationEntity(
+                                id = doc.id,
+                                name = doc.getString("name") ?: "",
+                                type = if (doc.getString("type") == "group") ConversationType.GROUP.name
+                                       else ConversationType.DIRECT.name,
+                                photoUrl = doc.getString("photoUrl"),
+                                groupId = doc.getString("groupId"),
+                                lastMessageText = doc.getString("lastMessageText") ?: "",
+                                lastMessageTimestamp = doc.getLong("lastMessageTimestamp") ?: 0L,
+                                lastMessageSenderId = doc.getString("lastMessageSenderId") ?: "",
+                                unreadCount = myUnread,
+                                memberIdsJson = serializeMemberIds(participantIds),
+                                lastSyncTimestamp = now,
+                                documentUpdateTime = incomingUpdateTime
+                            )
+                        } catch (e: Exception) {
+                            Timber.w(e, "Failed to parse conversation document: ${doc.id}")
+                            null
+                        }
+                    }
+
+                    if (entitiesToWrite.isNotEmpty()) {
+                        conversationDao.upsertAll(entitiesToWrite)
+                    }
+                }
+
+                Resource.Success(Unit)
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to batch fetch conversations")
+                Resource.Error(e.message ?: "Failed to batch fetch conversations")
+            }
+        }
+
     private fun serializeMemberIds(memberIds: List<String>): String {
         if (memberIds.isEmpty()) return "[]"
         return memberIds.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
@@ -291,17 +417,6 @@ class ConversationRepositoryImpl @Inject constructor(
         lastMessageText = lastMessageText, lastMessageSenderId = lastMessageSenderId,
         lastMessageTimestamp = lastMessageTimestamp, createdAt = createdAt
     )
-
-    companion object {
-        /** Timeout for foreground unread-count sync (Requirement 12.5) */
-        const val FOREGROUND_SYNC_TIMEOUT_MS = 10_000L
-
-        /** Cache key for conversations list */
-        private const val CACHE_KEY_CONVERSATIONS = "conversations_list"
-
-        /** Maximum delay before retrying a failed fetch of stale data (Requirement 11.6) */
-        private const val RETRY_DELAY_MS = 60_000L
-    }
 
     // ─── NetworkBoundResource Pattern (Requirements 11.1, 11.2, 11.3, 11.4, 11.6) ───
 
@@ -417,5 +532,139 @@ class ConversationRepositoryImpl @Inject constructor(
                 // No delayed invalidation needed since this was already a forced refresh.
             }
         )
+    }
+
+    // ─── Pin / Mute / Archive (Requirement 24.3, 24.4, 24.5) ───────────────
+
+    /**
+     * Pins a conversation for the current user.
+     * Enforces a maximum of 3 pinned conversations (Req 24.4).
+     */
+    override suspend fun pinConversation(conversationId: String): Resource<Unit> =
+        withContext(Dispatchers.IO) {
+            val uid = currentUid ?: return@withContext Resource.Error("User not authenticated")
+            try {
+                // Check current pin count
+                val pinnedCount = firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
+                    .whereArrayContains("pinnedBy", uid)
+                    .get()
+                    .await()
+                    .size()
+
+                if (pinnedCount >= MAX_PINNED_CONVERSATIONS) {
+                    return@withContext Resource.Error("Maximum of $MAX_PINNED_CONVERSATIONS pinned conversations reached")
+                }
+
+                firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
+                    .document(conversationId)
+                    .update("pinnedBy", com.google.firebase.firestore.FieldValue.arrayUnion(uid))
+                    .await()
+
+                Resource.Success(Unit)
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to pin conversation: $conversationId")
+                Resource.Error(e.message ?: "Failed to pin conversation")
+            }
+        }
+
+    /**
+     * Unpins a conversation for the current user.
+     */
+    override suspend fun unpinConversation(conversationId: String): Resource<Unit> =
+        withContext(Dispatchers.IO) {
+            val uid = currentUid ?: return@withContext Resource.Error("User not authenticated")
+            try {
+                firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
+                    .document(conversationId)
+                    .update("pinnedBy", com.google.firebase.firestore.FieldValue.arrayRemove(uid))
+                    .await()
+
+                Resource.Success(Unit)
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to unpin conversation: $conversationId")
+                Resource.Error(e.message ?: "Failed to unpin conversation")
+            }
+        }
+
+    /**
+     * Mutes a conversation for the current user (Req 24.5).
+     */
+    override suspend fun muteConversation(conversationId: String): Resource<Unit> =
+        withContext(Dispatchers.IO) {
+            val uid = currentUid ?: return@withContext Resource.Error("User not authenticated")
+            try {
+                firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
+                    .document(conversationId)
+                    .update("mutedBy", com.google.firebase.firestore.FieldValue.arrayUnion(uid))
+                    .await()
+
+                Resource.Success(Unit)
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to mute conversation: $conversationId")
+                Resource.Error(e.message ?: "Failed to mute conversation")
+            }
+        }
+
+    /**
+     * Unmutes a conversation for the current user.
+     */
+    override suspend fun unmuteConversation(conversationId: String): Resource<Unit> =
+        withContext(Dispatchers.IO) {
+            val uid = currentUid ?: return@withContext Resource.Error("User not authenticated")
+            try {
+                firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
+                    .document(conversationId)
+                    .update("mutedBy", com.google.firebase.firestore.FieldValue.arrayRemove(uid))
+                    .await()
+
+                Resource.Success(Unit)
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to unmute conversation: $conversationId")
+                Resource.Error(e.message ?: "Failed to unmute conversation")
+            }
+        }
+
+    /**
+     * Archives a conversation for the current user (Req 24.3).
+     * Removes it from the active conversation list by deleting from local Room.
+     */
+    override suspend fun archiveConversation(conversationId: String): Resource<Unit> =
+        withContext(Dispatchers.IO) {
+            val uid = currentUid ?: return@withContext Resource.Error("User not authenticated")
+            try {
+                // Mark as archived on server
+                firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
+                    .document(conversationId)
+                    .update("archivedBy", com.google.firebase.firestore.FieldValue.arrayUnion(uid))
+                    .await()
+
+                // Remove from local cache
+                conversationDao.deleteById(conversationId)
+
+                Resource.Success(Unit)
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to archive conversation: $conversationId")
+                Resource.Error(e.message ?: "Failed to archive conversation")
+            }
+        }
+
+    companion object {
+        /** Timeout for foreground unread-count sync (Requirement 12.5) */
+        const val FOREGROUND_SYNC_TIMEOUT_MS = 10_000L
+
+        /** Cache key for conversations list */
+        private const val CACHE_KEY_CONVERSATIONS = "conversations_list"
+
+        /** Maximum delay before retrying a failed fetch of stale data (Requirement 11.6) */
+        private const val RETRY_DELAY_MS = 60_000L
+
+        /** Maximum number of IDs per Firestore whereIn query (Firestore limit) (Requirement 5.1) */
+        const val BATCH_CHUNK_SIZE = 30
+
+        /** Staleness threshold: skip Firestore re-read if lastSyncTimestamp < 5 minutes old (Requirement 7.4) */
+        const val STALENESS_THRESHOLD_MS = 5 * 60 * 1000L // 5 minutes
+
+        /** Maximum number of pinned conversations per user (Requirement 24.4) */
+        const val MAX_PINNED_CONVERSATIONS = 3
     }
 }

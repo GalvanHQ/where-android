@@ -55,4 +55,40 @@ interface ConversationRepository {
      * Requirements: 11.1, 11.2
      */
     fun refreshConversations(): Flow<DataResource<List<Conversation>>>
+
+    /**
+     * Fetches conversations from Firestore in batches of 30 IDs using `whereIn` queries.
+     * Executes at most one batch query set per foreground sync cycle.
+     * Skips Firestore re-read for conversations whose lastSyncTimestamp is less than 5 minutes old.
+     * Skips Room write for documents whose stored documentUpdateTime matches the incoming snapshot version.
+     *
+     * Requirements: 5.1, 5.2, 5.7, 7.4
+     */
+    suspend fun batchFetchConversations(conversationIds: List<String>): Resource<Unit>
+
+    /**
+     * Pins a conversation for the current user.
+     * Returns error if the user already has 3 pinned conversations (Req 24.4).
+     */
+    suspend fun pinConversation(conversationId: String): Resource<Unit>
+
+    /**
+     * Unpins a conversation for the current user.
+     */
+    suspend fun unpinConversation(conversationId: String): Resource<Unit>
+
+    /**
+     * Mutes a conversation for the current user (Req 24.5).
+     */
+    suspend fun muteConversation(conversationId: String): Resource<Unit>
+
+    /**
+     * Unmutes a conversation for the current user.
+     */
+    suspend fun unmuteConversation(conversationId: String): Resource<Unit>
+
+    /**
+     * Archives a conversation for the current user (Req 24.3).
+     */
+    suspend fun archiveConversation(conversationId: String): Resource<Unit>
 }

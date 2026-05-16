@@ -45,4 +45,19 @@ interface MessageDao {
 
     @Query("DELETE FROM messages WHERE id = :messageId")
     suspend fun deleteById(messageId: String)
+
+    @Query("SELECT * FROM messages WHERE conversationId = :conversationId AND text LIKE :query COLLATE NOCASE ORDER BY timestamp ASC")
+    suspend fun searchMessages(conversationId: String, query: String): List<MessageEntity>
+
+    @Query("SELECT * FROM messages WHERE conversationId = :conversationId AND (type = 'IMAGE' OR type = 'VIDEO') ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
+    suspend fun getMediaMessages(conversationId: String, limit: Int, offset: Int): List<MessageEntity>
+
+    @Query("SELECT COUNT(*) FROM messages WHERE conversationId = :conversationId AND (type = 'IMAGE' OR type = 'VIDEO')")
+    suspend fun getMediaMessageCount(conversationId: String): Int
+
+    @Query("SELECT * FROM messages WHERE conversationId = :conversationId AND type = 'DOCUMENT' ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
+    suspend fun getDocumentMessages(conversationId: String, limit: Int, offset: Int): List<MessageEntity>
+
+    @Query("SELECT COUNT(*) FROM messages WHERE conversationId = :conversationId AND type = 'DOCUMENT'")
+    suspend fun getDocumentMessageCount(conversationId: String): Int
 }

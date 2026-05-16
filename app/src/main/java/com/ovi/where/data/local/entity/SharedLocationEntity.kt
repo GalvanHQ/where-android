@@ -17,7 +17,10 @@ data class SharedLocationEntity(
     val bearing: Float,
     val timestamp: Long,
     val isSharingActive: Boolean,
-    val sharingExpiresAt: Long
+    val sharingExpiresAt: Long,
+    // Display info for live location bubble rendering
+    val displayName: String = "",
+    val sharingStartedAt: Long = 0L
 )
 
 fun SharedLocationEntity.toDomain(): SharedLocation {
@@ -32,7 +35,9 @@ fun SharedLocationEntity.toDomain(): SharedLocation {
         bearing = bearing,
         timestamp = timestamp,
         isSharingActive = isSharingActive,
-        sharingExpiresAt = sharingExpiresAt
+        sharingExpiresAt = sharingExpiresAt,
+        displayName = displayName,
+        sharingStartedAt = sharingStartedAt
     )
 }
 
@@ -48,6 +53,8 @@ fun SharedLocation.toEntity(): SharedLocationEntity {
         bearing = bearing,
         timestamp = timestamp,
         isSharingActive = isSharingActive,
-        sharingExpiresAt = sharingExpiresAt
+        sharingExpiresAt = sharingExpiresAt,
+        displayName = displayName,
+        sharingStartedAt = sharingStartedAt
     )
 }

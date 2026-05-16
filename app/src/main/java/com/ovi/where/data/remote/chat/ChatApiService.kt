@@ -1,12 +1,14 @@
 package com.ovi.where.data.remote.chat
 
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.Header
+import retrofit2.http.Url
 
 interface ChatApiService {
     @GET("/api/conversations/{conversationId}/messages")
@@ -70,4 +72,27 @@ interface ChatApiService {
     suspend fun getConversations(
         @Header("Authorization") token: String
     ): List<ConversationDto>
+
+    /**
+     * Deletes a message sent by the current user.
+     * Used by the context menu "Delete" action (Requirement 9.7).
+     */
+    @DELETE("/api/conversations/{conversationId}/messages/{messageId}")
+    suspend fun deleteMessage(
+        @Header("Authorization") token: String,
+        @Path("conversationId") conversationId: String,
+        @Path("messageId") messageId: String
+    )
+
+    /**
+     * Fetches Open Graph metadata for a given URL from the server-side link preview API.
+     * Used to generate rich link previews in chat messages.
+     *
+     * Requirement 12.2: Fetch OG metadata (title, description, image URL) from server-side API.
+     * Requirement 12.3: Caller enforces 5-second timeout.
+     */
+    @GET("/api/link-preview")
+    suspend fun fetchLinkPreview(
+        @Query("url") url: String
+    ): LinkPreviewDto
 }

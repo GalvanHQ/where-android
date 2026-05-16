@@ -7,6 +7,7 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GetTokenResult
 import com.ovi.where.core.common.Resource
 import com.ovi.where.data.location.LocationManager
+import com.ovi.where.data.network.ConnectivityObserver
 import com.ovi.where.data.remote.chat.ChatSocketIoClient
 import com.ovi.where.data.repository.MessageRepositoryImpl
 import com.ovi.where.domain.model.Conversation
@@ -20,6 +21,7 @@ import com.ovi.where.domain.model.MessageType
 import com.ovi.where.domain.model.User
 import com.ovi.where.domain.repository.FriendshipRepository
 import com.ovi.where.domain.repository.InteractionRepository
+import com.ovi.where.domain.repository.LocationRepository
 import com.ovi.where.domain.repository.UserRepository
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
 import com.ovi.where.domain.usecase.chat.MarkConversationReadUseCase
@@ -78,6 +80,10 @@ class FakeInteractionRepository : InteractionRepository {
         type: InteractionType
     ) {
         recordedCalls.add(RecordedCall(userId, displayName, photoUrl, type))
+    }
+
+    override suspend fun clearAll() {
+        recordedCalls.clear()
     }
 }
 
@@ -168,14 +174,21 @@ class InteractionRecordingTest : StringSpec({
             coEvery { messageRepositoryImpl.sendMessage("conv1", "Hello Alice", null) } returns
                 Resource.Success(dummyMessage)
 
+            val locationRepository: LocationRepository = mockk(relaxed = true)
+            val connectivityObserver: ConnectivityObserver = mockk(relaxed = true)
+            every { connectivityObserver.isConnected } returns MutableStateFlow(true)
+            every { locationRepository.observeCachedLocations() } returns flowOf(emptyList())
+            every { locationRepository.observeLocationsWithCacheFallback(any()) } returns flowOf(emptyList())
+
             val handle = SavedStateHandle(mapOf("conversationId" to "conv1"))
             val vm = ChatViewModel(
                 application, handle, observeMessagesUseCase, sendMessageUseCase,
                 sendLocationMessageUseCase, markConversationReadUseCase,
-                observeConversationsUseCase, wsClient, messageRepositoryImpl,
+                observeConversationsUseCase, dagger.Lazy { wsClient }, messageRepositoryImpl,
                 firebaseAuth, locationManager, friendshipRepository,
-                fakeInteractionRepo
-            )
+                fakeInteractionRepo, mockk(relaxed = true), locationRepository, connectivityObserver,
+                mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true),
+                mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true))
             advanceUntilIdle()
 
             // Type and send a message
@@ -256,14 +269,21 @@ class InteractionRecordingTest : StringSpec({
             coEvery { messageRepositoryImpl.sendMessage("conv-group", "Hello team", null) } returns
                 Resource.Success(dummyMessage)
 
+            val locationRepository: LocationRepository = mockk(relaxed = true)
+            val connectivityObserver: ConnectivityObserver = mockk(relaxed = true)
+            every { connectivityObserver.isConnected } returns MutableStateFlow(true)
+            every { locationRepository.observeCachedLocations() } returns flowOf(emptyList())
+            every { locationRepository.observeLocationsWithCacheFallback(any()) } returns flowOf(emptyList())
+
             val handle = SavedStateHandle(mapOf("conversationId" to "conv-group"))
             val vm = ChatViewModel(
                 application, handle, observeMessagesUseCase, sendMessageUseCase,
                 sendLocationMessageUseCase, markConversationReadUseCase,
-                observeConversationsUseCase, wsClient, messageRepositoryImpl,
+                observeConversationsUseCase, dagger.Lazy { wsClient }, messageRepositoryImpl,
                 firebaseAuth, locationManager, friendshipRepository,
-                fakeInteractionRepo
-            )
+                fakeInteractionRepo, mockk(relaxed = true), locationRepository, connectivityObserver,
+                mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true),
+                mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true))
             advanceUntilIdle()
 
             // Type and send a message in group
@@ -336,14 +356,21 @@ class InteractionRecordingTest : StringSpec({
             coEvery { messageRepositoryImpl.sendMessage(any(), any(), any()) } returns
                 Resource.Error("Network error")
 
+            val locationRepository: LocationRepository = mockk(relaxed = true)
+            val connectivityObserver: ConnectivityObserver = mockk(relaxed = true)
+            every { connectivityObserver.isConnected } returns MutableStateFlow(true)
+            every { locationRepository.observeCachedLocations() } returns flowOf(emptyList())
+            every { locationRepository.observeLocationsWithCacheFallback(any()) } returns flowOf(emptyList())
+
             val handle = SavedStateHandle(mapOf("conversationId" to "conv1"))
             val vm = ChatViewModel(
                 application, handle, observeMessagesUseCase, sendMessageUseCase,
                 sendLocationMessageUseCase, markConversationReadUseCase,
-                observeConversationsUseCase, wsClient, messageRepositoryImpl,
+                observeConversationsUseCase, dagger.Lazy { wsClient }, messageRepositoryImpl,
                 firebaseAuth, locationManager, friendshipRepository,
-                fakeInteractionRepo
-            )
+                fakeInteractionRepo, mockk(relaxed = true), locationRepository, connectivityObserver,
+                mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true),
+                mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true))
             advanceUntilIdle()
 
             vm.onInputChange("Hello")
@@ -524,3 +551,4 @@ class InteractionRecordingTest : StringSpec({
         }
     }
 })
+

@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,7 +34,7 @@ import com.ovi.where.presentation.model.ConversationUiModel
  * Messenger-style compact chat header composable for the ChatScreen.
  *
  * Layout: back arrow (24dp) → 8dp → Avatar (36dp) with 10dp online indicator → 8dp → title column
- * Trailing actions: phone, video, info icons (24dp, onSurfaceVariant), max 3 visible.
+ * Trailing actions: info icon (24dp, onSurfaceVariant).
  *
  * Displays differently for 1:1 vs group conversations:
  * - 1:1 online: subtitle "Active now" in green/tertiary
@@ -169,51 +167,23 @@ fun ChatHeader(
                     }
                 }
 
-                // Trailing action icons: phone, video, info (24dp, onSurfaceVariant), max 3
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+                // Trailing action icon: info only (call buttons removed)
+                IconButton(
+                    onClick = {
+                        if (conversation.isGroup) {
+                            conversation.groupId?.let { onNavigateToGroupInfo(it) }
+                        } else {
+                            onNavigateToConversationInfo(conversation.id)
+                        }
+                    },
+                    modifier = Modifier.size(36.dp)
                 ) {
-                    IconButton(
-                        onClick = { /* Phone call action - placeholder */ },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Phone,
-                            contentDescription = "Phone call",
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { /* Video call action - placeholder */ },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Videocam,
-                            contentDescription = "Video call",
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    IconButton(
-                        onClick = {
-                            if (conversation.isGroup) {
-                                conversation.groupId?.let { onNavigateToGroupInfo(it) }
-                            } else {
-                                onNavigateToConversationInfo(conversation.id)
-                            }
-                        },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Conversation info",
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Conversation info",
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             } else {
                 // Fallback when conversation is null (loading state)

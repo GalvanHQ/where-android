@@ -1,5 +1,8 @@
-const { auth, db, messaging } = require('./firebase');
+const { auth, db, messaging, admin } = require('./firebase');
 const { v4: uuidv4 } = require('uuid');
+
+/** Max number of recent messages embedded inside a conversation doc. */
+const MAX_RECENT_MESSAGES = 50;
 
 const initializeSockets = (io) => {
     // Middleware for authentication
@@ -60,10 +63,8 @@ const initializeSockets = (io) => {
                     readBy: [uid]
                 };
 
-                await db.collection('messages').doc(msgId).set(msgDto);
-                
-                // Update last message in conversation and increment unread counts
-                await updateConversationLastMessage(conversationId, uid, text.trim(), now);
+                // Write to archive + embed in conversation doc (single batch)
+                await persistMessage(conversationId, msgId, msgDto, uid, text.trim(), now);
 
                 // Broadcast
                 io.to(conversationId).emit('message', msgDto);
@@ -98,10 +99,7 @@ const initializeSockets = (io) => {
                     readBy: [uid]
                 };
 
-                await db.collection('messages').doc(msgId).set(msgDto);
-
-                // Update last message in conversation and increment unread counts
-                await updateConversationLastMessage(conversationId, uid, '📷 Image', now);
+                await persistMessage(conversationId, msgId, msgDto, uid, '📷 Image', now);
 
                 // Broadcast
                 io.to(conversationId).emit('message', msgDto);
@@ -136,10 +134,7 @@ const initializeSockets = (io) => {
                     readBy: [uid]
                 };
 
-                await db.collection('messages').doc(msgId).set(msgDto);
-                
-                // Update last message in conversation and increment unread counts
-                await updateConversationLastMessage(conversationId, uid, '📍 Location', now);
+                await persistMessage(conversationId, msgId, msgDto, uid, '📍 Location', now);
 
                 io.to(conversationId).emit('message', msgDto);
                 socket.emit('ack', { tempId, id: msgId, timestamp: now });
@@ -147,6 +142,42 @@ const initializeSockets = (io) => {
                 sendFCM(conversationId, uid, userName, '📍 Shared a location');
             } catch (err) {
                 console.error('Error handling location message:', err);
+                socket.emit('error', { message: 'Internal server error' });
+            }
+        });
+
+        socket.on('voice_message', async (data) => {
+            if (!conversationId) return;
+            try {
+                const { tempId, voiceUrl, durationMs } = data;
+                if (!voiceUrl) return;
+
+                const msgId = uuidv4();
+                const now = Date.now();
+
+                const msgDto = {
+                    id: msgId,
+                    conversationId,
+                    senderId: uid,
+                    senderName: userName,
+                    text: '🎤 Voice message',
+                    messageType: 'VOICE',
+                    voiceUrl: voiceUrl,
+                    voiceDurationMs: durationMs || 0,
+                    timestamp: now,
+                    readBy: [uid]
+                };
+
+                await persistMessage(conversationId, msgId, msgDto, uid, '🎤 Voice message', now);
+
+                // Broadcast
+                io.to(conversationId).emit('message', msgDto);
+                socket.emit('ack', { tempId, id: msgId, timestamp: now });
+
+                // Send FCM push notifications
+                sendFCM(conversationId, uid, userName, '🎤 Sent a voice message');
+            } catch (err) {
+                console.error('Error handling voice message:', err);
                 socket.emit('error', { message: 'Internal server error' });
             }
         });
@@ -277,33 +308,60 @@ const initializeSockets = (io) => {
 };
 
 /**
- * Updates the conversation's last message fields and increments unread counts
- * for all participants except the sender.
+ * Persists a message to both the archive collection AND embeds it in the
+ * conversation document's recentMessages array. This replaces the old
+ * separate `db.collection('messages').set()` + `updateConversationLastMessage()`
+ * with a single batched write, and embeds the message for single-doc reads.
+ *
+ * Cost: 1 archive write + 1 conversation transaction = same as before,
+ * but now the conversation doc contains the last 50 messages.
  */
-async function updateConversationLastMessage(conversationId, senderId, text, timestamp) {
+async function persistMessage(conversationId, msgId, msgDto, senderId, previewText, timestamp) {
     const convRef = db.collection('conversations').doc(conversationId);
 
-    await db.runTransaction(async (transaction) => {
-        const doc = await transaction.get(convRef);
-        if (!doc.exists) return;
+    // Strip conversationId from the embedded copy to save space (it's implicit)
+    const embeddedMsg = { ...msgDto };
+    delete embeddedMsg.conversationId;
 
-        const data = doc.data();
+    await db.runTransaction(async (transaction) => {
+        const convDoc = await transaction.get(convRef);
+        if (!convDoc.exists) return;
+
+        const data = convDoc.data();
         const participants = data.participantIds || [];
         const unreadCounts = data.unreadCounts || {};
 
         // Increment unread count for all participants except sender
-        for (const participantId of participants) {
-            if (participantId !== senderId) {
-                unreadCounts[participantId] = (unreadCounts[participantId] || 0) + 1;
+        for (const pid of participants) {
+            if (pid !== senderId) {
+                unreadCounts[pid] = (unreadCounts[pid] || 0) + 1;
             }
         }
 
+        // Append to recentMessages, cap at MAX_RECENT_MESSAGES
+        let recentMessages = data.recentMessages || [];
+        recentMessages.push(embeddedMsg);
+        if (recentMessages.length > MAX_RECENT_MESSAGES) {
+            recentMessages = recentMessages.slice(-MAX_RECENT_MESSAGES);
+        }
+
+        // Track the oldest embedded timestamp for pagination cursor
+        const oldestRecentTimestamp = recentMessages.length > 0
+            ? recentMessages[0].timestamp
+            : timestamp;
+
         transaction.update(convRef, {
-            lastMessageText: text,
+            lastMessageText: previewText,
             lastMessageSenderId: senderId,
             lastMessageTimestamp: timestamp,
-            unreadCounts
+            unreadCounts,
+            recentMessages,
+            oldestRecentTimestamp
         });
+
+        // Also write to the archive collection for old-history pagination
+        const archiveRef = db.collection('messages').doc(msgId);
+        transaction.set(archiveRef, msgDto);
     });
 }
 

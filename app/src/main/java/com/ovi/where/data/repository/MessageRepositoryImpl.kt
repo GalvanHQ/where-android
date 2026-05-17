@@ -875,17 +875,30 @@ class MessageRepositoryImpl @Inject constructor(
      * - MessageDelivered: insert incoming messages into Room
      * - ReadReceipt: append userId to message's readBy list
      * - Error: mark related messages as FAILED
+     *
+     * IMPORTANT: Each frame is wrapped in try-catch to prevent a single
+     * malformed frame from killing the entire collector. Without this,
+     * one bad frame would cause ALL future acks to be missed, leaving
+     * every subsequent message stuck at PENDING forever.
      */
     private suspend fun observeIncomingFrames() {
+        Timber.i("observeIncomingFrames: collector started")
         wsClient.incomingFrames.collect { frame ->
-            when (frame) {
-                is ServerFrame.MessageAck -> handleAck(frame)
-                is ServerFrame.MessageDelivered -> handleIncomingMessage(frame)
-                is ServerFrame.ReadReceipt -> handleReadReceipt(frame)
-                is ServerFrame.Error -> {
-                    Log.e(TAG, "Server error: ${frame.message}")
+            try {
+                when (frame) {
+                    is ServerFrame.MessageAck -> {
+                        Timber.d("Received ack: tempId=${frame.tempId}, serverId=${frame.id}")
+                        handleAck(frame)
+                    }
+                    is ServerFrame.MessageDelivered -> handleIncomingMessage(frame)
+                    is ServerFrame.ReadReceipt -> handleReadReceipt(frame)
+                    is ServerFrame.Error -> {
+                        Log.e(TAG, "Server error: ${frame.message}")
+                    }
+                    else -> { /* handled by other components */ }
                 }
-                else -> { /* handled by other components */ }
+            } catch (e: Exception) {
+                Timber.e(e, "Error processing frame: ${frame::class.simpleName}")
             }
         }
     }
@@ -896,13 +909,16 @@ class MessageRepositoryImpl @Inject constructor(
      */
     private suspend fun handleAck(ack: ServerFrame.MessageAck) {
         // Cancel the timeout job
-        ackTimeoutJobs.remove(ack.tempId)?.cancel()
+        val cancelledJob = ackTimeoutJobs.remove(ack.tempId)
+        cancelledJob?.cancel()
+        Timber.d("handleAck: tempId=${ack.tempId}, serverId=${ack.id}, timeoutCancelled=${cancelledJob != null}")
 
         // Update the message in Room: replace tempId with serverId, set status to SENT
         try {
             if (ack.tempId == ack.id) {
                 // Server returned same ID — just update status
                 messageDao.updateStatus(ack.tempId, MessageStatus.SENT.name)
+                Timber.d("handleAck: updated status to SENT for ${ack.tempId}")
             } else {
                 // Server assigned a new ID — update in-place
                 messageDao.updateIdAndStatus(
@@ -911,9 +927,10 @@ class MessageRepositoryImpl @Inject constructor(
                     status = MessageStatus.SENT.name,
                     timestamp = ack.timestamp
                 )
+                Timber.d("handleAck: updated id ${ack.tempId} -> ${ack.id}, status -> SENT")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to handle ack for ${ack.tempId}: ${e.message}")
+            Timber.e(e, "Failed to handle ack for ${ack.tempId}")
         }
     }
 
@@ -968,6 +985,7 @@ class MessageRepositoryImpl @Inject constructor(
             type = when (frame.messageType) {
                 "LOCATION" -> MessageType.LOCATION.name
                 "IMAGE" -> MessageType.IMAGE.name
+                "VOICE" -> MessageType.VOICE.name
                 else -> MessageType.TEXT.name
             },
             timestamp = frame.timestamp,
@@ -976,6 +994,8 @@ class MessageRepositoryImpl @Inject constructor(
             longitude = frame.longitude,
             imageUrl = frame.imageUrl,
             thumbnailUrl = frame.thumbnailUrl,
+            voiceUrl = frame.voiceUrl,
+            voiceDurationMs = frame.voiceDurationMs,
             replyToId = null,
             replyToText = null,
             replyToSenderName = null,
@@ -1176,14 +1196,17 @@ class MessageRepositoryImpl @Inject constructor(
             type = when (messageType) {
                 "LOCATION" -> MessageType.LOCATION.name
                 "IMAGE" -> MessageType.IMAGE.name
+                "VOICE" -> MessageType.VOICE.name
                 else -> MessageType.TEXT.name
             },
             timestamp = timestamp,
             status = MessageStatus.SENT.name,
             latitude = latitude,
             longitude = longitude,
-            imageUrl = null,
-            thumbnailUrl = null,
+            imageUrl = imageUrl,
+            thumbnailUrl = thumbnailUrl,
+            voiceUrl = voiceUrl,
+            voiceDurationMs = voiceDurationMs,
             replyToId = null,
             replyToText = null,
             replyToSenderName = null,
@@ -1335,8 +1358,9 @@ class MessageRepositoryImpl @Inject constructor(
         return try {
             // Upload audio file to Firebase Storage
             val audioFile = java.io.File(audioFilePath)
+            val userId = firebaseAuth.currentUser?.uid ?: throw IllegalStateException("User not authenticated")
             val storageRef = firebaseStorage.reference
-                .child("voice_messages/$conversationId/${tempId}.m4a")
+                .child("voice_messages/$conversationId/$userId/${tempId}.m4a")
 
             val uploadUri = android.net.Uri.fromFile(audioFile)
             withTimeout(UPLOAD_TIMEOUT_MS) {
@@ -1344,28 +1368,24 @@ class MessageRepositoryImpl @Inject constructor(
             }
             val downloadUrl = storageRef.downloadUrl.await().toString()
 
+            // Update voice URL in Room so UI can display it
+            messageDao.updateVoiceUrl(tempId, downloadUrl)
+
             // Clean up local file after successful upload
             audioFile.delete()
 
-            // Send via WebSocket
-            wsClient.sendVoiceMessage(conversationId, tempId, downloadUrl, durationMs)
-
-            // Wait for ack
-            try {
-                withTimeout(ACK_TIMEOUT_MS) {
-                    wsClient.incomingFrames
-                        .filter { it is ServerFrame.MessageAck && (it as ServerFrame.MessageAck).tempId == tempId }
-                        .first()
-                }
-                // Update status to SENT
-                messageDao.updateStatus(tempId, MessageStatus.SENT.name)
-                val sentMessage = pendingMessage.copy(status = MessageStatus.SENT, voiceUrl = downloadUrl)
-                Resource.Success(sentMessage)
-            } catch (e: Exception) {
-                // Timeout or error — mark as FAILED
+            // Send via WebSocket — ack is handled by observeIncomingFrames/handleAck
+            val isConnected = wsClient.connectionState.value == ChatSocketIoClient.ConnectionState.CONNECTED
+            if (isConnected) {
+                wsClient.sendVoiceMessage(conversationId, tempId, downloadUrl, durationMs)
+                startAckTimeout(tempId)
+            } else {
+                // Voice messages don't have offline queue support yet — mark as failed
                 messageDao.updateStatus(tempId, MessageStatus.FAILED.name)
-                Resource.Error("Voice message send timed out")
+                return Resource.Error("Not connected — voice message cannot be queued")
             }
+
+            Resource.Success(pendingMessage.copy(voiceUrl = downloadUrl))
         } catch (e: Exception) {
             Timber.e(e, "Failed to send voice message")
             messageDao.updateStatus(tempId, MessageStatus.FAILED.name)

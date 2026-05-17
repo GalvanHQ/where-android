@@ -31,6 +31,10 @@ data class MessageDto(
     val messageType: String = "TEXT",
     val latitude: Double? = null,
     val longitude: Double? = null,
+    val imageUrl: String? = null,
+    val thumbnailUrl: String? = null,
+    val voiceUrl: String? = null,
+    val voiceDurationMs: Long? = null,
     val timestamp: Long = 0L,
     val readBy: List<String> = emptyList()
 )
@@ -93,6 +97,8 @@ sealed class ServerFrame {
         val longitude: Double? = null,
         val imageUrl: String? = null,
         val thumbnailUrl: String? = null,
+        val voiceUrl: String? = null,
+        val voiceDurationMs: Long? = null,
         val timestamp: Long = 0L,
         val readBy: List<String> = emptyList()
     ) : ServerFrame()

@@ -4,11 +4,6 @@ import android.Manifest
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -38,7 +33,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -58,50 +52,48 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.LocalReducedMotion
+import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.chat.components.AnimatedMessageBubble
 import com.ovi.where.presentation.chat.components.ChatBubble
 import com.ovi.where.presentation.chat.components.ChatEmptyState
 import com.ovi.where.presentation.chat.components.ChatInputBar
 import com.ovi.where.presentation.chat.components.DateSeparator
-import com.ovi.where.presentation.chat.components.MessageAnimationConstants
-import com.ovi.where.presentation.chat.components.NewMessageIndicator
-import com.ovi.where.presentation.chat.components.QueuedForSyncBanner
-import com.ovi.where.presentation.chat.components.ReplyPreviewBar
-import com.ovi.where.presentation.chat.components.SwipeToReplyContainer
-import com.ovi.where.presentation.chat.components.VoiceMessageBubble
-import com.ovi.where.presentation.chat.components.MessageSearchBar
+import com.ovi.where.presentation.chat.components.ImageMessageBubble
 import com.ovi.where.presentation.chat.components.LinkPreviewCard
 import com.ovi.where.presentation.chat.components.LinkableText
-import com.ovi.where.presentation.chat.components.ReactionPickerOverlay
-import com.ovi.where.presentation.chat.components.ReactionBadges
-import com.ovi.where.presentation.chat.components.ReadReceiptIndicator
-import com.ovi.where.presentation.chat.components.MessageStatusIndicator
-import com.ovi.where.presentation.chat.components.TypingIndicator
-import com.ovi.where.presentation.chat.components.ReconnectionBanner
-import com.ovi.where.presentation.chat.components.ImageMessageBubble
 import com.ovi.where.presentation.chat.components.LocationMessageBubble
+import com.ovi.where.presentation.chat.components.MessageAnimationConstants
+import com.ovi.where.presentation.chat.components.MessageSearchBar
+import com.ovi.where.presentation.chat.components.MessageStatusIndicator
+import com.ovi.where.presentation.chat.components.NewMessageIndicator
+import com.ovi.where.presentation.chat.components.QueuedForSyncBanner
+import com.ovi.where.presentation.chat.components.ReactionBadges
+import com.ovi.where.presentation.chat.components.ReactionPickerOverlay
+import com.ovi.where.presentation.chat.components.ReadReceiptIndicator
+import com.ovi.where.presentation.chat.components.ReplyPreviewBar
+import com.ovi.where.presentation.chat.components.SwipeToReplyContainer
+import com.ovi.where.presentation.chat.components.TypingIndicator
+import com.ovi.where.presentation.chat.components.VoiceMessageBubble
 import com.ovi.where.presentation.model.BubbleDirection
 import com.ovi.where.presentation.model.MessageUiModel
-import com.ovi.where.core.utils.showToast
-import com.ovi.where.domain.model.MessageStatus
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
@@ -171,10 +163,33 @@ fun ChatScreen(
     }
 
     // ── Image Attachment: Gallery picker via PhotoPicker API ───────────────────
+    // PhotoPicker URIs lose read permission after callback scope ends.
+    // Copy to local cache file immediately so background coroutine can access.
     val galleryLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri: android.net.Uri? ->
-        uri?.let { viewModel.sendImageMessage(it) }
+        uri?.let { sourceUri ->
+            try {
+                // Persist read permission for the duration of this process
+                context.contentResolver.takePersistableUriPermission(
+                    sourceUri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: SecurityException) {
+                // Some providers don't support persistable permissions — fallback to copy
+            }
+            // Copy to cache file for reliable background access
+            val cacheFile = java.io.File.createTempFile("gallery_", ".jpg", context.cacheDir)
+            try {
+                context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                    cacheFile.outputStream().use { output -> input.copyTo(output) }
+                }
+                val localUri = android.net.Uri.fromFile(cacheFile)
+                viewModel.sendImageMessage(localUri)
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(context, "Failed to read image", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     // ── Image Attachment: Camera capture ──────────────────────────────────────
@@ -202,6 +217,17 @@ fun ChatScreen(
             cameraLauncher.launch(uri)
         } else {
             android.widget.Toast.makeText(context, "Camera permission denied", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Microphone permission launcher (required for voice recording)
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.startVoiceRecording()
+        } else {
+            android.widget.Toast.makeText(context, "Microphone permission denied", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -402,15 +428,6 @@ fun ChatScreen(
             // Non-modal 48dp banner shown when a write action is attempted while offline.
             QueuedForSyncBanner(visible = uiState.showQueuedForSyncBanner)
 
-            // ── Reconnection Banner (Task 19.1, Requirement 27.8) ─────────────
-            // Show on showReconnectingBanner=true with spinner; error variant with Retry
-            // on showManualRetryAction; 300ms fade-out on isBannerFadingOut.
-            ReconnectionBanner(
-                showBanner = uiState.showReconnectingBanner,
-                showManualRetry = uiState.showManualRetryAction,
-                isFadingOut = uiState.isBannerFadingOut,
-                onRetry = viewModel::manualRetry
-            )
 
             // ── Message Search Bar (Task 8.1, Requirements 13.1-13.7) ─────────
             if (uiState.isSearchActive) {
@@ -783,7 +800,22 @@ fun ChatScreen(
                             ActivityResultContracts.PickVisualMedia.ImageOnly
                         )
                     )
-                }
+                },
+                // Voice recording state & callbacks
+                isVoiceRecording = uiState.isVoiceRecording,
+                voiceRecordingDurationMs = uiState.voiceRecordingDurationMs,
+                voiceWaveformAmplitudes = uiState.voiceWaveformAmplitudes,
+                onVoiceRecordStart = {
+                    if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
+                        android.content.pm.PackageManager.PERMISSION_GRANTED
+                    ) {
+                        viewModel.startVoiceRecording()
+                    } else {
+                        micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                },
+                onVoiceRecordStop = viewModel::stopVoiceRecordingAndSend,
+                onVoiceRecordCancel = viewModel::cancelVoiceRecording
             )
         }
     }

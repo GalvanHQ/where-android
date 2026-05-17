@@ -34,11 +34,11 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Phone
+
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Videocam
+
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -208,8 +208,6 @@ internal fun GroupInfoScreenContent(
                     isAdmin = uiState.isCurrentUserAdmin,
                     isMuted = uiState.isMuted,
                     onAddMembersTap = onNavigateToAddMembers,
-                    onAudioCallTap = { /* placeholder */ },
-                    onVideoCallTap = { /* placeholder */ },
                     onMuteTap = onToggleMute,
                     onSearchTap = { /* placeholder */ }
                 )
@@ -371,8 +369,6 @@ private fun ActionButtonRow(
     isAdmin: Boolean,
     isMuted: Boolean,
     onAddMembersTap: () -> Unit,
-    onAudioCallTap: () -> Unit,
-    onVideoCallTap: () -> Unit,
     onMuteTap: () -> Unit,
     onSearchTap: () -> Unit
 ) {
@@ -390,18 +386,6 @@ private fun ActionButtonRow(
                 onClick = onAddMembersTap
             )
         }
-        ActionButton(
-            icon = Icons.Default.Phone,
-            label = "Audio",
-            contentDescription = "Audio Call",
-            onClick = onAudioCallTap
-        )
-        ActionButton(
-            icon = Icons.Default.Videocam,
-            label = "Video",
-            contentDescription = "Video Call",
-            onClick = onVideoCallTap
-        )
         ActionButton(
             icon = Icons.Default.VolumeOff,
             label = if (isMuted) "Unmute" else "Mute",

@@ -14,6 +14,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -25,10 +26,10 @@ import com.ovi.where.presentation.model.BubbleDirection
  * Message delivery status indicator displayed after the timestamp on sent messages.
  *
  * Shows:
- * - PENDING: clock icon, onSurfaceVariant
- * - SENT: single tick, onSurfaceVariant
- * - DELIVERED: double tick, onSurfaceVariant
- * - READ: double tick, primary (accent) color
+ * - PENDING: clock icon, white/60%
+ * - SENT: single tick, white/70%
+ * - DELIVERED: double tick, white/70%
+ * - READ: double tick, light blue accent (#34B7F1)
  * - FAILED: error icon, error color
  *
  * Transitions between states use a 150ms crossfade animation (Requirement 23.5).
@@ -63,39 +64,38 @@ fun MessageStatusIndicator(
         animationSpec = if (reducedMotion) snap() else tween(durationMillis = CROSSFADE_DURATION_MS),
         label = "MessageStatusCrossfade",
         modifier = modifier
-            .padding(start = STATUS_SPACING)
             .semantics { contentDescription = accessibilityDescription }
     ) { currentStatus ->
         when (currentStatus) {
-            // Requirement 10.1: PENDING — clock icon, 14dp, onSurfaceVariant
+            // PENDING — clock icon, subtle white
             MessageStatus.PENDING -> Icon(
                 imageVector = Icons.Filled.AccessTime,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = Color.White.copy(alpha = 0.6f),
                 modifier = Modifier.size(STATUS_ICON_SIZE)
             )
-            // Requirement 10.2: SENT — single tick, 14dp, onSurfaceVariant
+            // SENT — single tick, white
             MessageStatus.SENT -> Icon(
                 imageVector = Icons.Filled.Check,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.size(STATUS_ICON_SIZE)
             )
-            // Requirement 10.3: DELIVERED — double tick, 14dp, onSurfaceVariant
+            // DELIVERED — double tick, white
             MessageStatus.DELIVERED -> Icon(
                 imageVector = Icons.Filled.DoneAll,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.size(STATUS_ICON_SIZE)
             )
-            // Requirement 10.4: READ — double tick, 14dp, primary (accent) color
+            // READ — double tick, light blue accent for clear "read" feedback
             MessageStatus.READ -> Icon(
                 imageVector = Icons.Filled.DoneAll,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = READ_TICK_COLOR,
                 modifier = Modifier.size(STATUS_ICON_SIZE)
             )
-            // Requirement 10.7: FAILED — error icon, 14dp, error color
+            // FAILED — error icon, error color
             MessageStatus.FAILED -> Icon(
                 imageVector = Icons.Filled.ErrorOutline,
                 contentDescription = null,
@@ -106,11 +106,11 @@ fun MessageStatusIndicator(
     }
 }
 
-/** Icon size for all status indicators (14dp per requirements). */
-private val STATUS_ICON_SIZE = 14.dp
+/** Icon size for all status indicators (13dp for compact inline display). */
+private val STATUS_ICON_SIZE = 13.dp
 
-/** Horizontal spacing between timestamp and status icon (4dp per requirements). */
-private val STATUS_SPACING = 4.dp
+/** Light blue color for READ status ticks — high contrast against primary bubble. */
+private val READ_TICK_COLOR = Color(0xFF34B7F1)
 
 /** Crossfade animation duration in milliseconds (150ms per Requirement 23.5). */
 private const val CROSSFADE_DURATION_MS = 150

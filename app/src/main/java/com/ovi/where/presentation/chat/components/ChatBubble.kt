@@ -25,15 +25,20 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.ovi.where.domain.model.MessageStatus
 import com.ovi.where.presentation.model.BubbleDirection
 import com.ovi.where.presentation.model.MessageUiModel
 
 /**
- * Messenger-style chat bubble composable.
+ * Material 3 styled chat bubble composable.
  *
  * Renders sent messages right-aligned with primary color background and white text,
  * and received messages left-aligned with surfaceContainerHigh background and onSurface text.
  * Applies asymmetric corner radii to create a "tail" effect on the last bubble in a group.
+ *
+ * Timestamp and status indicator are displayed inline at the bottom-end of the bubble
+ * in a compact row for a modern, clean chat UX.
  *
  * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 2.2, 2.3, 2.4
  */
@@ -64,10 +69,10 @@ fun ChatBubble(
     } else {
         MaterialTheme.colorScheme.onSurface
     }
-    val timestampColor = if (isSent) {
-        Color.White
+    val metaColor = if (isSent) {
+        Color.White.copy(alpha = 0.7f)
     } else {
-        MaterialTheme.colorScheme.onSurface
+        MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     // Resolve sender name: show "Unknown" when blank (Requirement 2.4)
@@ -125,7 +130,12 @@ fun ChatBubble(
                 modifier = Modifier.widthIn(max = maxBubbleWidth)
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(
+                        start = 12.dp,
+                        end = 12.dp,
+                        top = 8.dp,
+                        bottom = 6.dp
+                    )
                 ) {
                     // Message text
                     if (message.text.isNotEmpty()) {
@@ -136,16 +146,31 @@ fun ChatBubble(
                         )
                     }
 
-                    // Timestamp below text (Requirement 4.9)
+                    // Timestamp + Status indicator row — aligned to end
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = message.formattedTime,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = timestampColor,
-                        modifier = Modifier
-                            .align(Alignment.End)
-                            .alpha(0.7f)
-                    )
+                    Row(
+                        modifier = Modifier.align(Alignment.End),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        // Formatted time (e.g. "2:32 PM")
+                        Text(
+                            text = message.formattedTime,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 11.sp
+                            ),
+                            color = metaColor
+                        )
+
+                        // Status indicator for sent messages only
+                        if (isSent) {
+                            Spacer(modifier = Modifier.width(3.dp))
+                            MessageStatusIndicator(
+                                status = message.status,
+                                direction = message.direction
+                            )
+                        }
+                    }
                 }
             }
         }

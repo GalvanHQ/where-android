@@ -43,6 +43,9 @@ interface MessageDao {
     @Query("UPDATE messages SET imageUrl = :imageUrl WHERE id = :messageId")
     suspend fun updateImageUrl(messageId: String, imageUrl: String)
 
+    @Query("UPDATE messages SET voiceUrl = :voiceUrl WHERE id = :messageId")
+    suspend fun updateVoiceUrl(messageId: String, voiceUrl: String)
+
     @Query("DELETE FROM messages WHERE id = :messageId")
     suspend fun deleteById(messageId: String)
 

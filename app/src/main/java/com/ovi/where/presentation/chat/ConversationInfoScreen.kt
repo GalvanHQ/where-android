@@ -21,7 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Call
+
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Flag
@@ -30,7 +30,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Videocam
+
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
@@ -252,7 +252,7 @@ internal fun ConversationInfoContent(
 
 /**
  * Horizontal row of circular action buttons with labels.
- * Actions: Audio Call, Video Call, Profile, Mute, Search
+ * Actions: Profile, Mute, Search
  */
 @Composable
 internal fun ActionButtonRow(
@@ -268,16 +268,6 @@ internal fun ActionButtonRow(
             .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        ActionButton(
-            icon = Icons.Filled.Call,
-            label = "Audio Call",
-            onClick = { /* Calling not yet available */ }
-        )
-        ActionButton(
-            icon = Icons.Filled.Videocam,
-            label = "Video Call",
-            onClick = { /* Calling not yet available */ }
-        )
         ActionButton(
             icon = Icons.Filled.Person,
             label = "Profile",

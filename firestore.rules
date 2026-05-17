@@ -103,17 +103,32 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && request.auth.uid in request.resource.data.participantIds;
 
-      // Update: participant can update conversation metadata fields
-      // Permits field-level updates to pinnedBy, mutedBy, archivedBy, deletedBy arrays
+      // Update: participant can update client-side metadata only.
+      // Server-managed fields (recentMessages, unreadCounts, lastMessage*)
+      // are written via Admin SDK which bypasses rules.
       allow update: if isAuthenticated()
-        && request.auth.uid in resource.data.participantIds;
+        && request.auth.uid in resource.data.participantIds
+        && (!request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['recentMessages', 'oldestRecentTimestamp']));
 
+      // Legacy subcollection messages (kept for backward compatibility)
       match /messages/{messageId} {
         allow read: if isAuthenticated()
           && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
         allow create: if isAuthenticated() && request.auth.uid == request.resource.data.senderId;
         allow update: if isAuthenticated();
       }
+    }
+
+    // ===== MESSAGES (top-level archive) =====
+    // Server writes via Admin SDK (bypasses rules).
+    // Clients may read archived messages for pagination history.
+    match /messages/{messageId} {
+      allow read: if isAuthenticated()
+        && request.auth.uid in get(/databases/$(database)/documents/conversations/$(resource.data.conversationId)).data.participantIds;
+
+      // Only server (Admin SDK) creates/updates messages
+      allow create, update, delete: if false;
     }
 
     // ===== DIRECT LOCATION SHARES =====

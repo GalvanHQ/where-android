@@ -89,7 +89,16 @@ data class MessageUiModel(
     val linkPreviewDomain: String? = null,
     // ─── Mentions (Task 9.1) ──────────────────────────────────────────────────
     /** List of mentioned user IDs in this message (Requirement 14.3, 14.4). */
-    val mentionedUserIds: ImmutableList<String> = persistentListOf()
+    val mentionedUserIds: ImmutableList<String> = persistentListOf(),
+    // ─── Message Grouping Metadata (Requirements 4.6, 4.7, 10.3) ─────────────
+    /** Whether this message is the first in a sender group (same sender within 2 min). */
+    val isFirstInGroup: Boolean = true,
+    /** Whether this message is the last in a sender group (same sender within 2 min). */
+    val isLastInGroup: Boolean = true,
+    /** Whether a date separator should be shown above this message. */
+    val showDateSeparator: Boolean = false,
+    /** Label for the date separator ("Today", "Yesterday", or formatted date). */
+    val dateSeparatorLabel: String? = null
 )
 
 /**

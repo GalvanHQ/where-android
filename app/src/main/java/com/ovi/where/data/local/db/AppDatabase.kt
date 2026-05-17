@@ -35,7 +35,7 @@ import com.ovi.where.data.local.entity.VoiceMessageCacheEntity
         LinkPreviewCacheEntity::class,
         OnlineStatusEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -146,6 +146,15 @@ abstract class AppDatabase : RoomDatabase() {
                 // Add mutedByJson and pinnedByJson columns to conversations table (Req 24.4, 24.5)
                 db.execSQL("ALTER TABLE `conversations` ADD COLUMN `mutedByJson` TEXT NOT NULL DEFAULT '[]'")
                 db.execSQL("ALTER TABLE `conversations` ADD COLUMN `pinnedByJson` TEXT NOT NULL DEFAULT '[]'")
+            }
+        }
+
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add participantNamesJson and participantPhotosJson columns to conversations table
+                // for persistent storage of resolved participant metadata (Req 1.8, 1.9, 2.8, 2.9)
+                db.execSQL("ALTER TABLE `conversations` ADD COLUMN `participantNamesJson` TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE `conversations` ADD COLUMN `participantPhotosJson` TEXT DEFAULT NULL")
             }
         }
     }

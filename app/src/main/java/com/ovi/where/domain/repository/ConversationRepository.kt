@@ -91,4 +91,13 @@ interface ConversationRepository {
      * Archives a conversation for the current user (Req 24.3).
      */
     suspend fun archiveConversation(conversationId: String): Resource<Unit>
+
+    /**
+     * Soft-deletes a conversation for the current user (Req 1.7, 2.7).
+     * Adds the current user's ID to the Firestore `deletedBy` array field,
+     * and also removes from local Room for immediate UI feedback.
+     * The conversation will not reappear on sync because the Firestore listener
+     * filters out conversations where the current user is in `deletedBy`.
+     */
+    suspend fun softDeleteConversation(conversationId: String): Resource<Unit>
 }

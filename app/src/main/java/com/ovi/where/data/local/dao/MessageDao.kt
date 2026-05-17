@@ -60,4 +60,27 @@ interface MessageDao {
 
     @Query("SELECT COUNT(*) FROM messages WHERE conversationId = :conversationId AND type = 'DOCUMENT'")
     suspend fun getDocumentMessageCount(conversationId: String): Int
+
+    /**
+     * Finds a potential duplicate message by matching conversationId, senderId, text,
+     * and timestamp within a 1-second tolerance window.
+     * Used as a secondary deduplication safeguard (Requirement 1.13, 2.13).
+     */
+    @Query(
+        """
+        SELECT * FROM messages 
+        WHERE conversationId = :conversationId 
+          AND senderId = :senderId 
+          AND text = :text 
+          AND timestamp BETWEEN :timestampLow AND :timestampHigh 
+        LIMIT 1
+        """
+    )
+    suspend fun findDuplicate(
+        conversationId: String,
+        senderId: String,
+        text: String,
+        timestampLow: Long,
+        timestampHigh: Long
+    ): MessageEntity?
 }

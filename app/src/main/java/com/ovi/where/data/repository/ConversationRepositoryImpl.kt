@@ -253,6 +253,16 @@ class ConversationRepositoryImpl @Inject constructor(
                 if (error != null) return@addSnapshotListener
                 val entities = snapshot?.documents?.mapNotNull { doc ->
                     try {
+                        // Filter out conversations soft-deleted by the current user (Req 1.7, 2.7)
+                        val deletedBy = (doc.get("deletedBy") as? List<*>)
+                            ?.filterIsInstance<String>() ?: emptyList()
+                        if (uid in deletedBy) return@mapNotNull null
+
+                        // Filter out conversations archived by the current user (Req 1.6, 2.6)
+                        val archivedBy = (doc.get("archivedBy") as? List<*>)
+                            ?.filterIsInstance<String>() ?: emptyList()
+                        if (uid in archivedBy) return@mapNotNull null
+
                         val unreadMap = doc.get("unreadCounts") as? Map<*, *>
                         val myUnread = (unreadMap?.get(uid) as? Long)?.toInt() ?: 0
                         val participantIds = (doc.get("participantIds") as? List<*>)
@@ -274,7 +284,13 @@ class ConversationRepositoryImpl @Inject constructor(
                             unreadCount = myUnread,
                             memberIdsJson = serializeMemberIds(participantIds),
                             lastSyncTimestamp = System.currentTimeMillis(),
-                            documentUpdateTime = docUpdateTime
+                            documentUpdateTime = docUpdateTime,
+                            participantNamesJson = serializeFirestoreMap(
+                                doc.get("participantNames") as? Map<*, *>
+                            ),
+                            participantPhotosJson = serializeFirestoreMap(
+                                doc.get("participantPhotos") as? Map<*, *>
+                            )
                         )
                     } catch (_: Exception) { null }
                 } ?: emptyList()
@@ -282,6 +298,26 @@ class ConversationRepositoryImpl @Inject constructor(
                 // Write to Room immediately so UI flow emits within 500ms (Requirement 12.3)
                 repositoryScope.launch {
                     conversationDao.upsertAll(entities)
+
+                    // Remove any conversations that are now soft-deleted by this user (Req 1.7, 2.7)
+                    val deletedIds = snapshot?.documents?.filter { doc ->
+                        val deletedBy = (doc.get("deletedBy") as? List<*>)
+                            ?.filterIsInstance<String>() ?: emptyList()
+                        uid in deletedBy
+                    }?.map { it.id } ?: emptyList()
+                    for (deletedId in deletedIds) {
+                        conversationDao.deleteById(deletedId)
+                    }
+
+                    // Remove any conversations that are now archived by this user (Req 1.6, 2.6)
+                    val archivedIds = snapshot?.documents?.filter { doc ->
+                        val archivedBy = (doc.get("archivedBy") as? List<*>)
+                            ?.filterIsInstance<String>() ?: emptyList()
+                        uid in archivedBy
+                    }?.map { it.id } ?: emptyList()
+                    for (archivedId in archivedIds) {
+                        conversationDao.deleteById(archivedId)
+                    }
                 }
             }
     }
@@ -356,6 +392,16 @@ class ConversationRepositoryImpl @Inject constructor(
 
                     val entitiesToWrite = snapshot.documents.mapNotNull { doc ->
                         try {
+                            // Filter out conversations soft-deleted by the current user (Req 1.7, 2.7)
+                            val deletedBy = (doc.get("deletedBy") as? List<*>)
+                                ?.filterIsInstance<String>() ?: emptyList()
+                            if (uid in deletedBy) return@mapNotNull null
+
+                            // Filter out conversations archived by the current user (Req 1.6, 2.6)
+                            val archivedBy = (doc.get("archivedBy") as? List<*>)
+                                ?.filterIsInstance<String>() ?: emptyList()
+                            if (uid in archivedBy) return@mapNotNull null
+
                             // Get the document's updateTime from Firestore metadata
                             val incomingUpdateTime = doc.getDate("updateTime")?.time
                                 ?: doc.getLong("lastMessageTimestamp")
@@ -386,7 +432,13 @@ class ConversationRepositoryImpl @Inject constructor(
                                 unreadCount = myUnread,
                                 memberIdsJson = serializeMemberIds(participantIds),
                                 lastSyncTimestamp = now,
-                                documentUpdateTime = incomingUpdateTime
+                                documentUpdateTime = incomingUpdateTime,
+                                participantNamesJson = serializeFirestoreMap(
+                                    doc.get("participantNames") as? Map<*, *>
+                                ),
+                                participantPhotosJson = serializeFirestoreMap(
+                                    doc.get("participantPhotos") as? Map<*, *>
+                                )
                             )
                         } catch (e: Exception) {
                             Timber.w(e, "Failed to parse conversation document: ${doc.id}")
@@ -409,6 +461,21 @@ class ConversationRepositoryImpl @Inject constructor(
     private fun serializeMemberIds(memberIds: List<String>): String {
         if (memberIds.isEmpty()) return "[]"
         return memberIds.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
+    }
+
+    /**
+     * Converts a Firestore map (Map<*, *>) to a JSON object string for storage in Room.
+     * Returns null if the map is null or empty.
+     */
+    private fun serializeFirestoreMap(map: Map<*, *>?): String? {
+        if (map.isNullOrEmpty()) return null
+        val entries = map.entries.mapNotNull { (key, value) ->
+            val k = key as? String ?: return@mapNotNull null
+            val v = value as? String
+            if (v != null) "\"$k\":\"$v\"" else "\"$k\":null"
+        }
+        if (entries.isEmpty()) return null
+        return "{${entries.joinToString(",")}}"
     }
 
     private fun ConversationDto.toDomain() = Conversation(
@@ -625,8 +692,12 @@ class ConversationRepositoryImpl @Inject constructor(
         }
 
     /**
-     * Archives a conversation for the current user (Req 24.3).
-     * Removes it from the active conversation list by deleting from local Room.
+     * Archives a conversation for the current user (Req 1.6, 2.6).
+     * Adds the current user's ID to the Firestore `archivedBy` array field,
+     * and also removes from local Room for immediate UI feedback.
+     *
+     * The conversation will not reappear on sync because the Firestore listener
+     * filters out conversations where the current user is in `archivedBy`.
      */
     override suspend fun archiveConversation(conversationId: String): Resource<Unit> =
         withContext(Dispatchers.IO) {
@@ -645,6 +716,34 @@ class ConversationRepositoryImpl @Inject constructor(
             } catch (e: Exception) {
                 Timber.w(e, "Failed to archive conversation: $conversationId")
                 Resource.Error(e.message ?: "Failed to archive conversation")
+            }
+        }
+
+    /**
+     * Soft-deletes a conversation for the current user (Req 1.7, 2.7).
+     * Adds the current user's ID to the Firestore `deletedBy` array field (soft delete per user),
+     * and also removes from local Room for immediate UI feedback.
+     *
+     * The conversation will not reappear on sync because the Firestore listener
+     * filters out conversations where the current user is in `deletedBy`.
+     */
+    override suspend fun softDeleteConversation(conversationId: String): Resource<Unit> =
+        withContext(Dispatchers.IO) {
+            val uid = currentUid ?: return@withContext Resource.Error("User not authenticated")
+            try {
+                // Mark as deleted for this user on Firestore (soft delete)
+                firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
+                    .document(conversationId)
+                    .update("deletedBy", com.google.firebase.firestore.FieldValue.arrayUnion(uid))
+                    .await()
+
+                // Remove from local Room for immediate UI feedback
+                conversationDao.deleteById(conversationId)
+
+                Resource.Success(Unit)
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to soft-delete conversation: $conversationId")
+                Resource.Error(e.message ?: "Failed to delete conversation")
             }
         }
 

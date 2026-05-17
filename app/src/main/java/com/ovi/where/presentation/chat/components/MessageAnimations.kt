@@ -2,6 +2,7 @@ package com.ovi.where.presentation.chat.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
@@ -52,7 +53,7 @@ object MessageAnimationConstants {
 /**
  * Wraps a message bubble with entrance animation based on direction.
  *
- * - Sent messages: slide up 48dp + fade-in 0→100%, 200ms decelerate easing (Requirement 23.1)
+ * - Sent messages: slide up 48dp + fade-in 0→100%, 200ms ease-out easing (Requirement 23.1, 10.1)
  * - Received messages: slide in 32dp from left + fade-in 0→100%, 250ms decelerate easing (Requirement 23.2)
  * - Reduced motion: skip all slide animations, apply instantly (Requirement 23.7)
  *
@@ -97,13 +98,21 @@ fun AnimatedMessageBubble(
         MessageAnimationConstants.RECEIVED_ANIMATION_DURATION_MS
     }
 
+    // Requirement 10.1: Sent messages use ease-out (LinearOutSlowInEasing)
+    // Requirement 23.2: Received messages use standard decelerate (FastOutSlowInEasing)
+    val easing = if (direction == BubbleDirection.SENT) {
+        LinearOutSlowInEasing
+    } else {
+        FastOutSlowInEasing
+    }
+
     LaunchedEffect(messageId) {
         // Animate fade-in
         alpha.animateTo(
             targetValue = 1f,
             animationSpec = tween(
                 durationMillis = durationMs,
-                easing = FastOutSlowInEasing
+                easing = easing
             )
         )
     }
@@ -115,7 +124,7 @@ fun AnimatedMessageBubble(
                 targetValue = 0f,
                 animationSpec = tween(
                     durationMillis = durationMs,
-                    easing = FastOutSlowInEasing
+                    easing = easing
                 )
             )
         } else {
@@ -123,7 +132,7 @@ fun AnimatedMessageBubble(
                 targetValue = 0f,
                 animationSpec = tween(
                     durationMillis = durationMs,
-                    easing = FastOutSlowInEasing
+                    easing = easing
                 )
             )
         }

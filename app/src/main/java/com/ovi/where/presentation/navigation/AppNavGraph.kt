@@ -32,6 +32,8 @@ import com.ovi.where.presentation.auth.login.LoginScreen
 import com.ovi.where.presentation.auth.signup.SignUpScreen
 import com.ovi.where.presentation.auth.verification.EmailVerificationScreen
 import com.ovi.where.presentation.chat.ChatScreen
+import com.ovi.where.presentation.chat.ConversationInfoScreen
+import com.ovi.where.presentation.chat.GroupInfoScreen
 import com.ovi.where.presentation.chat.MediaGalleryScreen
 import com.ovi.where.presentation.group.JoinGroupScreen
 import com.ovi.where.presentation.group.create.CreateGroupScreen
@@ -468,6 +470,49 @@ fun AppNavGraph(
                     navController.navigate(Screen.MediaGallery.createRoute(convId)) {
                         launchSingleTop = true
                     }
+                },
+                onNavigateToConversationInfo = { convId ->
+                    navController.navigate(Screen.ConversationInfo.createRoute(convId)) {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        // ── Conversation Info (DM info screen) ────────────────────────────────
+        composable(
+            route     = Screen.ConversationInfo.ROUTE,
+            arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
+        ) { back ->
+            val conversationId = back.arguments?.getString("conversationId") ?: return@composable
+            ConversationInfoScreen(
+                conversationId         = conversationId,
+                onNavigateBack         = { navController.popBackStack() },
+                onNavigateToMediaGallery = {
+                    navController.navigate(Screen.MediaGallery.createRoute(conversationId)) {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        // ── Group Info (Group info screen) ────────────────────────────────────
+        composable(
+            route     = Screen.GroupInfo.ROUTE,
+            arguments = listOf(navArgument("groupId") { type = NavType.StringType })
+        ) { back ->
+            val groupId = back.arguments?.getString("groupId") ?: return@composable
+            GroupInfoScreen(
+                groupId                = groupId,
+                onNavigateBack         = { navController.popBackStack() },
+                onNavigateToMediaGallery = {
+                    // Navigate to media gallery using group's conversation ID if available
+                    navController.navigate(Screen.MediaGallery.createRoute(groupId)) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToAddMembers = {
+                    // Placeholder — add members flow not yet implemented
                 }
             )
         }

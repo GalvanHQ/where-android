@@ -21,5 +21,7 @@ data class ConversationEntity(
     val mutedByJson: String = "[]",
     val pinnedByJson: String = "[]",
     val lastSyncTimestamp: Long,
-    val documentUpdateTime: Long = 0L
+    val documentUpdateTime: Long = 0L,
+    val participantNamesJson: String? = null,
+    val participantPhotosJson: String? = null
 )

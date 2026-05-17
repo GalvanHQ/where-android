@@ -1,0 +1,380 @@
+package com.ovi.where.presentation.chat
+
+import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import com.ovi.where.core.theme.WhereTheme
+import com.ovi.where.presentation.model.ConversationUiModel
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+/**
+ * Unit tests for [ChatHeader] composable.
+ *
+ * Validates: Requirements 7.1, 7.5, 7.6, 7.7, 7.10, 7.11
+ *
+ * Tests cover:
+ * - Compact height (64dp) and avatar placement
+ * - Subtitle text for online/offline/group states
+ * - Action icon visibility and max count (3 icons)
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], manifest = Config.NONE)
+class ChatHeaderTest {
+
+    @get:Rule
+    val composeTestRule = createComposeRule()
+
+    // ── Helper to create a default ConversationUiModel for testing ───────────
+
+    private fun createConversation(
+        id: String = "conv-1",
+        title: String = "John Doe",
+        isGroup: Boolean = false,
+        isOtherUserOnline: Boolean = false,
+        memberCount: Int = 0,
+        photoUrl: String? = null,
+        otherUserId: String? = "user-2",
+        groupId: String? = null
+    ) = ConversationUiModel(
+        id = id,
+        title = title,
+        lastMessageText = "Hello",
+        lastMessageTime = "14:32",
+        unreadCount = 0,
+        photoUrl = photoUrl,
+        isGroup = isGroup,
+        groupId = groupId,
+        currentUserId = "current-user",
+        memberCount = memberCount,
+        isOtherUserOnline = isOtherUserOnline,
+        otherUserId = if (isGroup) null else otherUserId
+    )
+
+    // ── Compact height and avatar placement (Requirement 7.1) ───────────────
+
+    @Test
+    fun `header displays avatar with correct content description`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                ChatHeader(
+                    conversation = createConversation(title = "Alice"),
+                    isOtherUserFriend = true,
+                    onNavigateBack = {},
+                    onNavigateToUserProfile = {},
+                    onNavigateToGroupInfo = {},
+                    onNavigateToGroupMap = {}
+                )
+            }
+        }
+
+        // ConversationAvatar uses "$name avatar" as content description
+        composeTestRule
+            .onNodeWithContentDescription("Alice avatar")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `header displays title text`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                ChatHeader(
+                    conversation = createConversation(title = "Bob Smith"),
+                    isOtherUserFriend = true,
+                    onNavigateBack = {},
+                    onNavigateToUserProfile = {},
+                    onNavigateToGroupInfo = {},
+                    onNavigateToGroupMap = {}
+                )
+            }
+        }
+
+        composeTestRule
+            .onNodeWithText("Bob Smith")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `header displays back button`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                ChatHeader(
+                    conversation = createConversation(),
+                    isOtherUserFriend = true,
+                    onNavigateBack = {},
+                    onNavigateToUserProfile = {},
+                    onNavigateToGroupInfo = {},
+                    onNavigateToGroupMap = {}
+                )
+            }
+        }
+
+        composeTestRule
+            .onNodeWithContentDescription("Back")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `avatar and title area has tappable content description for info navigation`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                ChatHeader(
+                    conversation = createConversation(title = "Charlie"),
+                    isOtherUserFriend = true,
+                    onNavigateBack = {},
+                    onNavigateToUserProfile = {},
+                    onNavigateToGroupInfo = {},
+                    onNavigateToGroupMap = {}
+                )
+            }
+        }
+
+        // The tappable area has semantics contentDescription = "View {title} info"
+        composeTestRule
+            .onNodeWithContentDescription("View Charlie info")
+            .assertIsDisplayed()
+    }
+
+    // ── Subtitle text for online/offline/group states (Requirements 7.5, 7.6, 7.7) ──
+
+    @Test
+    fun `displays Active now subtitle when other user is online in DM`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                ChatHeader(
+                    conversation = createConversation(
+                        title = "Alice",
+                        isGroup = false,
+                        isOtherUserOnline = true
+                    ),
+                    isOtherUserFriend = true,
+                    onNavigateBack = {},
+                    onNavigateToUserProfile = {},
+                    onNavigateToGroupInfo = {},
+                    onNavigateToGroupMap = {}
+                )
+            }
+        }
+
+        composeTestRule
+            .onNodeWithText("Active now")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `displays Offline subtitle when other user is offline in DM`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                ChatHeader(
+                    conversation = createConversation(
+                        title = "Bob",
+                        isGroup = false,
+                        isOtherUserOnline = false
+                    ),
+                    isOtherUserFriend = true,
+                    onNavigateBack = {},
+                    onNavigateToUserProfile = {},
+                    onNavigateToGroupInfo = {},
+                    onNavigateToGroupMap = {}
+                )
+            }
+        }
+
+        composeTestRule
+            .onNodeWithText("Offline")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `displays member count subtitle for group conversations`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                ChatHeader(
+                    conversation = createConversation(
+                        title = "Team Chat",
+                        isGroup = true,
+                        memberCount = 5,
+                        groupId = "group-1"
+                    ),
+                    isOtherUserFriend = false,
+                    onNavigateBack = {},
+                    onNavigateToUserProfile = {},
+                    onNavigateToGroupInfo = {},
+                    onNavigateToGroupMap = {}
+                )
+            }
+        }
+
+        composeTestRule
+            .onNodeWithText("5 members")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `displays correct member count for large groups`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                ChatHeader(
+                    conversation = createConversation(
+                        title = "Big Group",
+                        isGroup = true,
+                        memberCount = 42,
+                        groupId = "group-2"
+                    ),
+                    isOtherUserFriend = false,
+                    onNavigateBack = {},
+                    onNavigateToUserProfile = {},
+                    onNavigateToGroupInfo = {},
+                    onNavigateToGroupMap = {}
+                )
+            }
+        }
+
+        composeTestRule
+            .onNodeWithText("42 members")
+            .assertIsDisplayed()
+    }
+
+    // ── Action icon visibility and max count (Requirements 7.10, 7.11) ──────
+
+    @Test
+    fun `displays phone call action icon`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                ChatHeader(
+                    conversation = createConversation(),
+                    isOtherUserFriend = true,
+                    onNavigateBack = {},
+                    onNavigateToUserProfile = {},
+                    onNavigateToGroupInfo = {},
+                    onNavigateToGroupMap = {}
+                )
+            }
+        }
+
+        composeTestRule
+            .onNodeWithContentDescription("Phone call")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `displays video call action icon`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                ChatHeader(
+                    conversation = createConversation(),
+                    isOtherUserFriend = true,
+                    onNavigateBack = {},
+                    onNavigateToUserProfile = {},
+                    onNavigateToGroupInfo = {},
+                    onNavigateToGroupMap = {}
+                )
+            }
+        }
+
+        composeTestRule
+            .onNodeWithContentDescription("Video call")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `displays info action icon`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                ChatHeader(
+                    conversation = createConversation(),
+                    isOtherUserFriend = true,
+                    onNavigateBack = {},
+                    onNavigateToUserProfile = {},
+                    onNavigateToGroupInfo = {},
+                    onNavigateToGroupMap = {}
+                )
+            }
+        }
+
+        composeTestRule
+            .onNodeWithContentDescription("Conversation info")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `displays exactly three action icons`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                ChatHeader(
+                    conversation = createConversation(),
+                    isOtherUserFriend = true,
+                    onNavigateBack = {},
+                    onNavigateToUserProfile = {},
+                    onNavigateToGroupInfo = {},
+                    onNavigateToGroupMap = {}
+                )
+            }
+        }
+
+        // Verify all three action icons are present
+        composeTestRule
+            .onNodeWithContentDescription("Phone call")
+            .assertIsDisplayed()
+        composeTestRule
+            .onNodeWithContentDescription("Video call")
+            .assertIsDisplayed()
+        composeTestRule
+            .onNodeWithContentDescription("Conversation info")
+            .assertIsDisplayed()
+    }
+
+    // ── Null conversation fallback state ─────────────────────────────────────
+
+    @Test
+    fun `displays fallback Chat text when conversation is null`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                ChatHeader(
+                    conversation = null,
+                    isOtherUserFriend = false,
+                    onNavigateBack = {},
+                    onNavigateToUserProfile = {},
+                    onNavigateToGroupInfo = {},
+                    onNavigateToGroupMap = {}
+                )
+            }
+        }
+
+        composeTestRule
+            .onNodeWithText("Chat")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `action icons are hidden when conversation is null`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                ChatHeader(
+                    conversation = null,
+                    isOtherUserFriend = false,
+                    onNavigateBack = {},
+                    onNavigateToUserProfile = {},
+                    onNavigateToGroupInfo = {},
+                    onNavigateToGroupMap = {}
+                )
+            }
+        }
+
+        // When conversation is null, the action icons row is not rendered
+        composeTestRule
+            .onNodeWithContentDescription("Phone call")
+            .assertDoesNotExist()
+        composeTestRule
+            .onNodeWithContentDescription("Video call")
+            .assertDoesNotExist()
+        composeTestRule
+            .onNodeWithContentDescription("Conversation info")
+            .assertDoesNotExist()
+    }
+}

@@ -1,20 +1,15 @@
 package com.ovi.where.presentation.chat.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.border
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,9 +17,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
@@ -33,173 +28,159 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.ovi.where.core.theme.Dimens
 
 /**
- * Pill-shaped chat input bar with:
- * - Leading attachment icon
- * - Trailing location share icon
- * - Circular Accent Primary send button with scale-down on press
- * - Focus border: 1dp Divider → 1.5dp Accent Primary
+ * Messenger-style chat input bar with:
+ * - 24dp corner radius, surfaceContainerHigh background, no border
+ * - Circular send button (40dp, primary) visible only when text is non-empty
+ * - Camera + attachment icons on trailing edge when text is empty
+ * - Placeholder "Aa" in onSurfaceVariant
+ * - Multi-line expansion up to 5 lines, then scrolls internally
+ * - 8dp padding from screen edges and 8dp vertical from message list
  *
- * Requirements: 16.2, 16.4
+ * Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6
  */
 @Composable
 fun ChatInputBar(
     text: String,
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
-    onAttachment: () -> Unit,
-    onLocationSend: () -> Unit,
-    modifier: Modifier = Modifier,
-    isSendEnabled: Boolean = text.isNotBlank(),
-    sendButtonPressed: Boolean = false
+    onCameraTap: () -> Unit,
+    onAttachmentTap: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val hasText = text.isNotBlank()
 
-    // Animate border width: 1dp unfocused → 1.5dp focused
-    val borderWidth by animateDpAsState(
-        targetValue = if (isFocused) 1.5.dp else 1.dp,
-        animationSpec = tween(durationMillis = 150),
-        label = "borderWidth"
-    )
-
-    // Animate border color via alpha (Divider when unfocused, Accent Primary when focused)
-    val borderColor = if (isFocused) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.outlineVariant
+    // Calculate max height for 5 lines based on bodyLarge line height
+    val textStyle = MaterialTheme.typography.bodyLarge
+    val lineHeightDp = with(LocalDensity.current) {
+        (textStyle.lineHeight.value * density).toDp()
     }
-
-    // Send button scale-down on press
-    val sendScale by animateFloatAsState(
-        targetValue = if (sendButtonPressed) 0.85f else 1f,
-        animationSpec = tween(durationMillis = 100),
-        label = "sendScale"
-    )
+    // Approximate max height: 5 lines of text + vertical padding (8dp top + 8dp bottom inside field)
+    val maxFieldHeight = remember(lineHeightDp) { lineHeightDp * 5 + 16.dp }
 
     Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Dimens.spaceMedium, vertical = Dimens.spaceMedium),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom
         ) {
-            // Pill-shaped input field with attachment and location icons
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .border(
-                        width = borderWidth,
-                        color = borderColor,
-                        shape = RoundedCornerShape(999.dp)
-                    )
+            // Rounded text field container
+            Surface(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh
             ) {
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.Bottom
                 ) {
-                    Row(
+                    // Text input area
+                    BasicTextField(
+                        value = text,
+                        onValueChange = onTextChange,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Dimens.spaceSmall, vertical = Dimens.spaceSmall),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Leading attachment icon
-                        IconButton(
-                            onClick = onAttachment,
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AttachFile,
-                                contentDescription = "Attach file",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(Dimens.iconSizeMedium)
-                            )
-                        }
-
-                        // Text input
-                        BasicTextField(
-                            value = text,
-                            onValueChange = onTextChange,
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = Dimens.spaceMedium),
-                            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                color = MaterialTheme.colorScheme.onSurface
-                            ),
-                            singleLine = true,
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            interactionSource = interactionSource,
-                            decorationBox = { innerTextField ->
-                                Box {
-                                    if (text.isEmpty()) {
-                                        Text(
-                                            text = "Message",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    innerTextField()
+                            .weight(1f)
+                            .heightIn(max = maxFieldHeight),
+                        textStyle = textStyle.copy(
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        maxLines = 5,
+                        decorationBox = { innerTextField ->
+                            Box {
+                                if (text.isEmpty()) {
+                                    Text(
+                                        text = "Aa",
+                                        style = textStyle,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
+                                innerTextField()
                             }
-                        )
+                        }
+                    )
 
-                        // Trailing location share icon
-                        IconButton(
-                            onClick = onLocationSend,
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = "Share location",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(Dimens.iconSizeMedium)
-                            )
+                    // Trailing icons: camera + attachment when empty, nothing when has text
+                    // (send button is outside the text field container)
+                    AnimatedVisibility(
+                        visible = !hasText,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = onCameraTap,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.CameraAlt,
+                                    contentDescription = "Camera",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            IconButton(
+                                onClick = onAttachmentTap,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.AttachFile,
+                                    contentDescription = "Attach file",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            Spacer(Modifier.width(Dimens.spaceMedium))
-
-            // Circular Accent Primary send button with scale-down on press
+            // Send button — visible only when text is non-empty
             AnimatedVisibility(
-                visible = isSendEnabled,
+                visible = hasText,
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut()
+            ) {
+                Spacer(Modifier.width(8.dp))
+            }
+            AnimatedVisibility(
+                visible = hasText,
                 enter = fadeIn() + scaleIn(),
                 exit = fadeOut() + scaleOut()
             ) {
                 FloatingActionButton(
                     onClick = onSend,
                     modifier = Modifier
-                        .size(44.dp)
-                        .scale(sendScale)
+                        .size(40.dp)
                         .semantics { contentDescription = "Send message" },
                     shape = CircleShape,
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     elevation = FloatingActionButtonDefaults.elevation(
-                        defaultElevation = 2.dp,
-                        pressedElevation = 4.dp
+                        defaultElevation = 0.dp,
+                        pressedElevation = 2.dp
                     )
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Send,
+                        imageVector = Icons.AutoMirrored.Filled.Send,
                         contentDescription = null,
-                        modifier = Modifier.size(Dimens.iconSizeMedium)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

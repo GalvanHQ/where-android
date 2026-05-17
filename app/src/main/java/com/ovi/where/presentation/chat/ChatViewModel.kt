@@ -13,11 +13,13 @@ import com.ovi.where.data.location.LocationManager
 import com.ovi.where.data.remote.chat.ChatSocketIoClient
 import com.ovi.where.data.remote.chat.ServerFrame
 import com.ovi.where.data.local.dao.OnlineStatusDao
+import com.ovi.where.data.local.entity.OnlineStatusEntity
 import com.ovi.where.data.repository.MessageRepositoryImpl
 import com.ovi.where.domain.model.Message
 import com.ovi.where.domain.model.MessageStatus
 import com.ovi.where.domain.model.MessageType
 import com.ovi.where.domain.model.MemberRole
+import com.ovi.where.domain.model.ConversationType
 import com.ovi.where.domain.model.FriendshipStatus
 import com.ovi.where.domain.model.InteractionType
 import com.ovi.where.domain.repository.FriendshipRepository
@@ -39,6 +41,7 @@ import com.ovi.where.service.LocationTrackingService
 import com.ovi.where.presentation.model.ConversationUiModel
 import com.ovi.where.presentation.model.MessageUiModel
 import com.ovi.where.presentation.model.formatConversationTimestamp
+import com.ovi.where.presentation.model.formatDateSeparatorLabel
 import com.ovi.where.presentation.model.formatMessageDateKey
 import com.ovi.where.presentation.model.formatMessageTime
 import com.ovi.where.presentation.model.toUiModel
@@ -227,13 +230,16 @@ class ChatViewModel @Inject constructor(
                         dateKeyFormatter = ::formatMessageDateKey
                     )
                 }
+                // Compute message grouping metadata (Requirements 4.6, 4.7, 10.3)
+                val timestamps = windowedMessages.map { it.timestamp }
+                val groupedUiModels = computeMessageGrouping(uiModels, timestamps)
                 // Requirement 17.7 / 19.1: Pre-compute grouped messages by dateKey
                 // so the LazyColumn items block performs no inline grouping/sorting/formatting.
-                val grouped = uiModels.groupBy { it.dateKey }
+                val grouped = groupedUiModels.groupBy { it.dateKey }
                     .entries
                     .map { (key, msgs) -> key to msgs }
                 _uiState.value = _uiState.value.copy(
-                    messages = uiModels,
+                    messages = groupedUiModels,
                     groupedMessages = grouped,
                     isLoading = false,
                     // When messages are evicted, there are always more messages to paginate back to
@@ -256,6 +262,27 @@ class ChatViewModel @Inject constructor(
 
     // ─── Conversation Observation ─────────────────────────────────────────────
 
+    /** Cached resolved display names for DM participants (userId -> displayName). */
+    private val participantNames = mutableMapOf<String, String>()
+
+    /** Cached resolved profile photo URLs for DM participants (userId -> photoUrl). */
+    private val participantPhotos = mutableMapOf<String, String?>()
+
+    /**
+     * Tracks which user IDs are currently online (from presence frames).
+     * Used to populate isOtherUserOnline for DM conversations in real-time.
+     *
+     * Bug fix (Task 4.2): Without this, the chat header always shows "Offline" for DM
+     * conversations because onlineMembers is never populated and no presence subscription
+     * exists in ChatViewModel for the other user.
+     *
+     * Requirements: 1.2, 2.2
+     */
+    private val onlineUserIds = mutableSetOf<String>()
+
+    /** Whether presence subscription for DM has been started (to avoid duplicate subscriptions). */
+    private var dmPresenceSubscribed = false
+
     private fun loadConversation(conversationId: String) {
         viewModelScope.launch {
             val uid = currentUserId ?: ""
@@ -263,7 +290,30 @@ class ChatViewModel @Inject constructor(
             observeConversationsUseCase().collect { conversations ->
                 val conv = conversations.firstOrNull { it.id == conversationId }
                 if (conv != null) {
-                    val uiModel = conv.toUiModel(uid, ::formatConversationTimestamp)
+                    // For DIRECT conversations with blank name, resolve participant metadata
+                    if (conv.type == ConversationType.DIRECT && conv.name.isBlank()) {
+                        val otherUid = conv.participantIds.firstOrNull { it != uid }
+                        if (otherUid != null && otherUid !in participantNames) {
+                            resolveParticipantProfile(otherUid)
+                        }
+                    }
+
+                    // For DIRECT conversations, subscribe to presence for the other user (Task 4.2)
+                    if (conv.type == ConversationType.DIRECT && !dmPresenceSubscribed) {
+                        val otherUid = conv.participantIds.firstOrNull { it != uid }
+                        if (otherUid != null) {
+                            dmPresenceSubscribed = true
+                            subscribeToDmPresence(otherUid)
+                        }
+                    }
+
+                    val uiModel = conv.toUiModel(
+                        uid,
+                        ::formatConversationTimestamp,
+                        participantNames,
+                        participantPhotos,
+                        onlineUserIds
+                    )
                     _uiState.value = _uiState.value.copy(conversation = uiModel)
                     // Check friendship status for 1:1 conversations (Requirement 8.4)
                     if (!uiModel.isGroup && uiModel.otherUserId != null) {
@@ -277,6 +327,103 @@ class ChatViewModel @Inject constructor(
                         observeGroupMembersForMentions(uiModel.groupId)
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Subscribes to WebSocket presence frames for the other user in a DM conversation.
+     * Updates [onlineUserIds] in real-time and refreshes the conversation UI model
+     * so the chat header displays "Active now" or "Offline" correctly.
+     *
+     * Also loads the initial online status from [OnlineStatusDao] so the header
+     * shows the correct state immediately on screen open.
+     *
+     * Bug fix (Task 4.2): The existing observePresenceForOnlineCount() only handles
+     * group conversations. This method provides equivalent functionality for DMs.
+     *
+     * Requirements: 1.2, 2.2
+     */
+    private fun subscribeToDmPresence(otherUserId: String) {
+        val uid = currentUserId ?: return
+
+        // Load initial online status from Room (persisted presence state)
+        viewModelScope.launch {
+            try {
+                val isOnline = onlineStatusDao.isUserOnline(otherUserId) ?: false
+                if (isOnline) {
+                    onlineUserIds.add(otherUserId)
+                    refreshConversationOnlineStatus(uid)
+                }
+            } catch (_: Exception) {
+                // On failure, keep default offline state (safe default)
+            }
+        }
+
+        // Subscribe to real-time presence frames for the other user
+        viewModelScope.launch {
+            wsClient.incomingFrames.collect { frame ->
+                if (frame is ServerFrame.Presence && frame.userId == otherUserId) {
+                    val changed = if (frame.status == "online") {
+                        onlineUserIds.add(frame.userId)
+                    } else {
+                        onlineUserIds.remove(frame.userId)
+                    }
+                    if (changed) {
+                        // Persist to Room for offline access
+                        onlineStatusDao.upsert(
+                            OnlineStatusEntity(
+                                userId = frame.userId,
+                                isOnline = frame.status == "online",
+                                lastUpdatedAt = System.currentTimeMillis()
+                            )
+                        )
+                        refreshConversationOnlineStatus(uid)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Refreshes the conversation UI model's online status after a presence change.
+     * Re-creates the [ConversationUiModel] with the updated [onlineUserIds] set
+     * so the chat header reflects the current "Active now" / "Offline" state.
+     *
+     * Requirements: 1.2, 2.2
+     */
+    private fun refreshConversationOnlineStatus(currentUserId: String) {
+        val currentConv = _uiState.value.conversation ?: return
+        val otherUid = currentConv.otherUserId ?: return
+        val isOnline = otherUid in onlineUserIds
+        if (currentConv.isOtherUserOnline != isOnline) {
+            _uiState.value = _uiState.value.copy(
+                conversation = currentConv.copy(isOtherUserOnline = isOnline)
+            )
+        }
+    }
+
+    /**
+     * Resolves the display name and profile photo for a DM participant.
+     * Fetches the user profile from [UserRepository] and caches the result
+     * in [participantNames] and [participantPhotos].
+     *
+     * Bug fix (Task 3.2): Without this, the chat header shows "Unknown User" for DM
+     * conversations because the conversation name is blank and no participant name
+     * resolution happens in ChatViewModel.
+     *
+     * Requirements: 1.1, 2.1
+     */
+    private suspend fun resolveParticipantProfile(userId: String) {
+        when (val result = userRepository.getUser(userId)) {
+            is Resource.Success -> {
+                result.data?.let { user ->
+                    participantNames[user.id] = user.displayName
+                    participantPhotos[user.id] = user.photoUrl
+                }
+            }
+            else -> {
+                // Silently fail — will retry on next conversation update
             }
         }
     }
@@ -2322,6 +2469,72 @@ class ChatViewModel @Inject constructor(
         )
     }
 
+    // ─── Message Grouping Computation (Requirements 4.6, 4.7, 10.3) ──────────
+
+    /**
+     * Computes message grouping metadata for a list of MessageUiModels.
+     *
+     * Grouping rules:
+     * - Consecutive messages from the same sender within 2 minutes (120,000ms) form a group.
+     * - `isFirstInGroup` is true for the first message in each group.
+     * - `isLastInGroup` is true for the last message in each group.
+     * - `showDateSeparator` is true when the dateKey differs from the previous message (or for the first message).
+     * - `dateSeparatorLabel` is "Today", "Yesterday", or a formatted date string.
+     *
+     * The input list must be sorted by timestamp ascending.
+     *
+     * Requirements: 4.6, 4.7, 10.3
+     */
+    internal fun computeMessageGrouping(
+        messages: List<MessageUiModel>,
+        timestamps: List<Long>
+    ): List<MessageUiModel> {
+        if (messages.isEmpty()) return emptyList()
+
+        val result = mutableListOf<MessageUiModel>()
+
+        for (i in messages.indices) {
+            val current = messages[i]
+            val currentTimestamp = timestamps[i]
+            val prev = if (i > 0) messages[i - 1] else null
+            val prevTimestamp = if (i > 0) timestamps[i - 1] else null
+            val next = if (i < messages.size - 1) messages[i + 1] else null
+            val nextTimestamp = if (i < messages.size - 1) timestamps[i + 1] else null
+
+            // Determine if this message is in the same group as the previous message
+            val sameGroupAsPrev = prev != null && prevTimestamp != null &&
+                current.senderId == prev.senderId &&
+                (currentTimestamp - prevTimestamp) <= MESSAGE_GROUP_THRESHOLD_MS
+
+            // Determine if this message is in the same group as the next message
+            val sameGroupAsNext = next != null && nextTimestamp != null &&
+                current.senderId == next.senderId &&
+                (nextTimestamp - currentTimestamp) <= MESSAGE_GROUP_THRESHOLD_MS
+
+            val isFirstInGroup = !sameGroupAsPrev
+            val isLastInGroup = !sameGroupAsNext
+
+            // Date separator: show when dateKey differs from previous message or for the first message
+            val showDateSeparator = prev == null || current.dateKey != prev.dateKey
+            val dateSeparatorLabel = if (showDateSeparator) {
+                formatDateSeparatorLabel(current.dateKey, clock)
+            } else {
+                null
+            }
+
+            result.add(
+                current.copy(
+                    isFirstInGroup = isFirstInGroup,
+                    isLastInGroup = isLastInGroup,
+                    showDateSeparator = showDateSeparator,
+                    dateSeparatorLabel = dateSeparatorLabel
+                )
+            )
+        }
+
+        return result
+    }
+
     companion object {
         /** Number of messages to load on initial page and each subsequent page. */
         const val INITIAL_PAGE_SIZE = 30
@@ -2388,6 +2601,9 @@ class ChatViewModel @Inject constructor(
 
         /** Debounce delay for mention suggestion updates (Requirement 14.1: within 300ms). */
         const val MENTION_DEBOUNCE_MS = 300L
+
+        /** Maximum time difference (ms) between consecutive messages to form a group (Requirements 4.6, 4.7). */
+        const val MESSAGE_GROUP_THRESHOLD_MS = 120_000L
 
         /**
          * Formats the remaining time for the live location sharing banner.

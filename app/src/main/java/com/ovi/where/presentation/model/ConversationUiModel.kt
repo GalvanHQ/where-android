@@ -47,7 +47,13 @@ data class ConversationUiModel(
     val isLastMessageFromCurrentUser: Boolean = false
 )
 
-fun Conversation.toUiModel(currentUserId: String, timeFormatter: (Long) -> String): ConversationUiModel {
+fun Conversation.toUiModel(
+    currentUserId: String,
+    timeFormatter: (Long) -> String,
+    participantNames: Map<String, String> = emptyMap(),
+    participantPhotos: Map<String, String?> = emptyMap(),
+    onlineUserIds: Set<String> = emptySet()
+): ConversationUiModel {
     val unread = (unreadCounts[currentUserId] as? Int)
         ?: (unreadCounts[currentUserId] as? Long)?.toInt()
         ?: 0
@@ -55,16 +61,31 @@ fun Conversation.toUiModel(currentUserId: String, timeFormatter: (Long) -> Strin
         participantIds.firstOrNull { it != currentUserId }
     } else null
     val otherOnline = if (type == ConversationType.DIRECT && otherUid != null) {
-        otherUid in onlineMembers
+        otherUid in onlineUserIds || otherUid in onlineMembers
     } else false
     val isOwnLastMessage = lastMessageSenderId == currentUserId
+
+    val resolvedTitle = resolveConversationTitle(
+        name = name,
+        type = type,
+        otherUserId = otherUid,
+        participantNames = participantNames
+    )
+
+    // Resolve photo URL: for DMs with no photo, use the other participant's profile photo
+    val resolvedPhotoUrl = if (type == ConversationType.DIRECT && photoUrl.isNullOrBlank() && otherUid != null) {
+        participantPhotos[otherUid] ?: photoUrl
+    } else {
+        photoUrl
+    }
+
     return ConversationUiModel(
         id               = id,
-        title            = name.ifBlank { "Chat" },
+        title            = resolvedTitle,
         lastMessageText  = formatLastMessagePreview(lastMessageType, lastMessageText),
         lastMessageTime  = if (lastMessageTimestamp > 0) timeFormatter(lastMessageTimestamp) else "",
         unreadCount      = unread,
-        photoUrl         = photoUrl,
+        photoUrl         = resolvedPhotoUrl,
         isGroup          = type == ConversationType.GROUP,
         groupId          = groupId,
         currentUserId    = currentUserId,
@@ -77,6 +98,38 @@ fun Conversation.toUiModel(currentUserId: String, timeFormatter: (Long) -> Strin
         lastMessageStatus = if (isOwnLastMessage) lastMessageStatus else null,
         isLastMessageFromCurrentUser = isOwnLastMessage
     )
+}
+
+/**
+ * Resolves the display title for a conversation.
+ *
+ * Resolution order:
+ * 1. Use the conversation [name] if it is not blank.
+ * 2. For direct messages, resolve from [participantNames] using [otherUserId].
+ * 3. Fall back to "Unknown User" for direct messages or "Unnamed Group" for group conversations.
+ *
+ * The result is guaranteed to never be blank.
+ */
+internal fun resolveConversationTitle(
+    name: String,
+    type: ConversationType,
+    otherUserId: String?,
+    participantNames: Map<String, String> = emptyMap()
+): String {
+    // Use the conversation name if it's not blank
+    if (name.isNotBlank()) return name
+
+    // For DMs, try to resolve from participant metadata
+    if (type == ConversationType.DIRECT && otherUserId != null) {
+        val participantName = participantNames[otherUserId]
+        if (!participantName.isNullOrBlank()) return participantName
+    }
+
+    // Final fallback based on conversation type
+    return when (type) {
+        ConversationType.DIRECT -> "Unknown User"
+        ConversationType.GROUP -> "Unnamed Group"
+    }
 }
 
 /**
@@ -103,9 +156,12 @@ private fun formatLastMessagePreview(type: MessageType, text: String): String {
 fun Conversation.toUiModel(
     currentUserId: String,
     timeFormatter: (Long) -> String,
-    activeLocations: List<SharedLocation>
+    activeLocations: List<SharedLocation>,
+    participantNames: Map<String, String> = emptyMap(),
+    participantPhotos: Map<String, String?> = emptyMap(),
+    onlineUserIds: Set<String> = emptySet()
 ): ConversationUiModel {
-    val base = toUiModel(currentUserId, timeFormatter)
+    val base = toUiModel(currentUserId, timeFormatter, participantNames, participantPhotos, onlineUserIds)
 
     // Match active locations to this conversation by groupId
     val conversationLocations = if (groupId != null) {

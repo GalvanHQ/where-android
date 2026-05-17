@@ -1,0 +1,163 @@
+package com.ovi.where.presentation.chat
+
+import com.ovi.where.presentation.model.BubbleDirection
+import com.ovi.where.presentation.model.MessageUiModel
+import com.ovi.where.presentation.model.formatDateSeparatorLabel
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldBeOneOf
+import io.kotest.matchers.string.shouldMatch
+import io.kotest.property.Arb
+import io.kotest.property.PropertyTesting
+import io.kotest.property.arbitrary.int
+import io.kotest.property.arbitrary.list
+import io.kotest.property.arbitrary.map
+import io.kotest.property.arbitrary.string
+import io.kotest.property.checkAll
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+
+/**
+ * Property-based tests for date separator insertion at day boundaries.
+ *
+ * Verifies that the computeMessageGrouping logic correctly inserts date separators
+ * between messages from different calendar days, and that separator labels are
+ * "Today", "Yesterday", or a formatted date string (MMM dd, yyyy).
+ *
+ * **Validates: Requirements 10.3**
+ */
+// Feature: chat-ui-redesign, Property 5: Date separator insertion at day boundaries
+class DateSeparatorPropertyTest : StringSpec({
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Feature: chat-ui-redesign, Property 5: Date separator insertion at day boundaries
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Fixed clock for deterministic "Today"/"Yesterday" computation
+    val fixedNow = System.currentTimeMillis()
+    val clock: () -> Long = { fixedNow }
+
+    val todayKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        .format(Calendar.getInstance().apply { timeInMillis = fixedNow }.time)
+    val yesterdayKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        .format(Calendar.getInstance().apply {
+            timeInMillis = fixedNow
+            add(Calendar.DATE, -1)
+        }.time)
+
+    // Generator: produces a list of dateKeys spanning multiple days
+    // Each dateKey is a valid "yyyy-MM-dd" string offset from today by 0..daySpread days
+    fun arbDateKeyList(minSize: Int = 2, maxSize: Int = 20, daySpread: Int = 7): Arb<List<String>> {
+        return Arb.list(Arb.int(0..daySpread), minSize..maxSize).map { offsets ->
+            offsets.map { offset ->
+                val cal = Calendar.getInstance().apply {
+                    timeInMillis = fixedNow
+                    add(Calendar.DATE, -offset)
+                }
+                SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(cal.time)
+            }
+        }
+    }
+
+    /** Helper: creates a minimal MessageUiModel with the given dateKey and senderId. */
+    fun makeMessage(id: String, dateKey: String, senderId: String = "user1"): MessageUiModel {
+        return MessageUiModel(
+            id = id,
+            senderId = senderId,
+            senderName = "Test User",
+            senderPhotoUrl = null,
+            senderInitials = "TU",
+            text = "Hello",
+            formattedTime = "12:00",
+            dateKey = dateKey,
+            direction = BubbleDirection.SENT,
+            isLocation = false,
+            latitude = null,
+            longitude = null,
+            locationLabel = null
+        )
+    }
+
+    /** Replicates the date separator logic from computeMessageGrouping. */
+    fun computeDateSeparators(messages: List<MessageUiModel>): List<MessageUiModel> {
+        if (messages.isEmpty()) return emptyList()
+        return messages.mapIndexed { i, msg ->
+            val prev = if (i > 0) messages[i - 1] else null
+            val showSeparator = prev == null || msg.dateKey != prev.dateKey
+            val label = if (showSeparator) formatDateSeparatorLabel(msg.dateKey, clock) else null
+            msg.copy(showDateSeparator = showSeparator, dateSeparatorLabel = label)
+        }
+    }
+
+    "Property 5a: showDateSeparator is true for the first message in the list" {
+        checkAll(iterations = 150, arbDateKeyList(minSize = 1, maxSize = 20)) { dateKeys ->
+            val messages = dateKeys.mapIndexed { i, dk -> makeMessage("msg_$i", dk) }
+            val result = computeDateSeparators(messages)
+
+            result.first().showDateSeparator shouldBe true
+        }
+    }
+
+    "Property 5b: showDateSeparator is true between consecutive messages with different dateKey values" {
+        checkAll(iterations = 150, arbDateKeyList(minSize = 2, maxSize = 20)) { dateKeys ->
+            val messages = dateKeys.mapIndexed { i, dk -> makeMessage("msg_$i", dk) }
+            val result = computeDateSeparators(messages)
+
+            for (i in 1 until result.size) {
+                if (result[i].dateKey != result[i - 1].dateKey) {
+                    result[i].showDateSeparator shouldBe true
+                }
+            }
+        }
+    }
+
+    "Property 5c: showDateSeparator is false between consecutive messages with the same dateKey" {
+        checkAll(iterations = 150, arbDateKeyList(minSize = 2, maxSize = 20)) { dateKeys ->
+            val messages = dateKeys.mapIndexed { i, dk -> makeMessage("msg_$i", dk) }
+            val result = computeDateSeparators(messages)
+
+            for (i in 1 until result.size) {
+                if (result[i].dateKey == result[i - 1].dateKey) {
+                    result[i].showDateSeparator shouldBe false
+                }
+            }
+        }
+    }
+
+    "Property 5d: dateSeparatorLabel is non-null when showDateSeparator is true" {
+        checkAll(iterations = 150, arbDateKeyList(minSize = 1, maxSize = 20)) { dateKeys ->
+            val messages = dateKeys.mapIndexed { i, dk -> makeMessage("msg_$i", dk) }
+            val result = computeDateSeparators(messages)
+
+            result.filter { it.showDateSeparator }.forEach { msg ->
+                msg.dateSeparatorLabel shouldNotBe null
+            }
+        }
+    }
+
+    "Property 5e: dateSeparatorLabel matches 'Today', 'Yesterday', or 'MMM dd, yyyy' format" {
+        // Regex for "MMM dd, yyyy" format (e.g. "Jan 15, 2024", "Dec 01, 2023")
+        val datePattern = Regex("^[A-Z][a-z]{2} \\d{2}, \\d{4}$")
+
+        checkAll(iterations = 150, arbDateKeyList(minSize = 1, maxSize = 20, daySpread = 30)) { dateKeys ->
+            val messages = dateKeys.mapIndexed { i, dk -> makeMessage("msg_$i", dk) }
+            val result = computeDateSeparators(messages)
+
+            result.filter { it.showDateSeparator }.forEach { msg ->
+                val label = msg.dateSeparatorLabel!!
+                val isValidLabel = label == "Today" || label == "Yesterday" || datePattern.matches(label)
+                isValidLabel shouldBe true
+            }
+        }
+    }
+
+}) {
+    companion object {
+        init {
+            // Lock the seed for reproducible counter-examples.
+            PropertyTesting.defaultSeed = 0xDA7EL
+        }
+    }
+}

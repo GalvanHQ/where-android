@@ -7,6 +7,8 @@ data class GroupMemberUiModel(
     val id: String,
     val userId: String,
     val displayName: String,
+    val photoUrl: String? = null,
+    val isOnline: Boolean = false,
     val roleText: String,
     val isAdmin: Boolean,
     val isSharingLocation: Boolean

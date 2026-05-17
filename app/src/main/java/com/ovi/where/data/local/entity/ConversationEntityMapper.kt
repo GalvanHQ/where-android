@@ -6,8 +6,11 @@ import com.ovi.where.domain.model.MessageStatus
 import com.ovi.where.domain.model.MessageType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 private val json = Json { ignoreUnknownKeys = true }
@@ -27,7 +30,9 @@ fun ConversationEntity.toDomain(): Conversation {
         lastMessageStatus = parseMessageStatus(lastMessageStatus),
         unreadCounts = mapOf(id to unreadCount),
         mutedBy = parseMemberIdsJson(mutedByJson),
-        pinnedBy = parseMemberIdsJson(pinnedByJson)
+        pinnedBy = parseMemberIdsJson(pinnedByJson),
+        participantNames = parseStringMapJson(participantNamesJson),
+        participantPhotos = parseNullableStringMapJson(participantPhotosJson)
     )
 }
 
@@ -48,7 +53,9 @@ fun Conversation.toEntity(): ConversationEntity {
         mutedByJson = serializeMemberIds(mutedBy),
         pinnedByJson = serializeMemberIds(pinnedBy),
         lastSyncTimestamp = System.currentTimeMillis(),
-        documentUpdateTime = 0L
+        documentUpdateTime = 0L,
+        participantNamesJson = serializeStringMap(participantNames),
+        participantPhotosJson = serializeNullableStringMap(participantPhotos)
     )
 }
 
@@ -92,4 +99,52 @@ private fun serializeMemberIds(memberIds: List<String>): String {
     if (memberIds.isEmpty()) return "[]"
     val jsonArray = JsonArray(memberIds.map { JsonPrimitive(it) })
     return jsonArray.toString()
+}
+
+/**
+ * Parses a JSON object string into a Map<String, String>.
+ * Returns an empty map if the input is null, blank, or malformed.
+ */
+private fun parseStringMapJson(jsonString: String?): Map<String, String> {
+    if (jsonString.isNullOrBlank()) return emptyMap()
+    return try {
+        val jsonObject = json.parseToJsonElement(jsonString).jsonObject
+        jsonObject.mapValues { (_, value) -> value.jsonPrimitive.content }
+    } catch (_: Exception) {
+        emptyMap()
+    }
+}
+
+/**
+ * Parses a JSON object string into a Map<String, String?>.
+ * Values may be null (JSON null). Returns an empty map if the input is null, blank, or malformed.
+ */
+private fun parseNullableStringMapJson(jsonString: String?): Map<String, String?> {
+    if (jsonString.isNullOrBlank()) return emptyMap()
+    return try {
+        val jsonObject = json.parseToJsonElement(jsonString).jsonObject
+        jsonObject.mapValues { (_, value) -> value.jsonPrimitive.contentOrNull }
+    } catch (_: Exception) {
+        emptyMap()
+    }
+}
+
+/**
+ * Serializes a Map<String, String> to a JSON object string.
+ * Returns null if the map is empty.
+ */
+private fun serializeStringMap(map: Map<String, String>): String? {
+    if (map.isEmpty()) return null
+    val jsonObject = JsonObject(map.mapValues { (_, value) -> JsonPrimitive(value) })
+    return jsonObject.toString()
+}
+
+/**
+ * Serializes a Map<String, String?> to a JSON object string.
+ * Null values are serialized as JSON null. Returns null if the map is empty.
+ */
+private fun serializeNullableStringMap(map: Map<String, String?>): String? {
+    if (map.isEmpty()) return null
+    val jsonObject = JsonObject(map.mapValues { (_, value) -> JsonPrimitive(value) })
+    return jsonObject.toString()
 }

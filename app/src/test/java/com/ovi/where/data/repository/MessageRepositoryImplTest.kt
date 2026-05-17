@@ -337,6 +337,37 @@ class MessageRepositoryImplTest : StringSpec({
         }
     }
 
+    "incoming MessageDelivered frame from sender's own echo is skipped (no duplicate insert)" {
+        runTest {
+            coEvery { messageDao.insert(any()) } returns Unit
+
+            val repo = createRepo()
+
+            // Simulate the server echoing back the sender's own message as a MessageDelivered frame
+            // This is the bug condition: senderId == currentUserId ("user123")
+            val frame = ServerFrame.MessageDelivered(
+                id = "server-msg-echo",
+                conversationId = "conv1",
+                senderId = "user123", // Same as currentUser.uid
+                senderName = "Test User",
+                text = "My own message echoed back",
+                messageType = "TEXT",
+                timestamp = 3000L,
+                readBy = emptyList()
+            )
+            incomingFrames.emit(frame)
+
+            // Give time for the collector to process
+            delay(100)
+
+            // Verify that NO insert was called for the sender's own echo
+            // The message already exists from the optimistic insert during sendMessage()
+            coVerify(exactly = 0) {
+                messageDao.insert(match { it.id == "server-msg-echo" })
+            }
+        }
+    }
+
     // ─── Read Receipt Tests (Task 3.4) ─────────────────────────────────────────
 
     "markRead emits read event via ChatSocketIoClient when connected" {

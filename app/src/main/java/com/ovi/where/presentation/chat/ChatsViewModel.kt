@@ -14,6 +14,7 @@ import com.ovi.where.domain.model.Conversation
 import com.ovi.where.domain.model.ConversationType
 import com.ovi.where.domain.model.SharedLocation
 import com.ovi.where.domain.repository.ConversationRepository
+import com.ovi.where.domain.repository.UserRepository
 import com.ovi.where.domain.usecase.GetSuggestionsUseCase
 import com.ovi.where.domain.usecase.SearchChatsUseCase
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
@@ -51,6 +52,7 @@ class ChatsViewModel @Inject constructor(
     private val lazyChatSocketIoClient: Lazy<ChatSocketIoClient>,
     private val firebaseAuth: FirebaseAuth,
     private val conversationRepository: ConversationRepository,
+    private val userRepository: UserRepository,
     private val searchChatsUseCase: SearchChatsUseCase,
     private val recentSearchesStore: RecentSearchesStore,
     private val getSuggestionsUseCase: GetSuggestionsUseCase,
@@ -74,6 +76,12 @@ class ChatsViewModel @Inject constructor(
 
     /** Tracks which user IDs are currently online (from presence events). */
     private val onlineUserIds = mutableSetOf<String>()
+
+    /** Cached resolved display names for DM participants (userId -> displayName). */
+    private val participantNames = mutableMapOf<String, String>()
+
+    /** Cached resolved profile photo URLs for DM participants (userId -> photoUrl). */
+    private val participantPhotos = mutableMapOf<String, String?>()
 
     /** Active location sharing sessions visible to the current user (Req 3.6). */
     private var activeLocations: List<SharedLocation> = emptyList()
@@ -125,7 +133,7 @@ class ChatsViewModel @Inject constructor(
             recentSearches = recentSearches,
             suggestions = suggestions,
             searchResults = if (query.isBlank()) emptyList()
-            else results.map { it.toUiModel(uid, ::formatConversationTimestamp) },
+            else results.map { it.toUiModel(uid, ::formatConversationTimestamp, participantNames, participantPhotos, onlineUserIds) },
             showEmptyState = query.isNotBlank() && results.isEmpty() && allConversations.isNotEmpty()
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, SearchUiState())
@@ -173,6 +181,7 @@ class ChatsViewModel @Inject constructor(
                                     isLoading = false,
                                     errorMessage = null
                                 )
+                                resolveParticipantMetadata()
                                 applySearchFilter()
                             } else {
                                 // Cache empty: emit loading state within 100ms (Req 20.3)
@@ -202,6 +211,7 @@ class ChatsViewModel @Inject constructor(
                             isLoading = false,
                             errorMessage = null
                         )
+                        resolveParticipantMetadata()
                         applySearchFilter()
                     }
                     is DataResource.Error -> {
@@ -213,6 +223,7 @@ class ChatsViewModel @Inject constructor(
                             isLoading = false,
                             errorMessage = resource.throwable.message
                         )
+                        resolveParticipantMetadata()
                         applySearchFilter()
                     }
                 }
@@ -333,6 +344,7 @@ class ChatsViewModel @Inject constructor(
                             isRefreshing = false,
                             errorMessage = null
                         )
+                        resolveParticipantMetadata()
                         applySearchFilter()
                     }
                     is DataResource.Error -> {
@@ -342,6 +354,7 @@ class ChatsViewModel @Inject constructor(
                             isRefreshing = false,
                             errorMessage = resource.throwable.message
                         )
+                        resolveParticipantMetadata()
                         applySearchFilter()
                     }
                 }
@@ -351,21 +364,34 @@ class ChatsViewModel @Inject constructor(
 
     // ── Observation ─────────────────────────────────────────────────────────
 
+    /** Debounce job for presence-triggered UI updates (Req 1.14, 2.14). */
+    private var presenceDebounceJob: kotlinx.coroutines.Job? = null
+
     /**
      * Observes presence frames from ChatSocketIoClient to track online status
      * per conversation avatar (Requirement 9.7).
      * Persists presence state to Room for offline access (Requirement 6.3).
+     *
+     * Performance fix (Req 1.14, 2.14): Debounces presence-triggered re-renders by 500ms
+     * and uses distinctUntilChanged semantics to avoid unnecessary UI updates when the
+     * online status set hasn't actually changed. Only the affected conversation's online
+     * status is updated via [applyTargetedPresenceUpdate] rather than re-mapping the
+     * entire list on every presence change.
      */
     private fun observePresenceUpdates() {
         viewModelScope.launch {
             chatSocketIoClient.incomingFrames.collect { frame ->
                 if (frame is ServerFrame.Presence) {
-                    val changed = if (frame.status == "online") {
+                    val previousSnapshot = onlineUserIds.toSet()
+                    if (frame.status == "online") {
                         onlineUserIds.add(frame.userId)
                     } else {
                         onlineUserIds.remove(frame.userId)
                     }
-                    if (changed) {
+                    val currentSnapshot = onlineUserIds.toSet()
+
+                    // distinctUntilChanged: only proceed if the online set actually changed
+                    if (currentSnapshot != previousSnapshot) {
                         // Persist to Room for offline access (Req 6.3)
                         onlineStatusDao.upsert(
                             OnlineStatusEntity(
@@ -374,8 +400,86 @@ class ChatsViewModel @Inject constructor(
                                 lastUpdatedAt = System.currentTimeMillis()
                             )
                         )
-                        applySearchFilter()
+
+                        // Debounce presence-triggered re-renders by 500ms (Req 1.14, 2.14)
+                        // Uses targeted update instead of full applySearchFilter() re-map
+                        presenceDebounceJob?.cancel()
+                        presenceDebounceJob = viewModelScope.launch {
+                            delay(PRESENCE_DEBOUNCE_MS)
+                            applyTargetedPresenceUpdate(frame.userId, frame.status == "online")
+                        }
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * Performs a targeted presence update on the existing conversation UI model list.
+     * Only updates the `isOtherUserOnline` field for the specific conversation whose
+     * other participant matches [userId], avoiding a full list re-map (Req 1.14, 2.14).
+     *
+     * Falls back to [applySearchFilter] if the conversation list hasn't been built yet.
+     */
+    private fun applyTargetedPresenceUpdate(userId: String, isOnline: Boolean) {
+        val currentConversations = _uiState.value.conversations
+        if (currentConversations.isEmpty()) {
+            // List not yet built — fall back to full re-map
+            applySearchFilter()
+            return
+        }
+
+        // Find the conversation(s) where the affected user is the other participant
+        var updated = false
+        val updatedConversations = currentConversations.map { model ->
+            if (!model.isGroup && model.otherUserId == userId && model.isOtherUserOnline != isOnline) {
+                updated = true
+                model.copy(isOtherUserOnline = isOnline)
+            } else {
+                model
+            }
+        }
+
+        if (updated) {
+            _uiState.value = _uiState.value.copy(conversations = updatedConversations)
+        }
+    }
+
+    // ── Participant Metadata Resolution ─────────────────────────────────────
+
+    /**
+     * Resolves display names and profile photos for all direct message conversation participants.
+     * Results are cached locally in [participantNames] and [participantPhotos] to avoid repeated lookups.
+     * Only fetches metadata for user IDs not already in the cache.
+     *
+     * Bug fix: Without this, toUiModel() receives empty participantNames map and DM conversations
+     * display "Unknown User" instead of the other participant's actual display name.
+     */
+    private fun resolveParticipantMetadata() {
+        val uid = currentUserId ?: return
+        // Collect all other-participant user IDs from direct message conversations
+        val dmParticipantIds = allConversations
+            .filter { it.type == ConversationType.DIRECT }
+            .flatMap { it.participantIds }
+            .filter { it != uid }
+            .distinct()
+
+        // Only resolve IDs not already cached
+        val unresolvedIds = dmParticipantIds.filter { it !in participantNames }
+        if (unresolvedIds.isEmpty()) return
+
+        viewModelScope.launch {
+            when (val result = userRepository.getUsers(unresolvedIds)) {
+                is Resource.Success -> {
+                    result.data?.forEach { user ->
+                        participantNames[user.id] = user.displayName
+                        participantPhotos[user.id] = user.photoUrl
+                    }
+                    // Re-apply filter with newly resolved metadata
+                    applySearchFilter()
+                }
+                else -> {
+                    // Silently fail — will retry on next conversation list update
                 }
             }
         }
@@ -489,7 +593,7 @@ class ChatsViewModel @Inject constructor(
         }
 
         val uiModels = filtered.map { conversation ->
-            conversation.toUiModel(uid, ::formatConversationTimestamp, activeLocations)
+            conversation.toUiModel(uid, ::formatConversationTimestamp, activeLocations, participantNames, participantPhotos, onlineUserIds)
         }
 
         // Sort: pinned conversations at top (timestamp sort within pinned group),
@@ -573,12 +677,14 @@ class ChatsViewModel @Inject constructor(
     // ── Delete Conversation ─────────────────────────────────────────────────
 
     /**
-     * Deletes a conversation from the local database.
-     * Removes it from Room so it disappears from the list immediately.
+     * Soft-deletes a conversation by adding the current user's ID to the Firestore
+     * `deletedBy` array and removing from local Room for immediate UI feedback.
+     * The conversation will not reappear on next sync because the Firestore listener
+     * filters out conversations where the current user is in `deletedBy` (Req 1.7, 2.7).
      */
     fun deleteConversation(conversationId: String) {
         viewModelScope.launch {
-            conversationRepository.deleteConversation(conversationId)
+            conversationRepository.softDeleteConversation(conversationId)
         }
     }
 
@@ -679,8 +785,10 @@ class ChatsViewModel @Inject constructor(
     }
 
     /**
-     * Archives a conversation (Req 24.3).
-     * Removes it from the active conversation list.
+     * Archives a conversation (Req 1.6, 2.6).
+     * Persists archive to Firestore and removes from the active conversation list immediately.
+     * The conversation will not reappear on sync because the Firestore listener
+     * filters out conversations where the current user is in `archivedBy`.
      */
     fun archiveConversation(conversationId: String) {
         viewModelScope.launch {
@@ -702,6 +810,12 @@ class ChatsViewModel @Inject constructor(
          * After this duration, loading state is dismissed and empty list is shown (Req 20.3).
          */
         const val NETWORK_FETCH_TIMEOUT_MS = 10_000L
+
+        /**
+         * Debounce interval for presence-triggered UI updates (Req 1.14, 2.14).
+         * Rapid presence changes within this window are coalesced into a single re-render.
+         */
+        const val PRESENCE_DEBOUNCE_MS = 500L
     }
 }
 

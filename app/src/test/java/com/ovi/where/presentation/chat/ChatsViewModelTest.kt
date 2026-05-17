@@ -10,6 +10,7 @@ import com.ovi.where.data.remote.chat.ServerFrame
 import com.ovi.where.domain.model.Conversation
 import com.ovi.where.domain.model.ConversationType
 import com.ovi.where.domain.repository.ConversationRepository
+import com.ovi.where.domain.repository.UserRepository
 import com.ovi.where.domain.usecase.GetSuggestionsUseCase
 import com.ovi.where.domain.usecase.SearchChatsUseCase
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
@@ -42,6 +43,7 @@ class ChatsViewModelTest : StringSpec({
     lateinit var firebaseAuth: FirebaseAuth
     lateinit var firebaseUser: FirebaseUser
     lateinit var conversationRepository: ConversationRepository
+    lateinit var userRepository: UserRepository
     lateinit var searchChatsUseCase: SearchChatsUseCase
     lateinit var recentSearchesStore: RecentSearchesStore
     lateinit var getSuggestionsUseCase: GetSuggestionsUseCase
@@ -61,6 +63,7 @@ class ChatsViewModelTest : StringSpec({
         firebaseAuth = mockk(relaxed = true)
         firebaseUser = mockk(relaxed = true)
         conversationRepository = mockk(relaxed = true)
+        userRepository = mockk(relaxed = true)
         searchChatsUseCase = mockk(relaxed = true)
         recentSearchesStore = mockk(relaxed = true)
         getSuggestionsUseCase = mockk(relaxed = true)
@@ -108,6 +111,7 @@ class ChatsViewModelTest : StringSpec({
         dagger.Lazy { chatSocketIoClient },
         firebaseAuth,
         conversationRepository,
+        userRepository,
         searchChatsUseCase,
         recentSearchesStore,
         getSuggestionsUseCase,

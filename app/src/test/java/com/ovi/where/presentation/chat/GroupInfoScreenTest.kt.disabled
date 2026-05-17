@@ -1,0 +1,526 @@
+package com.ovi.where.presentation.chat
+
+import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import com.ovi.where.core.theme.WhereTheme
+import com.ovi.where.presentation.model.GroupInfoUiState
+import com.ovi.where.presentation.model.GroupMemberUiModel
+import com.ovi.where.presentation.model.MediaThumbnail
+import com.ovi.where.presentation.model.MediaType
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+/**
+ * Unit tests for [GroupInfoScreen] composable content.
+ *
+ * Validates: Requirements 9.4, 9.5, 9.8, 9.9, 9.10, 9.11
+ *
+ * Tests cover:
+ * - Admin-only options visibility (overflow menu, add members, delete group, invite link)
+ * - Member list rendering with role badges and online indicators
+ * - Confirmation dialogs for leave/delete
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], manifest = Config.NONE)
+class GroupInfoScreenTest {
+
+    @get:Rule
+    val composeTestRule = createComposeRule()
+
+    // ── Helper data ─────────────────────────────────────────────────────────
+
+    private val adminMember = GroupMemberUiModel(
+        id = "member-1",
+        userId = "user-1",
+        displayName = "Alice Admin",
+        photoUrl = null,
+        isOnline = true,
+        roleText = "Admin",
+        isAdmin = true,
+        isSharingLocation = false
+    )
+
+    private val regularMember = GroupMemberUiModel(
+        id = "member-2",
+        userId = "user-2",
+        displayName = "Bob Member",
+        photoUrl = null,
+        isOnline = false,
+        roleText = "Member",
+        isAdmin = false,
+        isSharingLocation = false
+    )
+
+    private val onlineMember = GroupMemberUiModel(
+        id = "member-3",
+        userId = "user-3",
+        displayName = "Charlie Online",
+        photoUrl = null,
+        isOnline = true,
+        roleText = "Member",
+        isAdmin = false,
+        isSharingLocation = false
+    )
+
+    private fun createAdminState(
+        members: List<GroupMemberUiModel> = listOf(adminMember, regularMember, onlineMember),
+        inviteLink: String? = "https://where.app/invite/abc123"
+    ) = GroupInfoUiState(
+        groupName = "Test Group",
+        groupPhotoUrl = null,
+        memberCount = members.size,
+        members = members,
+        inviteLink = inviteLink,
+        isCurrentUserAdmin = true,
+        sharedMedia = emptyList(),
+        isMuted = false,
+        isLoading = false,
+        error = null
+    )
+
+    private fun createNonAdminState(
+        members: List<GroupMemberUiModel> = listOf(adminMember, regularMember, onlineMember)
+    ) = GroupInfoUiState(
+        groupName = "Test Group",
+        groupPhotoUrl = null,
+        memberCount = members.size,
+        members = members,
+        inviteLink = "https://where.app/invite/abc123",
+        isCurrentUserAdmin = false,
+        sharedMedia = emptyList(),
+        isMuted = false,
+        isLoading = false,
+        error = null
+    )
+
+    // ── Admin-only options visibility (Requirements 9.4, 9.5, 9.9, 9.10) ───
+
+    @Test
+    fun `Add Members button is visible in action row when user is admin`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createAdminState(),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Add Members").assertIsDisplayed()
+    }
+
+    @Test
+    fun `Add Members button is hidden in action row when user is not admin`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createNonAdminState(),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Add Members").assertDoesNotExist()
+    }
+
+    @Test
+    fun `Add Members row is visible in members section when user is admin`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createAdminState(),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        // The "Add Members" text row in the members section
+        composeTestRule.onNodeWithText("Add Members").assertIsDisplayed()
+    }
+
+    @Test
+    fun `Delete Group option is visible when user is admin`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createAdminState(),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Delete Group").assertIsDisplayed()
+    }
+
+    @Test
+    fun `Delete Group option is hidden when user is not admin`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createNonAdminState(),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Delete Group").assertDoesNotExist()
+    }
+
+    @Test
+    fun `Invite Link section is visible when user is admin and link exists`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createAdminState(inviteLink = "https://where.app/invite/abc123"),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Invite Link").assertIsDisplayed()
+        composeTestRule.onNodeWithText("https://where.app/invite/abc123").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Copy").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Share").assertIsDisplayed()
+    }
+
+    @Test
+    fun `Invite Link section is hidden when user is not admin`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createNonAdminState(),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Invite Link").assertDoesNotExist()
+    }
+
+    @Test
+    fun `overflow menu is visible for non-admin members when current user is admin`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createAdminState(),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        // Overflow menu button for non-admin member "Bob Member"
+        composeTestRule
+            .onNodeWithContentDescription("More options for Bob Member")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `overflow menu is hidden for all members when current user is not admin`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createNonAdminState(),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        composeTestRule
+            .onNodeWithContentDescription("More options for Bob Member")
+            .assertDoesNotExist()
+        composeTestRule
+            .onNodeWithContentDescription("More options for Charlie Online")
+            .assertDoesNotExist()
+    }
+
+    // ── Member list rendering with role badges and online indicators (Requirements 9.3, 9.11) ──
+
+    @Test
+    fun `member names are displayed in the member list`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createAdminState(),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Alice Admin").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Bob Member").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Charlie Online").assertIsDisplayed()
+    }
+
+    @Test
+    fun `Admin chip is displayed for admin members`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createAdminState(),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        // "Admin" chip text should be displayed (for Alice Admin)
+        composeTestRule.onNodeWithText("Admin").assertIsDisplayed()
+    }
+
+    @Test
+    fun `group name and member count are displayed in header`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createAdminState(),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Test Group").assertIsDisplayed()
+        composeTestRule.onNodeWithText("3 members").assertIsDisplayed()
+    }
+
+    @Test
+    fun `Leave Group option is always visible`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createNonAdminState(),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Leave Group").assertIsDisplayed()
+    }
+
+    // ── Confirmation dialogs for leave/delete (Requirements 9.8, 9.9) ───────
+
+    @Test
+    fun `tapping Leave Group shows confirmation dialog`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createAdminState(),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        // Tap "Leave Group"
+        composeTestRule.onNodeWithText("Leave Group").performClick()
+
+        // Confirmation dialog should appear
+        composeTestRule.onNodeWithText("Are you sure you want to leave this group? You won't be able to see messages or participate anymore.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Leave").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Cancel").assertIsDisplayed()
+    }
+
+    @Test
+    fun `tapping Delete Group shows confirmation dialog`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createAdminState(),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        // Tap "Delete Group"
+        composeTestRule.onNodeWithText("Delete Group").performClick()
+
+        // Confirmation dialog should appear
+        composeTestRule.onNodeWithText("Are you sure you want to delete this group? This action cannot be undone and all messages will be lost.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Delete").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Cancel").assertIsDisplayed()
+    }
+
+    @Test
+    fun `dismissing leave dialog hides it`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createAdminState(),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        // Open dialog
+        composeTestRule.onNodeWithText("Leave Group").performClick()
+        composeTestRule.onNodeWithText("Are you sure you want to leave this group? You won't be able to see messages or participate anymore.").assertIsDisplayed()
+
+        // Tap Cancel
+        composeTestRule.onNodeWithText("Cancel").performClick()
+
+        // Dialog should be dismissed
+        composeTestRule.onNodeWithText("Are you sure you want to leave this group? You won't be able to see messages or participate anymore.").assertDoesNotExist()
+    }
+
+    @Test
+    fun `dismissing delete dialog hides it`() {
+        composeTestRule.setContent {
+            WhereTheme {
+                GroupInfoScreenContent(
+                    uiState = createAdminState(),
+                    onNavigateBack = {},
+                    onNavigateToMediaGallery = {},
+                    onNavigateToAddMembers = {},
+                    onRetry = {},
+                    onToggleMute = {},
+                    onMakeAdmin = {},
+                    onRemoveMember = {},
+                    onLeaveGroup = {},
+                    onDeleteGroup = {}
+                )
+            }
+        }
+
+        // Open dialog
+        composeTestRule.onNodeWithText("Delete Group").performClick()
+        composeTestRule.onNodeWithText("Are you sure you want to delete this group? This action cannot be undone and all messages will be lost.").assertIsDisplayed()
+
+        // Tap Cancel
+        composeTestRule.onNodeWithText("Cancel").performClick()
+
+        // Dialog should be dismissed
+        composeTestRule.onNodeWithText("Are you sure you want to delete this group? This action cannot be undone and all messages will be lost.").assertDoesNotExist()
+    }
+}

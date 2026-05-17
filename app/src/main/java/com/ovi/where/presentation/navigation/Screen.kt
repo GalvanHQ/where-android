@@ -81,6 +81,22 @@ sealed class Screen(val route: String) {
         }
     }
 
+    @Serializable
+    data class ConversationInfo(val conversationId: String) : Screen("conversation_info/${conversationId}") {
+        companion object {
+            const val ROUTE = "conversation_info/{conversationId}"
+            fun createRoute(conversationId: String) = "conversation_info/$conversationId"
+        }
+    }
+
+    @Serializable
+    data class GroupInfo(val groupId: String) : Screen("group_info/${groupId}") {
+        companion object {
+            const val ROUTE = "group_info/{groupId}"
+            fun createRoute(groupId: String) = "group_info/$groupId"
+        }
+    }
+
     // ── People routes ─────────────────────────────────────────────────────────
 
     @Serializable

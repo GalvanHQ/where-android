@@ -920,8 +920,44 @@ class MessageRepositoryImpl @Inject constructor(
     /**
      * Handles incoming messages from other users (delivered via Socket.IO).
      * Inserts into Room (upsert handles deduplication via PK constraint).
+     *
+     * If the sender is the current user, skip the insert — the message already
+     * exists locally from the optimistic insert. The handleAck() will update
+     * the temp ID to the server ID. This prevents message duplication when the
+     * server echoes the sender's own message back as a MessageDelivered frame.
+     * (Requirement 1.13, 2.13)
      */
     private suspend fun handleIncomingMessage(frame: ServerFrame.MessageDelivered) {
+        // Skip sender's own messages — already exists from optimistic insert
+        val currentUserId = firebaseAuth.currentUser?.uid
+        if (frame.senderId == currentUserId) {
+            Timber.d("Skipping own message echo: id=${frame.id}, senderId=${frame.senderId}")
+            return
+        }
+
+        // Secondary deduplication safeguard: check if a message with same conversationId,
+        // senderId, text, and timestamp (within 1-second tolerance) already exists in Room.
+        // If found, update existing row's ID to server ID instead of inserting a new row.
+        // (Requirement 1.13, 2.13)
+        val timestampTolerance = 1000L // 1-second tolerance
+        val existingDuplicate = messageDao.findDuplicate(
+            conversationId = frame.conversationId,
+            senderId = frame.senderId,
+            text = frame.text,
+            timestampLow = frame.timestamp - timestampTolerance,
+            timestampHigh = frame.timestamp + timestampTolerance
+        )
+        if (existingDuplicate != null && existingDuplicate.id != frame.id) {
+            Timber.d("Deduplication: updating existing message ${existingDuplicate.id} to server ID ${frame.id}")
+            messageDao.updateIdAndStatus(
+                oldId = existingDuplicate.id,
+                newId = frame.id,
+                status = MessageStatus.SENT.name,
+                timestamp = frame.timestamp
+            )
+            return
+        }
+
         val entity = MessageEntity(
             id = frame.id,
             conversationId = frame.conversationId,

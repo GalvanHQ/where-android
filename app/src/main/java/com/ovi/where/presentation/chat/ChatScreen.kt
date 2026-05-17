@@ -1,7 +1,6 @@
 package com.ovi.where.presentation.chat
 
 import android.Manifest
-import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -33,17 +33,12 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -62,7 +57,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -75,7 +69,6 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
-import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -83,6 +76,10 @@ import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.LocalReducedMotion
 import com.ovi.where.presentation.chat.components.AnimatedMessageBubble
+import com.ovi.where.presentation.chat.components.ChatBubble
+import com.ovi.where.presentation.chat.components.ChatEmptyState
+import com.ovi.where.presentation.chat.components.ChatInputBar
+import com.ovi.where.presentation.chat.components.DateSeparator
 import com.ovi.where.presentation.chat.components.MessageAnimationConstants
 import com.ovi.where.presentation.chat.components.NewMessageIndicator
 import com.ovi.where.presentation.chat.components.QueuedForSyncBanner
@@ -95,6 +92,7 @@ import com.ovi.where.presentation.chat.components.LinkableText
 import com.ovi.where.presentation.chat.components.ReactionPickerOverlay
 import com.ovi.where.presentation.chat.components.ReactionBadges
 import com.ovi.where.presentation.chat.components.ReadReceiptIndicator
+import com.ovi.where.presentation.chat.components.MessageStatusIndicator
 import com.ovi.where.presentation.chat.components.TypingIndicator
 import com.ovi.where.presentation.chat.components.ReconnectionBanner
 import com.ovi.where.presentation.chat.components.ImageMessageBubble
@@ -105,9 +103,6 @@ import com.ovi.where.core.utils.showToast
 import com.ovi.where.domain.model.MessageStatus
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * ChatScreen — Individual conversation view with DESIGN.md-compliant bubble styling.
@@ -135,6 +130,7 @@ fun ChatScreen(
     onNavigateToGroupMap: (String) -> Unit = {},
     onNavigateToEditGroup: (String) -> Unit = {},
     onNavigateToMediaGallery: (String) -> Unit = {},
+    onNavigateToConversationInfo: (String) -> Unit = {},
     viewModel: ChatViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -336,6 +332,7 @@ fun ChatScreen(
                 onNavigateBack = onNavigateBack,
                 onNavigateToUserProfile = onNavigateToUserProfile,
                 onNavigateToGroupInfo = onNavigateToGroupInfo,
+                onNavigateToConversationInfo = onNavigateToConversationInfo,
                 onNavigateToGroupMap = onNavigateToGroupMap,
                 onNavigateToEditGroup = onNavigateToEditGroup,
                 onNavigateToMediaGallery = onNavigateToMediaGallery,
@@ -414,22 +411,14 @@ fun ChatScreen(
                     // Find the index of this message in the flat message list
                     val messageIndex = uiState.messages.indexOfFirst { it.id == targetMessageId }
                     if (messageIndex >= 0) {
-                        // Account for date separators and pagination items in the LazyColumn
-                        // We need to find the actual LazyColumn item index
-                        // Since messages are grouped by date, calculate the offset
-                        // Use pre-computed groupedMessages (Requirement 17.7)
+                        // Account for date separators and pagination items in the LazyColumn.
+                        // Each message with showDateSeparator=true adds an extra item before it.
                         var lazyColumnIndex = 0
-                        var found = false
-                        for ((_, messages) in uiState.groupedMessages) {
-                            lazyColumnIndex++ // date separator item
-                            for (msg in messages) {
-                                if (msg.id == targetMessageId) {
-                                    found = true
-                                    break
-                                }
-                                lazyColumnIndex++
-                            }
-                            if (found) break
+                        for (i in 0 until uiState.messages.size) {
+                            val msg = uiState.messages[i]
+                            if (msg.showDateSeparator) lazyColumnIndex++ // date separator item
+                            if (msg.id == targetMessageId) break
+                            lazyColumnIndex++ // message item
                         }
                         // Add offset for pagination loading/error items at top
                         if (uiState.isLoadingMore) lazyColumnIndex++
@@ -444,6 +433,9 @@ fun ChatScreen(
             Box(modifier = Modifier.weight(1f)) {
                 if (uiState.isLoading) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                } else if (uiState.messages.isEmpty()) {
+                    // Requirement 10.5: Centered empty state with illustration and "Say hi!" prompt
+                    ChatEmptyState(modifier = Modifier.align(Alignment.Center))
                 } else {
                     // Stable lambda references (Requirement 17.4, 19.6):
                     // Pre-create remembered lambdas outside the items block to avoid
@@ -471,8 +463,7 @@ fun ChatScreen(
                         contentPadding = PaddingValues(
                             horizontal = Dimens.spaceLarge,
                             vertical = Dimens.spaceMedium
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
+                        )
                     ) {
                         // ── Pagination loading indicator at top (Requirement 2.3) ──
                         // Requirement 19.1: Unique contentType "pagination_indicator" and stable key
@@ -524,88 +515,92 @@ fun ChatScreen(
                             }
                         }
 
-                        // ── Messages grouped by date ──────────────────────────────
-                        // Requirement 17.7 / 19.1: Use pre-computed groupedMessages from ViewModel.
-                        // No inline collection grouping/sorting/formatting in items block.
-                        uiState.groupedMessages.forEach { (dateKey, messages) ->
-                            // Requirement 17.3 / 19.1: Unique contentType "date_separator" and stable key
-                            item(
-                                key = "date_separator_$dateKey",
-                                contentType = "date_separator"
-                            ) {
-                                DateSeparator(date = formatDateHeader(dateKey))
+                        // ── Messages with ChatBubble and grouping (Requirements 4.1-4.9, 10.3, 10.4) ──
+                        // Flat iteration over messages using per-message grouping metadata.
+                        // Date separators are inserted based on showDateSeparator flag.
+                        // Spacing: 2dp between grouped messages, 8dp for non-grouped.
+                        items(
+                            items = uiState.messages,
+                            key = { it.id },
+                            contentType = { msg ->
+                                when {
+                                    msg.isVoice -> "voice_bubble"
+                                    msg.isImage -> "image_bubble"
+                                    msg.isLocation -> "location_bubble"
+                                    else -> "text_bubble"
+                                }
                             }
-                            // Requirement 17.3 / 19.1: contentType "message_bubble" and key by message ID
-                            // Requirement 19.6: animateItem modifier on each message item
-                            items(
-                                items = messages,
-                                key = { it.id },
-                                contentType = { msg ->
-                                    when {
-                                        msg.isVoice -> "voice_bubble"
-                                        msg.isImage -> "image_bubble"
-                                        msg.isLocation -> "location_bubble"
-                                        else -> "text_bubble"
-                                    }
-                                }
-                            ) { message ->
-                                // Determine if this message is a search result and if it's the current focused result
-                                val isSearchHighlighted = searchQuery != null &&
-                                        searchResultIds.contains(message.id)
-                                val isCurrentSearchResult = searchQuery != null &&
-                                        currentSearchResultIndex >= 0 &&
-                                        currentSearchResultIndex < searchResultIds.size &&
-                                        searchResultIds[currentSearchResultIndex] == message.id
+                        ) { message ->
+                            // Determine if this message is a search result and if it's the current focused result
+                            val isSearchHighlighted = searchQuery != null &&
+                                    searchResultIds.contains(message.id)
+                            val isCurrentSearchResult = searchQuery != null &&
+                                    currentSearchResultIndex >= 0 &&
+                                    currentSearchResultIndex < searchResultIds.size &&
+                                    searchResultIds[currentSearchResultIndex] == message.id
 
-                                // Requirement 17.4 / 19.6: Stable lambda references via remember
-                                // to avoid allocating new lambdas inside the item scope.
-                                val onReply = remember(message.id) {
+                            // Requirement 17.4 / 19.6: Stable lambda references via remember
+                            val onReply = remember(message.id) {
+                                {
+                                    viewModel.setReplyingTo(message)
+                                    try {
+                                        inputFocusRequester.requestFocus()
+                                    } catch (_: Exception) {}
+                                    Unit
+                                }
+                            }
+
+                            // Task 19.1, Requirement 27.1: Long-press (500ms) → show ReactionPickerOverlay
+                            val onLongPress = remember(message.id) {
+                                { viewModel.showReactionPicker(message.id) }
+                            }
+
+                            // Task 19.1, Requirement 27.5: Retry on FAILED image messages
+                            val onRetryMessage = remember(message.id) {
+                                { viewModel.retryMessage(message.id) }
+                            }
+
+                            // Task 19.1: Reaction badge tap toggles reaction
+                            val onReactionTapHandler = remember(message.id) {
+                                { emoji: String -> viewModel.toggleReaction(message.id, emoji) }
+                            }
+
+                            val onVoicePlayPause = remember(message.id, message.voiceUrl, message.voiceDurationMs) {
+                                if (message.isVoice && message.voiceUrl != null && message.voiceDurationMs != null) {
                                     {
-                                        viewModel.setReplyingTo(message)
-                                        try {
-                                            inputFocusRequester.requestFocus()
-                                        } catch (_: Exception) {}
-                                        Unit
+                                        viewModel.toggleVoicePlayback(
+                                            messageId = message.id,
+                                            audioUrl = message.voiceUrl,
+                                            durationMs = message.voiceDurationMs
+                                        )
                                     }
+                                } else null
+                            }
+
+                            val onVoiceSeek = remember(message.id, message.voiceDurationMs) {
+                                if (message.isVoice && message.voiceDurationMs != null) {
+                                    { progress: Float ->
+                                        viewModel.seekVoiceMessage(
+                                            messageId = message.id,
+                                            progress = progress,
+                                            durationMs = message.voiceDurationMs
+                                        )
+                                    }
+                                } else null
+                            }
+
+                            Column {
+                                // Date separator above this message if day boundary (Requirement 10.3, 10.4)
+                                if (message.showDateSeparator && message.dateSeparatorLabel != null) {
+                                    DateSeparator(label = message.dateSeparatorLabel)
                                 }
 
-                                // Task 19.1, Requirement 27.1: Long-press (500ms) → show ReactionPickerOverlay
-                                val onLongPress = remember(message.id) {
-                                    { viewModel.showReactionPicker(message.id) }
-                                }
-
-                                // Task 19.1, Requirement 27.5: Retry on FAILED image messages
-                                val onRetryMessage = remember(message.id) {
-                                    { viewModel.retryMessage(message.id) }
-                                }
-
-                                // Task 19.1: Reaction badge tap toggles reaction
-                                val onReactionTapHandler = remember(message.id) {
-                                    { emoji: String -> viewModel.toggleReaction(message.id, emoji) }
-                                }
-
-                                val onVoicePlayPause = remember(message.id, message.voiceUrl, message.voiceDurationMs) {
-                                    if (message.isVoice && message.voiceUrl != null && message.voiceDurationMs != null) {
-                                        {
-                                            viewModel.toggleVoicePlayback(
-                                                messageId = message.id,
-                                                audioUrl = message.voiceUrl,
-                                                durationMs = message.voiceDurationMs
-                                            )
-                                        }
-                                    } else null
-                                }
-
-                                val onVoiceSeek = remember(message.id, message.voiceDurationMs) {
-                                    if (message.isVoice && message.voiceDurationMs != null) {
-                                        { progress: Float ->
-                                            viewModel.seekVoiceMessage(
-                                                messageId = message.id,
-                                                progress = progress,
-                                                durationMs = message.voiceDurationMs
-                                            )
-                                        }
-                                    } else null
+                                // Spacing: 2dp between grouped messages, 8dp for non-grouped (Requirement 4.6)
+                                if (!message.isFirstInGroup) {
+                                    Spacer(modifier = Modifier.height(Dimens.spaceXSmall)) // 2dp
+                                } else if (!message.showDateSeparator) {
+                                    // First in group but not first message overall (no date separator above)
+                                    Spacer(modifier = Modifier.height(Dimens.spaceMedium)) // 8dp
                                 }
 
                                 // Requirement 8.1-8.7: Swipe-to-reply gesture on message bubbles
@@ -616,29 +611,44 @@ fun ChatScreen(
                                     isNewMessage = animatableNewMessageIds.contains(message.id)
                                 ) {
                                     SwipeToReplyContainer(onReply = onReply) {
-                                        // Voice playback state for this message (from top-level collected state)
+                                        // Voice playback state for this message
                                         val isThisVoicePlaying = voicePlaybackState.activeMessageId == message.id && voicePlaybackState.isPlaying
                                         val voiceProgress = if (voicePlaybackState.activeMessageId == message.id) voicePlaybackState.progress else 0f
                                         val voiceCurrentPos = if (voicePlaybackState.activeMessageId == message.id) voicePlaybackState.currentPositionMs else 0L
 
-                                        MessageBubble(
-                                            message = message,
-                                            showAvatar = message.direction == BubbleDirection.RECEIVED
-                                                    && isGroupConversation,
-                                            maxWidth = screenWidth * 0.75f,
-                                            onLocationTap = onLocationTap,
-                                            onLongPress = onLongPress,
-                                            onRetry = onRetryMessage,
-                                            onReactionTap = onReactionTapHandler,
-                                            onVoicePlayPause = onVoicePlayPause,
-                                            onVoiceSeek = onVoiceSeek,
-                                            isVoicePlaying = isThisVoicePlaying,
-                                            voiceProgress = voiceProgress,
-                                            voiceCurrentPositionMs = voiceCurrentPos,
-                                            searchQuery = searchQuery,
-                                            isSearchHighlighted = isSearchHighlighted,
-                                            isCurrentSearchResult = isCurrentSearchResult
-                                        )
+                                        // Use ChatBubble for standard text messages (Requirements 4.1-4.9)
+                                        if (!message.isVoice && !message.isImage && !message.isLocation) {
+                                            ChatBubble(
+                                                message = message,
+                                                isGroupChat = isGroupConversation,
+                                                isFirstInGroup = message.isFirstInGroup,
+                                                isLastInGroup = message.isLastInGroup,
+                                                showSenderAvatar = message.isFirstInGroup
+                                                        && message.direction == BubbleDirection.RECEIVED
+                                                        && isGroupConversation
+                                            )
+                                        } else {
+                                            // Fallback to existing MessageBubble for voice/image/location
+                                            MessageBubble(
+                                                message = message,
+                                                showAvatar = message.direction == BubbleDirection.RECEIVED
+                                                        && isGroupConversation
+                                                        && message.isFirstInGroup,
+                                                maxWidth = screenWidth * 0.75f,
+                                                onLocationTap = onLocationTap,
+                                                onLongPress = onLongPress,
+                                                onRetry = onRetryMessage,
+                                                onReactionTap = onReactionTapHandler,
+                                                onVoicePlayPause = onVoicePlayPause,
+                                                onVoiceSeek = onVoiceSeek,
+                                                isVoicePlaying = isThisVoicePlaying,
+                                                voiceProgress = voiceProgress,
+                                                voiceCurrentPositionMs = voiceCurrentPos,
+                                                searchQuery = searchQuery,
+                                                isSearchHighlighted = isSearchHighlighted,
+                                                isCurrentSearchResult = isCurrentSearchResult
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -708,24 +718,17 @@ fun ChatScreen(
                 )
             }
 
-            // ── Input bar ─────────────────────────────────────────────────────
-            InputBar(
+            // ── Input bar (Messenger-style, Requirements 5.1-5.6) ──────────────
+            ChatInputBar(
                 text = uiState.inputText,
                 onTextChange = viewModel::onInputChange,
                 onSend = viewModel::sendMessage,
-                onLocationSend = {
-                    val hasPermission = ContextCompat.checkSelfPermission(
-                        context, Manifest.permission.ACCESS_FINE_LOCATION
-                    ) == PackageManager.PERMISSION_GRANTED
-                    if (hasPermission) {
-                        viewModel.requestCurrentLocationAndSend()
-                    } else {
-                        locationPermissionLauncher.launch(
-                            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
-                        )
-                    }
+                onCameraTap = {
+                    // Camera action — placeholder for future camera integration
                 },
-                focusRequester = inputFocusRequester
+                onAttachmentTap = {
+                    // Attachment action — placeholder for future attachment integration
+                }
             )
         }
     }
@@ -981,12 +984,25 @@ private fun MessageBubble(
             }
 
             // Pre-computed time from MessageUiModel — no formatting in the composable
-            Text(
-                text = message.formattedTime,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = 2.dp)
-            )
+            ) {
+                Text(
+                    text = message.formattedTime,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // ── Message Status Indicator (Requirement 1.12, 2.12) ─────────────
+                // Shows progressive delivery status: PENDING → SENT → DELIVERED → READ
+                if (isSent) {
+                    MessageStatusIndicator(
+                        status = message.status,
+                        direction = message.direction
+                    )
+                }
+            }
 
             // ── Read Receipt Indicator (Task 19.1, Requirement 27.3) ──────────
             // Below sent messages with readBy >= 1 non-sender;
@@ -1004,99 +1020,6 @@ private fun MessageBubble(
 
 private fun Modifier.clickableIf(enabled: Boolean, onClick: () -> Unit): Modifier =
     if (enabled) this.clickable { onClick() } else this
-
-@Composable
-private fun DateSeparator(date: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = Dimens.spaceMedium),
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Surface(
-            shape = MaterialTheme.shapes.small,
-            color = MaterialTheme.colorScheme.surfaceVariant
-        ) {
-            Text(
-                text = date,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall)
-            )
-        }
-    }
-}
-
-@Composable
-private fun InputBar(
-    text: String,
-    onTextChange: (String) -> Unit,
-    onSend: () -> Unit,
-    onLocationSend: () -> Unit,
-    focusRequester: FocusRequester = remember { FocusRequester() }
-) {
-    Surface(
-        tonalElevation = 4.dp,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Dimens.spaceMedium, vertical = Dimens.spaceSmall),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Location button
-            IconButton(onClick = onLocationSend) {
-                Icon(
-                    Icons.Default.LocationOn,
-                    contentDescription = "Send location",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            // Text field (pill shape) — with focusRequester for swipe-to-reply (Requirement 8.3)
-            OutlinedTextField(
-                value = text,
-                onValueChange = onTextChange,
-                placeholder = { Text("Message") },
-                modifier = Modifier
-                    .weight(1f)
-                    .focusRequester(focusRequester),
-                shape = MaterialTheme.shapes.extraLarge,
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(0.5f),
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(0.5f)
-                )
-            )
-
-            Spacer(Modifier.width(Dimens.spaceMedium))
-
-            // Send FAB — only shown when text non-empty
-            AnimatedVisibility(
-                visible = text.isNotBlank(),
-                enter = fadeIn() + scaleIn(),
-                exit = fadeOut() + scaleOut()
-            ) {
-                FloatingActionButton(
-                    onClick = onSend,
-                    modifier = Modifier.size(40.dp),
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    shape = CircleShape
-                ) {
-                    Icon(
-                        Icons.Default.Send,
-                        contentDescription = "Send",
-                        modifier = Modifier.size(Dimens.iconSizeMedium),
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-            }
-        }
-    }
-}
 
 /**
  * Builds an AnnotatedString with search query matches highlighted.
@@ -1142,40 +1065,4 @@ private fun buildHighlightedText(
     }
 }
 
-/**
- * Converts a yyyy-MM-dd dateKey (pre-computed in [MessageUiModel]) to a
- * human-readable header like "Today", "Yesterday", or "Monday, 3 Jun".
- */
-private fun formatDateHeader(dateKey: String): String {
-    return try {
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val date = sdf.parse(dateKey) ?: return dateKey
-        val millis = date.time
-        when {
-            isToday(millis) -> "Today"
-            isYesterday(millis) -> "Yesterday"
-            else -> SimpleDateFormat("EEEE, d MMM", Locale.getDefault()).format(date)
-        }
-    } catch (e: Exception) {
-        dateKey
-    }
-}
 
-private fun isToday(timestamp: Long): Boolean {
-    val now = java.util.Calendar.getInstance()
-    val cal = java.util.Calendar.getInstance().apply { time = Date(timestamp) }
-    return now.get(java.util.Calendar.DATE) == cal.get(java.util.Calendar.DATE)
-            && now.get(java.util.Calendar.MONTH) == cal.get(java.util.Calendar.MONTH)
-            && now.get(java.util.Calendar.YEAR) == cal.get(java.util.Calendar.YEAR)
-}
-
-private fun isYesterday(timestamp: Long): Boolean {
-    val now = java.util.Calendar.getInstance()
-    val yesterday = java.util.Calendar.getInstance().apply {
-        add(java.util.Calendar.DATE, -1)
-    }
-    val cal = java.util.Calendar.getInstance().apply { time = Date(timestamp) }
-    return yesterday.get(java.util.Calendar.DATE) == cal.get(java.util.Calendar.DATE)
-            && yesterday.get(java.util.Calendar.MONTH) == cal.get(java.util.Calendar.MONTH)
-            && yesterday.get(java.util.Calendar.YEAR) == cal.get(java.util.Calendar.YEAR)
-}

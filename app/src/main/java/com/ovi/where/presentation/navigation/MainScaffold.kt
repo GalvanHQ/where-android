@@ -84,6 +84,7 @@ fun MainScaffold(
     onNavigateToGroupMap: (String) -> Unit,
     onNavigateToCreateGroup: () -> Unit,
     onNavigateToJoinGroup: () -> Unit,
+    onNavigateToNewMessage: () -> Unit,
     onNavigateToFriendRequests: () -> Unit,
     onNavigateToSearch: (String) -> Unit,
     onNavigateToEditProfile: () -> Unit,
@@ -133,8 +134,7 @@ fun MainScaffold(
                 ChatsScreen(
                     contentPadding = paddingValues,
                     onNavigateToChat = onNavigateToChat,
-                    onNavigateToCreateGroup = onNavigateToCreateGroup,
-                    onNavigateToJoinGroup = onNavigateToJoinGroup,
+                    onNavigateToNewMessage = onNavigateToNewMessage,
                     onNavigateToSearch = { onNavigateToSearch("chats") }
                 )
             }

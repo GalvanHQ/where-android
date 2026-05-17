@@ -123,14 +123,6 @@ sealed class Screen(val route: String) {
     // ── Group routes ──────────────────────────────────────────────────────────
 
     @Serializable
-    data class GroupDetails(val groupId: String) : Screen("group_details/${groupId}") {
-        companion object {
-            const val ROUTE = "group_details/{groupId}"
-            fun createRoute(groupId: String) = "group_details/$groupId"
-        }
-    }
-
-    @Serializable
     data class GroupMap(val groupId: String) : Screen("group_map/${groupId}") {
         companion object {
             const val ROUTE = "group_map/{groupId}"
@@ -143,6 +135,9 @@ sealed class Screen(val route: String) {
 
     @Serializable
     data object JoinGroup : Screen("join_group")
+
+    @Serializable
+    data object NewMessage : Screen("new_message")
 
     @Serializable
     data class EditGroup(val groupId: String) : Screen("edit_group/${groupId}") {

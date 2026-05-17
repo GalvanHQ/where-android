@@ -833,6 +833,33 @@ class ChatsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Requests mute/unmute of a conversation.
+     * Shows confirmation dialog before proceeding.
+     */
+    fun requestMuteConversation(conversationId: String) {
+        _uiState.value = _uiState.value.copy(
+            confirmMuteConversationId = conversationId,
+            contextMenuConversationId = null
+        )
+    }
+
+    /**
+     * Confirms and executes conversation mute/unmute toggle.
+     */
+    fun confirmMuteConversation() {
+        val conversationId = _uiState.value.confirmMuteConversationId ?: return
+        _uiState.value = _uiState.value.copy(confirmMuteConversationId = null)
+        toggleMuteConversation(conversationId)
+    }
+
+    /**
+     * Cancels the pending mute confirmation.
+     */
+    fun cancelMuteConversation() {
+        _uiState.value = _uiState.value.copy(confirmMuteConversationId = null)
+    }
+
 
 
     /**
@@ -871,6 +898,8 @@ data class ChatsUiState(
     val pinLimitError: String? = null,
     /** Conversation ID pending delete confirmation. */
     val confirmDeleteConversationId: String? = null,
+    /** Conversation ID pending mute/unmute confirmation. */
+    val confirmMuteConversationId: String? = null,
     /** Snackbar feedback message. */
     val snackbarMessage: String? = null
 )

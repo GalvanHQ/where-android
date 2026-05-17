@@ -280,12 +280,14 @@ private fun IdleContent(
     onClearAllRecentSearches: () -> Unit,
     onSuggestionTapped: (SuggestionUiModel) -> Unit
 ) {
+    val uniqueSuggestions = suggestions.distinctBy { it.userId }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = Dimens.spaceLarge)
     ) {
         // ── Recent Searches Section (avatar grid) ────────────────────────────
-        if (suggestions.isNotEmpty()) {
+        if (uniqueSuggestions.isNotEmpty()) {
             item(key = "recent_header") {
                 Row(
                     modifier = Modifier
@@ -316,14 +318,14 @@ private fun IdleContent(
 
             item(key = "recent_grid") {
                 RecentSearchesGrid(
-                    suggestions = suggestions.take(MAX_RECENT_GRID_ITEMS),
+                    suggestions = uniqueSuggestions.take(MAX_RECENT_GRID_ITEMS),
                     onSuggestionTapped = onSuggestionTapped
                 )
             }
         }
 
         // ── Suggested Section (vertical list) ────────────────────────────────
-        if (suggestions.isNotEmpty()) {
+        if (uniqueSuggestions.isNotEmpty()) {
             item(key = "suggested_header") {
                 Text(
                     text = "Suggested",
@@ -339,8 +341,8 @@ private fun IdleContent(
             }
 
             items(
-                items = suggestions,
-                key = { suggestion -> "suggested_${suggestion.userId}_${suggestions.indexOf(suggestion)}" }
+                items = uniqueSuggestions,
+                key = { suggestion -> "suggested_${suggestion.userId}" }
             ) { suggestion ->
                 SuggestedRow(
                     suggestion = suggestion,
@@ -374,7 +376,7 @@ private fun RecentSearchesGrid(
     ) {
         items(
             items = suggestions,
-            key = { suggestion -> "grid_${suggestion.userId}_${suggestions.indexOf(suggestion)}" }
+            key = { suggestion -> "grid_${suggestion.userId}" }
         ) { suggestion ->
             RecentSearchGridItem(
                 suggestion = suggestion,

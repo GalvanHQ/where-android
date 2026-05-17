@@ -68,7 +68,7 @@ val NeutralVar99 = Color(0xFFFEFBFF)
 val LocationActive   = Color(0xFF006878)   // = Secondary40 — active location indicator
 val LocationInactive = Color(0xFF5E5D67)   // = NeutralVar40 — inactive location indicator
 
-// ── Avatar palette — single source used by MapScreen + GroupDetailsScreen ───
+// ── Avatar palette — single source used by MapScreen + GroupInfoScreen ───
 // 8 entries with distributed hues at 40-tone level for visual distinguishability
 val AvatarColors = listOf(
     Color(0xFF5170FF),  // Primary40 — indigo-blue (hue ~228°)

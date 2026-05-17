@@ -35,9 +35,9 @@ import com.ovi.where.presentation.chat.ChatScreen
 import com.ovi.where.presentation.chat.ConversationInfoScreen
 import com.ovi.where.presentation.chat.GroupInfoScreen
 import com.ovi.where.presentation.chat.MediaGalleryScreen
+import com.ovi.where.presentation.chat.NewMessageScreen
 import com.ovi.where.presentation.group.JoinGroupScreen
 import com.ovi.where.presentation.group.create.CreateGroupScreen
-import com.ovi.where.presentation.group.details.GroupDetailsScreen
 import com.ovi.where.presentation.group.edit.EditGroupScreen
 import com.ovi.where.presentation.map.MapScreen
 import com.ovi.where.presentation.navigation.gatekeeper.AuthGatekeeperViewModel
@@ -279,7 +279,7 @@ fun AppNavGraph(
                     }
                 },
                 onNavigateToGroupDetails = { groupId ->
-                    navController.navigate(Screen.GroupDetails.createRoute(groupId)) {
+                    navController.navigate(Screen.GroupInfo.createRoute(groupId)) {
                         launchSingleTop = true
                     }
                 },
@@ -295,6 +295,11 @@ fun AppNavGraph(
                 },
                 onNavigateToJoinGroup = {
                     navController.navigate(Screen.JoinGroup.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToNewMessage = {
+                    navController.navigate(Screen.NewMessage.route) {
                         launchSingleTop = true
                     }
                 },
@@ -452,7 +457,7 @@ fun AppNavGraph(
                     }
                 },
                 onNavigateToGroupInfo = { groupId ->
-                    navController.navigate(Screen.GroupDetails.createRoute(groupId)) {
+                    navController.navigate(Screen.GroupInfo.createRoute(groupId)) {
                         launchSingleTop = true
                     }
                 },
@@ -577,33 +582,6 @@ fun AppNavGraph(
             )
         }
 
-        // ── Group Details ─────────────────────────────────────────────────────
-        composable(
-            route     = Screen.GroupDetails.ROUTE,
-            arguments = listOf(navArgument("groupId") { type = NavType.StringType })
-        ) { back ->
-            val groupId = back.arguments?.getString("groupId") ?: return@composable
-            GroupDetailsScreen(
-                groupId             = groupId,
-                onNavigateBack      = { navController.popBackStack() },
-                onNavigateToMap     = {
-                    navController.navigate(Screen.GroupMap.createRoute(groupId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToChat    = { convId ->
-                    navController.navigate(Screen.Chat.createRoute(convId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToEditGroup = {
-                    navController.navigate(Screen.EditGroup.createRoute(groupId)) {
-                        launchSingleTop = true
-                    }
-                }
-            )
-        }
-
         // ── Group Map ─────────────────────────────────────────────────────────
         composable(
             route     = Screen.GroupMap.ROUTE,
@@ -631,6 +609,28 @@ fun AppNavGraph(
                 onGroupJoined  = { groupId ->
                     navController.navigate(Screen.GroupMap.createRoute(groupId)) {
                         popUpTo(Screen.Main.route)
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        // ── New Message ───────────────────────────────────────────────────────
+        composable(Screen.NewMessage.route) {
+            NewMessageScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToNewChat = {
+                    navController.navigate(Screen.Search.createRoute("chats")) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToCreateGroup = {
+                    navController.navigate(Screen.CreateGroup.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToJoinGroup = {
+                    navController.navigate(Screen.JoinGroup.route) {
                         launchSingleTop = true
                     }
                 }
@@ -709,7 +709,7 @@ internal fun navigateToDeepLink(navController: NavHostController, route: String)
             }
         }
         segments.size == 2 && segments[0] == "group_details" && segments[1].isNotBlank() -> {
-            navController.navigate(Screen.GroupDetails.createRoute(segments[1])) {
+            navController.navigate(Screen.GroupInfo.createRoute(segments[1])) {
                 launchSingleTop = true
             }
         }

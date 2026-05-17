@@ -1,20 +1,7 @@
 package com.ovi.where.presentation.chat
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColor
 import androidx.compose.animation.core.EaseInOut
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDp
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.updateTransition
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
@@ -28,13 +15,13 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
@@ -46,23 +33,19 @@ import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PushPin
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -75,8 +58,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -84,7 +65,6 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -105,8 +85,7 @@ import kotlinx.coroutines.launch
 fun ChatsScreen(
     contentPadding: PaddingValues = PaddingValues(),
     onNavigateToChat: (String) -> Unit = {},
-    onNavigateToCreateGroup: () -> Unit = {},
-    onNavigateToJoinGroup: () -> Unit = {},
+    onNavigateToNewMessage: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
     viewModel: ChatsViewModel = hiltViewModel()
 ) {
@@ -147,27 +126,14 @@ fun ChatsScreen(
     // Pull-to-refresh state
     var isRefreshing by remember { mutableStateOf(false) }
 
-    // Expandable FAB menu state
-    var isFabExpanded by remember { mutableStateOf(false) }
+    // Bottom sheet state
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val selectedConversation = uiState.conversations.find { it.id == uiState.contextMenuConversationId }
 
     Scaffold(
         modifier = Modifier.padding(contentPadding),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            ExpandableFabMenu(
-                isExpanded = isFabExpanded,
-                onToggle = { isFabExpanded = !isFabExpanded },
-                onNewChat = {
-                    isFabExpanded = false
-                    onNavigateToSearch()
-                },
-                onNewGroup = {
-                    isFabExpanded = false
-                    onNavigateToCreateGroup()
-                }
-            )
-        }
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -186,16 +152,14 @@ fun ChatsScreen(
                    onClick = onNavigateToSearch,
                    modifier = Modifier.weight(1f)
                )
-               Surface(
-                   modifier = Modifier.size(48.dp),
-                   onClick = onNavigateToCreateGroup,
-                   shape = RoundedCornerShape(50)
+               IconButton(
+                   onClick = onNavigateToNewMessage
                ){
                    Icon(
-                       imageVector = ImageVector.vectorResource(id = R.drawable.team_check_alt),
-                       contentDescription = "Join group",
+                       imageVector = ImageVector.vectorResource(id = R.drawable.square_pen),
+                       contentDescription = "New message",
                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                       modifier = Modifier.padding(8.dp)
+                       modifier = Modifier.size(28.dp)
                    )
                }
            }
@@ -239,13 +203,8 @@ fun ChatsScreen(
                                 ConversationRow(
                                     conversation = conv,
                                     isOnline = isOnline,
-                                    isContextMenuVisible = uiState.contextMenuConversationId == conv.id,
                                     onClick = { onNavigateToChat(conv.id) },
                                     onLongClick = { viewModel.showConversationContextMenu(conv.id) },
-                                    onDismissContextMenu = { viewModel.dismissConversationContextMenu() },
-                                    onPin = { viewModel.togglePinConversation(conv.id) },
-                                    onMute = { viewModel.toggleMuteConversation(conv.id) },
-                                    onDelete = { viewModel.requestDeleteConversation(conv.id) },
                                     modifier = Modifier.animateItem(
                                         fadeInSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
                                         placementSpec = tween(
@@ -261,6 +220,70 @@ fun ChatsScreen(
                 }
             }
         }
+    }
+
+    // ── Conversation Actions Bottom Sheet ────────────────────────────────
+    if (selectedConversation != null) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.dismissConversationContextMenu() },
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp
+        ) {
+            ConversationActionsSheetContent(
+                isPinned = selectedConversation.isPinned,
+                isMuted = selectedConversation.isMuted,
+                onPin = {
+                    viewModel.dismissConversationContextMenu()
+                    viewModel.togglePinConversation(selectedConversation.id)
+                },
+                onMute = {
+                    viewModel.dismissConversationContextMenu()
+                    viewModel.requestMuteConversation(selectedConversation.id)
+                },
+                onDelete = {
+                    viewModel.dismissConversationContextMenu()
+                    viewModel.requestDeleteConversation(selectedConversation.id)
+                }
+            )
+        }
+    }
+
+    // ── Mute Confirmation Dialog ─────────────────────────────────────────
+    if (uiState.confirmMuteConversationId != null) {
+        val muteConv = uiState.conversations.find { it.id == uiState.confirmMuteConversationId }
+        val isMuted = muteConv?.isMuted == true
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelMuteConversation() },
+            title = {
+                Text(
+                    text = if (isMuted) "Unmute conversation?" else "Mute conversation?",
+                    style = MaterialTheme.typography.headlineSmall
+                )
+            },
+            text = {
+                Text(
+                    text = if (isMuted) "You will start receiving notifications from this conversation again."
+                    else "You will no longer receive notifications from this conversation.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.confirmMuteConversation() }
+                ) {
+                    Text(if (isMuted) "Unmute" else "Mute")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.cancelMuteConversation() }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     // ── Delete Confirmation Dialog ───────────────────────────────────────
@@ -301,133 +324,71 @@ fun ChatsScreen(
     }
 }
 
-// ── FAB Menu (Material 3) ────────────────────────────────────────────────────
+// ── Bottom Sheet Content ─────────────────────────────────────────────────────────
 
 @Composable
-private fun ExpandableFabMenu(
-    isExpanded: Boolean,
-    onToggle: () -> Unit,
-    onNewChat: () -> Unit,
-    onNewGroup: () -> Unit
+private fun ConversationActionsSheetContent(
+    isPinned: Boolean,
+    isMuted: Boolean,
+    onPin: () -> Unit,
+    onMute: () -> Unit,
+    onDelete: () -> Unit
 ) {
     Column(
-        horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(bottom = Dimens.spaceLarge)
     ) {
-        // ── Animated menu items ──────────────────────────────────────────
-        AnimatedVisibility(
-            visible = isExpanded,
-            enter = fadeIn() + slideInVertically { it / 2 } + scaleIn(initialScale = 0.8f),
-            exit = fadeOut() + slideOutVertically { it / 2 } + scaleOut(targetScale = 0.8f)
-        ) {
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.padding(bottom = 4.dp, end = 4.dp)
-            ) {
-                FabMenuItem(
-                    icon = Icons.Rounded.Group,
-                    label = "New Group",
-                    onClick = onNewGroup
-                )
-                FabMenuItem(
-                    icon = Icons.Rounded.Edit,
-                    label = "New Chat",
-                    onClick = onNewChat
-                )
-            }
-        }
-
-        // ── Main FAB with transition animations ─────────────────────────
-        val transition = updateTransition(targetState = isExpanded, label = "FAB Transition")
-
-        val fabSize by transition.animateDp(label = "FAB Size") { expanded ->
-            if (expanded) 48.dp else 56.dp
-        }
-
-        val fabShape by transition.animateDp(label = "FAB Shape") { expanded ->
-            if (expanded) 28.dp else 16.dp
-        }
-
-        val containerColor by transition.animateColor(label = "FAB Color") { expanded ->
-            if (expanded)
-                MaterialTheme.colorScheme.secondary
-            else
-                MaterialTheme.colorScheme.primary
-        }
-
-        val iconRotation by transition.animateFloat(label = "Icon Rotation") { expanded ->
-            if (expanded) 90f else 0f
-        }
-
-        val fabElevation by transition.animateDp(
-            transitionSpec = {
-                spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
-                )
-            },
-            label = "FAB Elevation"
-        ) { expanded ->
-            if (expanded) 8.dp else 6.dp
-        }
-
-        FloatingActionButton(
-            onClick = onToggle,
-            containerColor = containerColor,
-            shape = MaterialTheme.shapes.large,
-            modifier = Modifier
-                .size(fabSize)
-                .shadow(fabElevation, MaterialTheme.shapes.large)
-        ) {
-            Icon(
-                imageVector = if (isExpanded) Icons.Rounded.Close else Icons.Rounded.Edit,
-                contentDescription = if (isExpanded) "Close menu" else "New conversation",
-                tint = if (isExpanded)
-                    MaterialTheme.colorScheme.onSecondary
-                else
-                    MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier
-                    .size(24.dp)
-                    .rotate(iconRotation)
-            )
-        }
+        // Pin/Unpin
+        SheetActionRow(
+            icon = if (isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
+            label = if (isPinned) "Unpin" else "Pin",
+            onClick = onPin
+        )
+        // Mute/Unmute
+        SheetActionRow(
+            icon = if (isMuted) Icons.Outlined.Notifications else Icons.Default.NotificationsOff,
+            label = if (isMuted) "Unmute" else "Mute",
+            onClick = onMute
+        )
+        // Delete
+        SheetActionRow(
+            icon = Icons.Default.Delete,
+            label = "Delete",
+            tint = MaterialTheme.colorScheme.error,
+            onClick = onDelete
+        )
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FabMenuItem(
+private fun SheetActionRow(
     icon: ImageVector,
     label: String,
+    tint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
     onClick: () -> Unit
 ) {
-    Surface(
+    Row(
         modifier = Modifier
-            .shadow(4.dp, RoundedCornerShape(50)),
-        onClick = onClick,
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.primary
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick)
+            .padding(horizontal = Dimens.spaceLarge, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.onPrimary
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    fontSize = 16.sp
-                )
-            )
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            tint = tint
+        )
+        Spacer(Modifier.width(Dimens.spaceLarge))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = tint
+        )
     }
 }
 
@@ -465,154 +426,136 @@ private fun ChatsEmptyState() {
     }
 }
 
-// ── Conversation Row with Long-Press Context Menu ───────────────────────────────
+// ── Conversation Row ────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ConversationRow(
     conversation: ConversationUiModel,
     isOnline: Boolean,
-    isContextMenuVisible: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    onDismissContextMenu: () -> Unit,
-    onPin: () -> Unit,
-    onMute: () -> Unit,
-    onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val hasUnread = conversation.unreadCount > 0 && !conversation.isMuted
 
-    Box(modifier = modifier) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .combinedClickable(
-                    onClick = onClick,
-                    onLongClick = onLongClick
-                )
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Leading: 56dp ConversationAvatar with online indicator
-            ConversationAvatar(
-                name = conversation.title,
-                photoUrl = conversation.photoUrl,
-                isOnline = isOnline && !conversation.isGroup,
-                size = 56.dp,
-                indicatorSize = 14.dp,
-                indicatorBorderWidth = 2.dp
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
             )
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Leading: 56dp ConversationAvatar with online indicator
+        ConversationAvatar(
+            name = conversation.title,
+            photoUrl = conversation.photoUrl,
+            isOnline = isOnline && !conversation.isGroup,
+            size = 56.dp,
+            indicatorSize = 14.dp,
+            indicatorBorderWidth = 2.dp
+        )
 
-            Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(12.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
-                // Title line: Conversation_Title + trailing timestamp
+        Column(modifier = Modifier.weight(1f)) {
+            // Title line: Conversation_Title + trailing timestamp
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = conversation.title,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Spacer(Modifier.width(Dimens.spaceMedium))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Pin icon for pinned conversations
-                        if (conversation.isPinned) {
-                            Icon(
-                                imageVector = Icons.Default.PushPin,
-                                contentDescription = "Pinned",
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(Modifier.width(4.dp))
-                        }
-                        // Location pin icon when any member is sharing
-                        if (conversation.hasActiveLocationSharing) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = "Location sharing active",
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.tertiary
-                            )
-                            Spacer(Modifier.width(4.dp))
-                        }
-                        // Mute icon for muted conversations
-                        if (conversation.isMuted) {
-                            Icon(
-                                imageVector = Icons.Default.NotificationsOff,
-                                contentDescription = "Muted",
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(Modifier.width(4.dp))
-                        }
-                        Text(
-                            text = conversation.lastMessageTime,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (hasUnread) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = conversation.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
+                Spacer(Modifier.width(Dimens.spaceMedium))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Pin icon for pinned conversations
+                    if (conversation.isPinned) {
+                        Icon(
+                            imageVector = Icons.Default.PushPin,
+                            contentDescription = "Pinned",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    // Location pin icon when any member is sharing
+                    if (conversation.hasActiveLocationSharing) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = "Location sharing active",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.tertiary
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    // Mute icon for muted conversations
+                    if (conversation.isMuted) {
+                        Icon(
+                            imageVector = Icons.Default.NotificationsOff,
+                            contentDescription = "Muted",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    Text(
+                        text = conversation.lastMessageTime,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (hasUnread) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
-                Spacer(Modifier.height(Dimens.spaceXSmall))
+            Spacer(Modifier.height(Dimens.spaceXSmall))
 
-                // Preview line: message preview + trailing UnreadBadge
+            // Preview line: message preview + trailing UnreadBadge
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Message status indicator before preview for own last message
-                        if (conversation.isLastMessageFromCurrentUser && conversation.lastMessageStatus != null) {
-                            ConversationMessageStatusIcon(status = conversation.lastMessageStatus)
-                            Spacer(Modifier.width(4.dp))
-                        }
-                        Text(
-                            text = conversation.locationSharingPreview ?: conversation.lastMessageText,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (conversation.locationSharingPreview != null)
-                                MaterialTheme.colorScheme.tertiary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (hasUnread) FontWeight.Medium else FontWeight.Normal,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    // Message status indicator before preview for own last message
+                    if (conversation.isLastMessageFromCurrentUser && conversation.lastMessageStatus != null) {
+                        ConversationMessageStatusIcon(status = conversation.lastMessageStatus)
+                        Spacer(Modifier.width(4.dp))
                     }
-                    // Unread badge — hidden for muted conversations
-                    if (conversation.unreadCount > 0 && !conversation.isMuted) {
-                        Spacer(Modifier.width(Dimens.spaceMedium))
-                        UnreadBadge(count = conversation.unreadCount)
-                    }
+                    Text(
+                        text = conversation.locationSharingPreview ?: conversation.lastMessageText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (conversation.locationSharingPreview != null)
+                            MaterialTheme.colorScheme.tertiary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (hasUnread) FontWeight.Medium else FontWeight.Normal,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                // Unread badge — hidden for muted conversations
+                if (conversation.unreadCount > 0 && !conversation.isMuted) {
+                    Spacer(Modifier.width(Dimens.spaceMedium))
+                    UnreadBadge(count = conversation.unreadCount)
                 }
             }
         }
-
-        // Long-press context menu
-        ConversationContextMenu(
-            expanded = isContextMenuVisible,
-            isPinned = conversation.isPinned,
-            isMuted = conversation.isMuted,
-            onDismiss = onDismissContextMenu,
-            onPin = onPin,
-            onMute = onMute,
-            onDelete = onDelete
-        )
     }
 }
 
@@ -661,68 +604,6 @@ private fun ConversationMessageStatusIcon(status: MessageStatus) {
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-    }
-}
-
-// ── Long-Press Context Menu (Req 24.3) ──────────────────────────────────────────
-
-@Composable
-private fun ConversationContextMenu(
-    expanded: Boolean,
-    isPinned: Boolean,
-    isMuted: Boolean,
-    onDismiss: () -> Unit,
-    onPin: () -> Unit,
-    onMute: () -> Unit,
-    onDelete: () -> Unit
-) {
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismiss
-    ) {
-        // Pin/Unpin action
-        DropdownMenuItem(
-            text = { Text(if (isPinned) "Unpin" else "Pin") },
-            onClick = {
-                onDismiss()
-                onPin()
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = if (isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
-                    contentDescription = if (isPinned) "Unpin conversation" else "Pin conversation"
-                )
-            }
-        )
-        // Mute/Unmute action
-        DropdownMenuItem(
-            text = { Text(if (isMuted) "Unmute" else "Mute") },
-            onClick = {
-                onDismiss()
-                onMute()
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = if (isMuted) Icons.Outlined.Notifications else Icons.Default.NotificationsOff,
-                    contentDescription = if (isMuted) "Unmute conversation" else "Mute conversation"
-                )
-            }
-        )
-        // Delete action
-        DropdownMenuItem(
-            text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
-            onClick = {
-                onDismiss()
-                onDelete()
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete conversation",
-                    tint = MaterialTheme.colorScheme.error
-                )
-            }
-        )
     }
 }
 

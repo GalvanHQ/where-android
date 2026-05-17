@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -165,7 +166,42 @@ fun ChatScreen(
         if (granted) {
             viewModel.requestCurrentLocationAndSend()
         } else {
-            context.showToast("Location permission denied")
+            android.widget.Toast.makeText(context, "Location permission denied", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // ── Image Attachment: Gallery picker via PhotoPicker API ───────────────────
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri: android.net.Uri? ->
+        uri?.let { viewModel.sendImageMessage(it) }
+    }
+
+    // ── Image Attachment: Camera capture ──────────────────────────────────────
+    // Create a temporary URI for the camera to write to
+    var cameraImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            cameraImageUri?.let { viewModel.sendImageMessage(it) }
+        }
+    }
+
+    // Camera permission launcher (required for camera capture)
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                java.io.File.createTempFile("camera_", ".jpg", context.cacheDir)
+            )
+            cameraImageUri = uri
+            cameraLauncher.launch(uri)
+        } else {
+            android.widget.Toast.makeText(context, "Camera permission denied", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -320,6 +356,7 @@ fun ChatScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             ChatHeader(
                 conversation = uiState.conversation,
@@ -724,10 +761,28 @@ fun ChatScreen(
                 onTextChange = viewModel::onInputChange,
                 onSend = viewModel::sendMessage,
                 onCameraTap = {
-                    // Camera action — placeholder for future camera integration
+                    // Launch camera after checking permission
+                    if (context.checkSelfPermission(Manifest.permission.CAMERA) ==
+                        android.content.pm.PackageManager.PERMISSION_GRANTED
+                    ) {
+                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            java.io.File.createTempFile("camera_", ".jpg", context.cacheDir)
+                        )
+                        cameraImageUri = uri
+                        cameraLauncher.launch(uri)
+                    } else {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
                 },
                 onAttachmentTap = {
-                    // Attachment action — placeholder for future attachment integration
+                    // Launch system PhotoPicker for image selection
+                    galleryLauncher.launch(
+                        androidx.activity.result.PickVisualMediaRequest(
+                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                        )
+                    )
                 }
             )
         }

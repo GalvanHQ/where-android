@@ -1,6 +1,7 @@
 package com.ovi.where.presentation.chat
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
@@ -216,12 +217,14 @@ class ChatViewModel @Inject constructor(
             val uid = currentUserId ?: ""
             observeMessagesUseCase(conversationId).collect { messages ->
                 val sortedMessages = sortMessages(messages)
+                // Remove pre-existing duplicates from before the deduplication fix (Task 9.1/9.2)
+                val deduplicatedMessages = deduplicateMessages(sortedMessages)
                 // Requirement 19.3: Evict oldest messages beyond 500-message window.
                 // Preserve pagination cursor so user can paginate backward to retrieve evicted messages.
-                val windowedMessages = if (sortedMessages.size > MESSAGE_WINDOW_SIZE) {
-                    sortedMessages.takeLast(MESSAGE_WINDOW_SIZE)
+                val windowedMessages = if (deduplicatedMessages.size > MESSAGE_WINDOW_SIZE) {
+                    deduplicatedMessages.takeLast(MESSAGE_WINDOW_SIZE)
                 } else {
-                    sortedMessages
+                    deduplicatedMessages
                 }
                 val uiModels = windowedMessages.map {
                     it.toUiModel(
@@ -243,7 +246,7 @@ class ChatViewModel @Inject constructor(
                     groupedMessages = grouped,
                     isLoading = false,
                     // When messages are evicted, there are always more messages to paginate back to
-                    hasMoreMessages = _uiState.value.hasMoreMessages || sortedMessages.size > MESSAGE_WINDOW_SIZE
+                    hasMoreMessages = _uiState.value.hasMoreMessages || deduplicatedMessages.size > MESSAGE_WINDOW_SIZE
                 )
             }
         }
@@ -258,6 +261,53 @@ class ChatViewModel @Inject constructor(
      */
     private fun sortMessages(messages: List<Message>): List<Message> {
         return messages.sortedWith(compareBy<Message> { it.timestamp }.thenBy { it.id })
+    }
+
+    /**
+     * Removes duplicate messages that have the same senderId, text, and timestamp
+     * (within 1-second tolerance). This handles pre-existing duplicates in Room
+     * that were created before the deduplication fix (Task 9.1/9.2) was applied.
+     *
+     * Keeps the message with the non-temp ID (server ID) when possible.
+     * Also schedules background cleanup to remove duplicates from Room permanently.
+     */
+    private fun deduplicateMessages(messages: List<Message>): List<Message> {
+        if (messages.size <= 1) return messages
+
+        val result = mutableListOf<Message>()
+        val duplicateIds = mutableListOf<String>()
+
+        // Group by (senderId, text, timestamp rounded to 1-second buckets)
+        val groups = messages.groupBy { msg ->
+            Triple(msg.senderId, msg.text, msg.timestamp / 1000L)
+        }
+
+        for ((_, group) in groups) {
+            if (group.size == 1) {
+                result.add(group.first())
+            } else {
+                // Keep the message with the server ID (non-temp ID, i.e., doesn't start with "temp_")
+                val preferred = group.firstOrNull { !it.id.startsWith("temp_") } ?: group.first()
+                result.add(preferred)
+                // Mark others as duplicates for cleanup
+                group.filter { it.id != preferred.id }.forEach { duplicateIds.add(it.id) }
+            }
+        }
+
+        // Background cleanup: remove duplicate rows from Room
+        if (duplicateIds.isNotEmpty()) {
+            viewModelScope.launch {
+                for (id in duplicateIds) {
+                    try {
+                        messageRepositoryImpl.deleteMessageLocally(id)
+                    } catch (_: Exception) {
+                        // Best-effort cleanup
+                    }
+                }
+            }
+        }
+
+        return result.sortedWith(compareBy<Message> { it.timestamp }.thenBy { it.id })
     }
 
     // ─── Conversation Observation ─────────────────────────────────────────────
@@ -1105,6 +1155,20 @@ class ChatViewModel @Inject constructor(
     fun sendLocation(latitude: Double, longitude: Double) {
         val convId = _uiState.value.conversationId ?: return
         viewModelScope.launch { sendLocationMessageUseCase(convId, latitude, longitude) }
+    }
+
+    /**
+     * Sends an image message using the provided content URI.
+     *
+     * Called from ChatScreen after the user picks an image from gallery
+     * or captures a photo with the camera. Delegates to
+     * [MessageRepositoryImpl.sendImageMessage] which handles upload + message creation.
+     */
+    fun sendImageMessage(imageUri: Uri) {
+        val convId = _uiState.value.conversationId ?: return
+        viewModelScope.launch {
+            messageRepositoryImpl.sendImageMessage(convId, imageUri)
+        }
     }
 
     /**

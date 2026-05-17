@@ -9,6 +9,7 @@ data class ConversationInfoUiState(
     val photoUrl: String? = null,
     val isOnline: Boolean = false,
     val lastActiveTime: String? = null, // "Active Xh ago"
+    val otherUserId: String? = null,
     val sharedMedia: List<MediaThumbnail> = emptyList(),
     val isMuted: Boolean = false,
     val isLoading: Boolean = true

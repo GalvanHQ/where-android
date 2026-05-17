@@ -81,6 +81,8 @@ fun ConversationInfoScreen(
     conversationId: String,
     onNavigateBack: () -> Unit,
     onNavigateToMediaGallery: () -> Unit,
+    onNavigateToUserProfile: (String) -> Unit = {},
+    onNavigateToChat: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ConversationInfoViewModel = hiltViewModel()
 ) {
@@ -144,6 +146,10 @@ fun ConversationInfoScreen(
                     uiState = uiState,
                     onToggleMute = { viewModel.toggleMute() },
                     onNavigateToMediaGallery = onNavigateToMediaGallery,
+                    onNavigateToUserProfile = {
+                        uiState.otherUserId?.let { onNavigateToUserProfile(it) }
+                    },
+                    onNavigateToChat = onNavigateToChat,
                     modifier = Modifier.padding(paddingValues)
                 )
             }
@@ -156,6 +162,8 @@ internal fun ConversationInfoContent(
     uiState: ConversationInfoUiState,
     onToggleMute: () -> Unit,
     onNavigateToMediaGallery: () -> Unit,
+    onNavigateToUserProfile: () -> Unit = {},
+    onNavigateToChat: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -212,7 +220,12 @@ internal fun ConversationInfoContent(
         Spacer(modifier = Modifier.height(24.dp))
 
         // Action button row
-        ActionButtonRow(isMuted = uiState.isMuted, onToggleMute = onToggleMute)
+        ActionButtonRow(
+            isMuted = uiState.isMuted,
+            onToggleMute = onToggleMute,
+            onProfileTap = onNavigateToUserProfile,
+            onSearchTap = onNavigateToChat
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -245,6 +258,8 @@ internal fun ConversationInfoContent(
 internal fun ActionButtonRow(
     isMuted: Boolean,
     onToggleMute: () -> Unit,
+    onProfileTap: () -> Unit = {},
+    onSearchTap: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -256,17 +271,17 @@ internal fun ActionButtonRow(
         ActionButton(
             icon = Icons.Filled.Call,
             label = "Audio Call",
-            onClick = { /* TODO */ }
+            onClick = { /* Calling not yet available */ }
         )
         ActionButton(
             icon = Icons.Filled.Videocam,
             label = "Video Call",
-            onClick = { /* TODO */ }
+            onClick = { /* Calling not yet available */ }
         )
         ActionButton(
             icon = Icons.Filled.Person,
             label = "Profile",
-            onClick = { /* TODO */ }
+            onClick = onProfileTap
         )
         ActionButton(
             icon = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
@@ -276,7 +291,7 @@ internal fun ActionButtonRow(
         ActionButton(
             icon = Icons.Filled.Search,
             label = "Search",
-            onClick = { /* TODO */ }
+            onClick = onSearchTap
         )
     }
 }

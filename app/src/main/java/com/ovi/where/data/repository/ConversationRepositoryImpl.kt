@@ -606,17 +606,21 @@ class ConversationRepositoryImpl @Inject constructor(
     /**
      * Pins a conversation for the current user.
      * Enforces a maximum of 3 pinned conversations (Req 24.4).
+     *
+     * Pin count is checked against the local cached conversation list instead of a
+     * Firestore query to avoid PERMISSION_DENIED errors. The Firestore read rule
+     * requires `request.auth.uid in resource.data.participantIds`, but a
+     * `whereArrayContains("pinnedBy", uid)` query cannot satisfy that constraint
+     * because Firestore evaluates rules per-document and the query filter is on a
+     * different field.
      */
     override suspend fun pinConversation(conversationId: String): Resource<Unit> =
         withContext(Dispatchers.IO) {
             val uid = currentUid ?: return@withContext Resource.Error("User not authenticated")
             try {
-                // Check current pin count
-                val pinnedCount = firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
-                    .whereArrayContains("pinnedBy", uid)
-                    .get()
-                    .await()
-                    .size()
+                // Check current pin count from local cache to avoid Firestore query
+                // that would violate security rules (participantIds filter required for reads)
+                val pinnedCount = conversationDao.getPinnedCountForUser(uid)
 
                 if (pinnedCount >= MAX_PINNED_CONVERSATIONS) {
                     return@withContext Resource.Error("Maximum of $MAX_PINNED_CONVERSATIONS pinned conversations reached")

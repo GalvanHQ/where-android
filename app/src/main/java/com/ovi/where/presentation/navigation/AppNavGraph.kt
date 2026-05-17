@@ -492,6 +492,15 @@ fun AppNavGraph(
                     navController.navigate(Screen.MediaGallery.createRoute(conversationId)) {
                         launchSingleTop = true
                     }
+                },
+                onNavigateToUserProfile = { userId ->
+                    navController.navigate(Screen.UserProfile.createRoute(userId)) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToChat = {
+                    // Pop back to the chat screen (search focus can be handled there)
+                    navController.popBackStack()
                 }
             )
         }

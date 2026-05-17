@@ -682,10 +682,59 @@ class ChatsViewModel @Inject constructor(
      * The conversation will not reappear on next sync because the Firestore listener
      * filters out conversations where the current user is in `deletedBy` (Req 1.7, 2.7).
      */
-    fun deleteConversation(conversationId: String) {
+    /**
+     * Requests deletion of a conversation.
+     * Shows confirmation dialog before proceeding.
+     */
+    fun requestDeleteConversation(conversationId: String) {
+        _uiState.value = _uiState.value.copy(
+            confirmDeleteConversationId = conversationId,
+            contextMenuConversationId = null
+        )
+    }
+
+    /**
+     * Confirms and executes conversation deletion.
+     * Optimistically removes from local list and persists via repository.
+     */
+    fun confirmDeleteConversation() {
+        val conversationId = _uiState.value.confirmDeleteConversationId ?: return
+        _uiState.value = _uiState.value.copy(confirmDeleteConversationId = null)
+
+        // Optimistic removal from local list
+        allConversations = allConversations.filter { it.id != conversationId }
+        applySearchFilter()
+
         viewModelScope.launch {
-            conversationRepository.softDeleteConversation(conversationId)
+            val result = conversationRepository.softDeleteConversation(conversationId)
+            when (result) {
+                is Resource.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        snackbarMessage = "Conversation deleted"
+                    )
+                }
+                is Resource.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        snackbarMessage = result.message ?: "Failed to delete conversation"
+                    )
+                }
+                else -> {}
+            }
         }
+    }
+
+    /**
+     * Cancels the pending delete confirmation.
+     */
+    fun cancelDeleteConversation() {
+        _uiState.value = _uiState.value.copy(confirmDeleteConversationId = null)
+    }
+
+    /**
+     * Dismisses the snackbar message.
+     */
+    fun dismissSnackbar() {
+        _uiState.value = _uiState.value.copy(snackbarMessage = null)
     }
 
     // ── Pin / Mute / Archive Actions (Requirement 24.3, 24.4, 24.5) ────────
@@ -784,18 +833,7 @@ class ChatsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Archives a conversation (Req 1.6, 2.6).
-     * Persists archive to Firestore and removes from the active conversation list immediately.
-     * The conversation will not reappear on sync because the Firestore listener
-     * filters out conversations where the current user is in `archivedBy`.
-     */
-    fun archiveConversation(conversationId: String) {
-        viewModelScope.launch {
-            conversationRepository.archiveConversation(conversationId)
-            _uiState.value = _uiState.value.copy(contextMenuConversationId = null)
-        }
-    }
+
 
     /**
      * Dismisses the pin limit error message.
@@ -830,5 +868,9 @@ data class ChatsUiState(
     /** Conversation ID for which the context menu is currently shown (Req 24.3). */
     val contextMenuConversationId: String? = null,
     /** Error message for pin limit exceeded (Req 24.4). */
-    val pinLimitError: String? = null
+    val pinLimitError: String? = null,
+    /** Conversation ID pending delete confirmation. */
+    val confirmDeleteConversationId: String? = null,
+    /** Snackbar feedback message. */
+    val snackbarMessage: String? = null
 )

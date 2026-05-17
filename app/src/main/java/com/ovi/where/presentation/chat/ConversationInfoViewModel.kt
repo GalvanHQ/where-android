@@ -120,6 +120,7 @@ class ConversationInfoViewModel @Inject constructor(
                                 photoUrl = user.photoUrl,
                                 isOnline = user.isOnline,
                                 lastActiveTime = lastActive,
+                                otherUserId = otherUserId,
                                 sharedMedia = sharedMedia,
                                 isMuted = isMuted,
                                 isLoading = false
@@ -136,6 +137,7 @@ class ConversationInfoViewModel @Inject constructor(
                                 photoUrl = conversation.photoUrl,
                                 isOnline = false,
                                 lastActiveTime = null,
+                                otherUserId = otherUserId,
                                 sharedMedia = sharedMedia,
                                 isMuted = isMuted,
                                 isLoading = false

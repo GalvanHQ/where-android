@@ -1,9 +1,14 @@
 package com.ovi.where.presentation.chat
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColor
 import androidx.compose.animation.core.EaseInOut
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDp
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -12,7 +17,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,19 +36,20 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Group
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,10 +57,11 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -70,12 +76,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -106,7 +115,7 @@ fun ChatsScreen(
     val scope = rememberCoroutineScope()
 
     // ── Task 16.3: Wire foreground sync on app resume ─────────────────────────
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -127,16 +136,19 @@ fun ChatsScreen(
         }
     }
 
+    // Show action feedback snackbar
+    LaunchedEffect(uiState.snackbarMessage) {
+        uiState.snackbarMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.dismissSnackbar()
+        }
+    }
+
     // Pull-to-refresh state
     var isRefreshing by remember { mutableStateOf(false) }
 
     // Expandable FAB menu state
     var isFabExpanded by remember { mutableStateOf(false) }
-    val fabRotation by animateFloatAsState(
-        targetValue = if (isFabExpanded) 45f else 0f,
-        animationSpec = tween(durationMillis = 200),
-        label = "fab_rotation"
-    )
 
     Scaffold(
         modifier = Modifier.padding(contentPadding),
@@ -145,7 +157,6 @@ fun ChatsScreen(
         floatingActionButton = {
             ExpandableFabMenu(
                 isExpanded = isFabExpanded,
-                fabRotation = fabRotation,
                 onToggle = { isFabExpanded = !isFabExpanded },
                 onNewChat = {
                     isFabExpanded = false
@@ -164,12 +175,30 @@ fun ChatsScreen(
                 .padding(innerPadding)
                 .statusBarsPadding()
         ) {
-            // ── Search bar tap target — navigates to full-screen search ─────
-            SearchBarTapTarget(
-                placeholderText = "Search chats...",
-                onClick = onNavigateToSearch,
-                modifier = Modifier.padding(horizontal = Dimens.spaceLarge)
-            )
+           Row(
+               modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLarge),
+               horizontalArrangement = Arrangement.spacedBy(8.dp),
+               verticalAlignment = Alignment.CenterVertically
+           ){
+               // ── Search bar tap target — navigates to full-screen search ─────
+               SearchBarTapTarget(
+                   placeholderText = "Search chats...",
+                   onClick = onNavigateToSearch,
+                   modifier = Modifier.weight(1f)
+               )
+               Surface(
+                   modifier = Modifier.size(48.dp),
+                   onClick = onNavigateToCreateGroup,
+                   shape = RoundedCornerShape(50)
+               ){
+                   Icon(
+                       imageVector = ImageVector.vectorResource(id = R.drawable.team_check_alt),
+                       contentDescription = "Join group",
+                       tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                       modifier = Modifier.padding(8.dp)
+                   )
+               }
+           }
 
             Spacer(Modifier.height(Dimens.spaceSmall))
 
@@ -216,8 +245,7 @@ fun ChatsScreen(
                                     onDismissContextMenu = { viewModel.dismissConversationContextMenu() },
                                     onPin = { viewModel.togglePinConversation(conv.id) },
                                     onMute = { viewModel.toggleMuteConversation(conv.id) },
-                                    onArchive = { viewModel.archiveConversation(conv.id) },
-                                    onDelete = { viewModel.deleteConversation(conv.id) },
+                                    onDelete = { viewModel.requestDeleteConversation(conv.id) },
                                     modifier = Modifier.animateItem(
                                         fadeInSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
                                         placementSpec = tween(
@@ -234,101 +262,170 @@ fun ChatsScreen(
             }
         }
     }
+
+    // ── Delete Confirmation Dialog ───────────────────────────────────────
+    if (uiState.confirmDeleteConversationId != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelDeleteConversation() },
+            title = {
+                Text(
+                    text = "Delete conversation?",
+                    style = MaterialTheme.typography.headlineSmall
+                )
+            },
+            text = {
+                Text(
+                    text = "This conversation will be removed from your chat list. This action cannot be undone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.confirmDeleteConversation() }
+                ) {
+                    Text(
+                        text = "Delete",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.cancelDeleteConversation() }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
-// ── Expandable FAB Menu ─────────────────────────────────────────────────────────
+// ── FAB Menu (Material 3) ────────────────────────────────────────────────────
 
 @Composable
 private fun ExpandableFabMenu(
     isExpanded: Boolean,
-    fabRotation: Float,
     onToggle: () -> Unit,
     onNewChat: () -> Unit,
     onNewGroup: () -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        // "New Group" mini FAB
+        // ── Animated menu items ──────────────────────────────────────────
         AnimatedVisibility(
             visible = isExpanded,
-            enter = fadeIn(tween(150)) + scaleIn(tween(150)) + slideInVertically(tween(150)) { it / 2 },
-            exit = fadeOut(tween(100)) + scaleOut(tween(100)) + slideOutVertically(tween(100)) { it / 2 }
+            enter = fadeIn() + slideInVertically { it / 2 } + scaleIn(initialScale = 0.8f),
+            exit = fadeOut() + slideOutVertically { it / 2 } + scaleOut(targetScale = 0.8f)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(bottom = 4.dp, end = 4.dp)
             ) {
-                Text(
-                    text = "New Group",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .background(
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            shape = RoundedCornerShape(4.dp)
-                        )
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                FabMenuItem(
+                    icon = Icons.Rounded.Group,
+                    label = "New Group",
+                    onClick = onNewGroup
                 )
-                SmallFloatingActionButton(
-                    onClick = onNewGroup,
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                ) {
-                    Icon(
-                        Icons.Default.GroupAdd,
-                        contentDescription = "New Group"
-                    )
-                }
+                FabMenuItem(
+                    icon = Icons.Rounded.Edit,
+                    label = "New Chat",
+                    onClick = onNewChat
+                )
             }
         }
 
-        // "New Chat" mini FAB
-        AnimatedVisibility(
-            visible = isExpanded,
-            enter = fadeIn(tween(100)) + scaleIn(tween(100)) + slideInVertically(tween(100)) { it / 2 },
-            exit = fadeOut(tween(80)) + scaleOut(tween(80)) + slideOutVertically(tween(80)) { it / 2 }
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "New Chat",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .background(
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            shape = RoundedCornerShape(4.dp)
-                        )
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-                SmallFloatingActionButton(
-                    onClick = onNewChat,
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                ) {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = "New Chat"
-                    )
-                }
-            }
+        // ── Main FAB with transition animations ─────────────────────────
+        val transition = updateTransition(targetState = isExpanded, label = "FAB Transition")
+
+        val fabSize by transition.animateDp(label = "FAB Size") { expanded ->
+            if (expanded) 48.dp else 56.dp
         }
 
-        // Main FAB (toggle)
+        val fabShape by transition.animateDp(label = "FAB Shape") { expanded ->
+            if (expanded) 28.dp else 16.dp
+        }
+
+        val containerColor by transition.animateColor(label = "FAB Color") { expanded ->
+            if (expanded)
+                MaterialTheme.colorScheme.secondary
+            else
+                MaterialTheme.colorScheme.primary
+        }
+
+        val iconRotation by transition.animateFloat(label = "Icon Rotation") { expanded ->
+            if (expanded) 90f else 0f
+        }
+
+        val fabElevation by transition.animateDp(
+            transitionSpec = {
+                spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            },
+            label = "FAB Elevation"
+        ) { expanded ->
+            if (expanded) 8.dp else 6.dp
+        }
+
         FloatingActionButton(
             onClick = onToggle,
-            containerColor = MaterialTheme.colorScheme.primary,
-            shape = MaterialTheme.shapes.large
+            containerColor = containerColor,
+            shape = MaterialTheme.shapes.large,
+            modifier = Modifier
+                .size(fabSize)
+                .shadow(fabElevation, MaterialTheme.shapes.large)
         ) {
             Icon(
-                Icons.Default.Add,
-                contentDescription = if (isExpanded) "Close menu" else "Open menu",
-                tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.rotate(fabRotation)
+                imageVector = if (isExpanded) Icons.Rounded.Close else Icons.Rounded.Edit,
+                contentDescription = if (isExpanded) "Close menu" else "New conversation",
+                tint = if (isExpanded)
+                    MaterialTheme.colorScheme.onSecondary
+                else
+                    MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier
+                    .size(24.dp)
+                    .rotate(iconRotation)
+            )
+        }
+    }
+}
+
+@Composable
+private fun FabMenuItem(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .shadow(4.dp, RoundedCornerShape(50)),
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.primary
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.onPrimary
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontSize = 16.sp
+                )
             )
         }
     }
@@ -381,7 +478,6 @@ internal fun ConversationRow(
     onDismissContextMenu: () -> Unit,
     onPin: () -> Unit,
     onMute: () -> Unit,
-    onArchive: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -515,7 +611,6 @@ internal fun ConversationRow(
             onDismiss = onDismissContextMenu,
             onPin = onPin,
             onMute = onMute,
-            onArchive = onArchive,
             onDelete = onDelete
         )
     }
@@ -579,7 +674,6 @@ private fun ConversationContextMenu(
     onDismiss: () -> Unit,
     onPin: () -> Unit,
     onMute: () -> Unit,
-    onArchive: () -> Unit,
     onDelete: () -> Unit
 ) {
     DropdownMenu(
@@ -609,22 +703,8 @@ private fun ConversationContextMenu(
             },
             leadingIcon = {
                 Icon(
-                    imageVector = Icons.Default.NotificationsOff,
+                    imageVector = if (isMuted) Icons.Outlined.Notifications else Icons.Default.NotificationsOff,
                     contentDescription = if (isMuted) "Unmute conversation" else "Mute conversation"
-                )
-            }
-        )
-        // Archive action
-        DropdownMenuItem(
-            text = { Text("Archive") },
-            onClick = {
-                onDismiss()
-                onArchive()
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Archive,
-                    contentDescription = "Archive conversation"
                 )
             }
         )

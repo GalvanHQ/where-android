@@ -39,4 +39,7 @@ interface ConversationDao {
 
     @Query("SELECT lastSyncTimestamp FROM conversations WHERE id = :conversationId")
     suspend fun getLastSyncTimestamp(conversationId: String): Long?
+
+    @Query("SELECT COUNT(*) FROM conversations WHERE pinnedByJson LIKE '%' || :uid || '%'")
+    suspend fun getPinnedCountForUser(uid: String): Int
 }

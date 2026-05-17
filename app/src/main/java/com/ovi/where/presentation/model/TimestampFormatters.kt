@@ -1,24 +1,33 @@
 package com.ovi.where.presentation.model
 
+import com.ovi.where.core.utils.DateTimeUtils
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-/** Formats a millisecond timestamp for the conversation list (HH:mm / Yesterday / Day / dd/MM/yy). */
+/**
+ * Formats a millisecond timestamp for the conversation list row.
+ *
+ * Delegates to [DateTimeUtils] for core time/date formatting:
+ * - Today → time only via [DateTimeUtils.formatTime] (e.g. "02:32 PM")
+ * - Yesterday → "Yesterday"
+ * - Same week → day name (e.g. "Monday")
+ * - Older → short date via dd/MM/yy
+ */
 fun formatConversationTimestamp(timestamp: Long): String {
     if (timestamp == 0L) return ""
     val now = Calendar.getInstance()
     val msgCal = Calendar.getInstance().apply { time = Date(timestamp) }
 
-    // Today check: same year and same day-of-year
+    // Today → delegate to DateTimeUtils.formatTime
     val isSameDay = now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) &&
             now.get(Calendar.DAY_OF_YEAR) == msgCal.get(Calendar.DAY_OF_YEAR)
     if (isSameDay) {
-        return SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp))
+        return DateTimeUtils.formatTime(timestamp)
     }
 
-    // Yesterday check: subtract 1 calendar day from now and compare year + day-of-year
+    // Yesterday
     val yesterday = Calendar.getInstance().apply {
         timeInMillis = now.timeInMillis
         add(Calendar.DATE, -1)
@@ -29,14 +38,14 @@ fun formatConversationTimestamp(timestamp: Long): String {
         return "Yesterday"
     }
 
-    // Same calendar week check: same year and same week-of-year
+    // Same calendar week → day name
     val isSameWeek = now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) &&
             now.get(Calendar.WEEK_OF_YEAR) == msgCal.get(Calendar.WEEK_OF_YEAR)
     if (isSameWeek) {
         return SimpleDateFormat("EEEE", Locale.getDefault()).format(Date(timestamp))
     }
 
-    // Older dates: fall back to dd/MM/yy
+    // Older → short date
     return SimpleDateFormat("dd/MM/yy", Locale.getDefault()).format(Date(timestamp))
 }
 

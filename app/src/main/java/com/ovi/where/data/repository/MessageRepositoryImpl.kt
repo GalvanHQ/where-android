@@ -1363,8 +1363,11 @@ class MessageRepositoryImpl @Inject constructor(
                 .child("voice_messages/$conversationId/$userId/${tempId}.m4a")
 
             val uploadUri = android.net.Uri.fromFile(audioFile)
+            val metadata = com.google.firebase.storage.StorageMetadata.Builder()
+                .setContentType("audio/mp4")
+                .build()
             withTimeout(UPLOAD_TIMEOUT_MS) {
-                storageRef.putFile(uploadUri).await()
+                storageRef.putFile(uploadUri, metadata).await()
             }
             val downloadUrl = storageRef.downloadUrl.await().toString()
 

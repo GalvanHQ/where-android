@@ -9,8 +9,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,31 +20,30 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.EmojiEmotions
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.InputChip
-import androidx.compose.material3.InputChipDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -61,8 +58,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.ovi.where.R
@@ -71,10 +69,9 @@ import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.showToast
 import com.ovi.where.domain.model.User
 import com.ovi.where.presentation.common.PrimaryButton
-import com.ovi.where.presentation.common.WhereTextField
 import com.ovi.where.presentation.common.WhereTopAppBar
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateGroupScreen(
     onNavigateBack: () -> Unit,
@@ -85,18 +82,21 @@ fun CreateGroupScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let { viewModel.onAvatarSelected(it) }
     }
 
-    // Camera launcher (simplified — uses gallery for now)
     val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let { viewModel.onAvatarSelected(it) }
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        // Convert bitmap to Uri via a temp file for the ViewModel
+        if (bitmap != null) {
+            val file = java.io.File(context.cacheDir, "group_avatar_${System.currentTimeMillis()}.jpg")
+            file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
+            viewModel.onAvatarSelected(Uri.fromFile(file))
+        }
     }
 
     LaunchedEffect(key1 = true) {
@@ -114,9 +114,7 @@ fun CreateGroupScreen(
                     }
                     context.startActivity(Intent.createChooser(shareIntent, event.title))
                 }
-                is UiEvent.Navigate -> {
-                    // Navigation handled by parent
-                }
+                is UiEvent.Navigate -> { /* Navigation handled by parent */ }
                 is UiEvent.NavigateUp -> onNavigateBack()
                 else -> Unit
             }
@@ -132,297 +130,379 @@ fun CreateGroupScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        Surface(
+        if (uiState.isGroupCreated) {
+            InviteCodeDisplay(
+                inviteCode = uiState.inviteCode,
+                onShare = viewModel::onShareInviteCode,
+                onNavigateToChat = {
+                    val convId = uiState.createdConversationId
+                    if (convId != null) onGroupCreated(convId)
+                },
+                modifier = Modifier.padding(paddingValues)
+            )
+        } else {
+            CreateGroupForm(
+                uiState = uiState,
+                onNameChange = viewModel::onNameChange,
+                onDescriptionChange = viewModel::onDescriptionChange,
+                onMemberSearchQueryChange = viewModel::onMemberSearchQueryChange,
+                onMemberSelected = viewModel::onMemberSelected,
+                onMemberRemoved = viewModel::onMemberRemoved,
+                onPickFromGallery = { imagePickerLauncher.launch("image/*") },
+                onPickFromCamera = { cameraLauncher.launch(null) },
+                onCreateGroup = viewModel::onCreateGroup,
+                modifier = Modifier.padding(paddingValues)
+            )
+        }
+    }
+}
+
+// ── Group Creation Form ─────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CreateGroupForm(
+    uiState: CreateGroupUiState,
+    onNameChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
+    onMemberSearchQueryChange: (String) -> Unit,
+    onMemberSelected: (User) -> Unit,
+    onMemberRemoved: (User) -> Unit,
+    onPickFromGallery: () -> Unit,
+    onPickFromCamera: () -> Unit,
+    onCreateGroup: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showAvatarSheet by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .imePadding()
+    ) {
+        // ── Header: Avatar + Name inline (WhatsApp-style) ────────────────
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            color = MaterialTheme.colorScheme.background
+                .fillMaxWidth()
+                .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceXLarge),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            if (uiState.isGroupCreated) {
-                // ── Post-creation: Invite Code Display ───────────────────────
-                InviteCodeDisplay(
-                    inviteCode = uiState.inviteCode,
-                    onShare = viewModel::onShareInviteCode,
-                    onNavigateToChat = {
-                        val convId = uiState.createdConversationId
-                        if (convId != null) onGroupCreated(convId)
-                    }
+            // Avatar
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .clickable { showAvatarSheet = true },
+                contentAlignment = Alignment.Center
+            ) {
+                if (uiState.avatarUri != null) {
+                    AsyncImage(
+                        model = uiState.avatarUri,
+                        contentDescription = "Group avatar",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(64.dp).clip(CircleShape)
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.AddAPhoto,
+                        contentDescription = "Add group photo",
+                        modifier = Modifier.size(28.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(Dimens.spaceLarge))
+
+            // Name field inline
+            Column(modifier = Modifier.weight(1f)) {
+                OutlinedTextField(
+                    value = uiState.name,
+                    onValueChange = onNameChange,
+                    label = { Text(stringResource(R.string.label_group_name)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isLoading,
+                    isError = uiState.nameError != null,
+                    singleLine = true,
+                    shape = RoundedCornerShape(Dimens.cornerSmall),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
                 )
-            } else {
-                // ── Group Creation Form ──────────────────────────────────────
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .imePadding()
-                        .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceLarge),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // ── Avatar Picker ────────────────────────────────────────
-                    GroupAvatarPicker(
-                        avatarUri = uiState.avatarUri,
-                        onPickFromGallery = { imagePickerLauncher.launch("image/*") },
-                        onPickFromCamera = { cameraLauncher.launch("image/*") },
-                        onPickEmoji = { /* Emoji picker placeholder */ }
-                    )
-
-                    Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
-
-                    // ── Group Name Input ─────────────────────────────────────
-                    WhereTextField(
-                        value = uiState.name,
-                        onValueChange = viewModel::onNameChange,
-                        label = stringResource(R.string.label_group_name),
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !uiState.isLoading,
-                        isError = uiState.nameError != null,
-                        errorMessage = uiState.nameError,
-                        imeAction = ImeAction.Next
-                    )
-
-                    Spacer(modifier = Modifier.height(Dimens.spaceMedium))
-
-                    // ── Description Input ────────────────────────────────────
-                    WhereTextField(
-                        value = uiState.description,
-                        onValueChange = viewModel::onDescriptionChange,
-                        label = stringResource(R.string.label_description_optional),
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !uiState.isLoading,
-                        singleLine = false,
-                        maxLines = 3,
-                        minLines = 2,
-                        imeAction = ImeAction.Next
-                    )
-
-                    Spacer(modifier = Modifier.height(Dimens.spaceLarge))
-
-                    // ── Selected Members Chip Row ────────────────────────────
-                    if (uiState.selectedMembers.isNotEmpty()) {
-                        Text(
-                            text = "Members (${uiState.selectedMembers.size})",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = Dimens.spaceMedium)
-                        )
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium),
-                            verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
-                        ) {
-                            uiState.selectedMembers.forEach { member ->
-                                InputChip(
-                                    selected = true,
-                                    onClick = { viewModel.onMemberRemoved(member) },
-                                    label = {
-                                        Text(
-                                            text = member.displayName,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        Icon(
-                                            Icons.Default.Close,
-                                            contentDescription = "Remove ${member.displayName}",
-                                            modifier = Modifier.size(Dimens.iconSizeSmall)
-                                        )
-                                    },
-                                    colors = InputChipDefaults.inputChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(Dimens.spaceMedium))
-                    }
-
-                    // ── Member Search Field ──────────────────────────────────
-                    WhereTextField(
-                        value = uiState.memberSearchQuery,
-                        onValueChange = viewModel::onMemberSearchQueryChange,
-                        label = "Search members to add",
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !uiState.isLoading,
-                        imeAction = ImeAction.Done
-                    )
-
-                    // Members error
-                    uiState.membersError?.let { error ->
-                        Spacer(modifier = Modifier.height(Dimens.spaceSmall))
-                        Text(
-                            text = error,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-
-                    // ── Search Results ────────────────────────────────────────
-                    if (uiState.isSearching) {
-                        Spacer(modifier = Modifier.height(Dimens.spaceMedium))
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(Dimens.iconSizeMedium),
-                            strokeWidth = Dimens.strokeWidthThin
-                        )
-                    } else if (uiState.searchResults.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(Dimens.spaceMedium))
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.medium,
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            )
-                        ) {
-                            Column {
-                                uiState.searchResults.forEach { user ->
-                                    MemberSearchResultItem(
-                                        user = user,
-                                        onClick = { viewModel.onMemberSelected(user) }
-                                    )
-                                    if (user != uiState.searchResults.last()) {
-                                        HorizontalDivider(
-                                            thickness = Dimens.dividerThickness,
-                                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // ── Error Message ─────────────────────────────────────────
-                    uiState.error?.let { error ->
-                        Spacer(modifier = Modifier.height(Dimens.spaceMedium))
-                        Text(
-                            text = error,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
-
-                    // ── Create Button ─────────────────────────────────────────
-                    PrimaryButton(
-                        text = stringResource(R.string.action_create_group),
-                        onClick = viewModel::onCreateGroup,
-                        modifier = Modifier.fillMaxWidth(),
-                        isLoading = uiState.isLoading
+                uiState.nameError?.let { error ->
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 4.dp, start = 4.dp)
                     )
                 }
             }
         }
-    }
-}
 
-// ── Group Avatar Picker ─────────────────────────────────────────────────────────
-
-@Composable
-private fun GroupAvatarPicker(
-    avatarUri: Uri?,
-    onPickFromGallery: () -> Unit,
-    onPickFromCamera: () -> Unit,
-    onPickEmoji: () -> Unit
-) {
-    var showMenu by remember { mutableStateOf(false) }
-
-    Box(contentAlignment = Alignment.Center) {
-        Box(
+        // ── Description ──────────────────────────────────────────────────
+        OutlinedTextField(
+            value = uiState.description,
+            onValueChange = onDescriptionChange,
+            label = { Text(stringResource(R.string.label_description_optional)) },
             modifier = Modifier
-                .size(Dimens.avatarSizeXLarge)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .clickable { showMenu = true },
-            contentAlignment = Alignment.Center
-        ) {
-            if (avatarUri != null) {
-                AsyncImage(
-                    model = avatarUri,
-                    contentDescription = "Group avatar",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(Dimens.avatarSizeXLarge)
-                        .clip(CircleShape)
-                )
-            } else {
+                .fillMaxWidth()
+                .padding(horizontal = Dimens.spaceLarge),
+            enabled = !uiState.isLoading,
+            singleLine = false,
+            maxLines = 3,
+            minLines = 2,
+            shape = RoundedCornerShape(Dimens.cornerSmall),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+            )
+        )
+
+        Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
+
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+            modifier = Modifier.padding(horizontal = Dimens.spaceLarge)
+        )
+
+        Spacer(modifier = Modifier.height(Dimens.spaceLarge))
+
+        // ── Members Section ──────────────────────────────────────────────
+        Text(
+            text = if (uiState.selectedMembers.isNotEmpty())
+                "Add Members · ${uiState.selectedMembers.size} selected"
+            else "Add Members",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = Dimens.spaceLarge)
+        )
+
+        Spacer(modifier = Modifier.height(Dimens.spaceMedium))
+
+        // Search field
+        OutlinedTextField(
+            value = uiState.memberSearchQuery,
+            onValueChange = onMemberSearchQueryChange,
+            placeholder = { Text("Search friends") },
+            leadingIcon = {
                 Icon(
-                    Icons.Default.AddAPhoto,
-                    contentDescription = "Add group photo",
-                    modifier = Modifier.size(Dimens.iconSizeLarge),
-                    tint = MaterialTheme.colorScheme.primary
+                    Icons.Default.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Dimens.spaceLarge),
+            enabled = !uiState.isLoading,
+            singleLine = true,
+            shape = RoundedCornerShape(Dimens.cornerMedium),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            )
+        )
+
+        uiState.membersError?.let { error ->
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(start = Dimens.spaceLarge, top = Dimens.spaceSmall)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(Dimens.spaceMedium))
+
+        // Results / friend list
+        if (uiState.isSearching) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = Dimens.spaceLarge),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(Dimens.iconSizeMedium),
+                    strokeWidth = Dimens.strokeWidthThin
+                )
+            }
+        } else if (uiState.searchResults.isNotEmpty()) {
+            val selectedIds = uiState.selectedMembers.map { it.id }.toSet()
+            Column(modifier = Modifier.fillMaxWidth()) {
+                uiState.searchResults.forEach { user ->
+                    val isSelected = user.id in selectedIds
+                    ContactSelectableRow(
+                        user = user,
+                        isSelected = isSelected,
+                        onClick = {
+                            if (isSelected) onMemberRemoved(user) else onMemberSelected(user)
+                        }
+                    )
+                }
+            }
+        } else if (uiState.memberSearchQuery.isNotBlank()) {
+            Text(
+                text = "No friends found",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceLarge)
+            )
+        }
+
+        // General error
+        uiState.error?.let { error ->
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(
+                    start = Dimens.spaceLarge,
+                    top = Dimens.spaceMedium
+                )
+            )
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // ── Create Button (pinned to bottom) ─────────────────────────────
+        PrimaryButton(
+            text = stringResource(R.string.action_create_group),
+            onClick = onCreateGroup,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceLarge),
+            isLoading = uiState.isLoading
+        )
+    }
+
+    // ── Avatar Picker Bottom Sheet ───────────────────────────────────────
+    if (showAvatarSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showAvatarSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = Dimens.space2XLarge)
+            ) {
+                Text(
+                    text = "Choose photo",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(
+                        horizontal = Dimens.spaceXLarge,
+                        vertical = Dimens.spaceLarge
+                    )
+                )
+                ListItem(
+                    headlineContent = { Text("Take a photo") },
+                    leadingContent = {
+                        Icon(Icons.Default.CameraAlt, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable {
+                        showAvatarSheet = false
+                        onPickFromCamera()
+                    }
+                )
+                ListItem(
+                    headlineContent = { Text("Choose from gallery") },
+                    leadingContent = {
+                        Icon(Icons.Default.Image, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable {
+                        showAvatarSheet = false
+                        onPickFromGallery()
+                    }
                 )
             }
         }
-
-        DropdownMenu(
-            expanded = showMenu,
-            onDismissRequest = { showMenu = false }
-        ) {
-            DropdownMenuItem(
-                text = { Text("Camera") },
-                onClick = {
-                    showMenu = false
-                    onPickFromCamera()
-                },
-                leadingIcon = { Icon(Icons.Default.CameraAlt, null) }
-            )
-            DropdownMenuItem(
-                text = { Text("Gallery") },
-                onClick = {
-                    showMenu = false
-                    onPickFromGallery()
-                },
-                leadingIcon = { Icon(Icons.Default.Image, null) }
-            )
-            DropdownMenuItem(
-                text = { Text("Emoji") },
-                onClick = {
-                    showMenu = false
-                    onPickEmoji()
-                },
-                leadingIcon = { Icon(Icons.Default.EmojiEmotions, null) }
-            )
-        }
     }
 }
 
-// ── Member Search Result Item ───────────────────────────────────────────────────
+// ── Contact Selectable Row ──────────────────────────────────────────────────────
 
 @Composable
-private fun MemberSearchResultItem(
+private fun ContactSelectableRow(
     user: User,
+    isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    ListItem(
-        headlineContent = {
-            Text(
-                text = user.displayName,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .background(
+                if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+                else androidx.compose.ui.graphics.Color.Transparent
             )
-        },
-        leadingContent = {
+            .padding(horizontal = Dimens.spaceLarge, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Avatar with checkmark overlay
+        Box {
             Box(
                 modifier = Modifier
-                    .size(Dimens.avatarSizeSmall)
+                    .size(44.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.secondaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = user.displayName.take(1).uppercase(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
+                if (user.photoUrl != null) {
+                    AsyncImage(
+                        model = user.photoUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(44.dp).clip(CircleShape)
+                    )
+                } else {
+                    Text(
+                        text = user.displayName.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
             }
-        },
-        modifier = Modifier.clickable(onClick = onClick)
-    )
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(12.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.width(12.dp))
+
+        Text(
+            text = user.displayName,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+    }
 }
 
 // ── Invite Code Display (Post-Creation) ─────────────────────────────────────────
@@ -431,29 +511,57 @@ private fun MemberSearchResultItem(
 private fun InviteCodeDisplay(
     inviteCode: String,
     onShare: () -> Unit,
-    onNavigateToChat: () -> Unit
+    onNavigateToChat: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceLarge),
+            .padding(horizontal = Dimens.spaceXLarge),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.Share,
+                contentDescription = null,
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
+
         Text(
             text = "Group Created!",
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
         )
 
-        Spacer(modifier = Modifier.height(Dimens.spaceLarge))
+        Spacer(modifier = Modifier.height(Dimens.spaceMedium))
 
-        Card(
+        Text(
+            text = "Share this code with friends so they can join.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(Dimens.space2XLarge))
+
+        // Invite code
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
+            shape = RoundedCornerShape(Dimens.cornerMedium),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            tonalElevation = 0.dp
         ) {
             Column(
                 modifier = Modifier
@@ -462,29 +570,22 @@ private fun InviteCodeDisplay(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = stringResource(R.string.title_invite_code),
+                    text = "Invite Code",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(Dimens.spaceMedium))
                 Text(
                     text = inviteCode,
-                    style = MaterialTheme.typography.headlineLarge,
+                    style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(Dimens.spaceMedium))
-                Text(
-                    text = stringResource(R.string.msg_share_invite_instruction),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
+        Spacer(modifier = Modifier.height(Dimens.space2XLarge))
 
-        // Share button
         PrimaryButton(
             text = "Share Invite Code",
             onClick = onShare,
@@ -493,9 +594,8 @@ private fun InviteCodeDisplay(
 
         Spacer(modifier = Modifier.height(Dimens.spaceMedium))
 
-        // Go to chat button
         PrimaryButton(
-            text = "Go to Group Chat",
+            text = "Go to Group",
             onClick = onNavigateToChat,
             modifier = Modifier.fillMaxWidth(),
             containerColor = MaterialTheme.colorScheme.secondaryContainer,

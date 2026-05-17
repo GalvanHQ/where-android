@@ -29,11 +29,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -53,12 +52,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -94,7 +91,6 @@ fun JoinGroupScreen(
 
     var inviteCode by remember { mutableStateOf("") }
     var showSuccess by remember { mutableStateOf(false) }
-    var joinedGroupId by remember { mutableStateOf<String?>(null) }
 
     // Check clipboard for a valid 8-char code
     val clipboardText = clipboardManager.getText()?.text?.trim()?.uppercase()
@@ -111,7 +107,6 @@ fun JoinGroupScreen(
                 }
                 is com.ovi.where.core.common.UiEvent.Navigate -> {
                     val groupId = event.route.substringAfterLast("/")
-                    joinedGroupId = groupId
                     showSuccess = true
                     delay(1500L)
                     onGroupJoined(groupId)
@@ -136,187 +131,151 @@ fun JoinGroupScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        Surface(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
-            color = MaterialTheme.colorScheme.background
+                .padding(paddingValues)
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .imePadding()
-                        .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceLarge),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Spacer(modifier = Modifier.height(Dimens.space2XLarge))
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .imePadding()
+                    .padding(horizontal = Dimens.spaceXLarge),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(modifier = Modifier.height(48.dp))
 
-                    // ── Hero Icon ────────────────────────────────────────────
-                    Box(
-                        modifier = Modifier
-                            .size(Dimens.avatarCircle)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = ImageVector.vectorResource(id = R.drawable.team_check_alt),
-                            contentDescription = null,
-                            modifier = Modifier.size(Dimens.iconSizeXLarge),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
+                // ── Headline ─────────────────────────────────────────────
+                Text(
+                    text = stringResource(R.string.msg_enter_invite_code),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
 
-                    Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
+                Spacer(modifier = Modifier.height(Dimens.spaceMedium))
 
-                    // ── Headline ─────────────────────────────────────────────
-                    Text(
-                        text = stringResource(R.string.msg_enter_invite_code),
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
+                Text(
+                    text = stringResource(R.string.msg_invite_code_instruction),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
 
-                    Spacer(modifier = Modifier.height(Dimens.spaceMedium))
+                Spacer(modifier = Modifier.height(40.dp))
 
-                    Text(
-                        text = stringResource(R.string.msg_invite_code_instruction),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(Dimens.space2XLarge))
-
-                    // ── Segmented Code Input ────────────────────────────────
-                    SegmentedCodeInput(
-                        value = inviteCode,
-                        onValueChange = { newValue ->
-                            if (newValue.length <= INVITE_CODE_LENGTH) {
-                                inviteCode = newValue.uppercase()
-                            }
-                        },
-                        isError = uiState.error != null,
-                        focusRequester = focusRequester,
-                        onDone = {
-                            if (inviteCode.length == INVITE_CODE_LENGTH) {
-                                keyboardController?.hide()
-                                viewModel.joinGroup(inviteCode)
-                            }
+                // ── Segmented Code Input ────────────────────────────────
+                SegmentedCodeInput(
+                    value = inviteCode,
+                    onValueChange = { newValue ->
+                        if (newValue.length <= INVITE_CODE_LENGTH) {
+                            inviteCode = newValue.uppercase()
                         }
-                    )
-
-                    Spacer(modifier = Modifier.height(Dimens.spaceMedium))
-
-                    // ── Error Card ───────────────────────────────────────────
-                    AnimatedVisibility(visible = uiState.error != null) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer
-                            ),
-                            shape = MaterialTheme.shapes.medium
-                        ) {
-                            Text(
-                                text = uiState.error ?: "",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.padding(Dimens.spaceLarge)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(Dimens.spaceMedium))
-
-                    // ── Paste from Clipboard Chip ────────────────────────────
-                    if (hasValidClipboard) {
-                        AssistChip(
-                            onClick = {
-                                inviteCode = clipboardText ?: ""
-                            },
-                            label = { Text("Paste from clipboard") },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.ContentPaste,
-                                    contentDescription = "Paste",
-                                    modifier = Modifier.size(AssistChipDefaults.IconSize)
-                                )
-                            }
-                        )
-                        Spacer(modifier = Modifier.height(Dimens.spaceLarge))
-                    }
-
-                    Spacer(modifier = Modifier.height(Dimens.spaceLarge))
-
-                    // ── Join Button ──────────────────────────────────────────
-                    PrimaryButton(
-                        text = stringResource(R.string.action_join_group),
-                        onClick = {
+                    },
+                    isError = uiState.error != null,
+                    focusRequester = focusRequester,
+                    onDone = {
+                        if (inviteCode.length == INVITE_CODE_LENGTH) {
                             keyboardController?.hide()
                             viewModel.joinGroup(inviteCode)
-                        },
-                        isLoading = uiState.isLoading,
-                        enabled = inviteCode.length == INVITE_CODE_LENGTH,
-                        modifier = Modifier.fillMaxWidth()
+                        }
+                    }
+                )
+
+                // ── Error Message ────────────────────────────────────────
+                AnimatedVisibility(visible = uiState.error != null) {
+                    Text(
+                        text = uiState.error ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = Dimens.spaceMedium)
                     )
                 }
 
-                // ── Success Overlay ─────────────────────────────────────────
-                AnimatedVisibility(
-                    visible = showSuccess,
-                    enter = fadeIn() + scaleIn(
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow
-                        )
-                    ),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.95f)),
-                        contentAlignment = Alignment.Center
+                Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
+
+                // ── Paste from Clipboard ─────────────────────────────────
+                if (hasValidClipboard) {
+                    FilledTonalButton(
+                        onClick = { inviteCode = clipboardText ?: "" }
                     ) {
-                        Card(
+                        Icon(
+                            Icons.Default.ContentPaste,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(Dimens.spaceMedium))
+                        Text("Paste from clipboard")
+                    }
+                    Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
+                }
+
+                // ── Join Button ──────────────────────────────────────────
+                PrimaryButton(
+                    text = stringResource(R.string.action_join_group),
+                    onClick = {
+                        keyboardController?.hide()
+                        viewModel.joinGroup(inviteCode)
+                    },
+                    isLoading = uiState.isLoading,
+                    enabled = inviteCode.length == INVITE_CODE_LENGTH,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(Dimens.space2XLarge))
+            }
+
+            // ── Success Overlay ─────────────────────────────────────────
+            AnimatedVisibility(
+                visible = showSuccess,
+                enter = fadeIn() + scaleIn(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                ),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.95f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(Dimens.space2XLarge)
+                    ) {
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(Dimens.space2XLarge),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer
-                            ),
-                            shape = MaterialTheme.shapes.large
+                                .size(72.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(Dimens.spaceXLarge),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = "Success",
-                                    modifier = Modifier.size(Dimens.iconSizeXLarge),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.height(Dimens.spaceLarge))
-                                Text(
-                                    text = "Joined Successfully!",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                                Spacer(modifier = Modifier.height(Dimens.spaceMedium))
-                                Text(
-                                    text = "Taking you to the group…",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                                )
-                            }
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = "Success",
+                                modifier = Modifier.size(40.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
                         }
+                        Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
+                        Text(
+                            text = "Joined Successfully!",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.height(Dimens.spaceMedium))
+                        Text(
+                            text = "Taking you to the group…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -337,7 +296,6 @@ private fun SegmentedCodeInput(
     BasicTextField(
         value = value,
         onValueChange = { newValue ->
-            // Only allow alphanumeric characters
             val filtered = newValue.filter { it.isLetterOrDigit() }
             if (filtered.length <= INVITE_CODE_LENGTH) {
                 onValueChange(filtered)
@@ -373,7 +331,7 @@ private fun SegmentedCodeInput(
 
                     Box(
                         modifier = Modifier
-                            .size(width = 38.dp, height = 48.dp)
+                            .size(width = 40.dp, height = 52.dp)
                             .clip(RoundedCornerShape(Dimens.cornerSmall))
                             .background(bgColor)
                             .border(
@@ -383,23 +341,31 @@ private fun SegmentedCodeInput(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = char?.toString() ?: "",
-                            style = TextStyle(
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                textAlign = TextAlign.Center
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        if (char != null) {
+                            Text(
+                                text = char.toString(),
+                                style = TextStyle(
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    textAlign = TextAlign.Center
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        } else if (isFocused) {
+                            Box(
+                                modifier = Modifier
+                                    .width(2.dp)
+                                    .height(24.dp)
+                                    .background(MaterialTheme.colorScheme.primary)
+                            )
+                        }
                     }
 
-                    // Add a small gap between characters, wider gap at midpoint
                     if (index < INVITE_CODE_LENGTH - 1) {
                         Spacer(
                             modifier = Modifier.width(
-                                if (index == 3) Dimens.spaceMedium else Dimens.spaceSmall
+                                if (index == 3) 12.dp else 6.dp
                             )
                         )
                     }

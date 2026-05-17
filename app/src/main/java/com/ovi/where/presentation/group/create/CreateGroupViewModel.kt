@@ -13,8 +13,8 @@ import com.ovi.where.core.constants.AppConstants.MIN_SEARCH_QUERY_LENGTH
 import com.ovi.where.core.constants.AppConstants.SEARCH_DEBOUNCE_MS
 import com.ovi.where.core.utils.ImageUploadUtil
 import com.ovi.where.domain.model.User
-import com.ovi.where.domain.repository.UserRepository
 import com.ovi.where.domain.usecase.chat.CreateGroupConversationUseCase
+import com.ovi.where.domain.usecase.friend.ObserveFriendsUseCase
 import com.ovi.where.domain.usecase.group.CreateGroupUseCase
 import com.ovi.where.presentation.navigation.Screen
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,7 +25,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -49,7 +48,7 @@ class CreateGroupViewModel @Inject constructor(
     application: Application,
     private val createGroupUseCase: CreateGroupUseCase,
     private val createGroupConversationUseCase: CreateGroupConversationUseCase,
-    private val userRepository: UserRepository,
+    private val observeFriendsUseCase: ObserveFriendsUseCase,
     private val firebaseAuth: FirebaseAuth
 ) : AndroidViewModel(application) {
 
@@ -63,6 +62,9 @@ class CreateGroupViewModel @Inject constructor(
 
     private val currentUserId: String get() = firebaseAuth.currentUser?.uid ?: ""
 
+    /** Cached friends list for local filtering. */
+    private var allFriends: List<User> = emptyList()
+
     companion object {
         const val MIN_GROUP_NAME_LENGTH = 3
         const val MAX_GROUP_NAME_LENGTH = 50
@@ -71,13 +73,40 @@ class CreateGroupViewModel @Inject constructor(
     }
 
     init {
+        // Load friends list
+        viewModelScope.launch {
+            observeFriendsUseCase().collect { friends ->
+                allFriends = friends.map { entry ->
+                    User(
+                        id = entry.friendUid,
+                        displayName = entry.displayName,
+                        username = entry.username,
+                        photoUrl = entry.photoUrl
+                    )
+                }
+                // Re-filter if there's an active search query
+                val query = _uiState.value.memberSearchQuery
+                if (query.length >= MIN_SEARCH_QUERY_LENGTH) {
+                    filterFriends(query)
+                } else {
+                    // Show all friends when no query
+                    showAllFriends()
+                }
+            }
+        }
+
         // Debounced member search: 300ms debounce, minimum 2 characters
         viewModelScope.launch {
             memberSearchQuery
                 .debounce(SEARCH_DEBOUNCE_MS)
                 .distinctUntilChanged()
-                .filter { it.length >= MIN_SEARCH_QUERY_LENGTH }
-                .collect { query -> executeMemberSearch(query) }
+                .collect { query ->
+                    if (query.length >= MIN_SEARCH_QUERY_LENGTH) {
+                        filterFriends(query)
+                    } else {
+                        showAllFriends()
+                    }
+                }
         }
     }
 
@@ -101,81 +130,83 @@ class CreateGroupViewModel @Inject constructor(
 
     /**
      * Called when the member search query changes.
-     * Triggers debounced search when query >= 2 characters.
-     * Clears results when query is empty or too short.
+     * Filters friends locally.
+     * Shows all friends when query is empty.
      */
     fun onMemberSearchQueryChange(query: String) {
         _uiState.value = _uiState.value.copy(memberSearchQuery = query)
         memberSearchQuery.value = query
-        if (query.length < 2) {
-            _uiState.value = _uiState.value.copy(
-                searchResults = emptyList(),
-                isSearching = false
-            )
-        }
     }
 
     /**
-     * Executes the member search against the UserRepository.
-     * Filters out already-selected members and the current user.
-     * Limits results to 20.
+     * Filters the cached friends list locally by display name or username.
+     * Excludes already-selected members.
      */
-    private suspend fun executeMemberSearch(query: String) {
-        _uiState.value = _uiState.value.copy(isSearching = true)
+    private fun filterFriends(query: String) {
         val selectedIds = _uiState.value.selectedMembers.map { it.id }.toSet()
-
-        when (val result = userRepository.searchUsers(query)) {
-            is Resource.Success -> {
-                val users = result.data ?: emptyList()
-                val filtered = users
-                    .filter { it.id != currentUserId && it.id !in selectedIds }
-                    .take(20)
-                _uiState.value = _uiState.value.copy(
-                    searchResults = filtered,
-                    isSearching = false
-                )
+        val filtered = allFriends
+            .filter { friend ->
+                friend.id !in selectedIds &&
+                    (friend.displayName.contains(query, ignoreCase = true) ||
+                        friend.username.contains(query, ignoreCase = true))
             }
-            is Resource.Error -> {
-                _uiState.value = _uiState.value.copy(
-                    isSearching = false,
-                    error = result.message
-                )
-            }
-            else -> {}
-        }
+            .take(20)
+        _uiState.value = _uiState.value.copy(
+            searchResults = filtered,
+            isSearching = false
+        )
     }
 
     /**
-     * Adds a user to the selected members chip row.
-     * Removes them from search results to maintain consistency.
+     * Shows all friends (excluding already-selected) when there's no search query.
+     */
+    private fun showAllFriends() {
+        val selectedIds = _uiState.value.selectedMembers.map { it.id }.toSet()
+        val filtered = allFriends.filter { it.id !in selectedIds }
+        _uiState.value = _uiState.value.copy(
+            searchResults = filtered,
+            isSearching = false
+        )
+    }
+
+    /**
+     * Adds a user to the selected members.
+     * Removes them from the visible results.
      */
     fun onMemberSelected(user: User) {
         val currentSelected = _uiState.value.selectedMembers.toMutableList()
-        // Prevent duplicate selection
         if (currentSelected.any { it.id == user.id }) return
 
         currentSelected.add(user)
         _uiState.value = _uiState.value.copy(
             selectedMembers = currentSelected,
-            searchResults = _uiState.value.searchResults.filter { it.id != user.id },
             membersError = null
         )
+
+        // Re-filter to hide the selected user from results
+        val currentQuery = _uiState.value.memberSearchQuery
+        if (currentQuery.length >= MIN_SEARCH_QUERY_LENGTH) {
+            filterFriends(currentQuery)
+        } else {
+            showAllFriends()
+        }
     }
 
     /**
-     * Removes a user from the selected members chip row.
-     * If the user matches the current search query, restores them to search results.
+     * Removes a user from the selected members.
+     * Re-filters the friends list to show the removed user again.
      */
     fun onMemberRemoved(user: User) {
         val currentSelected = _uiState.value.selectedMembers.toMutableList()
         currentSelected.removeAll { it.id == user.id }
         _uiState.value = _uiState.value.copy(selectedMembers = currentSelected)
 
-        // If there's an active search query, re-run the search to restore the removed user
-        // in results (if they match the query)
+        // Re-filter to show the removed user in results again
         val currentQuery = _uiState.value.memberSearchQuery
-        if (currentQuery.length >= 2) {
-            viewModelScope.launch { executeMemberSearch(currentQuery) }
+        if (currentQuery.length >= MIN_SEARCH_QUERY_LENGTH) {
+            filterFriends(currentQuery)
+        } else {
+            showAllFriends()
         }
     }
 

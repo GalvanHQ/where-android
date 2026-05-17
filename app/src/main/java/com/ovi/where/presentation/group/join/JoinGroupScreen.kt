@@ -1,4 +1,4 @@
-package com.ovi.where.presentation.group
+package com.ovi.where.presentation.group.join
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
@@ -29,8 +29,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -38,7 +36,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -67,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ovi.where.R
+import com.ovi.where.core.common.UiEvent
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.common.PrimaryButton
@@ -102,10 +100,10 @@ fun JoinGroupScreen(
     LaunchedEffect(key1 = true) {
         viewModel.uiEvent.collect { event ->
             when (event) {
-                is com.ovi.where.core.common.UiEvent.ShowToast -> {
+                is UiEvent.ShowToast -> {
                     context.showToast(event.message)
                 }
-                is com.ovi.where.core.common.UiEvent.Navigate -> {
+                is UiEvent.Navigate -> {
                     val groupId = event.route.substringAfterLast("/")
                     showSuccess = true
                     delay(1500L)

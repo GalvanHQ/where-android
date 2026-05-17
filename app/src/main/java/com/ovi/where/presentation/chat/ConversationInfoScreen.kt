@@ -1,10 +1,9 @@
 package com.ovi.where.presentation.chat
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,13 +14,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Block
-
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Flag
@@ -30,9 +29,6 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.Search
-
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -46,14 +42,15 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -103,10 +100,11 @@ fun ConversationInfoScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         when {
             uiState.isLoading -> {
@@ -166,6 +164,8 @@ internal fun ConversationInfoContent(
     onNavigateToChat: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var showMuteDialog by remember { mutableStateOf(false) }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -222,7 +222,7 @@ internal fun ConversationInfoContent(
         // Action button row
         ActionButtonRow(
             isMuted = uiState.isMuted,
-            onToggleMute = onToggleMute,
+            onToggleMute = { showMuteDialog = true },
             onProfileTap = onNavigateToUserProfile,
             onSearchTap = onNavigateToChat
         )
@@ -241,17 +241,51 @@ internal fun ConversationInfoContent(
         CustomizeChatSection()
 
         // More Actions section
-        MoreActionsSection()
+        MoreActionsSection(
+            onSearchInConversation = onNavigateToChat,
+            onViewMedia = onNavigateToMediaGallery
+        )
 
         // Privacy & Support section (DM only — this screen is always DM)
         PrivacySupportSection()
 
         Spacer(modifier = Modifier.height(32.dp))
     }
+
+    // ── Mute Confirmation Dialog ─────────────────────────────────────────
+    if (showMuteDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showMuteDialog = false },
+            title = {
+                Text(if (uiState.isMuted) "Unmute conversation?" else "Mute conversation?")
+            },
+            text = {
+                Text(
+                    if (uiState.isMuted) "You will start receiving notifications from this conversation again."
+                    else "You will no longer receive notifications from this conversation."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showMuteDialog = false
+                        onToggleMute()
+                    }
+                ) {
+                    Text(if (uiState.isMuted) "Unmute" else "Mute")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMuteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 /**
- * Horizontal row of circular action buttons with labels.
+ * Horizontal row of card-style action buttons with labels.
  * Actions: Profile, Mute, Search
  */
 @Composable
@@ -266,66 +300,70 @@ internal fun ActionButtonRow(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        ActionButton(
+        InfoActionButton(
             icon = Icons.Filled.Person,
             label = "Profile",
+            modifier = Modifier.weight(1f),
             onClick = onProfileTap
         )
-        ActionButton(
+        InfoActionButton(
             icon = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
             label = if (isMuted) "Unmute" else "Mute",
+            modifier = Modifier.weight(1f),
             onClick = onToggleMute
         )
-        ActionButton(
+        InfoActionButton(
             icon = Icons.Filled.Search,
             label = "Search",
+            modifier = Modifier.weight(1f),
             onClick = onSearchTap
         )
     }
 }
 
 /**
- * Single circular action button with icon and label below.
- * Icon circle is 40dp with surfaceContainerHigh background.
+ * Card-style action button with icon and label.
+ * Rounded 16dp corners, surface color background.
  */
 @Composable
-private fun ActionButton(
+private fun InfoActionButton(
     icon: ImageVector,
     label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
-    Column(
+    androidx.compose.material3.Card(
         modifier = modifier
-            .clickable(onClick = onClick)
-            .padding(4.dp)
-            .semantics { contentDescription = label },
-        horizontalAlignment = Alignment.CenterHorizontally
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        )
     ) {
-        Box(
+        Column(
             modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurface
+                contentDescription = label,
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            maxLines = 1
-        )
     }
 }
 
@@ -339,39 +377,41 @@ private fun SharedMediaSection(
     onSeeAll: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        // Section header
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = 16.dp)
+    ) {
         SectionHeader(title = "Shared Media")
+        Spacer(modifier = Modifier.height(8.dp))
 
-        Row(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            media.take(6).forEach { thumbnail ->
-                AsyncImage(
-                    model = thumbnail.thumbnailUrl,
-                    contentDescription = "Shared media",
-                    modifier = Modifier
-                        .size(100.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            }
-        }
+            val spacing = 8.dp
+            val itemSize = (maxWidth - spacing * 2) / 3
 
-        // "See All" action
-        TextButton(
-            onClick = onSeeAll,
-            modifier = Modifier.padding(start = 8.dp)
-        ) {
-            Text(
-                text = "See All",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                    onClick = onSeeAll
+                ),
+                horizontalArrangement = Arrangement.spacedBy(spacing)
+            ) {
+                media.take(3).forEach { thumbnail ->
+                    AsyncImage(
+                        model = thumbnail.thumbnailUrl,
+                        contentDescription = "Shared media",
+                        modifier = Modifier
+                            .size(itemSize)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            }
         }
     }
 }
@@ -387,17 +427,17 @@ private fun CustomizeChatSection(modifier: Modifier = Modifier) {
         InfoListItem(
             icon = Icons.Filled.ColorLens,
             title = "Theme Color",
-            onClick = { /* TODO */ }
+            onClick = { /* Theme color picker — not yet implemented */ }
         )
         InfoListItem(
             icon = Icons.Filled.EmojiEmotions,
             title = "Emoji Shortcut",
-            onClick = { /* TODO */ }
+            onClick = { /* Emoji shortcut picker — not yet implemented */ }
         )
         InfoListItem(
             icon = Icons.Filled.PersonOutline,
             title = "Nicknames",
-            onClick = { /* TODO */ }
+            onClick = { /* Nicknames editor — not yet implemented */ }
         )
     }
 }
@@ -407,24 +447,28 @@ private fun CustomizeChatSection(modifier: Modifier = Modifier) {
  * and Notification Settings options.
  */
 @Composable
-private fun MoreActionsSection(modifier: Modifier = Modifier) {
+private fun MoreActionsSection(
+    onSearchInConversation: () -> Unit = {},
+    onViewMedia: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     Column(modifier = modifier.fillMaxWidth()) {
         SectionHeader(title = "More Actions")
 
         InfoListItem(
             icon = Icons.Filled.Search,
             title = "Search in Conversation",
-            onClick = { /* TODO */ }
+            onClick = onSearchInConversation
         )
         InfoListItem(
             icon = Icons.Filled.Image,
             title = "View Media & Files",
-            onClick = { /* TODO */ }
+            onClick = onViewMedia
         )
         InfoListItem(
             icon = Icons.Filled.Notifications,
             title = "Notification Settings",
-            onClick = { /* TODO */ }
+            onClick = { /* Notification settings — not yet implemented */ }
         )
     }
 }

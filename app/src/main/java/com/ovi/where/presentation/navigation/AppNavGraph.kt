@@ -36,9 +36,8 @@ import com.ovi.where.presentation.chat.ConversationInfoScreen
 import com.ovi.where.presentation.chat.GroupInfoScreen
 import com.ovi.where.presentation.chat.MediaGalleryScreen
 import com.ovi.where.presentation.chat.NewMessageScreen
-import com.ovi.where.presentation.group.JoinGroupScreen
+import com.ovi.where.presentation.group.join.JoinGroupScreen
 import com.ovi.where.presentation.group.create.CreateGroupScreen
-import com.ovi.where.presentation.group.edit.EditGroupScreen
 import com.ovi.where.presentation.map.MapScreen
 import com.ovi.where.presentation.navigation.gatekeeper.AuthGatekeeperViewModel
 import com.ovi.where.presentation.onboarding.OnboardingScreen
@@ -467,7 +466,7 @@ fun AppNavGraph(
                     }
                 },
                 onNavigateToEditGroup = { groupId ->
-                    navController.navigate(Screen.EditGroup.createRoute(groupId)) {
+                    navController.navigate(Screen.GroupInfo.createRoute(groupId)) {
                         launchSingleTop = true
                     }
                 },
@@ -634,18 +633,6 @@ fun AppNavGraph(
                         launchSingleTop = true
                     }
                 }
-            )
-        }
-
-        // ── Edit Group ────────────────────────────────────────────────────────
-        composable(
-            route     = Screen.EditGroup.ROUTE,
-            arguments = listOf(navArgument("groupId") { type = NavType.StringType })
-        ) { back ->
-            val groupId = back.arguments?.getString("groupId") ?: return@composable
-            EditGroupScreen(
-                groupId        = groupId,
-                onNavigateBack = { navController.popBackStack() }
             )
         }
 

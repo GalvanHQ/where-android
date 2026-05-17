@@ -8,8 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,18 +25,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonAdd
-
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
-
-import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -61,10 +58,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -135,6 +131,7 @@ internal fun GroupInfoScreenContent(
 
     var showLeaveDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showMuteDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -207,7 +204,7 @@ internal fun GroupInfoScreenContent(
                     isAdmin = uiState.isCurrentUserAdmin,
                     isMuted = uiState.isMuted,
                     onAddMembersTap = onNavigateToAddMembers,
-                    onMuteTap = onToggleMute,
+                    onMuteTap = { showMuteDialog = true },
                     onSearchTap = { /* placeholder */ }
                 )
 
@@ -313,6 +310,37 @@ internal fun GroupInfoScreenContent(
             }
         )
     }
+
+    // ── Mute Confirmation Dialog ─────────────────────────────────────────────
+    if (showMuteDialog) {
+        AlertDialog(
+            onDismissRequest = { showMuteDialog = false },
+            title = {
+                Text(if (uiState.isMuted) "Unmute group?" else "Mute group?")
+            },
+            text = {
+                Text(
+                    if (uiState.isMuted) "You will start receiving notifications from this group again."
+                    else "You will no longer receive notifications from this group."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showMuteDialog = false
+                        onToggleMute()
+                    }
+                ) {
+                    Text(if (uiState.isMuted) "Unmute" else "Mute")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMuteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 // ── Header: Large avatar + group name + member count ─────────────────────────
@@ -375,65 +403,68 @@ private fun ActionButtonRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         if (isAdmin) {
-            ActionButton(
-                icon = Icons.Default.PersonAdd,
+            GroupInfoActionButton(
+                icon = Icons.Filled.PersonAdd,
                 label = "Add",
-                contentDescription = "Add Members",
+                modifier = Modifier.weight(1f),
                 onClick = onAddMembersTap
             )
         }
-        ActionButton(
-            icon = Icons.Default.VolumeOff,
+        GroupInfoActionButton(
+            icon = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
             label = if (isMuted) "Unmute" else "Mute",
-            contentDescription = if (isMuted) "Unmute notifications" else "Mute notifications",
+            modifier = Modifier.weight(1f),
             onClick = onMuteTap
         )
-        ActionButton(
-            icon = Icons.Default.Search,
+        GroupInfoActionButton(
+            icon = Icons.Filled.Search,
             label = "Search",
-            contentDescription = "Search in conversation",
+            modifier = Modifier.weight(1f),
             onClick = onSearchTap
         )
     }
 }
 
 @Composable
-private fun ActionButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+private fun GroupInfoActionButton(
+    icon: ImageVector,
     label: String,
-    contentDescription: String,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(8.dp)
-            .semantics { this.contentDescription = contentDescription }
+    androidx.compose.material3.Card(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        )
     ) {
-        Box(
+        Column(
             modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurface
+                contentDescription = label,
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
@@ -611,7 +642,10 @@ private fun MemberRow(
 // ── Customize Chat Section ───────────────────────────────────────────────────
 
 @Composable
-private fun CustomizeChatSection() {
+private fun CustomizeChatSection(
+    onEditGroupName: () -> Unit = {},
+    onChangeGroupPhoto: () -> Unit = {}
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -631,71 +665,75 @@ private fun CustomizeChatSection() {
         SectionListItem(
             icon = Icons.Default.Edit,
             label = "Edit Group Name",
-            onClick = { /* placeholder */ }
+            onClick = onEditGroupName
         )
 
         // Group photo change
         SectionListItem(
             icon = Icons.Default.PhotoCamera,
             label = "Change Group Photo",
-            onClick = { /* placeholder */ }
+            onClick = onChangeGroupPhoto
         )
 
         // Theme color
         SectionListItem(
             icon = Icons.Default.Palette,
             label = "Theme Color",
-            onClick = { /* placeholder */ }
+            onClick = { /* Theme color picker — not yet implemented */ }
         )
     }
 }
 
 // ── Shared Media Section ─────────────────────────────────────────────────────
-
 @Composable
 private fun SharedMediaSection(
     media: List<MediaThumbnail>,
-    onSeeAllTap: () -> Unit
+    onSeeAllTap: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+            .padding(bottom = 16.dp)
     ) {
-        // Section header with "See All" action
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Shared Media",
-                style = MaterialTheme.typography.labelLarge.copy(
-                    fontWeight = FontWeight.SemiBold
-                ),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            TextButton(onClick = onSeeAllTap) {
-                Text("See All")
-            }
-        }
-
+        Text(
+            text = "Shared Media",
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = FontWeight.SemiBold
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
+        )
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Horizontal thumbnail row
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(end = 8.dp)
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
         ) {
-            items(media) { thumbnail ->
-                AsyncImage(
-                    model = thumbnail.thumbnailUrl,
-                    contentDescription = "Shared media",
-                    modifier = Modifier
-                        .size(100.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
-                )
+            val spacing = 8.dp
+            val itemSize = (maxWidth - spacing * 2) / 3
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        onClick = onSeeAllTap
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(spacing)
+            ) {
+                media.take(3).forEach { thumbnail ->
+                    AsyncImage(
+                        model = thumbnail.thumbnailUrl,
+                        contentDescription = "Shared media",
+                        modifier = Modifier
+                            .size(itemSize)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             }
         }
     }

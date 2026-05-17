@@ -1,4 +1,4 @@
-package com.ovi.where.presentation.group
+package com.ovi.where.presentation.group.join
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

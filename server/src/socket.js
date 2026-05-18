@@ -46,7 +46,7 @@ const initializeSockets = (io) => {
         socket.on('message', async (data) => {
             if (!conversationId) return;
             try {
-                const { tempId, text } = data;
+                const { tempId, text, replyToId, replyToText, replyToSenderName } = data;
                 if (!text || text.trim() === '') return;
 
                 const msgId = uuidv4();
@@ -63,7 +63,13 @@ const initializeSockets = (io) => {
                     readBy: [uid]
                 };
 
-                // Write to archive + embed in conversation doc (single batch)
+                // Include reply data if present
+                if (replyToId) {
+                    msgDto.replyToId = replyToId;
+                    msgDto.replyToText = replyToText || null;
+                    msgDto.replyToSenderName = replyToSenderName || null;
+                }
+
                 await persistMessage(conversationId, msgId, msgDto, uid, text.trim(), now);
 
                 // Broadcast
@@ -197,20 +203,29 @@ const initializeSockets = (io) => {
                 const { messageId, emoji } = data;
                 if (!messageId || !emoji) return;
 
-                const msgRef = db.collection('messages').doc(messageId);
-                const msgDoc = await msgRef.get();
-                if (!msgDoc.exists) return;
+                // Update reaction in the conversation's recentMessages array
+                const convRef = db.collection('conversations').doc(conversationId);
+                await db.runTransaction(async (transaction) => {
+                    const convDoc = await transaction.get(convRef);
+                    if (!convDoc.exists) return;
 
-                const msgData = msgDoc.data();
-                const reactions = msgData.reactions || {};
-                const emojiList = reactions[emoji] || [];
+                    const convData = convDoc.data();
+                    const recentMessages = convData.recentMessages || [];
+                    const msgIndex = recentMessages.findIndex(m => m.id === messageId);
 
-                // Only add if not already reacted with this emoji
-                if (!emojiList.includes(uid)) {
-                    emojiList.push(uid);
-                    reactions[emoji] = emojiList;
-                    await msgRef.update({ reactions });
-                }
+                    if (msgIndex >= 0) {
+                        const msg = recentMessages[msgIndex];
+                        const reactions = msg.reactions || {};
+                        const emojiList = reactions[emoji] || [];
+
+                        if (!emojiList.includes(uid)) {
+                            emojiList.push(uid);
+                            reactions[emoji] = emojiList;
+                            recentMessages[msgIndex] = { ...msg, reactions };
+                            transaction.update(convRef, { recentMessages });
+                        }
+                    }
+                });
 
                 // Broadcast reaction update to room
                 io.to(conversationId).emit('reaction_update', {
@@ -231,25 +246,34 @@ const initializeSockets = (io) => {
                 const { messageId, emoji } = data;
                 if (!messageId || !emoji) return;
 
-                const msgRef = db.collection('messages').doc(messageId);
-                const msgDoc = await msgRef.get();
-                if (!msgDoc.exists) return;
+                // Update reaction in the conversation's recentMessages array
+                const convRef = db.collection('conversations').doc(conversationId);
+                await db.runTransaction(async (transaction) => {
+                    const convDoc = await transaction.get(convRef);
+                    if (!convDoc.exists) return;
 
-                const msgData = msgDoc.data();
-                const reactions = msgData.reactions || {};
-                const emojiList = reactions[emoji] || [];
+                    const convData = convDoc.data();
+                    const recentMessages = convData.recentMessages || [];
+                    const msgIndex = recentMessages.findIndex(m => m.id === messageId);
 
-                // Remove uid from the emoji's reactor list
-                const index = emojiList.indexOf(uid);
-                if (index !== -1) {
-                    emojiList.splice(index, 1);
-                    if (emojiList.length === 0) {
-                        delete reactions[emoji];
-                    } else {
-                        reactions[emoji] = emojiList;
+                    if (msgIndex >= 0) {
+                        const msg = recentMessages[msgIndex];
+                        const reactions = msg.reactions || {};
+                        const emojiList = reactions[emoji] || [];
+
+                        const index = emojiList.indexOf(uid);
+                        if (index !== -1) {
+                            emojiList.splice(index, 1);
+                            if (emojiList.length === 0) {
+                                delete reactions[emoji];
+                            } else {
+                                reactions[emoji] = emojiList;
+                            }
+                            recentMessages[msgIndex] = { ...msg, reactions };
+                            transaction.update(convRef, { recentMessages });
+                        }
                     }
-                    await msgRef.update({ reactions });
-                }
+                });
 
                 // Broadcast reaction update to room
                 io.to(conversationId).emit('reaction_update', {

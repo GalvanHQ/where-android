@@ -209,12 +209,14 @@ class ChatSocketIoClient @Inject constructor() {
         _connectionState.value = ConnectionState.DISCONNECTED
     }
 
-    suspend fun sendText(text: String, tempId: String, replyToId: String? = null) {
+    suspend fun sendText(text: String, tempId: String, replyToId: String? = null, replyToText: String? = null, replyToSenderName: String? = null) {
         if (_connectionState.value != ConnectionState.CONNECTED) return
         val payload = JSONObject().apply {
             put("tempId", tempId)
             put("text", text)
             if (replyToId != null) put("replyToId", replyToId)
+            if (replyToText != null) put("replyToText", replyToText)
+            if (replyToSenderName != null) put("replyToSenderName", replyToSenderName)
         }
         socket?.emit("message", payload)
     }

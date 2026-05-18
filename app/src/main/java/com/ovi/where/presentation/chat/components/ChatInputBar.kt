@@ -176,6 +176,7 @@ fun ChatInputBar(
                         .padding(start = 16.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val mentionColor = MaterialTheme.colorScheme.primary
                     BasicTextField(
                         value = text,
                         onValueChange = onTextChange,

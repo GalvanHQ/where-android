@@ -836,7 +836,10 @@ class MessageRepositoryImpl @Inject constructor(
 
     private suspend fun emitMessage(tempId: String, text: String, replyToId: String?) {
         try {
-            wsClient.sendText(text, tempId, replyToId)
+            // Look up reply data from Room to send to server
+            val replyToText = if (replyToId != null) messageDao.getById(replyToId)?.text else null
+            val replyToSenderName = if (replyToId != null) messageDao.getById(replyToId)?.senderName else null
+            wsClient.sendText(text, tempId, replyToId, replyToText, replyToSenderName)
             startAckTimeout(tempId)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to emit message $tempId: ${e.message}")

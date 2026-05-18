@@ -18,7 +18,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class DataStorageViewModel @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val appDatabase: com.ovi.where.data.local.db.AppDatabase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DataStorageUiState())
@@ -43,6 +44,8 @@ class DataStorageViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isClearing = true) }
             withContext(Dispatchers.IO) {
+                // Clear Room database (all tables — messages, conversations, etc.)
+                appDatabase.clearAllTables()
                 // Clear internal cache directory
                 deleteDir(context.cacheDir)
                 // Clear Coil image cache (both memory and disk)

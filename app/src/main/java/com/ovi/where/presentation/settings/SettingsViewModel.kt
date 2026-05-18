@@ -1,21 +1,29 @@
 package com.ovi.where.presentation.settings
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import coil.imageLoader
+import com.ovi.where.data.local.db.AppDatabase
 import com.ovi.where.domain.usecase.auth.ObserveCurrentUserUseCase
 import com.ovi.where.domain.usecase.auth.SignOutUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val signOutUseCase: SignOutUseCase,
-    private val observeCurrentUserUseCase: ObserveCurrentUserUseCase
+    private val observeCurrentUserUseCase: ObserveCurrentUserUseCase,
+    private val appDatabase: AppDatabase,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -37,8 +45,30 @@ class SettingsViewModel @Inject constructor(
 
     fun signOut() {
         viewModelScope.launch {
+            // Clear all local data on sign out
+            clearAllCache()
             signOutUseCase()
             _uiState.update { it.copy(isSignedOut = true) }
+        }
+    }
+
+    fun clearCache() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isClearingCache = true) }
+            clearAllCache()
+            _uiState.update { it.copy(isClearingCache = false, cacheCleared = true) }
+        }
+    }
+
+    private suspend fun clearAllCache() = withContext(Dispatchers.IO) {
+        // Clear Room database (all tables)
+        appDatabase.clearAllTables()
+        // Clear Coil image cache (memory + disk)
+        context.imageLoader.memoryCache?.clear()
+        context.imageLoader.diskCache?.clear()
+        // Clear internal cache directory
+        context.cacheDir.listFiles()?.forEach { file ->
+            if (file.isDirectory) file.deleteRecursively() else file.delete()
         }
     }
 }
@@ -47,5 +77,7 @@ data class SettingsUiState(
     val displayName: String = "",
     val email: String = "",
     val photoUrl: String? = null,
-    val isSignedOut: Boolean = false
+    val isSignedOut: Boolean = false,
+    val isClearingCache: Boolean = false,
+    val cacheCleared: Boolean = false
 )

@@ -1633,6 +1633,18 @@ class ChatViewModel @Inject constructor(
     private var preSearchScrollOffset: Int = 0
 
     /**
+     * Checks if search should be activated (triggered from ConversationInfoScreen navigation result).
+     * Consumes the trigger so it only fires once.
+     */
+    fun checkAndConsumeSearchTrigger(): Boolean {
+        val trigger = savedStateHandle.get<Boolean>("activate_search") ?: false
+        if (trigger) {
+            savedStateHandle["activate_search"] = false
+        }
+        return trigger
+    }
+
+    /**
      * Activates the search bar. Saves the current scroll position for later restoration.
      *
      * Requirement 13.1: Search icon in header opens search bar.

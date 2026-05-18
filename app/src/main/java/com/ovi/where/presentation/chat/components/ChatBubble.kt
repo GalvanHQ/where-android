@@ -49,6 +49,7 @@ fun ChatBubble(
     isFirstInGroup: Boolean,
     isLastInGroup: Boolean,
     showSenderAvatar: Boolean,
+    themeColor: Color? = null,
     modifier: Modifier = Modifier
 ) {
     val isSent = message.direction == BubbleDirection.SENT
@@ -58,9 +59,9 @@ fun ChatBubble(
     // Corner radius: 18dp all corners, 4dp on tail corner for last bubble in group
     val bubbleShape = computeBubbleShape(isSent = isSent, isLastInGroup = isLastInGroup)
 
-    // Bubble colors
+    // Bubble colors — use themeColor for sent bubbles if provided
     val backgroundColor = if (isSent) {
-        MaterialTheme.colorScheme.primary
+        themeColor ?: MaterialTheme.colorScheme.primary
     } else {
         MaterialTheme.colorScheme.surfaceContainerHigh
     }

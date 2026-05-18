@@ -23,5 +23,8 @@ data class ConversationEntity(
     val lastSyncTimestamp: Long,
     val documentUpdateTime: Long = 0L,
     val participantNamesJson: String? = null,
-    val participantPhotosJson: String? = null
+    val participantPhotosJson: String? = null,
+    val themeColor: String? = null,
+    val emojiShortcut: String? = null,
+    val nicknamesJson: String? = null
 )

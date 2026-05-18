@@ -32,7 +32,10 @@ fun ConversationEntity.toDomain(): Conversation {
         mutedBy = parseMemberIdsJson(mutedByJson),
         pinnedBy = parseMemberIdsJson(pinnedByJson),
         participantNames = parseStringMapJson(participantNamesJson),
-        participantPhotos = parseNullableStringMapJson(participantPhotosJson)
+        participantPhotos = parseNullableStringMapJson(participantPhotosJson),
+        themeColor = themeColor,
+        emojiShortcut = emojiShortcut,
+        nicknames = parseStringMapJson(nicknamesJson)
     )
 }
 
@@ -55,7 +58,10 @@ fun Conversation.toEntity(): ConversationEntity {
         lastSyncTimestamp = System.currentTimeMillis(),
         documentUpdateTime = 0L,
         participantNamesJson = serializeStringMap(participantNames),
-        participantPhotosJson = serializeNullableStringMap(participantPhotos)
+        participantPhotosJson = serializeNullableStringMap(participantPhotos),
+        themeColor = themeColor,
+        emojiShortcut = emojiShortcut,
+        nicknamesJson = serializeStringMap(nicknames)
     )
 }
 

@@ -21,6 +21,10 @@ data class Conversation(
     // Mute/Pin
     val mutedBy: List<String> = emptyList(),
     val pinnedBy: List<String> = emptyList(),
+    // Customization
+    val themeColor: String? = null,
+    val emojiShortcut: String? = null,
+    val nicknames: Map<String, String> = emptyMap(),
     // Participant metadata (resolved from user profiles, cached in Room)
     val participantNames: Map<String, String> = emptyMap(),
     val participantPhotos: Map<String, String?> = emptyMap()

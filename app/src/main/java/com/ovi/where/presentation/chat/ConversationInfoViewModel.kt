@@ -46,7 +46,7 @@ class ConversationInfoViewModel @Inject constructor(
     private val _errorState = MutableStateFlow<String?>(null)
     val errorState: StateFlow<String?> = _errorState.asStateFlow()
 
-    private val currentUserId: String? get() = firebaseAuth.currentUser?.uid
+    val currentUserId: String? get() = firebaseAuth.currentUser?.uid
 
     init {
         loadConversationInfo()
@@ -104,6 +104,11 @@ class ConversationInfoViewModel @Inject constructor(
             // Check mute state
             val isMuted = conversation.mutedBy.contains(uid)
 
+            // Load customization fields
+            val themeColor = conversation.themeColor
+            val emojiShortcut = conversation.emojiShortcut
+            val nicknames = conversation.nicknames
+
             if (conversation.type == ConversationType.DIRECT && otherUserId != null) {
                 // Load other user's profile for DM conversations
                 when (val userResult = userRepository.getUser(otherUserId)) {
@@ -123,6 +128,9 @@ class ConversationInfoViewModel @Inject constructor(
                                 otherUserId = otherUserId,
                                 sharedMedia = sharedMedia,
                                 isMuted = isMuted,
+                                themeColor = themeColor,
+                                emojiShortcut = emojiShortcut,
+                                nicknames = nicknames,
                                 isLoading = false
                             )
                         }
@@ -140,6 +148,9 @@ class ConversationInfoViewModel @Inject constructor(
                                 otherUserId = otherUserId,
                                 sharedMedia = sharedMedia,
                                 isMuted = isMuted,
+                                themeColor = themeColor,
+                                emojiShortcut = emojiShortcut,
+                                nicknames = nicknames,
                                 isLoading = false
                             )
                         }
@@ -161,6 +172,9 @@ class ConversationInfoViewModel @Inject constructor(
                         lastActiveTime = null,
                         sharedMedia = sharedMedia,
                         isMuted = isMuted,
+                        themeColor = themeColor,
+                        emojiShortcut = emojiShortcut,
+                        nicknames = nicknames,
                         isLoading = false
                     )
                 }
@@ -229,6 +243,52 @@ class ConversationInfoViewModel @Inject constructor(
 
             if (result is Resource.Success) {
                 _uiState.update { it.copy(isMuted = !currentMuted) }
+            }
+        }
+    }
+
+    /**
+     * Updates the theme color for this conversation.
+     * @param colorHex Hex color string (e.g., "#5170FF") or null to reset.
+     */
+    fun updateThemeColor(colorHex: String?) {
+        viewModelScope.launch {
+            val result = conversationRepository.updateThemeColor(conversationId, colorHex)
+            if (result is Resource.Success) {
+                _uiState.update { it.copy(themeColor = colorHex) }
+            }
+        }
+    }
+
+    /**
+     * Updates the emoji shortcut for this conversation.
+     * @param emoji Single emoji character or null to reset.
+     */
+    fun updateEmojiShortcut(emoji: String?) {
+        viewModelScope.launch {
+            val result = conversationRepository.updateEmojiShortcut(conversationId, emoji)
+            if (result is Resource.Success) {
+                _uiState.update { it.copy(emojiShortcut = emoji) }
+            }
+        }
+    }
+
+    /**
+     * Updates a nickname for a participant in this conversation.
+     * @param userId The user whose nickname to set.
+     * @param nickname The new nickname, or empty string to remove.
+     */
+    fun updateNickname(userId: String, nickname: String) {
+        viewModelScope.launch {
+            val currentNicknames = _uiState.value.nicknames.toMutableMap()
+            if (nickname.isBlank()) {
+                currentNicknames.remove(userId)
+            } else {
+                currentNicknames[userId] = nickname
+            }
+            val result = conversationRepository.updateNicknames(conversationId, currentNicknames)
+            if (result is Resource.Success) {
+                _uiState.update { it.copy(nicknames = currentNicknames) }
             }
         }
     }

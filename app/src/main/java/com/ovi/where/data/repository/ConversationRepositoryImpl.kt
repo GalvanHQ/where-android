@@ -290,6 +290,11 @@ class ConversationRepositoryImpl @Inject constructor(
                             ),
                             participantPhotosJson = serializeFirestoreMap(
                                 doc.get("participantPhotos") as? Map<*, *>
+                            ),
+                            themeColor = doc.getString("themeColor"),
+                            emojiShortcut = doc.getString("emojiShortcut"),
+                            nicknamesJson = serializeFirestoreMap(
+                                doc.get("nicknames") as? Map<*, *>
                             )
                         )
                     } catch (_: Exception) { null }
@@ -438,6 +443,11 @@ class ConversationRepositoryImpl @Inject constructor(
                                 ),
                                 participantPhotosJson = serializeFirestoreMap(
                                     doc.get("participantPhotos") as? Map<*, *>
+                                ),
+                                themeColor = doc.getString("themeColor"),
+                                emojiShortcut = doc.getString("emojiShortcut"),
+                                nicknamesJson = serializeFirestoreMap(
+                                    doc.get("nicknames") as? Map<*, *>
                                 )
                             )
                         } catch (e: Exception) {
@@ -748,6 +758,48 @@ class ConversationRepositoryImpl @Inject constructor(
             } catch (e: Exception) {
                 Timber.w(e, "Failed to soft-delete conversation: $conversationId")
                 Resource.Error(e.message ?: "Failed to delete conversation")
+            }
+        }
+
+    override suspend fun updateThemeColor(conversationId: String, color: String?): Resource<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
+                    .document(conversationId)
+                    .update("themeColor", color)
+                    .await()
+                Resource.Success(Unit)
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to update theme color: $conversationId")
+                Resource.Error(e.message ?: "Failed to update theme color")
+            }
+        }
+
+    override suspend fun updateEmojiShortcut(conversationId: String, emoji: String?): Resource<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
+                    .document(conversationId)
+                    .update("emojiShortcut", emoji)
+                    .await()
+                Resource.Success(Unit)
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to update emoji shortcut: $conversationId")
+                Resource.Error(e.message ?: "Failed to update emoji shortcut")
+            }
+        }
+
+    override suspend fun updateNicknames(conversationId: String, nicknames: Map<String, String>): Resource<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
+                    .document(conversationId)
+                    .update("nicknames", nicknames)
+                    .await()
+                Resource.Success(Unit)
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to update nicknames: $conversationId")
+                Resource.Error(e.message ?: "Failed to update nicknames")
             }
         }
 

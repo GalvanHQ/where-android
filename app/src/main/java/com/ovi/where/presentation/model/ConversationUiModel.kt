@@ -44,7 +44,11 @@ data class ConversationUiModel(
     /** The status of the last message sent by the current user (Req 24.2). */
     val lastMessageStatus: MessageStatus? = null,
     /** Whether the last message was sent by the current user (Req 24.2). */
-    val isLastMessageFromCurrentUser: Boolean = false
+    val isLastMessageFromCurrentUser: Boolean = false,
+    /** Theme color hex string for this conversation (e.g., "#5170FF"). */
+    val themeColor: String? = null,
+    /** Emoji shortcut for quick reactions in this conversation. */
+    val emojiShortcut: String? = null
 )
 
 fun Conversation.toUiModel(
@@ -96,7 +100,9 @@ fun Conversation.toUiModel(
         isMuted          = currentUserId in mutedBy,
         lastMessageType  = lastMessageType,
         lastMessageStatus = if (isOwnLastMessage) lastMessageStatus else null,
-        isLastMessageFromCurrentUser = isOwnLastMessage
+        isLastMessageFromCurrentUser = isOwnLastMessage,
+        themeColor       = themeColor,
+        emojiShortcut    = emojiShortcut
     )
 }
 

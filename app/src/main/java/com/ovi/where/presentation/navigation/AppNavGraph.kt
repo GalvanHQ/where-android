@@ -503,7 +503,8 @@ fun AppNavGraph(
                     }
                 },
                 onNavigateToChat = {
-                    // Pop back to the chat screen (search focus can be handled there)
+                    // Set result to trigger search mode in ChatScreen
+                    navController.previousBackStackEntry?.savedStateHandle?.set("activate_search", true)
                     navController.popBackStack()
                 }
             )

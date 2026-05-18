@@ -35,7 +35,7 @@ import com.ovi.where.data.local.entity.VoiceMessageCacheEntity
         LinkPreviewCacheEntity::class,
         OnlineStatusEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -155,6 +155,15 @@ abstract class AppDatabase : RoomDatabase() {
                 // for persistent storage of resolved participant metadata (Req 1.8, 1.9, 2.8, 2.9)
                 db.execSQL("ALTER TABLE `conversations` ADD COLUMN `participantNamesJson` TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE `conversations` ADD COLUMN `participantPhotosJson` TEXT DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add customization columns to conversations table (theme color, emoji shortcut, nicknames)
+                db.execSQL("ALTER TABLE `conversations` ADD COLUMN `themeColor` TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE `conversations` ADD COLUMN `emojiShortcut` TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE `conversations` ADD COLUMN `nicknamesJson` TEXT DEFAULT NULL")
             }
         }
     }

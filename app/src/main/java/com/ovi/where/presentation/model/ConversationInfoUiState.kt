@@ -12,5 +12,9 @@ data class ConversationInfoUiState(
     val otherUserId: String? = null,
     val sharedMedia: List<MediaThumbnail> = emptyList(),
     val isMuted: Boolean = false,
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    // Customization
+    val themeColor: String? = null,
+    val emojiShortcut: String? = null,
+    val nicknames: Map<String, String> = emptyMap()
 )

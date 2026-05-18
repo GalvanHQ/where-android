@@ -142,7 +142,11 @@ fun ConversationInfoScreen(
             else -> {
                 ConversationInfoContent(
                     uiState = uiState,
+                    currentUserId = viewModel.currentUserId ?: "",
                     onToggleMute = { viewModel.toggleMute() },
+                    onUpdateThemeColor = { viewModel.updateThemeColor(it) },
+                    onUpdateEmojiShortcut = { viewModel.updateEmojiShortcut(it) },
+                    onUpdateNickname = { userId, nickname -> viewModel.updateNickname(userId, nickname) },
                     onNavigateToMediaGallery = onNavigateToMediaGallery,
                     onNavigateToUserProfile = {
                         uiState.otherUserId?.let { onNavigateToUserProfile(it) }
@@ -158,13 +162,20 @@ fun ConversationInfoScreen(
 @Composable
 internal fun ConversationInfoContent(
     uiState: ConversationInfoUiState,
+    currentUserId: String = "",
     onToggleMute: () -> Unit,
+    onUpdateThemeColor: (String?) -> Unit = {},
+    onUpdateEmojiShortcut: (String?) -> Unit = {},
+    onUpdateNickname: (String, String) -> Unit = { _, _ -> },
     onNavigateToMediaGallery: () -> Unit,
     onNavigateToUserProfile: () -> Unit = {},
     onNavigateToChat: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showMuteDialog by remember { mutableStateOf(false) }
+    var showColorPicker by remember { mutableStateOf(false) }
+    var showEmojiPicker by remember { mutableStateOf(false) }
+    var showNicknameEditor by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -224,7 +235,10 @@ internal fun ConversationInfoContent(
             isMuted = uiState.isMuted,
             onToggleMute = { showMuteDialog = true },
             onProfileTap = onNavigateToUserProfile,
-            onSearchTap = onNavigateToChat
+            onSearchTap = {
+                // Navigate back to chat — search will be triggered via savedStateHandle
+                onNavigateToChat()
+            }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -238,7 +252,13 @@ internal fun ConversationInfoContent(
         }
 
         // Customize Chat section
-        CustomizeChatSection()
+        CustomizeChatSection(
+            themeColor = uiState.themeColor,
+            emojiShortcut = uiState.emojiShortcut,
+            onThemeColorTap = { showColorPicker = true },
+            onEmojiShortcutTap = { showEmojiPicker = true },
+            onNicknamesTap = { showNicknameEditor = true }
+        )
 
         // More Actions section
         MoreActionsSection(
@@ -280,6 +300,46 @@ internal fun ConversationInfoContent(
                     Text("Cancel")
                 }
             }
+        )
+    }
+
+    // ── Theme Color Picker Dialog ────────────────────────────────────────
+    if (showColorPicker) {
+        ThemeColorPickerDialog(
+            currentColor = uiState.themeColor,
+            onColorSelected = { color ->
+                showColorPicker = false
+                onUpdateThemeColor(color)
+            },
+            onDismiss = { showColorPicker = false }
+        )
+    }
+
+    // ── Emoji Shortcut Picker Dialog ─────────────────────────────────────
+    if (showEmojiPicker) {
+        EmojiShortcutPickerDialog(
+            currentEmoji = uiState.emojiShortcut,
+            onEmojiSelected = { emoji ->
+                showEmojiPicker = false
+                onUpdateEmojiShortcut(emoji)
+            },
+            onDismiss = { showEmojiPicker = false }
+        )
+    }
+
+    // ── Nickname Editor Dialog ────────────────────────────────────────────
+    if (showNicknameEditor) {
+        NicknameEditorDialog(
+            otherUserId = uiState.otherUserId ?: "",
+            otherUserName = uiState.conversationTitle,
+            currentNickname = uiState.nicknames[uiState.otherUserId] ?: "",
+            currentUserId = currentUserId,
+            currentUserName = "You",
+            currentUserNickname = uiState.nicknames[currentUserId] ?: "",
+            onSave = { userId, nickname ->
+                onUpdateNickname(userId, nickname)
+            },
+            onDismiss = { showNicknameEditor = false }
         )
     }
 }
@@ -420,24 +480,33 @@ private fun SharedMediaSection(
  * "Customize Chat" section with theme color, emoji shortcut, and nicknames options.
  */
 @Composable
-private fun CustomizeChatSection(modifier: Modifier = Modifier) {
+private fun CustomizeChatSection(
+    themeColor: String? = null,
+    emojiShortcut: String? = null,
+    onThemeColorTap: () -> Unit = {},
+    onEmojiShortcutTap: () -> Unit = {},
+    onNicknamesTap: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     Column(modifier = modifier.fillMaxWidth()) {
         SectionHeader(title = "Customize Chat")
 
         InfoListItem(
             icon = Icons.Filled.ColorLens,
             title = "Theme Color",
-            onClick = { /* Theme color picker — not yet implemented */ }
+            subtitle = themeColor ?: "Default",
+            onClick = onThemeColorTap
         )
         InfoListItem(
             icon = Icons.Filled.EmojiEmotions,
             title = "Emoji Shortcut",
-            onClick = { /* Emoji shortcut picker — not yet implemented */ }
+            subtitle = emojiShortcut ?: "👍",
+            onClick = onEmojiShortcutTap
         )
         InfoListItem(
             icon = Icons.Filled.PersonOutline,
             title = "Nicknames",
-            onClick = { /* Nicknames editor — not yet implemented */ }
+            onClick = onNicknamesTap
         )
     }
 }
@@ -527,6 +596,7 @@ private fun InfoListItem(
     title: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    subtitle: String? = null,
     tintColor: Color = MaterialTheme.colorScheme.onSurface
 ) {
     Row(
@@ -543,10 +613,257 @@ private fun InfoListItem(
             tint = tintColor
         )
         Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyLarge,
-            color = tintColor
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = tintColor
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
+}
+
+// ── Theme Color Picker Dialog ────────────────────────────────────────────────
+
+private val themeColorOptions = listOf(
+    "#5170FF" to "Indigo",
+    "#006878" to "Teal",
+    "#8E3A8C" to "Purple",
+    "#6B5E00" to "Gold",
+    "#006E2C" to "Green",
+    "#BA1A1A" to "Red",
+    "#006491" to "Blue",
+    "#8B4513" to "Brown"
+)
+
+@Composable
+private fun ThemeColorPickerDialog(
+    currentColor: String?,
+    onColorSelected: (String?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Theme Color") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Choose a color for this conversation",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                // Color grid
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    themeColorOptions.take(4).forEach { (hex, name) ->
+                        ColorCircle(
+                            colorHex = hex,
+                            isSelected = currentColor == hex,
+                            onClick = { onColorSelected(hex) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    themeColorOptions.drop(4).forEach { (hex, name) ->
+                        ColorCircle(
+                            colorHex = hex,
+                            isSelected = currentColor == hex,
+                            onClick = { onColorSelected(hex) }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onColorSelected(null) }) {
+                Text("Reset to Default")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun ColorCircle(
+    colorHex: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val color = try {
+        Color(android.graphics.Color.parseColor(colorHex))
+    } catch (_: Exception) {
+        MaterialTheme.colorScheme.primary
+    }
+
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .clickable(onClick = onClick)
+            .then(
+                if (isSelected) Modifier.padding(2.dp) else Modifier
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(if (isSelected) 36.dp else 40.dp)
+                .clip(androidx.compose.foundation.shape.CircleShape)
+                .then(
+                    Modifier.clickable(onClick = onClick)
+                )
+        ) {
+            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                drawCircle(color = color)
+            }
+        }
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Filled.ColorLens,
+                contentDescription = "Selected",
+                modifier = Modifier.size(16.dp),
+                tint = Color.White
+            )
+        }
+    }
+}
+
+// ── Emoji Shortcut Picker Dialog ─────────────────────────────────────────────
+
+private val emojiOptions = listOf("👍", "❤️", "😂", "😮", "😢", "🔥", "🎉", "👏", "💯", "🙏", "😊", "🥰")
+
+@Composable
+private fun EmojiShortcutPickerDialog(
+    currentEmoji: String?,
+    onEmojiSelected: (String?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Emoji Shortcut") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Choose a quick-react emoji for this conversation",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                // Emoji grid (3 rows of 4)
+                for (row in emojiOptions.chunked(4)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        row.forEach { emoji ->
+                            Text(
+                                text = emoji,
+                                style = MaterialTheme.typography.headlineMedium,
+                                modifier = Modifier
+                                    .clickable { onEmojiSelected(emoji) }
+                                    .padding(8.dp),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onEmojiSelected(null) }) {
+                Text("Reset to Default")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+// ── Nickname Editor Dialog ────────────────────────────────────────────────────
+
+@Composable
+private fun NicknameEditorDialog(
+    otherUserId: String,
+    otherUserName: String,
+    currentNickname: String,
+    currentUserId: String = "",
+    currentUserName: String = "You",
+    currentUserNickname: String = "",
+    onSave: (String, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var otherNickname by remember { mutableStateOf(currentNickname) }
+    var selfNickname by remember { mutableStateOf(currentUserNickname) }
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Nicknames") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(
+                    "Set nicknames for this conversation",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // Other user's nickname
+                androidx.compose.material3.OutlinedTextField(
+                    value = otherNickname,
+                    onValueChange = { otherNickname = it },
+                    label = { Text(otherUserName) },
+                    placeholder = { Text("Set a nickname") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                // Current user's nickname
+                androidx.compose.material3.OutlinedTextField(
+                    value = selfNickname,
+                    onValueChange = { selfNickname = it },
+                    label = { Text(currentUserName) },
+                    placeholder = { Text("Set your nickname") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                // Save both nicknames
+                if (otherUserId.isNotBlank()) onSave(otherUserId, otherNickname)
+                if (currentUserId.isNotBlank()) onSave(currentUserId, selfNickname)
+                onDismiss()
+            }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

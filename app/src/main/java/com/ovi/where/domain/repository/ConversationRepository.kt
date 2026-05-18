@@ -100,4 +100,22 @@ interface ConversationRepository {
      * filters out conversations where the current user is in `deletedBy`.
      */
     suspend fun softDeleteConversation(conversationId: String): Resource<Unit>
+
+    /**
+     * Updates the theme color for a conversation.
+     * Stored as a hex string (e.g., "#5170FF").
+     */
+    suspend fun updateThemeColor(conversationId: String, color: String?): Resource<Unit>
+
+    /**
+     * Updates the emoji shortcut for a conversation.
+     * Stored as a single emoji character (e.g., "👍").
+     */
+    suspend fun updateEmojiShortcut(conversationId: String, emoji: String?): Resource<Unit>
+
+    /**
+     * Updates nicknames for participants in a conversation.
+     * Stored as a map of userId -> nickname.
+     */
+    suspend fun updateNicknames(conversationId: String, nicknames: Map<String, String>): Resource<Unit>
 }

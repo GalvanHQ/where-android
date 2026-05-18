@@ -133,6 +133,13 @@ fun ChatScreen(
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
+    // Theme color — single source of truth, parsed once and remembered
+    val conversationThemeColor = remember(uiState.conversation?.themeColor) {
+        uiState.conversation?.themeColor?.let { hex ->
+            try { androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(hex)) } catch (_: Exception) { null }
+        }
+    }
     val reducedMotion = LocalReducedMotion.current
     val density = LocalDensity.current
 
@@ -349,6 +356,16 @@ fun ChatScreen(
             if (firstVisibleIndex <= 5 && !uiState.isLoadingMore && uiState.hasMoreMessages && !uiState.isLoading) {
                 viewModel.loadOlderMessages()
             }
+        }
+    }
+
+    // ── Activate search when returning from ConversationInfo with search intent ──
+    LaunchedEffect(Unit) {
+        val shouldActivateSearch = viewModel.checkAndConsumeSearchTrigger()
+        if (shouldActivateSearch) {
+            val scrollIndex = listState.firstVisibleItemIndex
+            val scrollOffset = listState.firstVisibleItemScrollOffset
+            viewModel.activateSearch(scrollIndex, scrollOffset)
         }
     }
 
@@ -679,7 +696,8 @@ fun ChatScreen(
                                                 isLastInGroup = message.isLastInGroup,
                                                 showSenderAvatar = message.isFirstInGroup
                                                         && message.direction == BubbleDirection.RECEIVED
-                                                        && isGroupConversation
+                                                        && isGroupConversation,
+                                                themeColor = conversationThemeColor
                                             )
                                         } else {
                                             // Fallback to existing MessageBubble for voice/image/location
@@ -700,7 +718,8 @@ fun ChatScreen(
                                                 voiceCurrentPositionMs = voiceCurrentPos,
                                                 searchQuery = searchQuery,
                                                 isSearchHighlighted = isSearchHighlighted,
-                                                isCurrentSearchResult = isCurrentSearchResult
+                                                isCurrentSearchResult = isCurrentSearchResult,
+                                                themeColor = conversationThemeColor
                                             )
                                         }
                                     }
@@ -815,7 +834,17 @@ fun ChatScreen(
                     }
                 },
                 onVoiceRecordStop = viewModel::stopVoiceRecordingAndSend,
-                onVoiceRecordCancel = viewModel::cancelVoiceRecording
+                onVoiceRecordCancel = viewModel::cancelVoiceRecording,
+                // Emoji shortcut
+                emojiShortcut = uiState.conversation?.emojiShortcut,
+                onEmojiShortcutSend = {
+                    val emoji = uiState.conversation?.emojiShortcut
+                    if (emoji != null) {
+                        viewModel.onInputChange(emoji)
+                        viewModel.sendMessage()
+                    }
+                },
+                themeColor = conversationThemeColor
             )
         }
     }
@@ -876,13 +905,14 @@ private fun MessageBubble(
     voiceCurrentPositionMs: Long = 0L,
     searchQuery: String? = null,
     isSearchHighlighted: Boolean = false,
-    isCurrentSearchResult: Boolean = false
+    isCurrentSearchResult: Boolean = false,
+    themeColor: androidx.compose.ui.graphics.Color? = null
 ) {
     val isSent = message.direction == BubbleDirection.SENT
 
     // Requirement 16.1: Sent = Accent Primary (primary), Received = Background Elevated (surfaceContainerHigh)
     val bubbleColor = if (isSent) {
-        MaterialTheme.colorScheme.primary
+        themeColor ?: MaterialTheme.colorScheme.primary
     } else {
         MaterialTheme.colorScheme.surfaceContainerHigh
     }

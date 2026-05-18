@@ -1,12 +1,15 @@
 package com.ovi.where.presentation.chat.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -49,6 +52,7 @@ fun ChatBubble(
     onLongPress: () -> Unit = {},
     onRetry: () -> Unit = {},
     onLocationTap: () -> Unit = {},
+    onReplyQuoteTap: (String) -> Unit = {},
     onVoicePlayPause: (() -> Unit)? = null,
     onVoiceSeek: ((Float) -> Unit)? = null,
     isVoicePlaying: Boolean = false,
@@ -224,14 +228,47 @@ fun ChatBubble(
                                 start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp
                             )
                         ) {
-                            if (message.text.isNotEmpty()) {
-                                Text(
-                                    text = message.text,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = textColor
+                            // Reply quote block
+                            if (message.replyToText != null) {
+                                ReplyQuoteBlock(
+                                    senderName = message.replyToSenderName ?: "",
+                                    text = message.replyToText,
+                                    isSent = isSent,
+                                    onClick = {
+                                        message.replyToId?.let { onReplyQuoteTap(it) }
+                                    }
                                 )
                             }
+
+                            if (message.text.isNotEmpty()) {
+                                if (message.mentionedUserIds.isNotEmpty()) {
+                                    MentionStyledText(
+                                        text = message.text,
+                                        mentionedUserIds = message.mentionedUserIds,
+                                        userDisplayNames = emptyMap(),
+                                        modifier = Modifier
+                                    )
+                                } else {
+                                    Text(
+                                        text = message.text,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = textColor
+                                    )
+                                }
+                            }
                         }
+                    }
+
+                    // Link preview below the bubble
+                    if (message.hasLinkPreview && message.linkPreviewUrl != null && message.linkPreviewTitle != null) {
+                        LinkPreviewCard(
+                            url = message.linkPreviewUrl,
+                            title = message.linkPreviewTitle,
+                            description = message.linkPreviewDescription,
+                            imageUrl = message.linkPreviewImageUrl,
+                            domain = message.linkPreviewDomain ?: "",
+                            modifier = Modifier.widthIn(max = maxBubbleWidth)
+                        )
                     }
                 }
             }
@@ -296,5 +333,60 @@ internal fun computeBubbleShape(
         !isSent && isMiddle -> RoundedCornerShape(tight, full, full, tight)
         !isSent && isLastInGroup -> RoundedCornerShape(tight, full, full, tight)
         else -> RoundedCornerShape(full)
+    }
+}
+
+/**
+ * Reply quote block shown inside the bubble above the message text.
+ * Shows a vertical accent bar + sender name + quoted text.
+ */
+@Composable
+private fun ReplyQuoteBlock(
+    senderName: String,
+    text: String,
+    isSent: Boolean,
+    onClick: () -> Unit = {}
+) {
+    val accentColor = if (isSent) {
+        Color.White.copy(alpha = 0.6f)
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+    val nameColor = if (isSent) Color.White else MaterialTheme.colorScheme.primary
+    val textColor = if (isSent) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(4.dp))
+            .clickable(onClick = onClick)
+            .padding(bottom = 6.dp)
+    ) {
+        // Vertical accent bar
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(36.dp)
+                .background(accentColor, RoundedCornerShape(2.dp))
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Column {
+            if (senderName.isNotBlank()) {
+                Text(
+                    text = senderName,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = nameColor,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodySmall,
+                color = textColor,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+        }
     }
 }

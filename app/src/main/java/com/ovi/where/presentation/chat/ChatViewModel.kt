@@ -947,6 +947,8 @@ class ChatViewModel @Inject constructor(
 
         // Clear input text and reply state on send
         val replyToId = _uiState.value.replyingToMessage?.id
+        val replyToText = _uiState.value.replyingToMessage?.text
+        val replyToSenderName = _uiState.value.replyingToMessage?.senderName
         _uiState.value = _uiState.value.copy(
             inputText = "",
             replyingToMessage = null,

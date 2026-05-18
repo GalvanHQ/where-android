@@ -16,6 +16,9 @@ interface ConversationDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(conversations: List<ConversationEntity>)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIgnore(conversations: List<ConversationEntity>): List<Long>
+
     @Query("SELECT * FROM conversations ORDER BY lastMessageTimestamp DESC")
     suspend fun getAll(): List<ConversationEntity>
 

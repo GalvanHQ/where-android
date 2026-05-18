@@ -304,7 +304,23 @@ class ConversationRepositoryImpl @Inject constructor(
 
                 // Write to Room immediately so UI flow emits within 500ms (Requirement 12.3)
                 repositoryScope.launch {
-                    conversationDao.upsertAll(entities)
+                    // Smart upsert: preserve locally-set customization fields
+                    // (themeColor, emojiShortcut, nicknamesJson, photoUrl) when Firestore
+                    // sends null for them (race condition with local writes).
+                    val mergedEntities = entities.map { incoming ->
+                        val existing = conversationDao.getById(incoming.id)
+                        if (existing != null) {
+                            incoming.copy(
+                                themeColor = incoming.themeColor ?: existing.themeColor,
+                                emojiShortcut = incoming.emojiShortcut ?: existing.emojiShortcut,
+                                nicknamesJson = incoming.nicknamesJson ?: existing.nicknamesJson,
+                                photoUrl = incoming.photoUrl ?: existing.photoUrl
+                            )
+                        } else {
+                            incoming
+                        }
+                    }
+                    conversationDao.upsertAll(mergedEntities)
 
                     // Parse recentMessages from each conversation doc and upsert to messages table.
                     // This gives the client messages for free (0 extra Firestore reads).
@@ -317,14 +333,19 @@ class ConversationRepositoryImpl @Inject constructor(
                                 parseRecentMessageToEntity(convId, map)
                             }
                             if (messageEntities.isNotEmpty()) {
-                                // Only upsert messages that don't already exist in Room
-                                // (avoids overwriting optimistic inserts with incomplete data)
+                                val currentUid = currentUid
+                                val now = System.currentTimeMillis()
+                                // Only insert messages that don't already exist in Room.
+                                // Skip recent messages from the current user (already in Room from optimistic insert).
                                 for (entity in messageEntities) {
+                                    // Skip own messages sent within last 60s (handled by optimistic insert + ack)
+                                    if (entity.senderId == currentUid && (now - entity.timestamp) < 60_000L) {
+                                        continue
+                                    }
                                     val existing = messageDao.getById(entity.id)
                                     if (existing == null) {
                                         messageDao.insert(entity)
                                     } else if (existing.imageUrl.isNullOrBlank() && !entity.imageUrl.isNullOrBlank()) {
-                                        // Update imageUrl if the existing one is blank but new one has it
                                         messageDao.updateImageUrl(entity.id, entity.imageUrl!!)
                                     }
                                 }

@@ -81,11 +81,29 @@ fun ReplyPreviewBar(
                 )
                 Spacer(Modifier.height(Dimens.spaceXSmall))
                 Text(
-                    text = replyingToMessage.text.take(100),
+                    text = when {
+                        replyingToMessage.isImage -> "📷 Photo"
+                        replyingToMessage.isVoice -> "🎤 Voice message"
+                        replyingToMessage.isLocation -> "📍 Location"
+                        else -> replyingToMessage.text.take(100)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // Image thumbnail for image replies
+            if (replyingToMessage.isImage && !replyingToMessage.imageUrl.isNullOrBlank()) {
+                Spacer(Modifier.width(Dimens.spaceMedium))
+                coil.compose.AsyncImage(
+                    model = replyingToMessage.imageUrl,
+                    contentDescription = "Reply image",
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(4.dp))
                 )
             }
 

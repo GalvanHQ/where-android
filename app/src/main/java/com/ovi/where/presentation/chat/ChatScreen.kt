@@ -647,6 +647,14 @@ fun ChatScreen(
                                             onLongPress = onLongPress,
                                             onRetry = onRetryMessage,
                                             onLocationTap = onLocationTap,
+                                            onReplyQuoteTap = { replyId ->
+                                                coroutineScope.launch {
+                                                    val index = uiState.messages.indexOfFirst { it.id == replyId }
+                                                    if (index >= 0) {
+                                                        listState.animateScrollToItem(index)
+                                                    }
+                                                }
+                                            },
                                             onVoicePlayPause = onVoicePlayPause,
                                             onVoiceSeek = onVoiceSeek,
                                             isVoicePlaying = isThisVoicePlaying,

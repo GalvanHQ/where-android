@@ -142,6 +142,15 @@ class MessageRepositoryImpl @Inject constructor(
 
         val tempId = UUID.randomUUID().toString()
         val currentUser = firebaseAuth.currentUser
+
+        // Look up reply message from Room to get text and sender name
+        val replyToText = if (replyToId != null) {
+            messageDao.getById(replyToId)?.text
+        } else null
+        val replyToSenderName = if (replyToId != null) {
+            messageDao.getById(replyToId)?.senderName
+        } else null
+
         val optimistic = Message(
             id = tempId,
             conversationId = conversationId,
@@ -152,7 +161,9 @@ class MessageRepositoryImpl @Inject constructor(
             type = MessageType.TEXT,
             timestamp = System.currentTimeMillis(),
             status = MessageStatus.PENDING,
-            replyToId = replyToId
+            replyToId = replyToId,
+            replyToText = replyToText,
+            replyToSenderName = replyToSenderName
         )
 
         // Step 1: Insert optimistically into Room with PENDING status

@@ -358,10 +358,6 @@ async function persistMessage(conversationId, msgId, msgDto, senderId, previewTe
             recentMessages,
             oldestRecentTimestamp
         });
-
-        // Also write to the archive collection for old-history pagination
-        const archiveRef = db.collection('messages').doc(msgId);
-        transaction.set(archiveRef, msgDto);
     });
 }
 

@@ -430,7 +430,7 @@ private fun ChatsEmptyState() {
     }
 }
 
-// ── Conversation Row ────────────────────────────────────────────────────────────
+// ── Conversation Row ──────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

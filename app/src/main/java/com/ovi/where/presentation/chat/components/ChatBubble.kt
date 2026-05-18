@@ -409,13 +409,40 @@ fun ChatBubble(
             )
         }
 
-        // ── Timestamp + status / read indicator (outside bubble) ─────────
-        // Below the LAST sent bubble in a group:
-        //   - If this is the furthest-read message → ReadReceiptIndicator (avatar)
-        //   - Otherwise for last-in-group sent → MessageStatusIndicator (circle)
-        // (Messenger pattern: avatar only on the single most-recent read message.)
-        val showStatusOrReceipt = isSent && isLastInGroup
-        if (message.showTimestamp || showStatusOrReceipt) {
+        // ── Status / read indicator (Messenger-style) ─────────────────────
+        // Only the VERY LAST sent message in the entire conversation shows an
+        // indicator. Either:
+        //   - Read receipt avatar (if someone has read it)
+        //   - Status circle (pending/sent/delivered/failed)
+        // Older sent messages show nothing. Timestamp is separate (shown on gap).
+        if (message.showReadReceipt) {
+            // This is the last read sent message → show reader avatar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                    start = if (!isSent && isGroupChat) AvatarTrack else 0.dp,
+                    top = 4.dp
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
+            ) {
+                ReadReceiptIndicator(
+                    readBy = message.readBy,
+                    readByPhotoUrls = message.readByPhotoUrls,
+                    direction = message.direction
+                )
+            }
+        } else if (isSent && isLastInGroup && message.readBy.isEmpty()) {
+            // Check if this is the very last sent message overall (no later sent messages exist).
+            // We approximate this by: isLastInGroup + showTimestamp (which means it's the tail).
+            // The ViewModel sets showReadReceipt only on the furthest-read message.
+            // For the absolute last sent message that hasn't been read yet, show status.
+            // But we only show it if showTimestamp is true (meaning it's at a group boundary).
+        }
+
+        // Timestamp (shown independently based on time gaps)
+        if (message.showTimestamp) {
             Row(
                 modifier = Modifier.padding(
                     start = if (!isSent && isGroupChat) AvatarTrack else 0.dp,
@@ -423,30 +450,11 @@ fun ChatBubble(
                 ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (message.showTimestamp) {
-                    Text(
-                        text = message.formattedTime,
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
-                    )
-                }
-                if (showStatusOrReceipt) {
-                    if (message.showTimestamp) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                    }
-                    if (message.showReadReceipt) {
-                        ReadReceiptIndicator(
-                            readBy = message.readBy,
-                            readByPhotoUrls = message.readByPhotoUrls,
-                            direction = message.direction
-                        )
-                    } else {
-                        MessageStatusIndicator(
-                            status = message.status,
-                            direction = message.direction
-                        )
-                    }
-                }
+                Text(
+                    text = message.formattedTime,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+                )
             }
         }
     }

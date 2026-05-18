@@ -111,7 +111,12 @@ data class MessageUiModel(
      * read receipt avatar should render. Messenger only shows the avatar under the
      * most recent sent message that has been read by the other party.
      */
-    val showReadReceipt: Boolean = false
+    val showReadReceipt: Boolean = false,
+    /**
+     * Whether this is the absolute last sent message in the conversation — the only
+     * message that shows the status circle (pending/sent/delivered) when not yet read.
+     */
+    val showStatusIndicator: Boolean = false
 )
 
 /**

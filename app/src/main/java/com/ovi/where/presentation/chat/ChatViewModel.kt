@@ -257,14 +257,20 @@ class ChatViewModel @Inject constructor(
                 val lastReadIndex = groupedUiModels.indexOfLast {
                     it.direction == BubbleDirection.SENT && it.readBy.isNotEmpty()
                 }
-                val finalModels = if (lastReadIndex >= 0) {
-                    groupedUiModels.mapIndexed { index, model ->
-                        if (index == lastReadIndex) model.copy(showReadReceipt = true)
-                        else if (model.direction == BubbleDirection.SENT && model.readBy.isNotEmpty()) {
-                            model // keep readBy data but showReadReceipt stays false
-                        } else model
+                // Also find the absolute last sent message for the status indicator.
+                val lastSentIndex = groupedUiModels.indexOfLast {
+                    it.direction == BubbleDirection.SENT
+                }
+                val finalModels = groupedUiModels.mapIndexed { index, model ->
+                    when {
+                        index == lastReadIndex -> model.copy(showReadReceipt = true)
+                        // Only show status circle on the very last sent message when
+                        // it hasn't been read yet (no read receipt to show).
+                        index == lastSentIndex && lastReadIndex != lastSentIndex ->
+                            model.copy(showStatusIndicator = true)
+                        else -> model
                     }
-                } else groupedUiModels
+                }
                 // Requirement 17.7 / 19.1: Pre-compute grouped messages by dateKey
                 // so the LazyColumn items block performs no inline grouping/sorting/formatting.
                 val grouped = finalModels.groupBy { it.dateKey }

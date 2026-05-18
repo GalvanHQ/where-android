@@ -105,7 +105,13 @@ data class MessageUiModel(
     /** For consecutive image messages: IDs of all images in this collage group (only set on first). */
     val imageCollageUrls: List<String> = emptyList(),
     /** Whether this image message should be hidden (it's rendered as part of a collage on a previous item). */
-    val isHiddenInCollage: Boolean = false
+    val isHiddenInCollage: Boolean = false,
+    /**
+     * Whether this is the furthest-read sent message — the single message where the
+     * read receipt avatar should render. Messenger only shows the avatar under the
+     * most recent sent message that has been read by the other party.
+     */
+    val showReadReceipt: Boolean = false
 )
 
 /**

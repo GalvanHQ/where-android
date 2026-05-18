@@ -411,9 +411,9 @@ fun ChatBubble(
 
         // ── Timestamp + status / read indicator (outside bubble) ─────────
         // Below the LAST sent bubble in a group:
-        //   - If unread by anyone yet → MessageStatusIndicator (circle morph: pending/sent/delivered/failed)
-        //   - Once read by someone     → ReadReceiptIndicator replaces the circle with reader avatar(s)
-        // (Messenger pattern: the two indicators are mutually exclusive in the same slot.)
+        //   - If this is the furthest-read message → ReadReceiptIndicator (avatar)
+        //   - Otherwise for last-in-group sent → MessageStatusIndicator (circle)
+        // (Messenger pattern: avatar only on the single most-recent read message.)
         val showStatusOrReceipt = isSent && isLastInGroup
         if (message.showTimestamp || showStatusOrReceipt) {
             Row(
@@ -434,7 +434,7 @@ fun ChatBubble(
                     if (message.showTimestamp) {
                         Spacer(modifier = Modifier.width(6.dp))
                     }
-                    if (message.readBy.isNotEmpty()) {
+                    if (message.showReadReceipt) {
                         ReadReceiptIndicator(
                             readBy = message.readBy,
                             readByPhotoUrls = message.readByPhotoUrls,

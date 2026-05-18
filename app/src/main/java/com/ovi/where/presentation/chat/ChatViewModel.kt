@@ -7,28 +7,29 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.ovi.where.core.common.Resource
-import com.ovi.where.data.network.ConnectivityObserver
-import com.ovi.where.domain.repository.LocationRepository
-import com.ovi.where.domain.model.SharedLocation
-import com.ovi.where.data.location.LocationManager
-import com.ovi.where.data.remote.chat.ChatSocketIoClient
-import com.ovi.where.data.remote.chat.ServerFrame
+import com.ovi.where.data.audio.VoiceRecorder
 import com.ovi.where.data.local.dao.OnlineStatusDao
 import com.ovi.where.data.local.entity.OnlineStatusEntity
+import com.ovi.where.data.location.LocationManager
+import com.ovi.where.data.network.ConnectivityObserver
+import com.ovi.where.data.remote.chat.ChatSocketIoClient
+import com.ovi.where.data.remote.chat.ServerFrame
 import com.ovi.where.data.repository.MessageRepositoryImpl
-import com.ovi.where.domain.model.Message
-import com.ovi.where.domain.model.MessageStatus
-import com.ovi.where.domain.model.MessageType
-import com.ovi.where.domain.model.MemberRole
 import com.ovi.where.domain.model.ConversationType
 import com.ovi.where.domain.model.FriendshipStatus
 import com.ovi.where.domain.model.InteractionType
+import com.ovi.where.domain.model.MemberRole
+import com.ovi.where.domain.model.Message
+import com.ovi.where.domain.model.MessageStatus
+import com.ovi.where.domain.model.MessageType
+import com.ovi.where.domain.model.SharedLocation
 import com.ovi.where.domain.repository.FriendshipRepository
 import com.ovi.where.domain.repository.GroupRepository
 import com.ovi.where.domain.repository.InteractionRepository
+import com.ovi.where.domain.repository.LocationRepository
 import com.ovi.where.domain.repository.UserRepository
-import com.ovi.where.domain.usecase.chat.MarkConversationReadUseCase
 import com.ovi.where.domain.usecase.chat.FetchLinkPreviewUseCase
+import com.ovi.where.domain.usecase.chat.MarkConversationReadUseCase
 import com.ovi.where.domain.usecase.chat.ObserveConversationsUseCase
 import com.ovi.where.domain.usecase.chat.ObserveMessagesUseCase
 import com.ovi.where.domain.usecase.chat.SendLocationMessageUseCase
@@ -36,9 +37,9 @@ import com.ovi.where.domain.usecase.chat.SendMessageUseCase
 import com.ovi.where.domain.usecase.group.MuteGroupMemberUseCase
 import com.ovi.where.domain.usecase.location.StartLocationSharingUseCase
 import com.ovi.where.domain.usecase.location.StopLocationSharingUseCase
+import com.ovi.where.presentation.chat.ChatViewModel.Companion.TYPING_TIMEOUT_MS
 import com.ovi.where.presentation.chat.components.VoicePlaybackController
-import com.ovi.where.data.audio.VoiceRecorder
-import com.ovi.where.service.LocationTrackingService
+import com.ovi.where.presentation.model.BubbleDirection
 import com.ovi.where.presentation.model.ConversationUiModel
 import com.ovi.where.presentation.model.MessageUiModel
 import com.ovi.where.presentation.model.formatConversationTimestamp
@@ -46,6 +47,8 @@ import com.ovi.where.presentation.model.formatDateSeparatorLabel
 import com.ovi.where.presentation.model.formatMessageDateKey
 import com.ovi.where.presentation.model.formatMessageTime
 import com.ovi.where.presentation.model.toUiModel
+import com.ovi.where.service.LocationTrackingService
+import dagger.Lazy
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Job
@@ -62,9 +65,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
-import java.util.concurrent.ConcurrentHashMap
 import java.util.UUID
-import dagger.Lazy
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
 /**
@@ -248,13 +250,28 @@ class ChatViewModel @Inject constructor(
                 // Compute message grouping metadata (Requirements 4.6, 4.7, 10.3)
                 val timestamps = windowedMessages.map { it.timestamp }
                 val groupedUiModels = computeMessageGrouping(uiModels, timestamps)
+
+                // Messenger-style read receipt: only show on the LAST sent message
+                // that has been read. Find its index and set showReadReceipt = true
+                // only on that one message.
+                val lastReadIndex = groupedUiModels.indexOfLast {
+                    it.direction == BubbleDirection.SENT && it.readBy.isNotEmpty()
+                }
+                val finalModels = if (lastReadIndex >= 0) {
+                    groupedUiModels.mapIndexed { index, model ->
+                        if (index == lastReadIndex) model.copy(showReadReceipt = true)
+                        else if (model.direction == BubbleDirection.SENT && model.readBy.isNotEmpty()) {
+                            model // keep readBy data but showReadReceipt stays false
+                        } else model
+                    }
+                } else groupedUiModels
                 // Requirement 17.7 / 19.1: Pre-compute grouped messages by dateKey
                 // so the LazyColumn items block performs no inline grouping/sorting/formatting.
-                val grouped = groupedUiModels.groupBy { it.dateKey }
+                val grouped = finalModels.groupBy { it.dateKey }
                     .entries
                     .map { (key, msgs) -> key to msgs }
                 _uiState.value = _uiState.value.copy(
-                    messages = groupedUiModels,
+                    messages = finalModels,
                     groupedMessages = grouped,
                     isLoading = false,
                     // When messages are evicted, there are always more messages to paginate back to

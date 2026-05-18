@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,7 +44,7 @@ import com.ovi.where.core.utils.LocalReducedMotion
  * The 6 emojis available in the reaction picker.
  * Requirements: 3.1
  */
-val REACTION_EMOJIS = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
+val REACTION_EMOJIS = listOf("👍", "❤️", "😂", "😮", "😢", "🙏", "😡")
 
 /**
  * Full-screen overlay that shows a reaction picker when a message is long-pressed.
@@ -87,7 +88,7 @@ fun ReactionPickerOverlay(
         Box(
             modifier = modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f))
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.35f))
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -96,10 +97,12 @@ fun ReactionPickerOverlay(
             contentAlignment = Alignment.Center
         ) {
             Surface(
-                shape = RoundedCornerShape(50),
+                shape = RoundedCornerShape(50.dp),
                 color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 12.dp,
+                shadowElevation = 16.dp,
+                tonalElevation = 2.dp,
                 modifier = Modifier
+                    .padding(horizontal = 16.dp)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -108,11 +111,10 @@ fun ReactionPickerOverlay(
                     .semantics { contentDescription = "Reaction picker" }
             ) {
                 Row(
-                    modifier = Modifier.padding(
-                        horizontal = 10.dp,
-                        vertical = 8.dp
-                    ),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     REACTION_EMOJIS.forEach { emoji ->
@@ -159,7 +161,7 @@ private fun ReactionEmojiButton(
     ) {
         Text(
             text = emoji,
-            fontSize = 30.sp,
+            fontSize = 24.sp,
             modifier = Modifier.scale(scale)
         )
     }

@@ -924,21 +924,26 @@ class MessageRepositoryImpl @Inject constructor(
         cancelledJob?.cancel()
         Timber.d("handleAck: tempId=${ack.tempId}, serverId=${ack.id}, timeoutCancelled=${cancelledJob != null}")
 
-        // Update the message in Room: replace tempId with serverId, set status to SENT
         try {
             if (ack.tempId == ack.id) {
                 // Server returned same ID — just update status
                 messageDao.updateStatus(ack.tempId, MessageStatus.SENT.name)
-                Timber.d("handleAck: updated status to SENT for ${ack.tempId}")
             } else {
-                // Server assigned a new ID — update in-place
+                // Server assigned a new ID.
+                // Race condition: recentMessages parsing may have already inserted a row
+                // with serverId (without reply/reaction data). Delete that incomplete row
+                // first, then rename our rich local row from tempId → serverId.
+                val existingServerRow = messageDao.getById(ack.id)
+                if (existingServerRow != null) {
+                    // Incomplete row from recentMessages — delete it, keep our rich local one
+                    messageDao.deleteById(ack.id)
+                }
                 messageDao.updateIdAndStatus(
                     oldId = ack.tempId,
                     newId = ack.id,
                     status = MessageStatus.SENT.name,
                     timestamp = ack.timestamp
                 )
-                Timber.d("handleAck: updated id ${ack.tempId} -> ${ack.id}, status -> SENT")
             }
         } catch (e: Exception) {
             Timber.e(e, "Failed to handle ack for ${ack.tempId}")

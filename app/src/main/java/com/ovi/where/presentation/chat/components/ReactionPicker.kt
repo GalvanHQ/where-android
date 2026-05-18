@@ -177,7 +177,7 @@ fun ReactionBadges(
                 ) {
                     Text(
                         text = emoji,
-                        fontSize = 14.sp
+                        fontSize = 12.sp
                     )
                     if (count >= 2) {
                         Text(

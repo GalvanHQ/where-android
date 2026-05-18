@@ -333,20 +333,21 @@ class ConversationRepositoryImpl @Inject constructor(
                                 parseRecentMessageToEntity(convId, map)
                             }
                             if (messageEntities.isNotEmpty()) {
-                                val currentUid = currentUid
-                                val now = System.currentTimeMillis()
-                                // Only insert messages that don't already exist in Room.
-                                // Skip recent messages from the current user (already in Room from optimistic insert).
+                                // Field-level merge: never overwrite richer local data with
+                                // incomplete Firestore embedded messages. Only insert truly new
+                                // messages; for existing ones, only fill in missing fields.
                                 for (entity in messageEntities) {
-                                    // Skip own messages sent within last 60s (handled by optimistic insert + ack)
-                                    if (entity.senderId == currentUid && (now - entity.timestamp) < 60_000L) {
-                                        continue
-                                    }
                                     val existing = messageDao.getById(entity.id)
                                     if (existing == null) {
+                                        // Truly new message — insert
                                         messageDao.insert(entity)
-                                    } else if (existing.imageUrl.isNullOrBlank() && !entity.imageUrl.isNullOrBlank()) {
-                                        messageDao.updateImageUrl(entity.id, entity.imageUrl!!)
+                                    } else {
+                                        // Existing message — only update imageUrl if it was missing
+                                        if (existing.imageUrl.isNullOrBlank() && !entity.imageUrl.isNullOrBlank()) {
+                                            messageDao.updateImageUrl(entity.id, entity.imageUrl!!)
+                                        }
+                                        // Never overwrite: replyToText, replyToSenderName, reactionsJson, readByJson
+                                        // These are richer locally (set by optimistic insert or socket frames)
                                     }
                                 }
                             }

@@ -53,6 +53,7 @@ fun ChatBubble(
     onRetry: () -> Unit = {},
     onLocationTap: () -> Unit = {},
     onReplyQuoteTap: (String) -> Unit = {},
+    onReactionTap: (String) -> Unit = {},
     onVoicePlayPause: (() -> Unit)? = null,
     onVoiceSeek: ((Float) -> Unit)? = null,
     isVoicePlaying: Boolean = false,
@@ -258,20 +259,33 @@ fun ChatBubble(
                             }
                         }
                     }
-
-                    // Link preview below the bubble
-                    if (message.hasLinkPreview && message.linkPreviewUrl != null && message.linkPreviewTitle != null) {
-                        LinkPreviewCard(
-                            url = message.linkPreviewUrl,
-                            title = message.linkPreviewTitle,
-                            description = message.linkPreviewDescription,
-                            imageUrl = message.linkPreviewImageUrl,
-                            domain = message.linkPreviewDomain ?: "",
-                            modifier = Modifier.widthIn(max = maxBubbleWidth)
-                        )
-                    }
                 }
             }
+        }
+
+        // Link preview outside the Row (proper placement below bubble)
+        if (message.hasLinkPreview && message.linkPreviewUrl != null && message.linkPreviewTitle != null) {
+            LinkPreviewCard(
+                url = message.linkPreviewUrl,
+                title = message.linkPreviewTitle,
+                description = message.linkPreviewDescription,
+                imageUrl = message.linkPreviewImageUrl,
+                domain = message.linkPreviewDomain ?: "",
+                modifier = Modifier
+                    .widthIn(max = maxBubbleWidth)
+                    .padding(start = if (!isSent && isGroupChat) 36.dp else 0.dp)
+            )
+        }
+
+        // Reaction badges below the bubble
+        if (message.reactions.isNotEmpty()) {
+            ReactionBadges(
+                reactions = message.reactions,
+                onReactionTap = onReactionTap,
+                modifier = Modifier.padding(
+                    start = if (!isSent && isGroupChat) 36.dp else 0.dp
+                )
+            )
         }
 
         // Timestamp outside bubble (only after time gaps)

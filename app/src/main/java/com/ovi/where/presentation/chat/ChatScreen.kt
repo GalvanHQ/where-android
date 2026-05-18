@@ -655,6 +655,7 @@ fun ChatScreen(
                                                     }
                                                 }
                                             },
+                                            onReactionTap = onReactionTapHandler,
                                             onVoicePlayPause = onVoicePlayPause,
                                             onVoiceSeek = onVoiceSeek,
                                             isVoicePlaying = isThisVoicePlaying,

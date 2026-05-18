@@ -29,6 +29,9 @@ interface OnlineStatusDao {
     @Query("SELECT isOnline FROM online_status WHERE userId = :userId")
     suspend fun isUserOnline(userId: String): Boolean?
 
+    @Query("SELECT * FROM online_status WHERE userId = :userId")
+    suspend fun getStatus(userId: String): OnlineStatusEntity?
+
     @Query("DELETE FROM online_status")
     suspend fun clearAll()
 }

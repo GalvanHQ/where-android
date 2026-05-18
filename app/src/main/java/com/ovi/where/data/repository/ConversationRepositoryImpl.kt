@@ -335,19 +335,41 @@ class ConversationRepositoryImpl @Inject constructor(
                             if (messageEntities.isNotEmpty()) {
                                 // Field-level merge: never overwrite richer local data with
                                 // incomplete Firestore embedded messages. Only insert truly new
-                                // messages; for existing ones, only fill in missing fields.
+                                // messages; for existing ones, merge specific fields.
                                 for (entity in messageEntities) {
                                     val existing = messageDao.getById(entity.id)
                                     if (existing == null) {
                                         // Truly new message — insert
                                         messageDao.insert(entity)
                                     } else {
-                                        // Existing message — only update imageUrl if it was missing
+                                        // Existing message — fill in missing imageUrl
                                         if (existing.imageUrl.isNullOrBlank() && !entity.imageUrl.isNullOrBlank()) {
                                             messageDao.updateImageUrl(entity.id, entity.imageUrl!!)
                                         }
-                                        // Never overwrite: replyToText, replyToSenderName, reactionsJson, readByJson
-                                        // These are richer locally (set by optimistic insert or socket frames)
+
+                                        // readBy is monotonic (only grows). Union local with
+                                        // remote so reconnecting clients see read receipts that
+                                        // arrived while they were offline.
+                                        val mergedReadBy = unionJsonStringArrays(
+                                            existing.readByJson,
+                                            entity.readByJson
+                                        )
+                                        if (mergedReadBy != existing.readByJson) {
+                                            messageDao.updateReadBy(entity.id, mergedReadBy)
+                                        }
+
+                                        // Reactions: server is authoritative for the persisted
+                                        // state (it does the transactional add/remove). Apply
+                                        // remote reactions if they differ — covers offline/reopen
+                                        // case where socket events were missed.
+                                        if (entity.reactionsJson != "{}"
+                                            && entity.reactionsJson != existing.reactionsJson
+                                        ) {
+                                            messageDao.updateReactions(entity.id, entity.reactionsJson)
+                                        }
+
+                                        // Never overwrite reply text/senderName — set at send time,
+                                        // immutable, and always richer locally.
                                     }
                                 }
                             }
@@ -563,6 +585,26 @@ class ConversationRepositoryImpl @Inject constructor(
         lastMessageText = lastMessageText, lastMessageSenderId = lastMessageSenderId,
         lastMessageTimestamp = lastMessageTimestamp, createdAt = createdAt
     )
+
+    /**
+     * Computes the union of two JSON arrays of quoted strings.
+     * Used to merge `readBy` lists which are monotonic — once a user has read a
+     * message, they remain in the list forever. Order is not significant.
+     *
+     * Input format: `["userA","userB"]`. Tolerant of whitespace and empty input.
+     */
+    private fun unionJsonStringArrays(a: String, b: String): String {
+        fun parse(s: String): List<String> {
+            if (s.isBlank() || s == "[]") return emptyList()
+            return s.removeSurrounding("[", "]")
+                .split(",")
+                .map { it.trim().removeSurrounding("\"") }
+                .filter { it.isNotEmpty() }
+        }
+        val merged = (parse(a) + parse(b)).distinct()
+        if (merged.isEmpty()) return "[]"
+        return merged.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
+    }
 
     /**
      * Parses a single message map from the Firestore `recentMessages` array

@@ -376,6 +376,8 @@ fun ChatScreen(
                 onNavigateBack = onNavigateBack,
                 onNavigateToGroupInfo = onNavigateToGroupInfo,
                 onNavigateToConversationInfo = onNavigateToConversationInfo,
+                onlineMemberCount = uiState.onlineMemberCount,
+                isOtherUserFriend = uiState.isOtherUserFriend
             )
         }
     ) { paddingValues ->

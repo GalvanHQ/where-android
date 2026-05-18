@@ -298,7 +298,12 @@ const initializeSockets = (io) => {
             try {
                 const now = Date.now();
 
-                // Reset unread count + update readBy on recent messages
+                // Track which message IDs were marked read in this call so we can
+                // broadcast a precise read_receipt to other participants.
+                // Works for both 1:1 and group conversations because the data
+                // structure (recentMessages with readBy array) is the same.
+                let newlyReadMessageIds = [];
+
                 const convRef = db.collection('conversations').doc(conversationId);
                 await db.runTransaction(async (transaction) => {
                     const doc = await transaction.get(convRef);
@@ -310,8 +315,9 @@ const initializeSockets = (io) => {
                     const unreadCounts = data.unreadCounts || {};
                     unreadCounts[uid] = 0;
 
-                    // Mark all messages as read by this user
+                    // Mark all unread messages from other senders as read by this user
                     const recentMessages = data.recentMessages || [];
+                    const markedIds = [];
                     let updated = false;
                     for (let i = 0; i < recentMessages.length; i++) {
                         const msg = recentMessages[i];
@@ -320,6 +326,7 @@ const initializeSockets = (io) => {
                             if (!readBy.includes(uid)) {
                                 readBy.push(uid);
                                 recentMessages[i] = { ...msg, readBy };
+                                markedIds.push(msg.id);
                                 updated = true;
                             }
                         }
@@ -330,15 +337,15 @@ const initializeSockets = (io) => {
                         updateData.recentMessages = recentMessages;
                     }
                     transaction.update(convRef, updateData);
+
+                    // Capture for broadcast outside the transaction
+                    newlyReadMessageIds = markedIds;
                 });
 
-                // Broadcast read receipt to room — include all message IDs that were marked read
-                const readMessageIds = recentMessages
-                    .filter(m => m.senderId !== uid && (m.readBy || []).includes(uid))
-                    .map(m => m.id);
-
+                // Always broadcast — even if no new messages were marked read,
+                // the receipt acts as a presence/seen ping for the sender's UI.
                 socket.to(conversationId).emit('read_receipt', {
-                    messageIds: readMessageIds,
+                    messageIds: newlyReadMessageIds,
                     userId: uid,
                     timestamp: now
                 });

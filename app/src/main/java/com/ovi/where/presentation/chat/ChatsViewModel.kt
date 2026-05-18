@@ -77,6 +77,9 @@ class ChatsViewModel @Inject constructor(
     /** Tracks which user IDs are currently online (from presence events). */
     private val onlineUserIds = mutableSetOf<String>()
 
+    /** Last-seen timestamps (epoch millis) for resolved DM participants. */
+    private val lastSeenByUser = mutableMapOf<String, Long>()
+
     /** Cached resolved display names for DM participants (userId -> displayName). */
     private val participantNames = mutableMapOf<String, String>()
 
@@ -133,7 +136,7 @@ class ChatsViewModel @Inject constructor(
             recentSearches = recentSearches,
             suggestions = suggestions,
             searchResults = if (query.isBlank()) emptyList()
-            else results.map { it.toUiModel(uid, ::formatConversationTimestamp, participantNames, participantPhotos, onlineUserIds) },
+            else results.map { it.toUiModel(uid, ::formatConversationTimestamp, participantNames, participantPhotos, onlineUserIds, lastSeenByUser) },
             showEmptyState = query.isNotBlank() && results.isEmpty() && allConversations.isNotEmpty()
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, SearchUiState())
@@ -383,12 +386,20 @@ class ChatsViewModel @Inject constructor(
             chatSocketIoClient.incomingFrames.collect { frame ->
                 if (frame is ServerFrame.Presence) {
                     val previousSnapshot = onlineUserIds.toSet()
-                    if (frame.status == "online") {
+                    val isOnline = frame.status == "online"
+                    if (isOnline) {
                         onlineUserIds.add(frame.userId)
                     } else {
                         onlineUserIds.remove(frame.userId)
                     }
                     val currentSnapshot = onlineUserIds.toSet()
+
+                    // Always record activity timestamp on a presence frame.
+                    // Going offline: capture moment they left.
+                    // Coming online: refresh "most recent activity" so reconnects don't
+                    // show a stale "Active 5h ago" subtitle.
+                    val now = System.currentTimeMillis()
+                    lastSeenByUser[frame.userId] = now
 
                     // distinctUntilChanged: only proceed if the online set actually changed
                     if (currentSnapshot != previousSnapshot) {
@@ -396,8 +407,9 @@ class ChatsViewModel @Inject constructor(
                         onlineStatusDao.upsert(
                             OnlineStatusEntity(
                                 userId = frame.userId,
-                                isOnline = frame.status == "online",
-                                lastUpdatedAt = System.currentTimeMillis()
+                                isOnline = isOnline,
+                                lastUpdatedAt = now,
+                                lastSeen = now
                             )
                         )
 
@@ -406,7 +418,7 @@ class ChatsViewModel @Inject constructor(
                         presenceDebounceJob?.cancel()
                         presenceDebounceJob = viewModelScope.launch {
                             delay(PRESENCE_DEBOUNCE_MS)
-                            applyTargetedPresenceUpdate(frame.userId, frame.status == "online")
+                            applyTargetedPresenceUpdate(frame.userId, isOnline, now)
                         }
                     }
                 }
@@ -421,7 +433,7 @@ class ChatsViewModel @Inject constructor(
      *
      * Falls back to [applySearchFilter] if the conversation list hasn't been built yet.
      */
-    private fun applyTargetedPresenceUpdate(userId: String, isOnline: Boolean) {
+    private fun applyTargetedPresenceUpdate(userId: String, isOnline: Boolean, lastSeen: Long) {
         val currentConversations = _uiState.value.conversations
         if (currentConversations.isEmpty()) {
             // List not yet built — fall back to full re-map
@@ -432,9 +444,15 @@ class ChatsViewModel @Inject constructor(
         // Find the conversation(s) where the affected user is the other participant
         var updated = false
         val updatedConversations = currentConversations.map { model ->
-            if (!model.isGroup && model.otherUserId == userId && model.isOtherUserOnline != isOnline) {
+            if (!model.isGroup
+                && model.otherUserId == userId
+                && (model.isOtherUserOnline != isOnline || model.otherUserLastSeen != lastSeen)
+            ) {
                 updated = true
-                model.copy(isOtherUserOnline = isOnline)
+                model.copy(
+                    isOtherUserOnline = isOnline,
+                    otherUserLastSeen = lastSeen
+                )
             } else {
                 model
             }
@@ -471,9 +489,27 @@ class ChatsViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = userRepository.getUsers(unresolvedIds)) {
                 is Resource.Success -> {
+                    val now = System.currentTimeMillis()
+                    val statusEntities = mutableListOf<OnlineStatusEntity>()
                     result.data?.forEach { user ->
                         participantNames[user.id] = user.displayName
                         participantPhotos[user.id] = user.photoUrl
+                        if (user.lastSeen > 0L) {
+                            lastSeenByUser[user.id] = user.lastSeen
+                        }
+                        statusEntities += OnlineStatusEntity(
+                            userId = user.id,
+                            isOnline = user.isOnline,
+                            lastUpdatedAt = now,
+                            lastSeen = user.lastSeen
+                        )
+                    }
+                    if (statusEntities.isNotEmpty()) {
+                        // Persist authoritative profile snapshot so offline reopens
+                        // render "Active Xm ago" without a server round-trip.
+                        try {
+                            onlineStatusDao.upsertAll(statusEntities)
+                        } catch (_: Exception) { /* best-effort */ }
                     }
                     // Re-apply filter with newly resolved metadata
                     applySearchFilter()
@@ -593,7 +629,7 @@ class ChatsViewModel @Inject constructor(
         }
 
         val uiModels = filtered.map { conversation ->
-            conversation.toUiModel(uid, ::formatConversationTimestamp, activeLocations, participantNames, participantPhotos, onlineUserIds)
+            conversation.toUiModel(uid, ::formatConversationTimestamp, activeLocations, participantNames, participantPhotos, onlineUserIds, lastSeenByUser)
         }
 
         // Sort: pinned conversations at top (timestamp sort within pinned group),

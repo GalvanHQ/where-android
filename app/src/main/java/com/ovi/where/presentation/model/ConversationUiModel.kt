@@ -29,6 +29,12 @@ data class ConversationUiModel(
     val memberCount: Int = 0,
     /** Whether the other user in a 1:1 conversation is currently online. */
     val isOtherUserOnline: Boolean = false,
+    /**
+     * Last-seen timestamp (epoch millis) for the other user in a 1:1 conversation.
+     * Used to render "Active 5m ago" / "Active 2h ago" subtitles when offline.
+     * `0L` means unknown — show plain "Offline" instead.
+     */
+    val otherUserLastSeen: Long = 0L,
     /** The other user's ID in a 1:1 conversation (null for groups). */
     val otherUserId: String? = null,
     /** Whether any member in this conversation has active location sharing (Req 3.1). */
@@ -58,7 +64,8 @@ fun Conversation.toUiModel(
     timeFormatter: (Long) -> String,
     participantNames: Map<String, String> = emptyMap(),
     participantPhotos: Map<String, String?> = emptyMap(),
-    onlineUserIds: Set<String> = emptySet()
+    onlineUserIds: Set<String> = emptySet(),
+    lastSeenByUser: Map<String, Long> = emptyMap()
 ): ConversationUiModel {
     val unread = (unreadCounts[currentUserId] as? Int)
         ?: (unreadCounts[currentUserId] as? Long)?.toInt()
@@ -69,6 +76,9 @@ fun Conversation.toUiModel(
     val otherOnline = if (type == ConversationType.DIRECT && otherUid != null) {
         otherUid in onlineUserIds || otherUid in onlineMembers
     } else false
+    val otherLastSeen = if (type == ConversationType.DIRECT && otherUid != null) {
+        lastSeenByUser[otherUid] ?: 0L
+    } else 0L
     val isOwnLastMessage = lastMessageSenderId == currentUserId
 
     val resolvedTitle = resolveConversationTitle(
@@ -98,6 +108,7 @@ fun Conversation.toUiModel(
         currentUserId    = currentUserId,
         memberCount      = participantIds.size,
         isOtherUserOnline = otherOnline,
+        otherUserLastSeen = otherLastSeen,
         otherUserId      = otherUid,
         isPinned         = currentUserId in pinnedBy,
         isMuted          = currentUserId in mutedBy,
@@ -175,9 +186,10 @@ fun Conversation.toUiModel(
     activeLocations: List<SharedLocation>,
     participantNames: Map<String, String> = emptyMap(),
     participantPhotos: Map<String, String?> = emptyMap(),
-    onlineUserIds: Set<String> = emptySet()
+    onlineUserIds: Set<String> = emptySet(),
+    lastSeenByUser: Map<String, Long> = emptyMap()
 ): ConversationUiModel {
-    val base = toUiModel(currentUserId, timeFormatter, participantNames, participantPhotos, onlineUserIds)
+    val base = toUiModel(currentUserId, timeFormatter, participantNames, participantPhotos, onlineUserIds, lastSeenByUser)
 
     // Match active locations to this conversation by groupId
     val conversationLocations = if (groupId != null) {

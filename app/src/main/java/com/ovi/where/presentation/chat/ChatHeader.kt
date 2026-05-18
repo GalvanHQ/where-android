@@ -1,7 +1,9 @@
 package com.ovi.where.presentation.chat
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
@@ -20,8 +23,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -29,21 +39,23 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ovi.where.presentation.chat.components.ConversationAvatar
 import com.ovi.where.presentation.model.ConversationUiModel
+import com.ovi.where.presentation.model.LastActiveFormatter
+import kotlinx.coroutines.delay
 
 /**
- * Messenger-style compact chat header composable for the ChatScreen.
+ * Messenger-style compact chat header for ChatScreen.
  *
- * Layout: back arrow (24dp) → 8dp → Avatar (36dp) with 10dp online indicator → 8dp → title column
- * Trailing actions: info icon (24dp, onSurfaceVariant).
+ * Layout: back arrow → avatar (with online dot) → title column (name + status) → info icon.
  *
- * Displays differently for 1:1 vs group conversations:
- * - 1:1 online: subtitle "Active now" in green/tertiary
- * - 1:1 offline: subtitle "Offline" in onSurfaceVariant
- * - Group: subtitle "{N} members" in onSurfaceVariant
+ * Subtitle is Messenger-style:
+ *   - 1:1 online             → green dot + "Active now"
+ *   - 1:1 offline + lastSeen → "Active 5m ago" (no dot)
+ *   - 1:1 offline (unknown)  → "Offline"
+ *   - Group, n online        → green dot + "{n} of {total} active"
+ *   - Group, none online     → "{total} members"
  *
- * Tapping the avatar/title area navigates to the info screen.
- *
- * Requirements: 2.1, 2.5, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 7.10, 7.11
+ * Subtitle text re-renders every minute so "Active 5m ago" ticks forward without a
+ * full state push from the ViewModel.
  */
 @Composable
 fun ChatHeader(
@@ -51,6 +63,8 @@ fun ChatHeader(
     onNavigateBack: () -> Unit,
     onNavigateToGroupInfo: (String) -> Unit,
     onNavigateToConversationInfo: (String) -> Unit = {},
+    onlineMemberCount: Int = 0,
+    isOtherUserFriend: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -100,7 +114,9 @@ fun ChatHeader(
                     ConversationAvatar(
                         name = conversation.title,
                         photoUrl = conversation.photoUrl,
-                        isOnline = !conversation.isGroup && conversation.isOtherUserOnline,
+                        isOnline = !conversation.isGroup
+                            && isOtherUserFriend
+                            && conversation.isOtherUserOnline,
                         size = 36.dp,
                         indicatorSize = 10.dp,
                         indicatorBorderWidth = 1.5.dp
@@ -123,29 +139,10 @@ fun ChatHeader(
                             overflow = TextOverflow.Ellipsis
                         )
 
-                        // Subtitle based on conversation type and online status
-                        val subtitleText: String
-                        val subtitleColor = when {
-                            conversation.isGroup -> {
-                                subtitleText = "${conversation.memberCount} members"
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                            conversation.isOtherUserOnline -> {
-                                subtitleText = "Active now"
-                                MaterialTheme.colorScheme.tertiary
-                            }
-                            else -> {
-                                subtitleText = "Offline"
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        }
-
-                        Text(
-                            text = subtitleText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = subtitleColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                        ActiveStatusSubtitle(
+                            conversation = conversation,
+                            onlineMemberCount = onlineMemberCount,
+                            isOtherUserFriend = isOtherUserFriend
                         )
                     }
                 }
@@ -180,5 +177,89 @@ fun ChatHeader(
                 )
             }
         }
+    }
+}
+
+/**
+ * Renders the active-status subtitle line (with the live green dot when applicable).
+ *
+ * The text is recomputed every 60s so "Active 5m ago" advances over time without
+ * waiting for a state push. Skips re-rendering entirely when the user is online or
+ * has no known last-seen timestamp.
+ */
+@Composable
+private fun ActiveStatusSubtitle(
+    conversation: ConversationUiModel,
+    onlineMemberCount: Int,
+    isOtherUserFriend: Boolean
+) {
+    // Tick every minute so the relative-time subtitle stays current.
+    var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(conversation.id) {
+        while (true) {
+            delay(60_000L)
+            nowMs = System.currentTimeMillis()
+        }
+    }
+
+    when {
+        conversation.isGroup -> {
+            if (onlineMemberCount > 0) {
+                StatusLine(
+                    showDot = true,
+                    text = "$onlineMemberCount of ${conversation.memberCount} active",
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+            } else {
+                StatusLine(
+                    showDot = false,
+                    text = "${conversation.memberCount} members",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        // 1:1 — only show presence info if the other user is a friend.
+        !isOtherUserFriend -> Unit
+        conversation.isOtherUserOnline -> {
+            StatusLine(
+                showDot = true,
+                text = "Active now",
+                color = MaterialTheme.colorScheme.tertiary
+            )
+        }
+        else -> {
+            val text = LastActiveFormatter.format(
+                isOnline = false,
+                lastSeen = conversation.otherUserLastSeen,
+                now = nowMs
+            )
+            StatusLine(
+                showDot = false,
+                text = text,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatusLine(showDot: Boolean, text: String, color: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (showDot) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.tertiary)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }

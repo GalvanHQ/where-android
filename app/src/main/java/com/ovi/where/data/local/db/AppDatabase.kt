@@ -35,7 +35,7 @@ import com.ovi.where.data.local.entity.VoiceMessageCacheEntity
         LinkPreviewCacheEntity::class,
         OnlineStatusEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -164,6 +164,14 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `conversations` ADD COLUMN `themeColor` TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE `conversations` ADD COLUMN `emojiShortcut` TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE `conversations` ADD COLUMN `nicknamesJson` TEXT DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Track lastSeen alongside online status so we can render
+                // Messenger-style "Active 5m ago" subtitles when a user is offline.
+                db.execSQL("ALTER TABLE `online_status` ADD COLUMN `lastSeen` INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

@@ -331,6 +331,12 @@ class ChatViewModel @Inject constructor(
      */
     private val onlineUserIds = mutableSetOf<String>()
 
+    /**
+     * Last-seen timestamps (epoch millis) for resolved DM participants.
+     * Keyed by userId. Drives the Messenger-style "Active 5m ago" subtitle when offline.
+     */
+    private val lastSeenByUser = mutableMapOf<String, Long>()
+
     /** Whether presence subscription for DM has been started (to avoid duplicate subscriptions). */
     private var dmPresenceSubscribed = false
 
@@ -341,10 +347,13 @@ class ChatViewModel @Inject constructor(
             observeConversationsUseCase().collect { conversations ->
                 val conv = conversations.firstOrNull { it.id == conversationId }
                 if (conv != null) {
-                    // For DIRECT conversations with blank name, resolve participant metadata
-                    if (conv.type == ConversationType.DIRECT && conv.name.isBlank()) {
+                    // For DIRECT conversations resolve participant metadata so we have
+                    // displayName, photo, and lastSeen for the header. Skip if already cached.
+                    if (conv.type == ConversationType.DIRECT) {
                         val otherUid = conv.participantIds.firstOrNull { it != uid }
-                        if (otherUid != null && otherUid !in participantNames) {
+                        if (otherUid != null
+                            && (otherUid !in participantNames || otherUid !in lastSeenByUser)
+                        ) {
                             resolveParticipantProfile(otherUid)
                         }
                     }
@@ -363,7 +372,8 @@ class ChatViewModel @Inject constructor(
                         ::formatConversationTimestamp,
                         participantNames,
                         participantPhotos,
-                        onlineUserIds
+                        onlineUserIds,
+                        lastSeenByUser
                     )
 
                     // Check if nicknames changed before updating state
@@ -409,9 +419,10 @@ class ChatViewModel @Inject constructor(
         // Load initial online status from Room (persisted presence state)
         viewModelScope.launch {
             try {
-                val isOnline = onlineStatusDao.isUserOnline(otherUserId) ?: false
-                if (isOnline) {
-                    onlineUserIds.add(otherUserId)
+                val cached = onlineStatusDao.getStatus(otherUserId)
+                if (cached != null) {
+                    if (cached.isOnline) onlineUserIds.add(otherUserId)
+                    if (cached.lastSeen > 0L) lastSeenByUser[otherUserId] = cached.lastSeen
                     refreshConversationOnlineStatus(uid)
                 }
             } catch (_: Exception) {
@@ -423,18 +434,27 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             wsClient.incomingFrames.collect { frame ->
                 if (frame is ServerFrame.Presence && frame.userId == otherUserId) {
-                    val changed = if (frame.status == "online") {
+                    val isOnline = frame.status == "online"
+                    val changed = if (isOnline) {
                         onlineUserIds.add(frame.userId)
                     } else {
                         onlineUserIds.remove(frame.userId)
                     }
+
+                    // Always update lastSeen on transition: when going offline, capture
+                    // the moment they left; when coming online, treat the current time as
+                    // the most recent activity.
+                    val now = System.currentTimeMillis()
+                    lastSeenByUser[frame.userId] = now
+
                     if (changed) {
                         // Persist to Room for offline access
                         onlineStatusDao.upsert(
                             OnlineStatusEntity(
                                 userId = frame.userId,
-                                isOnline = frame.status == "online",
-                                lastUpdatedAt = System.currentTimeMillis()
+                                isOnline = isOnline,
+                                lastUpdatedAt = now,
+                                lastSeen = now
                             )
                         )
                         refreshConversationOnlineStatus(uid)
@@ -455,9 +475,13 @@ class ChatViewModel @Inject constructor(
         val currentConv = _uiState.value.conversation ?: return
         val otherUid = currentConv.otherUserId ?: return
         val isOnline = otherUid in onlineUserIds
-        if (currentConv.isOtherUserOnline != isOnline) {
+        val lastSeen = lastSeenByUser[otherUid] ?: currentConv.otherUserLastSeen
+        if (currentConv.isOtherUserOnline != isOnline || currentConv.otherUserLastSeen != lastSeen) {
             _uiState.value = _uiState.value.copy(
-                conversation = currentConv.copy(isOtherUserOnline = isOnline)
+                conversation = currentConv.copy(
+                    isOtherUserOnline = isOnline,
+                    otherUserLastSeen = lastSeen
+                )
             )
         }
     }
@@ -479,6 +503,23 @@ class ChatViewModel @Inject constructor(
                 result.data?.let { user ->
                     participantNames[user.id] = user.displayName
                     participantPhotos[user.id] = user.photoUrl
+                    if (user.lastSeen > 0L) {
+                        lastSeenByUser[user.id] = user.lastSeen
+                    }
+                    // Persist presence snapshot from authoritative profile so offline reopens
+                    // show "Active 5m ago" without waiting for a socket frame.
+                    try {
+                        onlineStatusDao.upsert(
+                            OnlineStatusEntity(
+                                userId = user.id,
+                                isOnline = user.isOnline,
+                                lastUpdatedAt = System.currentTimeMillis(),
+                                lastSeen = user.lastSeen
+                            )
+                        )
+                    } catch (_: Exception) {
+                        // Best-effort; falls back to in-memory map.
+                    }
                 }
             }
             else -> {

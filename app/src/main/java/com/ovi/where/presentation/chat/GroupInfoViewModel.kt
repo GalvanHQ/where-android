@@ -485,7 +485,12 @@ class GroupInfoViewModel @Inject constructor(
             if (conversationId == null) {
                 conversationId = conversationRepository.getConversationIdByGroupId(groupId)
             }
-            val convId = conversationId ?: return@launch
+            val convId = conversationId
+            timber.log.Timber.d("GroupInfoVM: updateNickname userId=$userId, nickname=$nickname, convId=$convId, groupId=$groupId")
+            if (convId == null) {
+                timber.log.Timber.w("GroupInfoVM: updateNickname SKIPPED — conversationId is null")
+                return@launch
+            }
 
             val currentNicknames = _uiState.value.nicknames.toMutableMap()
             if (nickname.isBlank()) {
@@ -494,7 +499,8 @@ class GroupInfoViewModel @Inject constructor(
                 currentNicknames[userId] = nickname
             }
             _uiState.update { it.copy(nicknames = currentNicknames) }
-            conversationRepository.updateNicknames(convId, currentNicknames)
+            val result = conversationRepository.updateNicknames(convId, currentNicknames)
+            timber.log.Timber.d("GroupInfoVM: updateNicknames result=$result")
         }
     }
 

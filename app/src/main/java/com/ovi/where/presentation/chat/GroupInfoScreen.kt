@@ -62,7 +62,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -72,11 +71,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.chat.components.ConversationAvatar
-import kotlinx.coroutines.launch
 import com.ovi.where.presentation.model.GroupInfoUiState
 import com.ovi.where.presentation.model.MediaThumbnail
+import kotlinx.coroutines.launch
 
 /**
  * Messenger-style Group Info Screen composable.
@@ -89,7 +90,6 @@ import com.ovi.where.presentation.model.MediaThumbnail
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GroupInfoScreen(
-    groupId: String,
     onNavigateBack: () -> Unit,
     onNavigateToMediaGallery: () -> Unit,
     onNavigateToAddMembers: () -> Unit,
@@ -827,6 +827,8 @@ private fun SharedMediaSection(
     onSeeAllTap: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -838,10 +840,11 @@ private fun SharedMediaSection(
                 fontWeight = FontWeight.SemiBold
             ),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
         )
+
         Spacer(modifier = Modifier.height(8.dp))
 
         BoxWithConstraints(
@@ -855,20 +858,42 @@ private fun SharedMediaSection(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(
-                        onClick = onSeeAllTap
-                    ),
+                    .clickable(onClick = onSeeAllTap),
                 horizontalArrangement = Arrangement.spacedBy(spacing)
             ) {
                 media.take(3).forEach { thumbnail ->
-                    AsyncImage(
-                        model = thumbnail.thumbnailUrl,
-                        contentDescription = "Shared media",
-                        modifier = Modifier
-                            .size(itemSize)
-                            .clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Crop
-                    )
+                    val imageUrl = thumbnail.thumbnailUrl
+
+                    if (imageUrl.isNotBlank()) {
+                        val imageRequest = remember(imageUrl) {
+                            ImageRequest.Builder(context)
+                                .data(imageUrl)
+                                .size(240, 240)
+                                .crossfade(true)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .diskCachePolicy(CachePolicy.ENABLED)
+                                .networkCachePolicy(CachePolicy.ENABLED)
+                                .memoryCacheKey(imageUrl)
+                                .diskCacheKey(imageUrl)
+                                .build()
+                        }
+
+                        AsyncImage(
+                            model = imageRequest,
+                            contentDescription = "Shared media",
+                            modifier = Modifier
+                                .size(itemSize)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(itemSize)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                        )
+                    }
                 }
             }
         }

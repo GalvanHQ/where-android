@@ -1,5 +1,6 @@
 package com.ovi.where.presentation.chat
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,6 +59,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.chat.components.ConversationAvatar
 import com.ovi.where.presentation.model.ConversationInfoUiState
@@ -77,7 +80,6 @@ import com.ovi.where.presentation.model.MediaThumbnail
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationInfoScreen(
-    conversationId: String,
     onNavigateBack: () -> Unit,
     onNavigateToMediaGallery: () -> Unit,
     onNavigateToUserProfile: (String) -> Unit = {},
@@ -483,6 +485,8 @@ private fun SharedMediaSection(
     onSeeAll: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -502,20 +506,42 @@ private fun SharedMediaSection(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(
-                    onClick = onSeeAll
-                ),
+                    .clickable(onClick = onSeeAll),
                 horizontalArrangement = Arrangement.spacedBy(spacing)
             ) {
                 media.take(3).forEach { thumbnail ->
-                    AsyncImage(
-                        model = thumbnail.thumbnailUrl,
-                        contentDescription = "Shared media",
-                        modifier = Modifier
-                            .size(itemSize)
-                            .clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Crop
-                    )
+                    val imageUrl = thumbnail.thumbnailUrl
+
+                    if (imageUrl.isNotBlank()) {
+                        val imageRequest = remember(imageUrl) {
+                            ImageRequest.Builder(context)
+                                .data(imageUrl)
+                                .size(240, 240)
+                                .crossfade(true)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .diskCachePolicy(CachePolicy.ENABLED)
+                                .networkCachePolicy(CachePolicy.ENABLED)
+                                .memoryCacheKey(imageUrl)
+                                .diskCacheKey(imageUrl)
+                                .build()
+                        }
+
+                        AsyncImage(
+                            model = imageRequest,
+                            contentDescription = "Shared media",
+                            modifier = Modifier
+                                .size(itemSize)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(itemSize)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                        )
+                    }
                 }
             }
         }

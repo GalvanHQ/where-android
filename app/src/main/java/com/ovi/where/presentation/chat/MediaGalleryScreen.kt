@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.SubcomposeAsyncImage
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 
 /**
@@ -67,7 +68,6 @@ import coil.request.ImageRequest
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MediaGalleryScreen(
-    conversationId: String,
     onNavigateBack: () -> Unit,
     viewModel: MediaGalleryViewModel = hiltViewModel()
 ) {
@@ -286,13 +286,22 @@ private fun MediaGridItem(
             }
         } else {
             val context = LocalContext.current
-            // Requirement 25.5: Load thumbnail (240px width)
-            val thumbnailModel = ImageRequest.Builder(context)
-                .data(item.thumbnailUrl ?: item.url)
-                .size(240, 240)
-                .crossfade(true)
-                .setParameter("retry", retryKey)
-                .build()
+            val imageUrl = item.thumbnailUrl ?: item.url
+            val cacheKey = "${item.id}_thumb_$imageUrl"
+
+            val thumbnailModel = remember(imageUrl, retryKey) {
+                ImageRequest.Builder(context)
+                    .data(imageUrl)
+                    .size(240, 240)
+                    .crossfade(true)
+                    .memoryCachePolicy(CachePolicy.ENABLED)
+                    .diskCachePolicy(CachePolicy.ENABLED)
+                    .networkCachePolicy(CachePolicy.ENABLED)
+                    .memoryCacheKey(cacheKey)
+                    .diskCacheKey(cacheKey)
+                    .setParameter("retry", retryKey)
+                    .build()
+            }
 
             SubcomposeAsyncImage(
                 model = thumbnailModel,

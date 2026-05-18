@@ -55,11 +55,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.ovi.where.core.theme.Dimens
 
 /**
@@ -247,6 +251,30 @@ private fun ProfileHeaderCard(
     sharedCount: Int,
     ringAlpha: Float
 ) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+
+    val profilePhotoPixelSize = remember(density) {
+        with(density) { 80.dp.roundToPx() }
+    }
+
+    val profilePhotoRequest = remember(photoUrl, profilePhotoPixelSize) {
+        if (photoUrl.isNullOrBlank()) {
+            null
+        } else {
+            ImageRequest.Builder(context)
+                .data(photoUrl)
+                .crossfade(true)
+                .size(profilePhotoPixelSize)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .networkCachePolicy(CachePolicy.ENABLED)
+                .memoryCacheKey(photoUrl)
+                .diskCacheKey(photoUrl)
+                .build()
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -275,9 +303,9 @@ private fun ProfileHeaderCard(
                         )
                 )
 
-                if (photoUrl != null) {
+                if (profilePhotoRequest != null) {
                     AsyncImage(
-                        model = photoUrl,
+                        model = profilePhotoRequest,
                         contentDescription = "Profile photo",
                         modifier = Modifier
                             .size(80.dp)

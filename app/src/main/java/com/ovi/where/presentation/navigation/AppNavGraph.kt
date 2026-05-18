@@ -534,7 +534,6 @@ fun AppNavGraph(
         ) { back ->
             val conversationId = back.arguments?.getString("conversationId") ?: return@composable
             ConversationInfoScreen(
-                conversationId         = conversationId,
                 onNavigateBack         = { navController.popBackStack() },
                 onNavigateToMediaGallery = {
                     navController.navigate(Screen.MediaGallery.createRoute(conversationId)) {
@@ -566,7 +565,6 @@ fun AppNavGraph(
         ) { back ->
             val conversationId = back.arguments?.getString("conversationId") ?: return@composable
             NicknamesScreen(
-                conversationId = conversationId,
                 onNavigateBack = { navController.popBackStack() }
             )
         }
@@ -629,7 +627,6 @@ fun AppNavGraph(
         ) { back ->
             val groupId = back.arguments?.getString("groupId") ?: return@composable
             GroupInfoScreen(
-                groupId                = groupId,
                 onNavigateBack         = { navController.popBackStack() },
                 onNavigateToMediaGallery = {
                     navController.navigate(Screen.MediaGallery.createRoute(groupId)) {
@@ -771,7 +768,6 @@ fun AppNavGraph(
         ) { back ->
             val convId = back.arguments?.getString("conversationId") ?: return@composable
             MediaGalleryScreen(
-                conversationId = convId,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

@@ -48,12 +48,16 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.presentation.common.WhereTopAppBar
 
@@ -154,10 +158,37 @@ fun EditProfileScreen(
                             )
                     )
 
-                    val imageModel = uiState.newPhotoUri ?: uiState.photoUrl
-                    if (imageModel != null) {
+                    val context = LocalContext.current
+                    val density = LocalDensity.current
+
+                    val avatarPixelSize = remember(density) {
+                        with(density) { Dimens.avatarCircle.roundToPx() }
+                    }
+
+                    val imageModel: Any? = uiState.newPhotoUri ?: uiState.photoUrl
+
+                    val avatarImageRequest = remember(imageModel, avatarPixelSize) {
+                        if (imageModel == null) {
+                            null
+                        } else {
+                            val cacheKey = imageModel.toString()
+
+                            ImageRequest.Builder(context)
+                                .data(imageModel)
+                                .crossfade(true)
+                                .size(avatarPixelSize)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .diskCachePolicy(CachePolicy.ENABLED)
+                                .networkCachePolicy(CachePolicy.ENABLED)
+                                .memoryCacheKey(cacheKey)
+                                .diskCacheKey(cacheKey)
+                                .build()
+                        }
+                    }
+
+                    if (avatarImageRequest != null) {
                         AsyncImage(
-                            model = imageModel,
+                            model = avatarImageRequest,
                             contentDescription = "Profile photo",
                             modifier = Modifier
                                 .size(Dimens.avatarCircle)

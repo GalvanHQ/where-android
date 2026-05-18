@@ -25,11 +25,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.SubcomposeAsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 
 /**
  * Full-screen image viewer with swipe paging for multiple images.
@@ -68,6 +71,20 @@ fun FullScreenImageViewer(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
+                val context = LocalContext.current
+                val url = imageUrls[page]
+
+                val imageRequest = remember(url) {
+                    ImageRequest.Builder(context)
+                        .data(url)
+                        .crossfade(true)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .networkCachePolicy(CachePolicy.ENABLED)
+                        .memoryCacheKey(url)
+                        .diskCacheKey(url)
+                        .build()
+                }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -78,7 +95,7 @@ fun FullScreenImageViewer(
                     contentAlignment = Alignment.Center
                 ) {
                     SubcomposeAsyncImage(
-                        model = imageUrls[page],
+                        model = imageRequest,
                         contentDescription = "Image ${page + 1} of ${imageUrls.size}",
                         contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize(),

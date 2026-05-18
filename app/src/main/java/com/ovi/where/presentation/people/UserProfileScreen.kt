@@ -65,6 +65,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -72,6 +74,8 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.ovi.where.R
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.presentation.model.ProfileFriendshipAction
@@ -224,11 +228,37 @@ fun UserProfileScreen(
                                                 shape = CircleShape
                                             )
                                     )
-                                    if (profile.photoUrl != null) {
+                                    val context = LocalContext.current
+                                    val density = LocalDensity.current
+
+                                    val profilePhotoPixelSize = remember(density) {
+                                        with(density) { 80.dp.roundToPx() }
+                                    }
+
+                                    val profilePhotoRequest = remember(profile.photoUrl, profilePhotoPixelSize) {
+                                        if (profile.photoUrl.isNullOrBlank()) {
+                                            null
+                                        } else {
+                                            ImageRequest.Builder(context)
+                                                .data(profile.photoUrl)
+                                                .crossfade(true)
+                                                .size(profilePhotoPixelSize)
+                                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                                .diskCachePolicy(CachePolicy.ENABLED)
+                                                .networkCachePolicy(CachePolicy.ENABLED)
+                                                .memoryCacheKey(profile.photoUrl)
+                                                .diskCacheKey(profile.photoUrl)
+                                                .build()
+                                        }
+                                    }
+
+                                    if (profilePhotoRequest != null) {
                                         AsyncImage(
-                                            model = profile.photoUrl,
+                                            model = profilePhotoRequest,
                                             contentDescription = "Profile photo",
-                                            modifier = Modifier.size(80.dp).clip(CircleShape),
+                                            modifier = Modifier
+                                                .size(80.dp)
+                                                .clip(CircleShape),
                                             contentScale = ContentScale.Crop
                                         )
                                     } else {

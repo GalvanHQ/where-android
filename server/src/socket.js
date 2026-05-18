@@ -23,6 +23,7 @@ const initializeSockets = (io) => {
     io.on('connection', (socket) => {
         const uid = socket.user.uid;
         const userName = socket.user.name || 'User';
+        const userPhotoUrl = socket.user.picture || null;
         const conversationId = socket.handshake.query.conversationId;
 
         if (conversationId) {
@@ -57,6 +58,7 @@ const initializeSockets = (io) => {
                     conversationId,
                     senderId: uid,
                     senderName: userName,
+                    senderPhotoUrl: userPhotoUrl,
                     text: text.trim(),
                     messageType: 'TEXT',
                     timestamp: now,
@@ -98,6 +100,7 @@ const initializeSockets = (io) => {
                     conversationId,
                     senderId: uid,
                     senderName: userName,
+                    senderPhotoUrl: userPhotoUrl,
                     text: '📷 Image',
                     messageType: 'IMAGE',
                     imageUrl: imageUrl,
@@ -132,6 +135,7 @@ const initializeSockets = (io) => {
                     conversationId,
                     senderId: uid,
                     senderName: userName,
+                    senderPhotoUrl: userPhotoUrl,
                     text: '📍 Location',
                     messageType: 'LOCATION',
                     latitude,
@@ -166,6 +170,7 @@ const initializeSockets = (io) => {
                     conversationId,
                     senderId: uid,
                     senderName: userName,
+                    senderPhotoUrl: userPhotoUrl,
                     text: '🎤 Voice message',
                     messageType: 'VOICE',
                     voiceUrl: voiceUrl,
@@ -293,7 +298,7 @@ const initializeSockets = (io) => {
             try {
                 const now = Date.now();
 
-                // Reset unread count for this user in the conversation
+                // Reset unread count + update readBy on recent messages
                 const convRef = db.collection('conversations').doc(conversationId);
                 await db.runTransaction(async (transaction) => {
                     const doc = await transaction.get(convRef);
@@ -304,7 +309,27 @@ const initializeSockets = (io) => {
 
                     const unreadCounts = data.unreadCounts || {};
                     unreadCounts[uid] = 0;
-                    transaction.update(convRef, { unreadCounts });
+
+                    // Mark all messages as read by this user
+                    const recentMessages = data.recentMessages || [];
+                    let updated = false;
+                    for (let i = 0; i < recentMessages.length; i++) {
+                        const msg = recentMessages[i];
+                        if (msg.senderId !== uid) {
+                            const readBy = msg.readBy || [];
+                            if (!readBy.includes(uid)) {
+                                readBy.push(uid);
+                                recentMessages[i] = { ...msg, readBy };
+                                updated = true;
+                            }
+                        }
+                    }
+
+                    const updateData = { unreadCounts };
+                    if (updated) {
+                        updateData.recentMessages = recentMessages;
+                    }
+                    transaction.update(convRef, updateData);
                 });
 
                 // Broadcast read receipt to room

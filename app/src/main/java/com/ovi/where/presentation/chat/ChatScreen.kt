@@ -792,7 +792,8 @@ fun ChatScreen(
                         viewModel.sendMessage()
                     }
                 },
-                themeColor = conversationThemeColor
+                themeColor = conversationThemeColor,
+                mentionRanges = uiState.mentionRanges
             )
         }
     }

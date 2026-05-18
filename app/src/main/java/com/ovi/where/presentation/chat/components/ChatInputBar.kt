@@ -79,6 +79,7 @@ fun ChatInputBar(
     emojiShortcut: String? = null,
     onEmojiShortcutSend: () -> Unit = {},
     themeColor: Color? = null,
+    mentionRanges: List<IntRange> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     val hasText = text.isNotBlank()
@@ -177,7 +178,6 @@ fun ChatInputBar(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val mentionColor = MaterialTheme.colorScheme.primary
-                    val mentionRegex = remember { Regex("""@\w[\w\s]*\w|@\w+""") }
                     BasicTextField(
                         value = text,
                         onValueChange = onTextChange,
@@ -192,17 +192,20 @@ fun ChatInputBar(
                         cursorBrush = SolidColor(accent),
                         maxLines = 5,
                         visualTransformation = androidx.compose.ui.text.input.VisualTransformation { annotatedString ->
-                            val matches = mentionRegex.findAll(annotatedString.text).toList()
-                            if (matches.isEmpty()) {
+                            if (mentionRanges.isEmpty()) {
                                 androidx.compose.ui.text.input.TransformedText(annotatedString, androidx.compose.ui.text.input.OffsetMapping.Identity)
                             } else {
                                 val builder = androidx.compose.ui.text.AnnotatedString.Builder(annotatedString)
-                                for (match in matches) {
-                                    builder.addStyle(
-                                        androidx.compose.ui.text.SpanStyle(color = mentionColor, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
-                                        match.range.first,
-                                        match.range.last + 1
-                                    )
+                                for (range in mentionRanges) {
+                                    val safeStart = range.first.coerceIn(0, annotatedString.length)
+                                    val safeEnd = (range.last + 1).coerceIn(0, annotatedString.length)
+                                    if (safeEnd > safeStart) {
+                                        builder.addStyle(
+                                            androidx.compose.ui.text.SpanStyle(color = mentionColor, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                                            safeStart,
+                                            safeEnd
+                                        )
+                                    }
                                 }
                                 androidx.compose.ui.text.input.TransformedText(builder.toAnnotatedString(), androidx.compose.ui.text.input.OffsetMapping.Identity)
                             }

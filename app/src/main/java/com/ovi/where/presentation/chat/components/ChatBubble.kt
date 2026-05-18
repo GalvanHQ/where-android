@@ -247,7 +247,7 @@ fun ChatBubble(
                             if (message.text.isNotEmpty()) {
                                 if (message.mentionedUserIds.isNotEmpty()) {
                                     // Style @mentions: find @word patterns and highlight them
-                                    val mentionRegex = Regex("""@\w[\w\s]*\w|@\w""")
+                                    val mentionRegex = Regex("""@\w+""")
                                     val mentionRanges = mentionRegex.findAll(message.text)
                                         .map { it.range }
                                         .toList()

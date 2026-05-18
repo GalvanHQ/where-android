@@ -908,13 +908,14 @@ class ChatViewModel @Inject constructor(
     }
 
     fun onInputChange(text: String) {
-        _uiState.value = _uiState.value.copy(inputText = text)
+        _uiState.value = _uiState.value.copy(
+            inputText = text,
+            mentionRanges = mentionEngine.getMentionRanges(text)
+        )
         // Use TypingIndicatorManager for debounced outgoing typing events (300ms throttle)
-        // Requirement 7.1: Emit at most one typing event per 300ms window
         if (text.isNotEmpty()) {
             wsClient.typingIndicatorManager.onKeystroke()
         } else {
-            // Input cleared: emit stop-typing immediately (Requirement 7.4)
             wsClient.typingIndicatorManager.onMessageSentOrInputCleared()
         }
         // Trigger mention detection for group chats (Requirement 14.1)
@@ -2948,6 +2949,8 @@ data class ChatUiState(
     val mentionSuggestions: List<MentionEngine.MentionMember> = emptyList(),
     /** List of mentioned user IDs for the current message being composed (Requirement 14.3). */
     val mentionedUserIds: List<String> = emptyList(),
+    /** Character ranges of mention tokens in the input text for blue styling. */
+    val mentionRanges: List<IntRange> = emptyList(),
     // ─── Image Size Error State ───────────────────────────────────────────────
     /** Whether to show the image size limit error inline (Requirement 6.7). */
     val showImageSizeError: Boolean = false

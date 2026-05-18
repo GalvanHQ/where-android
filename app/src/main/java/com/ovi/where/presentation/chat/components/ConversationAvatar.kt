@@ -13,12 +13,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.ovi.where.core.theme.AvatarColors
 
 /**
@@ -50,7 +53,15 @@ fun ConversationAvatar(
         // Avatar content: remote image or initials fallback
         if (!photoUrl.isNullOrBlank()) {
             AsyncImage(
-                model = photoUrl,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(photoUrl)
+                    .crossfade(true)
+                    .memoryCacheKey(photoUrl)
+                    .diskCacheKey(photoUrl)
+                    .memoryCachePolicy(CachePolicy.ENABLED)
+                    .diskCachePolicy(CachePolicy.ENABLED)
+                    .size(128)
+                    .build(),
                 contentDescription = name,
                 modifier = Modifier
                     .size(size)

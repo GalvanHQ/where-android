@@ -9,6 +9,7 @@ import com.ovi.where.core.constants.AppConstants
 import com.ovi.where.data.local.CacheStalenessChecker
 import com.ovi.where.data.local.dao.ConversationDao
 import com.ovi.where.data.local.entity.ConversationEntity
+import com.ovi.where.data.local.entity.MessageEntity
 import com.ovi.where.data.local.entity.toDomain
 import com.ovi.where.data.local.entity.toEntity
 import com.ovi.where.data.remote.chat.ChatApiClient
@@ -53,6 +54,7 @@ class ConversationRepositoryImpl @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
     private val conversationDao: ConversationDao,
+    private val messageDao: com.ovi.where.data.local.dao.MessageDao,
     private val cacheStalenessChecker: CacheStalenessChecker
 ) : ConversationRepository {
 
@@ -304,6 +306,22 @@ class ConversationRepositoryImpl @Inject constructor(
                 repositoryScope.launch {
                     conversationDao.upsertAll(entities)
 
+                    // Parse recentMessages from each conversation doc and upsert to messages table.
+                    // This gives the client messages for free (0 extra Firestore reads).
+                    snapshot?.documents?.forEach { doc ->
+                        try {
+                            val recentMessages = doc.get("recentMessages") as? List<*> ?: return@forEach
+                            val convId = doc.id
+                            val messageEntities = recentMessages.mapNotNull { raw ->
+                                val map = raw as? Map<*, *> ?: return@mapNotNull null
+                                parseRecentMessageToEntity(convId, map)
+                            }
+                            if (messageEntities.isNotEmpty()) {
+                                messageDao.upsertAll(messageEntities)
+                            }
+                        } catch (_: Exception) { /* non-critical */ }
+                    }
+
                     // For group conversations with no photoUrl, fetch from group document
                     val groupConvsWithoutPhoto = entities.filter { entity ->
                         entity.type == ConversationType.GROUP.name
@@ -513,6 +531,58 @@ class ConversationRepositoryImpl @Inject constructor(
         lastMessageText = lastMessageText, lastMessageSenderId = lastMessageSenderId,
         lastMessageTimestamp = lastMessageTimestamp, createdAt = createdAt
     )
+
+    /**
+     * Parses a single message map from the Firestore `recentMessages` array
+     * into a [MessageEntity] for Room storage.
+     */
+    private fun parseRecentMessageToEntity(conversationId: String, map: Map<*, *>): MessageEntity? {
+        val id = map["id"] as? String ?: return null
+        val senderId = map["senderId"] as? String ?: return null
+        val timestamp = (map["timestamp"] as? Long)
+            ?: (map["timestamp"] as? Double)?.toLong()
+            ?: return null
+
+        val readBy = (map["readBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+        val readByJson = if (readBy.isEmpty()) "[]"
+            else readBy.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
+
+        val reactions = map["reactions"] as? Map<*, *>
+        val reactionsJson = if (reactions.isNullOrEmpty()) "{}"
+        else {
+            val entries = reactions.entries.mapNotNull { (k, v) ->
+                val emoji = k as? String ?: return@mapNotNull null
+                val users = (v as? List<*>)?.filterIsInstance<String>() ?: return@mapNotNull null
+                val usersArr = users.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
+                "\"$emoji\":$usersArr"
+            }
+            "{${entries.joinToString(",")}}"
+        }
+
+        return MessageEntity(
+            id = id,
+            conversationId = conversationId,
+            senderId = senderId,
+            senderName = map["senderName"] as? String ?: "",
+            senderPhotoUrl = map["senderPhotoUrl"] as? String,
+            text = map["text"] as? String ?: "",
+            type = map["messageType"] as? String ?: "TEXT",
+            timestamp = timestamp,
+            status = "SENT",
+            latitude = (map["latitude"] as? Double),
+            longitude = (map["longitude"] as? Double),
+            imageUrl = map["imageUrl"] as? String,
+            thumbnailUrl = map["thumbnailUrl"] as? String,
+            replyToId = map["replyToId"] as? String,
+            replyToText = map["replyToText"] as? String,
+            replyToSenderName = map["replyToSenderName"] as? String,
+            reactionsJson = reactionsJson,
+            readByJson = readByJson,
+            voiceUrl = map["voiceUrl"] as? String,
+            voiceDurationMs = (map["voiceDurationMs"] as? Long)
+                ?: (map["voiceDurationMs"] as? Double)?.toLong()
+        )
+    }
 
     // ─── NetworkBoundResource Pattern (Requirements 11.1, 11.2, 11.3, 11.4, 11.6) ───
 

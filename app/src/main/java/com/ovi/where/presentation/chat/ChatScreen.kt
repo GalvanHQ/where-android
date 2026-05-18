@@ -409,34 +409,9 @@ fun ChatScreen(
         topBar = {
             ChatHeader(
                 conversation = uiState.conversation,
-                isOtherUserFriend = uiState.isOtherUserFriend,
-                activeLocationSharingCount = uiState.activeLocationSharingCount,
-                isOtherUserSharingLocation = uiState.isOtherUserSharingLocation,
-                onlineMemberCount = uiState.onlineMemberCount,
-                isCurrentUserAdmin = uiState.isCurrentUserAdmin,
-                showAdminOverflowMenu = uiState.showAdminOverflowMenu,
                 onNavigateBack = onNavigateBack,
-                onNavigateToUserProfile = onNavigateToUserProfile,
                 onNavigateToGroupInfo = onNavigateToGroupInfo,
                 onNavigateToConversationInfo = onNavigateToConversationInfo,
-                onNavigateToGroupMap = onNavigateToGroupMap,
-                onNavigateToEditGroup = onNavigateToEditGroup,
-                onNavigateToMediaGallery = onNavigateToMediaGallery,
-                onSearchTap = {
-                    // Requirement 13.1: Search icon opens search bar
-                    // Requirement 13.7: Save current scroll position before activating search
-                    val scrollIndex = listState.firstVisibleItemIndex
-                    val scrollOffset = listState.firstVisibleItemScrollOffset
-                    viewModel.activateSearch(scrollIndex, scrollOffset)
-                },
-                onAdminOverflowToggle = { viewModel.toggleAdminOverflowMenu() },
-                onAdminOverflowDismiss = { viewModel.dismissAdminOverflowMenu() },
-                onMuteMemberTap = { viewModel.showMuteMemberPicker() },
-                onGroupSettingsTap = {
-                    viewModel.dismissAdminOverflowMenu()
-                    uiState.conversation?.groupId?.let { onNavigateToEditGroup(it) }
-                },
-                onInviteLinkTap = { viewModel.handleInviteLink() }
             )
         }
     ) { paddingValues ->

@@ -48,33 +48,16 @@ import com.ovi.where.presentation.model.ConversationUiModel
 @Composable
 fun ChatHeader(
     conversation: ConversationUiModel?,
-    isOtherUserFriend: Boolean,
-    activeLocationSharingCount: Int = 0,
-    isOtherUserSharingLocation: Boolean = false,
-    onlineMemberCount: Int = 0,
-    isCurrentUserAdmin: Boolean = false,
-    showAdminOverflowMenu: Boolean = false,
     onNavigateBack: () -> Unit,
-    onNavigateToUserProfile: (String) -> Unit,
     onNavigateToGroupInfo: (String) -> Unit,
     onNavigateToConversationInfo: (String) -> Unit = {},
-    onNavigateToGroupMap: (String) -> Unit,
-    onNavigateToEditGroup: (String) -> Unit = {},
-    onNavigateToMediaGallery: (String) -> Unit = {},
-    onSearchTap: () -> Unit = {},
-    onAdminOverflowToggle: () -> Unit = {},
-    onAdminOverflowDismiss: () -> Unit = {},
-    onMuteMemberTap: () -> Unit = {},
-    onGroupSettingsTap: () -> Unit = {},
-    onInviteLinkTap: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding(),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 1.dp
+        color = MaterialTheme.colorScheme.surface
     ) {
         Row(
             modifier = Modifier

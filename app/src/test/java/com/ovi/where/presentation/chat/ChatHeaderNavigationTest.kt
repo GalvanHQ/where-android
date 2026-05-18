@@ -82,7 +82,6 @@ class ChatHeaderNavigationTest {
             WhereTheme {
                 ChatHeader(
                     conversation = createDmConversation(id = "conv-dm-42", title = "Bob"),
-                    isOtherUserFriend = true,
                     onNavigateBack = {},
                     onNavigateToUserProfile = {},
                     onNavigateToGroupInfo = {},
@@ -111,7 +110,6 @@ class ChatHeaderNavigationTest {
             WhereTheme {
                 ChatHeader(
                     conversation = createDmConversation(title = "Carol"),
-                    isOtherUserFriend = true,
                     onNavigateBack = {},
                     onNavigateToUserProfile = {},
                     onNavigateToGroupInfo = { groupInfoNavigated = true },
@@ -142,7 +140,6 @@ class ChatHeaderNavigationTest {
                         title = "Design Team",
                         groupId = "group-design-99"
                     ),
-                    isOtherUserFriend = false,
                     onNavigateBack = {},
                     onNavigateToUserProfile = {},
                     onNavigateToGroupInfo = { groupId ->
@@ -171,7 +168,6 @@ class ChatHeaderNavigationTest {
             WhereTheme {
                 ChatHeader(
                     conversation = createGroupConversation(title = "Friends"),
-                    isOtherUserFriend = false,
                     onNavigateBack = {},
                     onNavigateToUserProfile = {},
                     onNavigateToGroupInfo = {},
@@ -199,7 +195,6 @@ class ChatHeaderNavigationTest {
             WhereTheme {
                 ChatHeader(
                     conversation = createDmConversation(title = "Dave"),
-                    isOtherUserFriend = true,
                     onNavigateBack = { backNavigated = true },
                     onNavigateToUserProfile = {},
                     onNavigateToGroupInfo = {},
@@ -223,7 +218,6 @@ class ChatHeaderNavigationTest {
             WhereTheme {
                 ChatHeader(
                     conversation = createDmConversation(title = "Eve"),
-                    isOtherUserFriend = true,
                     onNavigateBack = {},
                     onNavigateToUserProfile = {},
                     onNavigateToGroupInfo = {},
@@ -244,7 +238,6 @@ class ChatHeaderNavigationTest {
             WhereTheme {
                 ChatHeader(
                     conversation = createGroupConversation(title = "Work Group"),
-                    isOtherUserFriend = false,
                     onNavigateBack = {},
                     onNavigateToUserProfile = {},
                     onNavigateToGroupInfo = {},
@@ -272,7 +265,6 @@ class ChatHeaderNavigationTest {
                         id = "unique-conv-abc123",
                         title = "Frank"
                     ),
-                    isOtherUserFriend = true,
                     onNavigateBack = {},
                     onNavigateToUserProfile = {},
                     onNavigateToGroupInfo = {},
@@ -300,7 +292,6 @@ class ChatHeaderNavigationTest {
                         title = "Gaming Squad",
                         groupId = "grp-gaming-xyz"
                     ),
-                    isOtherUserFriend = false,
                     onNavigateBack = {},
                     onNavigateToUserProfile = {},
                     onNavigateToGroupInfo = { navigatedGroupId = it },

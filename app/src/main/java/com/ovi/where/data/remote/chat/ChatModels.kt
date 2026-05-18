@@ -36,7 +36,11 @@ data class MessageDto(
     val voiceUrl: String? = null,
     val voiceDurationMs: Long? = null,
     val timestamp: Long = 0L,
-    val readBy: List<String> = emptyList()
+    val readBy: List<String> = emptyList(),
+    val replyToId: String? = null,
+    val replyToText: String? = null,
+    val replyToSenderName: String? = null,
+    val reactions: Map<String, List<String>> = emptyMap()
 )
 
 @Serializable

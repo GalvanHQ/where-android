@@ -1205,6 +1205,14 @@ class MessageRepositoryImpl @Inject constructor(
         firebaseAuth.currentUser?.getIdToken(false)?.await()?.token ?: ""
 
     private fun MessageDto.toDomainEntity(fallbackConversationId: String): MessageEntity {
+        val reactionsJsonStr = if (reactions.isEmpty()) "{}" else {
+            val entries = reactions.entries.map { (emoji, users) ->
+                val usersArr = users.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
+                "\"$emoji\":$usersArr"
+            }
+            "{${entries.joinToString(",")}}"
+        }
+
         return MessageEntity(
             id = id,
             conversationId = conversationId.ifEmpty { fallbackConversationId },
@@ -1226,10 +1234,10 @@ class MessageRepositoryImpl @Inject constructor(
             thumbnailUrl = thumbnailUrl,
             voiceUrl = voiceUrl,
             voiceDurationMs = voiceDurationMs,
-            replyToId = null,
-            replyToText = null,
-            replyToSenderName = null,
-            reactionsJson = "{}",
+            replyToId = replyToId,
+            replyToText = replyToText,
+            replyToSenderName = replyToSenderName,
+            reactionsJson = reactionsJsonStr,
             readByJson = serializeReadBy(readBy)
         )
     }

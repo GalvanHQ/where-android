@@ -118,7 +118,8 @@ private fun computeSenderInitials(name: String): String {
 fun Message.toUiModel(
     currentUserId: String,
     timeFormatter: (Long) -> String,
-    dateKeyFormatter: (Long) -> String
+    dateKeyFormatter: (Long) -> String,
+    nicknames: Map<String, String> = emptyMap()
 ): MessageUiModel {
     val direction = if (senderId == currentUserId) BubbleDirection.SENT else BubbleDirection.RECEIVED
     val isLocation = type == MessageType.LOCATION
@@ -128,8 +129,11 @@ fun Message.toUiModel(
         "%.4f, %.4f".format(latitude, longitude)
     } else null
 
+    // Resolve sender name: use nickname if available, otherwise fall back to senderName
+    val resolvedSenderName = nicknames[senderId]?.takeIf { it.isNotBlank() } ?: senderName
+
     // Pre-compute sender initials for avatar fallback
-    val initials = computeSenderInitials(senderName)
+    val initials = computeSenderInitials(resolvedSenderName)
 
     // Filter readBy to exclude the sender
     val filteredReadBy = readBy.filter { it != senderId }
@@ -145,7 +149,7 @@ fun Message.toUiModel(
     return MessageUiModel(
         id             = id,
         senderId       = senderId,
-        senderName     = senderName,
+        senderName     = resolvedSenderName,
         senderPhotoUrl = senderPhotoUrl,
         senderInitials = initials,
         text           = when {

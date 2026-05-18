@@ -249,34 +249,27 @@ class ConversationInfoViewModel @Inject constructor(
 
     /**
      * Updates the theme color for this conversation.
-     * @param colorHex Hex color string (e.g., "#5170FF") or null to reset.
+     * Writes to Room first (SSOT), then Firestore. The Room Flow auto-updates the UI.
      */
     fun updateThemeColor(colorHex: String?) {
         viewModelScope.launch {
-            val result = conversationRepository.updateThemeColor(conversationId, colorHex)
-            if (result is Resource.Success) {
-                _uiState.update { it.copy(themeColor = colorHex) }
-            }
+            conversationRepository.updateThemeColor(conversationId, colorHex)
         }
     }
 
     /**
      * Updates the emoji shortcut for this conversation.
-     * @param emoji Single emoji character or null to reset.
+     * Writes to Room first (SSOT), then Firestore. The Room Flow auto-updates the UI.
      */
     fun updateEmojiShortcut(emoji: String?) {
         viewModelScope.launch {
-            val result = conversationRepository.updateEmojiShortcut(conversationId, emoji)
-            if (result is Resource.Success) {
-                _uiState.update { it.copy(emojiShortcut = emoji) }
-            }
+            conversationRepository.updateEmojiShortcut(conversationId, emoji)
         }
     }
 
     /**
      * Updates a nickname for a participant in this conversation.
-     * @param userId The user whose nickname to set.
-     * @param nickname The new nickname, or empty string to remove.
+     * Writes to Room first (SSOT), then Firestore. The Room Flow auto-updates the UI.
      */
     fun updateNickname(userId: String, nickname: String) {
         viewModelScope.launch {
@@ -286,10 +279,7 @@ class ConversationInfoViewModel @Inject constructor(
             } else {
                 currentNicknames[userId] = nickname
             }
-            val result = conversationRepository.updateNicknames(conversationId, currentNicknames)
-            if (result is Resource.Success) {
-                _uiState.update { it.copy(nicknames = currentNicknames) }
-            }
+            conversationRepository.updateNicknames(conversationId, currentNicknames)
         }
     }
 

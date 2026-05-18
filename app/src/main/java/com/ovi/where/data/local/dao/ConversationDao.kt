@@ -42,4 +42,13 @@ interface ConversationDao {
 
     @Query("SELECT COUNT(*) FROM conversations WHERE pinnedByJson LIKE '%' || :uid || '%'")
     suspend fun getPinnedCountForUser(uid: String): Int
+
+    @Query("UPDATE conversations SET themeColor = :themeColor WHERE id = :conversationId")
+    suspend fun updateThemeColor(conversationId: String, themeColor: String?)
+
+    @Query("UPDATE conversations SET emojiShortcut = :emojiShortcut WHERE id = :conversationId")
+    suspend fun updateEmojiShortcut(conversationId: String, emojiShortcut: String?)
+
+    @Query("UPDATE conversations SET nicknamesJson = :nicknamesJson WHERE id = :conversationId")
+    suspend fun updateNicknames(conversationId: String, nicknamesJson: String?)
 }

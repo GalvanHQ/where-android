@@ -51,12 +51,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.chat.components.ConversationAvatar
 import com.ovi.where.presentation.model.ConversationInfoUiState
 import com.ovi.where.presentation.model.MediaThumbnail
@@ -80,6 +82,7 @@ fun ConversationInfoScreen(
     onNavigateToMediaGallery: () -> Unit,
     onNavigateToUserProfile: (String) -> Unit = {},
     onNavigateToChat: () -> Unit = {},
+    onNavigateToNicknames: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ConversationInfoViewModel = hiltViewModel()
 ) {
@@ -146,7 +149,7 @@ fun ConversationInfoScreen(
                     onToggleMute = { viewModel.toggleMute() },
                     onUpdateThemeColor = { viewModel.updateThemeColor(it) },
                     onUpdateEmojiShortcut = { viewModel.updateEmojiShortcut(it) },
-                    onUpdateNickname = { userId, nickname -> viewModel.updateNickname(userId, nickname) },
+                    onNavigateToNicknames = onNavigateToNicknames,
                     onNavigateToMediaGallery = onNavigateToMediaGallery,
                     onNavigateToUserProfile = {
                         uiState.otherUserId?.let { onNavigateToUserProfile(it) }
@@ -166,7 +169,7 @@ internal fun ConversationInfoContent(
     onToggleMute: () -> Unit,
     onUpdateThemeColor: (String?) -> Unit = {},
     onUpdateEmojiShortcut: (String?) -> Unit = {},
-    onUpdateNickname: (String, String) -> Unit = { _, _ -> },
+    onNavigateToNicknames: () -> Unit = {},
     onNavigateToMediaGallery: () -> Unit,
     onNavigateToUserProfile: () -> Unit = {},
     onNavigateToChat: () -> Unit = {},
@@ -175,7 +178,9 @@ internal fun ConversationInfoContent(
     var showMuteDialog by remember { mutableStateOf(false) }
     var showColorPicker by remember { mutableStateOf(false) }
     var showEmojiPicker by remember { mutableStateOf(false) }
-    var showNicknameEditor by remember { mutableStateOf(false) }
+    var showBlockDialog by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Column(
         modifier = modifier
@@ -197,9 +202,11 @@ internal fun ConversationInfoContent(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Conversation title
+        // Conversation title (use nickname if set)
+        val displayTitle = uiState.nicknames[uiState.otherUserId]?.takeIf { it.isNotBlank() }
+            ?: uiState.conversationTitle
         Text(
-            text = uiState.conversationTitle,
+            text = displayTitle,
             style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.Bold
             ),
@@ -257,7 +264,7 @@ internal fun ConversationInfoContent(
             emojiShortcut = uiState.emojiShortcut,
             onThemeColorTap = { showColorPicker = true },
             onEmojiShortcutTap = { showEmojiPicker = true },
-            onNicknamesTap = { showNicknameEditor = true }
+            onNicknamesTap = onNavigateToNicknames
         )
 
         // More Actions section
@@ -267,7 +274,10 @@ internal fun ConversationInfoContent(
         )
 
         // Privacy & Support section (DM only — this screen is always DM)
-        PrivacySupportSection()
+        PrivacySupportSection(
+            onBlockTap = { showBlockDialog = true },
+            onReportTap = { showReportDialog = true }
+        )
 
         Spacer(modifier = Modifier.height(32.dp))
     }
@@ -327,19 +337,55 @@ internal fun ConversationInfoContent(
         )
     }
 
-    // ── Nickname Editor Dialog ────────────────────────────────────────────
-    if (showNicknameEditor) {
-        NicknameEditorDialog(
-            otherUserId = uiState.otherUserId ?: "",
-            otherUserName = uiState.conversationTitle,
-            currentNickname = uiState.nicknames[uiState.otherUserId] ?: "",
-            currentUserId = currentUserId,
-            currentUserName = "You",
-            currentUserNickname = uiState.nicknames[currentUserId] ?: "",
-            onSave = { userId, nickname ->
-                onUpdateNickname(userId, nickname)
+    // ── Block Confirmation Dialog ────────────────────────────────────────
+    if (showBlockDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showBlockDialog = false },
+            title = { Text("Block user?") },
+            text = {
+                Text("They won't be able to message you or see your profile. You can unblock them later from settings.")
             },
-            onDismiss = { showNicknameEditor = false }
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showBlockDialog = false
+                        context.showToast("User blocked")
+                    }
+                ) {
+                    Text("Block", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBlockDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // ── Report Confirmation Dialog ───────────────────────────────────────
+    if (showReportDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showReportDialog = false },
+            title = { Text("Report user?") },
+            text = {
+                Text("This will send a report to our team for review. The user won't be notified.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showReportDialog = false
+                        context.showToast("Report submitted")
+                    }
+                ) {
+                    Text("Report", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showReportDialog = false }) {
+                    Text("Cancel")
+                }
+            }
         )
     }
 }
@@ -547,20 +593,24 @@ private fun MoreActionsSection(
  * Only shown for direct message conversations.
  */
 @Composable
-private fun PrivacySupportSection(modifier: Modifier = Modifier) {
+private fun PrivacySupportSection(
+    onBlockTap: () -> Unit = {},
+    onReportTap: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     Column(modifier = modifier.fillMaxWidth()) {
         SectionHeader(title = "Privacy & Support")
 
         InfoListItem(
             icon = Icons.Filled.Block,
             title = "Block",
-            onClick = { /* TODO */ },
+            onClick = onBlockTap,
             tintColor = MaterialTheme.colorScheme.error
         )
         InfoListItem(
             icon = Icons.Filled.Flag,
             title = "Report",
-            onClick = { /* TODO */ },
+            onClick = onReportTap,
             tintColor = MaterialTheme.colorScheme.error
         )
     }

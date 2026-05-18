@@ -1,7 +1,6 @@
 package com.ovi.where.presentation.chat.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -13,7 +12,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,20 +25,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,13 +51,17 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
- * Premium chat input bar with:
- * - Pill-shaped text field with inline attachment icons
- * - Emoji shortcut FAB when set (Messenger-style like button)
- * - Morphing send/mic FAB with smooth transitions
- * - Voice recording overlay with waveform visualization
+ * Premium chat input bar.
+ *
+ * Layout (collapsed):  [+] │ Message...  [🎤] │ [➤/👍]
+ * Layout (expanded):   [✕] [📷] [🖼️] │ Message...  [🎤] │ [➤/👍]
+ *
+ * - Plus expands inline to show Camera + Gallery icons (no dropdown/popup)
+ * - Mic inside the pill for voice recording
+ * - Right: Send (when typing) or Emoji shortcut (when set)
  */
 @Composable
 fun ChatInputBar(
@@ -78,183 +82,187 @@ fun ChatInputBar(
     modifier: Modifier = Modifier
 ) {
     val hasText = text.isNotBlank()
-    val accentColor = themeColor ?: MaterialTheme.colorScheme.primary
+    val accent = themeColor ?: MaterialTheme.colorScheme.primary
     val textStyle = MaterialTheme.typography.bodyLarge
-    val lineHeightDp = with(LocalDensity.current) {
-        (textStyle.lineHeight.value * density).toDp()
-    }
-    val maxFieldHeight = remember(lineHeightDp) { lineHeightDp * 5 + 16.dp }
+    val lineHeightDp = with(LocalDensity.current) { (textStyle.lineHeight.value * density).toDp() }
+    val maxFieldHeight = remember(lineHeightDp) { lineHeightDp * 5 + 20.dp }
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        if (isVoiceRecording) {
-            VoiceRecordingBar(
-                durationMs = voiceRecordingDurationMs,
-                waveformAmplitudes = voiceWaveformAmplitudes,
-                onCancel = onVoiceRecordCancel,
-                onStop = onVoiceRecordStop,
-                accentColor = accentColor
-            )
-        } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                // ── Text field pill ───────────────────────────────────────
-                Surface(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(28.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    tonalElevation = 0.dp
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 16.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        BasicTextField(
-                            value = text,
-                            onValueChange = onTextChange,
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = 36.dp, max = maxFieldHeight)
-                                .padding(vertical = 8.dp),
-                            textStyle = textStyle.copy(
-                                color = MaterialTheme.colorScheme.onSurface
-                            ),
-                            cursorBrush = SolidColor(accentColor),
-                            maxLines = 5,
-                            decorationBox = { innerTextField ->
-                                Box(contentAlignment = Alignment.CenterStart) {
-                                    if (text.isEmpty()) {
-                                        Text(
-                                            text = "Message",
-                                            style = textStyle,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                        )
-                                    }
-                                    innerTextField()
-                                }
-                            }
-                        )
+    if (isVoiceRecording) {
+        VoiceRecordingBar(
+            durationMs = voiceRecordingDurationMs,
+            waveformAmplitudes = voiceWaveformAmplitudes,
+            onCancel = onVoiceRecordCancel,
+            onStop = onVoiceRecordStop,
+            accent = accent,
+            modifier = modifier
+        )
+    } else {
+        var expanded by remember { mutableStateOf(false) }
 
-                        // Inline icons (collapse when typing)
-                        AnimatedVisibility(
-                            visible = !hasText,
-                            enter = fadeIn(tween(120)),
-                            exit = fadeOut(tween(120))
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // ── Left: Plus or expanded Camera+Gallery ────────────────
+            AnimatedContent(
+                targetState = expanded,
+                transitionSpec = {
+                    (scaleIn(tween(120)) + fadeIn(tween(120)))
+                        .togetherWith(scaleOut(tween(80)) + fadeOut(tween(80)))
+                        .using(SizeTransform(clip = false))
+                },
+                label = "attach"
+            ) { isExpanded ->
+                if (isExpanded) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { expanded = false },
+                            modifier = Modifier.size(38.dp),
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            )
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(
-                                    onClick = onAttachmentTap,
-                                    modifier = Modifier.size(34.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.AttachFile,
-                                        contentDescription = "Attach",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                IconButton(
-                                    onClick = onCameraTap,
-                                    modifier = Modifier.size(34.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.CameraAlt,
-                                        contentDescription = "Camera",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
+                            Icon(Icons.Filled.Close, "Close", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        IconButton(
+                            onClick = { expanded = false; onCameraTap() },
+                            modifier = Modifier.size(38.dp),
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            )
+                        ) {
+                            Icon(Icons.Filled.CameraAlt, "Camera", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        IconButton(
+                            onClick = { expanded = false; onAttachmentTap() },
+                            modifier = Modifier.size(38.dp),
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            )
+                        ) {
+                            Icon(Icons.Filled.Image, "Gallery", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                } else {
+                    IconButton(
+                        onClick = { expanded = true },
+                        modifier = Modifier.size(42.dp),
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        Icon(Icons.Filled.Add, "Attach", Modifier.size(22.dp))
+                    }
                 }
+            }
 
-                Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(6.dp))
 
-                // ── Action FAB area ──────────────────────────────────────
-                AnimatedContent(
-                    targetState = hasText,
-                    transitionSpec = {
-                        (scaleIn(tween(180)) + fadeIn(tween(180)))
-                            .togetherWith(scaleOut(tween(120)) + fadeOut(tween(120)))
-                            .using(SizeTransform(clip = false))
-                    },
-                    label = "input_fab"
-                ) { showSend ->
-                    when {
-                        showSend -> {
-                            // Send FAB
-                            FloatingActionButton(
-                                onClick = onSend,
-                                modifier = Modifier
-                                    .size(46.dp)
-                                    .semantics { contentDescription = "Send message" },
-                                shape = CircleShape,
-                                containerColor = accentColor,
-                                contentColor = Color.White,
-                                elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                        emojiShortcut != null -> {
-                            // Emoji shortcut + mic
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(
-                                    onClick = onVoiceRecordStart,
-                                    modifier = Modifier.size(38.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Mic,
-                                        contentDescription = "Voice",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                                FloatingActionButton(
-                                    onClick = onEmojiShortcutSend,
-                                    modifier = Modifier
-                                        .size(46.dp)
-                                        .semantics { contentDescription = "Send $emojiShortcut" },
-                                    shape = CircleShape,
-                                    containerColor = accentColor,
-                                    contentColor = Color.White,
-                                    elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
-                                ) {
+            // ── Text field pill ──────────────────────────────────────
+            Surface(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 0.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    BasicTextField(
+                        value = text,
+                        onValueChange = onTextChange,
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 38.dp, max = maxFieldHeight)
+                            .padding(vertical = 9.dp),
+                        textStyle = textStyle.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                            lineHeight = 20.sp
+                        ),
+                        cursorBrush = SolidColor(accent),
+                        maxLines = 5,
+                        decorationBox = { innerTextField ->
+                            Box(contentAlignment = Alignment.CenterStart) {
+                                if (text.isEmpty()) {
                                     Text(
-                                        text = emojiShortcut,
-                                        style = MaterialTheme.typography.titleMedium
+                                        text = "Message",
+                                        style = textStyle.copy(lineHeight = 20.sp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                     )
                                 }
+                                innerTextField()
                             }
                         }
-                        else -> {
-                            // Mic FAB
-                            FloatingActionButton(
-                                onClick = onVoiceRecordStart,
-                                modifier = Modifier
-                                    .size(46.dp)
-                                    .semantics { contentDescription = "Record voice" },
-                                shape = CircleShape,
-                                containerColor = accentColor,
-                                contentColor = Color.White,
-                                elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Mic,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                    )
+
+                    // Mic inside pill
+                    IconButton(
+                        onClick = onVoiceRecordStart,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Mic,
+                            contentDescription = "Voice",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.width(6.dp))
+
+            // ── Right: Send or Emoji shortcut ────────────────────────
+            AnimatedContent(
+                targetState = hasText,
+                transitionSpec = {
+                    (scaleIn(tween(150)) + fadeIn(tween(150)))
+                        .togetherWith(scaleOut(tween(100)) + fadeOut(tween(100)))
+                        .using(SizeTransform(clip = false))
+                },
+                label = "send_btn"
+            ) { typing ->
+                when {
+                    typing -> {
+                        IconButton(
+                            onClick = onSend,
+                            modifier = Modifier.size(42.dp).semantics { contentDescription = "Send" },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = accent,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Send, null, Modifier.size(20.dp))
+                        }
+                    }
+                    emojiShortcut != null -> {
+                        IconButton(
+                            onClick = onEmojiShortcutSend,
+                            modifier = Modifier.size(42.dp).semantics { contentDescription = "Send $emojiShortcut" },
+                            colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Transparent)
+                        ) {
+                            Text(text = emojiShortcut, fontSize = 26.sp)
+                        }
+                    }
+                    else -> {
+                        IconButton(
+                            onClick = {},
+                            modifier = Modifier.size(42.dp),
+                            enabled = false,
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = accent.copy(alpha = 0.3f),
+                                contentColor = Color.White.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Send, null, Modifier.size(20.dp))
                         }
                     }
                 }
@@ -271,7 +279,8 @@ private fun VoiceRecordingBar(
     waveformAmplitudes: List<Float>,
     onCancel: () -> Unit,
     onStop: () -> Unit,
-    accentColor: Color
+    accent: Color,
+    modifier: Modifier = Modifier
 ) {
     val seconds = (durationMs / 1000).toInt()
     val minutes = seconds / 60
@@ -285,25 +294,18 @@ private fun VoiceRecordingBar(
     )
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .height(58.dp)
-            .padding(horizontal = 8.dp),
+            .height(56.dp)
+            .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Cancel
         IconButton(onClick = onCancel, modifier = Modifier.size(42.dp)) {
-            Icon(
-                imageVector = Icons.Filled.Close,
-                contentDescription = "Cancel",
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(22.dp)
-            )
+            Icon(Icons.Filled.Close, "Cancel", Modifier.size(22.dp), tint = MaterialTheme.colorScheme.error)
         }
 
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(8.dp))
 
-        // Recording indicator
         Box(
             modifier = Modifier
                 .size(8.dp)
@@ -315,45 +317,31 @@ private fun VoiceRecordingBar(
 
         Text(
             text = timerText,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
             color = MaterialTheme.colorScheme.onSurface
         )
 
         Spacer(Modifier.width(12.dp))
 
-        // Waveform
         WaveformVisualization(
             amplitudes = waveformAmplitudes,
-            color = accentColor,
-            modifier = Modifier
-                .weight(1f)
-                .height(28.dp)
+            color = accent,
+            modifier = Modifier.weight(1f).height(28.dp)
         )
 
         Spacer(Modifier.width(8.dp))
 
-        // Send
-        FloatingActionButton(
+        IconButton(
             onClick = onStop,
-            modifier = Modifier
-                .size(46.dp)
-                .semantics { contentDescription = "Send voice" },
-            shape = CircleShape,
-            containerColor = accentColor,
-            contentColor = Color.White,
-            elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
+            modifier = Modifier.size(42.dp).semantics { contentDescription = "Send voice" },
+            colors = IconButtonDefaults.iconButtonColors(containerColor = accent, contentColor = Color.White)
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.Send,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
+            Icon(Icons.AutoMirrored.Filled.Send, null, Modifier.size(20.dp))
         }
     }
 }
 
-// ── Waveform Visualization ───────────────────────────────────────────────────
+// ── Waveform ─────────────────────────────────────────────────────────────────
 
 @Composable
 private fun WaveformVisualization(
@@ -361,7 +349,7 @@ private fun WaveformVisualization(
     color: Color,
     modifier: Modifier = Modifier
 ) {
-    val maxBars = 28
+    val maxBars = 24
     val displayAmps = if (amplitudes.size > maxBars) amplitudes.takeLast(maxBars) else amplitudes
 
     Row(
@@ -370,13 +358,13 @@ private fun WaveformVisualization(
         horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         displayAmps.forEach { amp ->
-            val barHeight = (amp.coerceIn(0.08f, 1f) * 24).dp
+            val h = (amp.coerceIn(0.1f, 1f) * 22).dp
             Box(
                 modifier = Modifier
                     .width(3.dp)
-                    .height(barHeight)
+                    .height(h)
                     .clip(RoundedCornerShape(1.5.dp))
-                    .background(color.copy(alpha = 0.6f + amp * 0.4f))
+                    .background(color.copy(alpha = 0.5f + amp * 0.5f))
             )
         }
     }

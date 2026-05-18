@@ -36,6 +36,7 @@ import com.ovi.where.presentation.chat.ConversationInfoScreen
 import com.ovi.where.presentation.chat.GroupInfoScreen
 import com.ovi.where.presentation.chat.MediaGalleryScreen
 import com.ovi.where.presentation.chat.NewMessageScreen
+import com.ovi.where.presentation.chat.NicknamesScreen
 import com.ovi.where.presentation.group.join.JoinGroupScreen
 import com.ovi.where.presentation.group.create.CreateGroupScreen
 import com.ovi.where.presentation.map.MapScreen
@@ -447,8 +448,16 @@ fun AppNavGraph(
             arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
         ) { back ->
             val conversationId = back.arguments?.getString("conversationId") ?: return@composable
+
+            // Observe search trigger from ConversationInfo screen
+            val searchTrigger = back.savedStateHandle.get<Boolean>("activate_search") ?: false
+            if (searchTrigger) {
+                back.savedStateHandle["activate_search"] = false
+            }
+
             ChatScreen(
                 conversationId       = conversationId,
+                startInSearchMode    = searchTrigger,
                 onNavigateBack       = { navController.popBackStack() },
                 onNavigateToUserProfile = { userId ->
                     navController.navigate(Screen.UserProfile.createRoute(userId)) {
@@ -506,7 +515,24 @@ fun AppNavGraph(
                     // Set result to trigger search mode in ChatScreen
                     navController.previousBackStackEntry?.savedStateHandle?.set("activate_search", true)
                     navController.popBackStack()
+                },
+                onNavigateToNicknames = {
+                    navController.navigate(Screen.Nicknames.createRoute(conversationId)) {
+                        launchSingleTop = true
+                    }
                 }
+            )
+        }
+
+        // ── Nicknames ─────────────────────────────────────────────────────────
+        composable(
+            route     = Screen.Nicknames.ROUTE,
+            arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
+        ) { back ->
+            val conversationId = back.arguments?.getString("conversationId") ?: return@composable
+            NicknamesScreen(
+                conversationId = conversationId,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 

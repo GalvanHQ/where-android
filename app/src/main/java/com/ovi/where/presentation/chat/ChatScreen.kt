@@ -117,6 +117,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ChatScreen(
     conversationId: String,
+    startInSearchMode: Boolean = false,
     onNavigateBack: () -> Unit = {},
     onNavigateToUserProfile: (String) -> Unit = {},
     onNavigateToGroupInfo: (String) -> Unit = {},
@@ -134,11 +135,13 @@ fun ChatScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // Theme color — single source of truth, parsed once and remembered
-    val conversationThemeColor = remember(uiState.conversation?.themeColor) {
-        uiState.conversation?.themeColor?.let { hex ->
-            try { androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(hex)) } catch (_: Exception) { null }
-        }
+    // Theme color — single source of truth derived from conversation state.
+    // Stable: only changes when the actual hex string value changes.
+    // During initial load (conversation == null), returns null (uses default primary).
+    val themeColorHex = uiState.conversation?.themeColor
+    val conversationThemeColor: androidx.compose.ui.graphics.Color? = remember(themeColorHex) {
+        if (themeColorHex.isNullOrBlank()) null
+        else try { androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(themeColorHex)) } catch (_: Exception) { null }
     }
     val reducedMotion = LocalReducedMotion.current
     val density = LocalDensity.current
@@ -281,7 +284,10 @@ fun ChatScreen(
     // - If > 150dp above: show "new message" indicator instead
     LaunchedEffect(uiState.messages.size) {
         val currentCount = uiState.messages.size
-        if (currentCount > previousMessageCount && previousMessageCount > 0) {
+        if (currentCount > 0 && previousMessageCount == 0) {
+            // Initial load — scroll to bottom immediately
+            listState.scrollToItem(currentCount - 1)
+        } else if (currentCount > previousMessageCount && previousMessageCount > 0) {
             // New messages arrived — determine if we should auto-scroll or show indicator
             val newMessages = uiState.messages.takeLast(currentCount - previousMessageCount)
             val newIds = newMessages.map { it.id }.toSet()
@@ -359,13 +365,13 @@ fun ChatScreen(
         }
     }
 
-    // ── Activate search when returning from ConversationInfo with search intent ──
-    LaunchedEffect(Unit) {
-        val shouldActivateSearch = viewModel.checkAndConsumeSearchTrigger()
-        if (shouldActivateSearch) {
-            val scrollIndex = listState.firstVisibleItemIndex
-            val scrollOffset = listState.firstVisibleItemScrollOffset
-            viewModel.activateSearch(scrollIndex, scrollOffset)
+    // ── Activate search when requested by ConversationInfo ──────────────────
+    LaunchedEffect(startInSearchMode) {
+        if (startInSearchMode) {
+            viewModel.activateSearch(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset
+            )
         }
     }
 
@@ -501,8 +507,8 @@ fun ChatScreen(
             }
 
             // ── Message list ──────────────────────────────────────────────────
-            Box(modifier = Modifier.weight(1f)) {
-                if (uiState.isLoading) {
+            Box(modifier = Modifier.weight(1f).fillMaxSize()) {
+                if (uiState.isLoading || uiState.conversation == null) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 } else if (uiState.messages.isEmpty()) {
                     // Requirement 10.5: Centered empty state with illustration and "Say hi!" prompt

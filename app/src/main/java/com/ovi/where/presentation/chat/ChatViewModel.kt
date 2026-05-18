@@ -82,7 +82,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     application: Application,
-    private val savedStateHandle: SavedStateHandle,
+    val savedStateHandle: SavedStateHandle,
     private val observeMessagesUseCase: ObserveMessagesUseCase,
     private val sendMessageUseCase: SendMessageUseCase,
     private val sendLocationMessageUseCase: SendLocationMessageUseCase,
@@ -230,7 +230,8 @@ class ChatViewModel @Inject constructor(
                     it.toUiModel(
                         currentUserId = uid,
                         timeFormatter = ::formatMessageTime,
-                        dateKeyFormatter = ::formatMessageDateKey
+                        dateKeyFormatter = ::formatMessageDateKey,
+                        nicknames = _uiState.value.conversation?.nicknames ?: emptyMap()
                     )
                 }
                 // Compute message grouping metadata (Requirements 4.6, 4.7, 10.3)
@@ -364,7 +365,15 @@ class ChatViewModel @Inject constructor(
                         participantPhotos,
                         onlineUserIds
                     )
+
+                    // Check if nicknames changed before updating state
+                    val previousNicknames = _uiState.value.conversation?.nicknames ?: emptyMap()
                     _uiState.value = _uiState.value.copy(conversation = uiModel)
+
+                    // Re-map messages if nicknames changed (so bubble sender names update)
+                    if (uiModel.nicknames != previousNicknames && _uiState.value.messages.isNotEmpty()) {
+                        remapMessagesWithNicknames(uiModel.nicknames, uid)
+                    }
                     // Check friendship status for 1:1 conversations (Requirement 8.4)
                     if (!uiModel.isGroup && uiModel.otherUserId != null) {
                         checkFriendshipStatus(uiModel.otherUserId)
@@ -1633,18 +1642,6 @@ class ChatViewModel @Inject constructor(
     private var preSearchScrollOffset: Int = 0
 
     /**
-     * Checks if search should be activated (triggered from ConversationInfoScreen navigation result).
-     * Consumes the trigger so it only fires once.
-     */
-    fun checkAndConsumeSearchTrigger(): Boolean {
-        val trigger = savedStateHandle.get<Boolean>("activate_search") ?: false
-        if (trigger) {
-            savedStateHandle["activate_search"] = false
-        }
-        return trigger
-    }
-
-    /**
      * Activates the search bar. Saves the current scroll position for later restoration.
      *
      * Requirement 13.1: Search icon in header opens search bar.
@@ -1727,6 +1724,27 @@ class ChatViewModel @Inject constructor(
         val prevIndex = state.currentSearchResultIndex - 1
         if (prevIndex < 0) return // Already at first result
         _uiState.value = state.copy(currentSearchResultIndex = prevIndex)
+    }
+
+    /**
+     * Re-maps existing messages with updated nicknames so sender names reflect the change.
+     */
+    private fun remapMessagesWithNicknames(nicknames: Map<String, String>, currentUserId: String) {
+        val updatedMessages = _uiState.value.messages.map { msg ->
+            val resolvedName = nicknames[msg.senderId]?.takeIf { it.isNotBlank() } ?: msg.senderName
+            if (resolvedName != msg.senderName) {
+                msg.copy(senderName = resolvedName)
+            } else {
+                msg
+            }
+        }
+        val grouped = updatedMessages.groupBy { it.dateKey }
+            .entries
+            .map { (key, msgs) -> key to msgs }
+        _uiState.value = _uiState.value.copy(
+            messages = updatedMessages,
+            groupedMessages = grouped
+        )
     }
 
     /**

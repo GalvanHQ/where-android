@@ -48,7 +48,9 @@ data class ConversationUiModel(
     /** Theme color hex string for this conversation (e.g., "#5170FF"). */
     val themeColor: String? = null,
     /** Emoji shortcut for quick reactions in this conversation. */
-    val emojiShortcut: String? = null
+    val emojiShortcut: String? = null,
+    /** Nicknames map: userId -> nickname. */
+    val nicknames: Map<String, String> = emptyMap()
 )
 
 fun Conversation.toUiModel(
@@ -73,7 +75,8 @@ fun Conversation.toUiModel(
         name = name,
         type = type,
         otherUserId = otherUid,
-        participantNames = participantNames
+        participantNames = participantNames,
+        nicknames = nicknames
     )
 
     // Resolve photo URL: for DMs with no photo, use the other participant's profile photo
@@ -102,7 +105,8 @@ fun Conversation.toUiModel(
         lastMessageStatus = if (isOwnLastMessage) lastMessageStatus else null,
         isLastMessageFromCurrentUser = isOwnLastMessage,
         themeColor       = themeColor,
-        emojiShortcut    = emojiShortcut
+        emojiShortcut    = emojiShortcut,
+        nicknames        = nicknames
     )
 }
 
@@ -110,18 +114,24 @@ fun Conversation.toUiModel(
  * Resolves the display title for a conversation.
  *
  * Resolution order:
- * 1. Use the conversation [name] if it is not blank.
- * 2. For direct messages, resolve from [participantNames] using [otherUserId].
- * 3. Fall back to "Unknown User" for direct messages or "Unnamed Group" for group conversations.
- *
- * The result is guaranteed to never be blank.
+ * 1. For DMs: use nickname for the other user if set.
+ * 2. Use the conversation [name] if it is not blank.
+ * 3. For direct messages, resolve from [participantNames] using [otherUserId].
+ * 4. Fall back to "Unknown User" for direct messages or "Unnamed Group" for group conversations.
  */
 internal fun resolveConversationTitle(
     name: String,
     type: ConversationType,
     otherUserId: String?,
-    participantNames: Map<String, String> = emptyMap()
+    participantNames: Map<String, String> = emptyMap(),
+    nicknames: Map<String, String> = emptyMap()
 ): String {
+    // For DMs, check nickname first
+    if (type == ConversationType.DIRECT && otherUserId != null) {
+        val nickname = nicknames[otherUserId]
+        if (!nickname.isNullOrBlank()) return nickname
+    }
+
     // Use the conversation name if it's not blank
     if (name.isNotBlank()) return name
 

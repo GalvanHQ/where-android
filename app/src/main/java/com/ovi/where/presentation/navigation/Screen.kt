@@ -140,6 +140,14 @@ sealed class Screen(val route: String) {
     data object NewMessage : Screen("new_message")
 
     @Serializable
+    data class Nicknames(val conversationId: String) : Screen("nicknames/${conversationId}") {
+        companion object {
+            const val ROUTE = "nicknames/{conversationId}"
+            fun createRoute(conversationId: String) = "nicknames/$conversationId"
+        }
+    }
+
+    @Serializable
     data class MediaGallery(val conversationId: String) : Screen("media_gallery/${conversationId}") {
         companion object {
             const val ROUTE = "media_gallery/{conversationId}"

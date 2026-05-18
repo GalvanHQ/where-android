@@ -764,6 +764,9 @@ class ConversationRepositoryImpl @Inject constructor(
     override suspend fun updateThemeColor(conversationId: String, color: String?): Resource<Unit> =
         withContext(Dispatchers.IO) {
             try {
+                // Write to Room first (SSOT — immediate UI update)
+                conversationDao.updateThemeColor(conversationId, color)
+                // Then persist to Firestore
                 firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
                     .document(conversationId)
                     .update("themeColor", color)
@@ -778,6 +781,9 @@ class ConversationRepositoryImpl @Inject constructor(
     override suspend fun updateEmojiShortcut(conversationId: String, emoji: String?): Resource<Unit> =
         withContext(Dispatchers.IO) {
             try {
+                // Write to Room first (SSOT — immediate UI update)
+                conversationDao.updateEmojiShortcut(conversationId, emoji)
+                // Then persist to Firestore
                 firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
                     .document(conversationId)
                     .update("emojiShortcut", emoji)
@@ -792,6 +798,14 @@ class ConversationRepositoryImpl @Inject constructor(
     override suspend fun updateNicknames(conversationId: String, nicknames: Map<String, String>): Resource<Unit> =
         withContext(Dispatchers.IO) {
             try {
+                // Serialize for Room
+                val nicknamesJson = if (nicknames.isEmpty()) null
+                else kotlinx.serialization.json.JsonObject(
+                    nicknames.mapValues { (_, v) -> kotlinx.serialization.json.JsonPrimitive(v) }
+                ).toString()
+                // Write to Room first (SSOT — immediate UI update)
+                conversationDao.updateNicknames(conversationId, nicknamesJson)
+                // Then persist to Firestore
                 firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
                     .document(conversationId)
                     .update("nicknames", nicknames)

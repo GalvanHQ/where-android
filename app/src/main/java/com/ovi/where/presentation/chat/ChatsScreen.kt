@@ -4,6 +4,7 @@ import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,12 +23,12 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Schedule
@@ -58,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -73,7 +75,6 @@ import com.ovi.where.core.constants.AppConstants.PULL_TO_REFRESH_TIMEOUT_MS
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.domain.model.MessageStatus
 import com.ovi.where.presentation.chat.components.ConversationAvatar
-import com.ovi.where.presentation.chat.components.UnreadBadge
 import com.ovi.where.presentation.common.LIST_ITEM_ANIMATION_DURATION_MS
 import com.ovi.where.presentation.common.search.SearchBarTapTarget
 import com.ovi.where.presentation.model.ConversationUiModel
@@ -194,6 +195,9 @@ fun ChatsScreen(
                     }
                     else -> {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            item{
+                                Spacer(Modifier.height(Dimens.spaceSmall))
+                            }
                             items(
                                 items = uiState.conversations,
                                 key = { it.id },
@@ -446,7 +450,7 @@ internal fun ConversationRow(
                 onClick = onClick,
                 onLongClick = onLongClick
             )
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Leading: 56dp ConversationAvatar with online indicator
@@ -454,107 +458,97 @@ internal fun ConversationRow(
             name = conversation.title,
             photoUrl = conversation.photoUrl,
             isOnline = isOnline && !conversation.isGroup,
-            size = 56.dp,
+            size = 50.dp,
             indicatorSize = 14.dp,
             indicatorBorderWidth = 2.dp
         )
 
         Spacer(Modifier.width(12.dp))
 
+        // Middle: title + preview (takes remaining space)
         Column(modifier = Modifier.weight(1f)) {
-            // Title line: Conversation_Title + trailing timestamp
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = conversation.title,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+            // Title line: Name + optional mute/pin icons
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = conversation.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (conversation.isMuted) {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Default.NotificationsOff,
+                        contentDescription = "Muted",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 }
-                Spacer(Modifier.width(Dimens.spaceMedium))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Pin icon for pinned conversations
-                    if (conversation.isPinned) {
-                        Icon(
-                            imageVector = Icons.Default.PushPin,
-                            contentDescription = "Pinned",
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.width(4.dp))
-                    }
-                    // Location pin icon when any member is sharing
-                    if (conversation.hasActiveLocationSharing) {
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = "Location sharing active",
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.tertiary
-                        )
-                        Spacer(Modifier.width(4.dp))
-                    }
-                    // Mute icon for muted conversations
-                    if (conversation.isMuted) {
-                        Icon(
-                            imageVector = Icons.Default.NotificationsOff,
-                            contentDescription = "Muted",
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.width(4.dp))
-                    }
-                    Text(
-                        text = conversation.lastMessageTime,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (hasUnread) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant
+                if (conversation.isPinned) {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Default.PushPin,
+                        contentDescription = "Pinned",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 }
             }
 
-            Spacer(Modifier.height(Dimens.spaceXSmall))
+            Spacer(Modifier.height(2.dp))
 
-            // Preview line: message preview + trailing UnreadBadge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Message status indicator before preview for own last message
-                    if (conversation.isLastMessageFromCurrentUser && conversation.lastMessageStatus != null) {
-                        ConversationMessageStatusIcon(status = conversation.lastMessageStatus)
-                        Spacer(Modifier.width(4.dp))
+            // Preview line: "You: message" or just message text
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val previewText = buildString {
+                    if (conversation.locationSharingPreview != null) {
+                        append(conversation.locationSharingPreview)
+                    } else {
+                        // Messenger-style: prefix "You: " for own messages
+                        if (conversation.isLastMessageFromCurrentUser) {
+                            append("You: ")
+                        }
+                        append(conversation.lastMessageText)
                     }
-                    Text(
-                        text = conversation.locationSharingPreview ?: conversation.lastMessageText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (conversation.locationSharingPreview != null)
-                            MaterialTheme.colorScheme.tertiary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = if (hasUnread) FontWeight.Medium else FontWeight.Normal,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
-                // Unread badge — hidden for muted conversations
-                if (conversation.unreadCount > 0 && !conversation.isMuted) {
-                    Spacer(Modifier.width(Dimens.spaceMedium))
-                    UnreadBadge(count = conversation.unreadCount)
-                }
+
+                Text(
+                    text = previewText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = when {
+                        conversation.locationSharingPreview != null -> MaterialTheme.colorScheme.tertiary
+                        hasUnread -> MaterialTheme.colorScheme.onSurface
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    fontWeight = if (hasUnread) FontWeight.Medium else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+
+                // Timestamp: " · 14:32"
+                Text(
+                    text = " · ${conversation.lastMessageTime}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (hasUnread) MaterialTheme.colorScheme.onSurface
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (hasUnread) FontWeight.Medium else FontWeight.Normal,
+                    maxLines = 1
+                )
             }
+        }
+
+        // Trailing: unread dot indicator (Messenger uses a filled dot, not a number)
+        if (hasUnread) {
+            Spacer(Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+            )
         }
     }
 }

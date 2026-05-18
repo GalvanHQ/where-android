@@ -210,8 +210,18 @@ class ConversationRepositoryImpl @Inject constructor(
                 )
             }
 
-            // Persist to Room before Firestore listener starts
-            conversationDao.upsertAll(entities)
+            // Persist to Room before Firestore listener starts.
+            // Preserve existing mutedBy/pinnedBy since the REST DTO doesn't carry them.
+            val mergedEntities = entities.map { incoming ->
+                val existing = conversationDao.getById(incoming.id)
+                if (existing != null) {
+                    incoming.copy(
+                        mutedByJson = existing.mutedByJson,
+                        pinnedByJson = existing.pinnedByJson
+                    )
+                } else incoming
+            }
+            conversationDao.upsertAll(mergedEntities)
             Resource.Success(Unit)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to fetch initial conversations")
@@ -285,6 +295,14 @@ class ConversationRepositoryImpl @Inject constructor(
                             lastMessageSenderId = doc.getString("lastMessageSenderId") ?: "",
                             unreadCount = myUnread,
                             memberIdsJson = serializeMemberIds(participantIds),
+                            mutedByJson = serializeMemberIds(
+                                (doc.get("mutedBy") as? List<*>)
+                                    ?.filterIsInstance<String>() ?: emptyList()
+                            ),
+                            pinnedByJson = serializeMemberIds(
+                                (doc.get("pinnedBy") as? List<*>)
+                                    ?.filterIsInstance<String>() ?: emptyList()
+                            ),
                             lastSyncTimestamp = System.currentTimeMillis(),
                             documentUpdateTime = docUpdateTime,
                             participantNamesJson = serializeFirestoreMap(
@@ -527,6 +545,14 @@ class ConversationRepositoryImpl @Inject constructor(
                                 lastMessageSenderId = doc.getString("lastMessageSenderId") ?: "",
                                 unreadCount = myUnread,
                                 memberIdsJson = serializeMemberIds(participantIds),
+                                mutedByJson = serializeMemberIds(
+                                    (doc.get("mutedBy") as? List<*>)
+                                        ?.filterIsInstance<String>() ?: emptyList()
+                                ),
+                                pinnedByJson = serializeMemberIds(
+                                    (doc.get("pinnedBy") as? List<*>)
+                                        ?.filterIsInstance<String>() ?: emptyList()
+                                ),
                                 lastSyncTimestamp = now,
                                 documentUpdateTime = incomingUpdateTime,
                                 participantNamesJson = serializeFirestoreMap(
@@ -700,7 +726,17 @@ class ConversationRepositoryImpl @Inject constructor(
                         lastSyncTimestamp = System.currentTimeMillis()
                     )
                 }
-                conversationDao.upsertAll(entities)
+                // Preserve local mutedBy/pinnedBy — REST DTO doesn't carry them.
+                val mergedEntities = entities.map { incoming ->
+                    val existing = conversationDao.getById(incoming.id)
+                    if (existing != null) {
+                        incoming.copy(
+                            mutedByJson = existing.mutedByJson,
+                            pinnedByJson = existing.pinnedByJson
+                        )
+                    } else incoming
+                }
+                conversationDao.upsertAll(mergedEntities)
                 // Update cache metadata with current timestamp (and ETag if available)
                 cacheStalenessChecker.updateMetadata(CACHE_KEY_CONVERSATIONS)
             },
@@ -762,7 +798,17 @@ class ConversationRepositoryImpl @Inject constructor(
                         lastSyncTimestamp = System.currentTimeMillis()
                     )
                 }
-                conversationDao.upsertAll(entities)
+                // Preserve local mutedBy/pinnedBy — REST DTO doesn't carry them.
+                val mergedEntities = entities.map { incoming ->
+                    val existing = conversationDao.getById(incoming.id)
+                    if (existing != null) {
+                        incoming.copy(
+                            mutedByJson = existing.mutedByJson,
+                            pinnedByJson = existing.pinnedByJson
+                        )
+                    } else incoming
+                }
+                conversationDao.upsertAll(mergedEntities)
                 cacheStalenessChecker.updateMetadata(CACHE_KEY_CONVERSATIONS)
             },
             shouldFetch = { true }, // Always fetch on explicit refresh

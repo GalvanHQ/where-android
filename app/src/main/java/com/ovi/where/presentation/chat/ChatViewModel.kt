@@ -917,6 +917,8 @@ class ChatViewModel @Inject constructor(
             // Input cleared: emit stop-typing immediately (Requirement 7.4)
             wsClient.typingIndicatorManager.onMessageSentOrInputCleared()
         }
+        // Trigger mention detection for group chats (Requirement 14.1)
+        onMentionTrigger(text, text.length)
     }
 
     // ─── Message Send with Reply Clearing and Offline Queue Rejection (Task 6.3) ──

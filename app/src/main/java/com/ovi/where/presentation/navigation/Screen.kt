@@ -46,6 +46,9 @@ sealed class Screen(val route: String) {
     data object EditProfile : Screen("edit_profile")
 
     @Serializable
+    data object MyProfile : Screen("my_profile")
+
+    @Serializable
     data object Settings : Screen("settings")
 
     @Serializable
@@ -138,6 +141,22 @@ sealed class Screen(val route: String) {
 
     @Serializable
     data object NewMessage : Screen("new_message")
+
+    @Serializable
+    data class AddGroupMembers(val groupId: String) : Screen("add_group_members/${groupId}") {
+        companion object {
+            const val ROUTE = "add_group_members/{groupId}"
+            fun createRoute(groupId: String) = "add_group_members/$groupId"
+        }
+    }
+
+    @Serializable
+    data class GroupMembers(val groupId: String) : Screen("group_members/${groupId}") {
+        companion object {
+            const val ROUTE = "group_members/{groupId}"
+            fun createRoute(groupId: String) = "group_members/$groupId"
+        }
+    }
 
     @Serializable
     data class Nicknames(val conversationId: String) : Screen("nicknames/${conversationId}") {

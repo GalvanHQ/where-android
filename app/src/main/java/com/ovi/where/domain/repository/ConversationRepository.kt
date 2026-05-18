@@ -118,4 +118,22 @@ interface ConversationRepository {
      * Stored as a map of userId -> nickname.
      */
     suspend fun updateNicknames(conversationId: String, nicknames: Map<String, String>): Resource<Unit>
+
+    /**
+     * Resolves the conversationId for a given groupId.
+     * First checks Room, then queries Firestore directly as fallback.
+     */
+    suspend fun getConversationIdByGroupId(groupId: String): String?
+
+    /**
+     * Updates the photo URL for a conversation.
+     * Writes to Room first (SSOT) then Firestore.
+     */
+    suspend fun updateConversationPhotoUrl(conversationId: String, photoUrl: String?): Resource<Unit>
+
+    /**
+     * Updates the photo URL for a conversation identified by its groupId.
+     * Writes to Room first (SSOT) then resolves conversationId for Firestore.
+     */
+    suspend fun updateConversationPhotoUrlByGroupId(groupId: String, photoUrl: String?): Resource<Unit>
 }

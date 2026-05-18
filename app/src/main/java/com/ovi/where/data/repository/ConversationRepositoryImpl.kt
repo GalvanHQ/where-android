@@ -304,6 +304,25 @@ class ConversationRepositoryImpl @Inject constructor(
                 repositoryScope.launch {
                     conversationDao.upsertAll(entities)
 
+                    // For group conversations with no photoUrl, fetch from group document
+                    val groupConvsWithoutPhoto = entities.filter { entity ->
+                        entity.type == ConversationType.GROUP.name
+                            && entity.photoUrl.isNullOrBlank()
+                            && !entity.groupId.isNullOrBlank()
+                    }
+                    for (entity in groupConvsWithoutPhoto) {
+                        try {
+                            val groupDoc = firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
+                                .document(entity.groupId!!)
+                                .get()
+                                .await()
+                            val avatarUrl = groupDoc.getString("avatarUrl")
+                            if (!avatarUrl.isNullOrBlank()) {
+                                conversationDao.updatePhotoUrl(entity.id, avatarUrl)
+                            }
+                        } catch (_: Exception) { /* non-critical */ }
+                    }
+
                     // Remove any conversations that are now soft-deleted by this user (Req 1.7, 2.7)
                     val deletedIds = snapshot?.documents?.filter { doc ->
                         val deletedBy = (doc.get("deletedBy") as? List<*>)
@@ -814,6 +833,85 @@ class ConversationRepositoryImpl @Inject constructor(
             } catch (e: Exception) {
                 Timber.w(e, "Failed to update nicknames: $conversationId")
                 Resource.Error(e.message ?: "Failed to update nicknames")
+            }
+        }
+
+    /**
+     * Resolves the conversationId for a given groupId.
+     * First checks Room (fast), then queries Firestore directly as fallback.
+     */
+    override suspend fun getConversationIdByGroupId(groupId: String): String? =
+        withContext(Dispatchers.IO) {
+            // 1. Try Room first (fast path)
+            val cached = conversationDao.getByGroupId(groupId)
+            if (cached != null) return@withContext cached.id
+
+            // 2. Fallback: query Firestore directly
+            try {
+                val snapshot = firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
+                    .whereEqualTo("groupId", groupId)
+                    .limit(1)
+                    .get()
+                    .await()
+                val doc = snapshot.documents.firstOrNull()
+                doc?.id
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to resolve conversationId for groupId: $groupId")
+                null
+            }
+        }
+
+    /**
+     * Updates the photo URL for a conversation.
+     * Writes to Room first (SSOT — immediate UI update) then Firestore.
+     */
+    override suspend fun updateConversationPhotoUrl(conversationId: String, photoUrl: String?): Resource<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                // Write to Room first (SSOT — immediate UI update)
+                conversationDao.updatePhotoUrl(conversationId, photoUrl)
+                // Then persist to Firestore
+                firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
+                    .document(conversationId)
+                    .update("photoUrl", photoUrl)
+                    .await()
+                Resource.Success(Unit)
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to update conversation photo: $conversationId")
+                Resource.Error(e.message ?: "Failed to update conversation photo")
+            }
+        }
+
+    /**
+     * Updates the photo URL for a conversation identified by groupId.
+     * Updates Room immediately by groupId (no conversationId needed).
+     * Then resolves the conversationId and updates Firestore.
+     */
+    override suspend fun updateConversationPhotoUrlByGroupId(groupId: String, photoUrl: String?): Resource<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                // Update Room directly by groupId (immediate UI update)
+                Timber.d("ConvRepo: updatePhotoUrlByGroupId groupId=$groupId, photoUrl=$photoUrl")
+                conversationDao.updatePhotoUrlByGroupId(groupId, photoUrl)
+
+                // Verify the update took effect
+                val entity = conversationDao.getByGroupId(groupId)
+                Timber.d("ConvRepo: after update, entity=${entity?.id}, entity.photoUrl=${entity?.photoUrl}, entity.groupId=${entity?.groupId}")
+
+                // Resolve conversationId for Firestore update
+                val convId = getConversationIdByGroupId(groupId)
+                Timber.d("ConvRepo: resolved convId=$convId for Firestore update")
+                if (convId != null) {
+                    firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
+                        .document(convId)
+                        .update("photoUrl", photoUrl)
+                        .await()
+                    Timber.d("ConvRepo: Firestore photoUrl updated for convId=$convId")
+                }
+                Resource.Success(Unit)
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to update conversation photo by groupId: $groupId")
+                Resource.Error(e.message ?: "Failed to update conversation photo")
             }
         }
 

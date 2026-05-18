@@ -51,4 +51,13 @@ interface ConversationDao {
 
     @Query("UPDATE conversations SET nicknamesJson = :nicknamesJson WHERE id = :conversationId")
     suspend fun updateNicknames(conversationId: String, nicknamesJson: String?)
+
+    @Query("SELECT * FROM conversations WHERE groupId = :groupId LIMIT 1")
+    suspend fun getByGroupId(groupId: String): ConversationEntity?
+
+    @Query("UPDATE conversations SET photoUrl = :photoUrl WHERE id = :conversationId")
+    suspend fun updatePhotoUrl(conversationId: String, photoUrl: String?)
+
+    @Query("UPDATE conversations SET photoUrl = :photoUrl WHERE groupId = :groupId")
+    suspend fun updatePhotoUrlByGroupId(groupId: String, photoUrl: String?)
 }

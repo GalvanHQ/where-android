@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,16 +31,17 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.EmojiEmotions
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,6 +49,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -58,6 +62,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -66,9 +72,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.chat.components.ConversationAvatar
+import kotlinx.coroutines.launch
 import com.ovi.where.presentation.model.GroupInfoUiState
-import com.ovi.where.presentation.model.GroupMemberUiModel
 import com.ovi.where.presentation.model.MediaThumbnail
 
 /**
@@ -86,22 +93,55 @@ fun GroupInfoScreen(
     onNavigateBack: () -> Unit,
     onNavigateToMediaGallery: () -> Unit,
     onNavigateToAddMembers: () -> Unit,
+    onNavigateToMembers: () -> Unit = {},
+    onNavigateToNicknames: () -> Unit = {},
+    onNavigateToSearch: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: GroupInfoViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+
+    // Image picker for group photo
+    val imagePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        uri?.let {
+            coroutineScope.launch {
+                val result = com.ovi.where.core.utils.ImageUploadUtil.uploadProfilePicture(
+                    context = context,
+                    imageUri = it
+                )
+                if (result.isSuccess) {
+                    val url = result.getOrNull()
+                    if (url != null) {
+                        viewModel.updateGroupPhoto(url)
+                        context.showToast("Group photo updated")
+                    }
+                } else {
+                    context.showToast("Failed to upload photo")
+                }
+            }
+        }
+    }
 
     GroupInfoScreenContent(
         uiState = uiState,
         onNavigateBack = onNavigateBack,
         onNavigateToMediaGallery = onNavigateToMediaGallery,
         onNavigateToAddMembers = onNavigateToAddMembers,
+        onNavigateToMembers = onNavigateToMembers,
+        onNavigateToNicknames = onNavigateToNicknames,
+        onNavigateToSearch = onNavigateToSearch,
         onRetry = { viewModel.retry() },
         onToggleMute = { viewModel.toggleMute() },
-        onMakeAdmin = { userId -> viewModel.makeAdmin(userId) },
-        onRemoveMember = { userId -> viewModel.removeMember(userId) },
         onLeaveGroup = { viewModel.leaveGroup { onNavigateBack() } },
         onDeleteGroup = { viewModel.deleteGroup { onNavigateBack() } },
+        onUpdateGroupName = { viewModel.updateGroupName(it) },
+        onUpdateThemeColor = { viewModel.updateThemeColor(it) },
+        onUpdateEmojiShortcut = { viewModel.updateEmojiShortcut(it) },
+        onChangeGroupPhoto = { imagePickerLauncher.launch("image/*") },
         modifier = modifier
     )
 }
@@ -119,12 +159,17 @@ internal fun GroupInfoScreenContent(
     onNavigateBack: () -> Unit,
     onNavigateToMediaGallery: () -> Unit,
     onNavigateToAddMembers: () -> Unit,
+    onNavigateToMembers: () -> Unit = {},
+    onNavigateToNicknames: () -> Unit = {},
+    onNavigateToSearch: () -> Unit = {},
     onRetry: () -> Unit,
     onToggleMute: () -> Unit,
-    onMakeAdmin: (String) -> Unit,
-    onRemoveMember: (String) -> Unit,
     onLeaveGroup: () -> Unit,
     onDeleteGroup: () -> Unit,
+    onUpdateGroupName: (String) -> Unit = {},
+    onUpdateThemeColor: (String?) -> Unit = {},
+    onUpdateEmojiShortcut: (String?) -> Unit = {},
+    onChangeGroupPhoto: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -132,6 +177,9 @@ internal fun GroupInfoScreenContent(
     var showLeaveDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showMuteDialog by remember { mutableStateOf(false) }
+    var showEditNameDialog by remember { mutableStateOf(false) }
+    var showThemeColorDialog by remember { mutableStateOf(false) }
+    var showEmojiPicker by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -205,24 +253,29 @@ internal fun GroupInfoScreenContent(
                     isMuted = uiState.isMuted,
                     onAddMembersTap = onNavigateToAddMembers,
                     onMuteTap = { showMuteDialog = true },
-                    onSearchTap = { /* placeholder */ }
+                    onSearchTap = onNavigateToSearch
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
                 // ── Members Section ──────────────────────────────────────────
                 MembersSection(
-                    members = uiState.members,
-                    isCurrentUserAdmin = uiState.isCurrentUserAdmin,
-                    onAddMembersTap = onNavigateToAddMembers,
-                    onMakeAdmin = onMakeAdmin,
-                    onRemoveMember = onRemoveMember
+                    memberCount = uiState.memberCount,
+                    onViewAllMembers = onNavigateToMembers
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // ── Customize Chat Section ───────────────────────────────────
-                CustomizeChatSection()
+                CustomizeChatSection(
+                    themeColor = uiState.themeColor,
+                    emojiShortcut = uiState.emojiShortcut,
+                    onEditGroupName = { showEditNameDialog = true },
+                    onChangeGroupPhoto = onChangeGroupPhoto,
+                    onThemeColor = { showThemeColorDialog = true },
+                    onEmojiShortcut = { showEmojiPicker = true },
+                    onNicknames = onNavigateToNicknames
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -234,6 +287,11 @@ internal fun GroupInfoScreenContent(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                 }
+
+                // ── View Media & Files ───────────────────────────────────────
+                MoreActionsSection(onNavigateToMediaGallery = onNavigateToMediaGallery)
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // ── Invite Link Section (admin only) ─────────────────────────
                 if (uiState.isCurrentUserAdmin && uiState.inviteLink != null) {
@@ -336,6 +394,167 @@ internal fun GroupInfoScreenContent(
             },
             dismissButton = {
                 TextButton(onClick = { showMuteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // ── Edit Group Name Dialog ───────────────────────────────────────────────
+    if (showEditNameDialog) {
+        var newName by remember { mutableStateOf(uiState.groupName) }
+        AlertDialog(
+            onDismissRequest = { showEditNameDialog = false },
+            title = { Text("Edit Group Name") },
+            text = {
+                Column {
+                    Text(
+                        text = "Enter a new group name:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    TextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                            unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showEditNameDialog = false
+                        if (newName.isNotBlank() && newName != uiState.groupName) {
+                            onUpdateGroupName(newName)
+                            context.showToast("Group name updated")
+                        }
+                    }
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditNameDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // ── Theme Color Picker Dialog ────────────────────────────────────────────
+    if (showThemeColorDialog) {
+        val themeColors = listOf(
+            "#5170FF", "#006878", "#8E3A8C", "#6B5E00",
+            "#006E2C", "#BA1A1A", "#006491", "#8B4513"
+        )
+        AlertDialog(
+            onDismissRequest = { showThemeColorDialog = false },
+            title = { Text("Theme Color") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Choose a color for this conversation", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        themeColors.take(4).forEach { hex ->
+                            val color = try { androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(hex)) } catch (_: Exception) { MaterialTheme.colorScheme.primary }
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .clickable {
+                                        showThemeColorDialog = false
+                                        onUpdateThemeColor(hex)
+                                        context.showToast("Theme color updated")
+                                    }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        themeColors.drop(4).forEach { hex ->
+                            val color = try { androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(hex)) } catch (_: Exception) { MaterialTheme.colorScheme.primary }
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .clickable {
+                                        showThemeColorDialog = false
+                                        onUpdateThemeColor(hex)
+                                        context.showToast("Theme color updated")
+                                    }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showThemeColorDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+            dismissButton = {}
+        )
+    }
+
+    // ── Emoji Shortcut Picker Dialog ─────────────────────────────────────────
+    if (showEmojiPicker) {
+        val emojiOptions = listOf("👍", "❤️", "😂", "😮", "😢", "🔥", "🎉", "👏", "💯", "🙏", "😊", "🥰")
+        AlertDialog(
+            onDismissRequest = { showEmojiPicker = false },
+            title = { Text("Emoji Shortcut") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Choose a quick-react emoji for this conversation",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    for (row in emojiOptions.chunked(4)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            row.forEach { emoji ->
+                                Text(
+                                    text = emoji,
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    modifier = Modifier
+                                        .clickable {
+                                            showEmojiPicker = false
+                                            onUpdateEmojiShortcut(emoji)
+                                            context.showToast("Emoji shortcut updated")
+                                        }
+                                        .padding(8.dp),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showEmojiPicker = false
+                    onUpdateEmojiShortcut(null)
+                    context.showToast("Emoji shortcut reset")
+                }) {
+                    Text("Reset to Default")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEmojiPicker = false }) {
                     Text("Cancel")
                 }
             }
@@ -472,169 +691,40 @@ private fun GroupInfoActionButton(
 
 @Composable
 private fun MembersSection(
-    members: List<GroupMemberUiModel>,
-    isCurrentUserAdmin: Boolean,
-    onAddMembersTap: () -> Unit,
-    onMakeAdmin: (String) -> Unit,
-    onRemoveMember: (String) -> Unit
+    memberCount: Int,
+    onViewAllMembers: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
-        // Section header
         Text(
-            text = "Members",
-            style = MaterialTheme.typography.labelLarge.copy(
-                fontWeight = FontWeight.SemiBold
-            ),
+            text = "$memberCount members",
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        // "Add Members" row at top for admins (Requirement 9.5)
-        if (isCurrentUserAdmin) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onAddMembersTap)
-                    .padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PersonAdd,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Add Members",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
-
-        // Member list
-        members.forEach { member ->
-            MemberRow(
-                member = member,
-                isCurrentUserAdmin = isCurrentUserAdmin,
-                onMakeAdmin = { onMakeAdmin(member.userId) },
-                onRemoveMember = { onRemoveMember(member.userId) }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onViewAllMembers)
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Group,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        }
-    }
-}
-
-@Composable
-private fun MemberRow(
-    member: GroupMemberUiModel,
-    isCurrentUserAdmin: Boolean,
-    onMakeAdmin: () -> Unit,
-    onRemoveMember: () -> Unit
-) {
-    var showOverflowMenu by remember { mutableStateOf(false) }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // 40dp avatar with online indicator (Requirement 9.11)
-        ConversationAvatar(
-            name = member.displayName,
-            photoUrl = member.photoUrl,
-            isOnline = member.isOnline,
-            size = 40.dp,
-            indicatorSize = 10.dp,
-            indicatorBorderWidth = 1.5.dp
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        // Name + Admin chip
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = member.displayName,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-
-                // "Admin" chip (Requirement 9.3)
-                if (member.isAdmin) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Admin",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .background(
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                shape = RoundedCornerShape(4.dp)
-                            )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-            }
-        }
-
-        // Overflow menu for non-admin members (Requirement 9.4)
-        if (isCurrentUserAdmin && !member.isAdmin) {
-            Box {
-                IconButton(
-                    onClick = { showOverflowMenu = true },
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "More options for ${member.displayName}",
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                DropdownMenu(
-                    expanded = showOverflowMenu,
-                    onDismissRequest = { showOverflowMenu = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Make Admin") },
-                        onClick = {
-                            showOverflowMenu = false
-                            onMakeAdmin()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                "Remove from Group",
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        },
-                        onClick = {
-                            showOverflowMenu = false
-                            onRemoveMember()
-                        }
-                    )
-                }
-            }
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = "See chat members",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }
@@ -643,15 +733,19 @@ private fun MemberRow(
 
 @Composable
 private fun CustomizeChatSection(
+    themeColor: String? = null,
+    emojiShortcut: String? = null,
     onEditGroupName: () -> Unit = {},
-    onChangeGroupPhoto: () -> Unit = {}
+    onChangeGroupPhoto: () -> Unit = {},
+    onThemeColor: () -> Unit = {},
+    onEmojiShortcut: () -> Unit = {},
+    onNicknames: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
-        // Section header
         Text(
             text = "Customize Chat",
             style = MaterialTheme.typography.labelLarge.copy(
@@ -661,25 +755,67 @@ private fun CustomizeChatSection(
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        // Group name edit
         SectionListItem(
             icon = Icons.Default.Edit,
             label = "Edit Group Name",
             onClick = onEditGroupName
         )
 
-        // Group photo change
         SectionListItem(
             icon = Icons.Default.PhotoCamera,
             label = "Change Group Photo",
             onClick = onChangeGroupPhoto
         )
 
-        // Theme color
         SectionListItem(
             icon = Icons.Default.Palette,
             label = "Theme Color",
-            onClick = { /* Theme color picker — not yet implemented */ }
+            subtitle = themeColor ?: "Default",
+            onClick = onThemeColor
+        )
+
+        SectionListItem(
+            icon = Icons.Filled.EmojiEmotions,
+            label = "Emoji Shortcut",
+            subtitle = emojiShortcut ?: "👍",
+            onClick = onEmojiShortcut
+        )
+
+        SectionListItem(
+            icon = Icons.Default.PersonAdd,
+            label = "Nicknames",
+            onClick = onNicknames
+        )
+    }
+}
+
+@Composable
+private fun MoreActionsSection(
+    onNavigateToMediaGallery: () -> Unit
+){
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        Text(
+            text = "More Actions",
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = FontWeight.SemiBold
+            ),
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        SectionListItem(
+            icon = Icons.Default.Photo,
+            label = "View Media & Files",
+            onClick = onNavigateToMediaGallery
+        )
+        SectionListItem(
+            icon = Icons.Filled.Notifications,
+            label = "Notification Settings",
+            onClick = { /* Notification settings — not yet implemented */ }
         )
     }
 }
@@ -746,14 +882,24 @@ private fun InviteLinkSection(
     inviteLink: String,
     context: Context
 ) {
+    // Extract just the invite code (last segment of the link, or the whole string if no slashes)
+    val inviteCode = inviteLink.substringAfterLast("/").takeIf { it.isNotBlank() } ?: inviteLink
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
+            .border(
+                width = 1.5.dp,
+                color = MaterialTheme.colorScheme.primary,
+                shape = RoundedCornerShape(40.dp)
+            )
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        // Section header
         Text(
-            text = "Invite Link",
+            text = "Invite Code",
             style = MaterialTheme.typography.labelLarge.copy(
                 fontWeight = FontWeight.SemiBold
             ),
@@ -761,25 +907,33 @@ private fun InviteLinkSection(
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        // Link text
+        // Code display
         Text(
-            text = inviteLink,
-            style = MaterialTheme.typography.bodyMedium,
+            text = inviteCode,
+            style = MaterialTheme.typography.headlineSmall.copy(
+                fontWeight = FontWeight.Bold
+            ),
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        Text(
+            text = "Share this code with others to let them join the group.",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
         // Copy + Share buttons
         Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
         ) {
-            // Copy button
             TextButton(
                 onClick = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("Invite Link", inviteLink))
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Invite Code", inviteCode))
+                    context.showToast("Code copied")
                 }
             ) {
                 Icon(
@@ -790,15 +944,15 @@ private fun InviteLinkSection(
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("Copy")
             }
+            Spacer(modifier = Modifier.width(48.dp))
 
-            // Share button
             TextButton(
                 onClick = {
                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
                         type = "text/plain"
-                        putExtra(Intent.EXTRA_TEXT, inviteLink)
+                        putExtra(Intent.EXTRA_TEXT, "Join my group on Where! Use invite code: $inviteCode")
                     }
-                    context.startActivity(Intent.createChooser(shareIntent, "Share Invite Link"))
+                    context.startActivity(Intent.createChooser(shareIntent, "Share Invite Code"))
                 }
             ) {
                 Icon(
@@ -869,9 +1023,10 @@ private fun DeleteGroupRow(onClick: () -> Unit) {
 
 @Composable
 private fun SectionListItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     label: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    subtitle: String? = null
 ) {
     Row(
         modifier = Modifier
@@ -887,10 +1042,19 @@ private fun SectionListItem(
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Column {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }

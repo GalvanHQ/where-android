@@ -9,6 +9,9 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -18,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -37,8 +41,8 @@ import com.ovi.where.presentation.chat.GroupInfoScreen
 import com.ovi.where.presentation.chat.MediaGalleryScreen
 import com.ovi.where.presentation.chat.NewMessageScreen
 import com.ovi.where.presentation.chat.NicknamesScreen
-import com.ovi.where.presentation.group.join.JoinGroupScreen
 import com.ovi.where.presentation.group.create.CreateGroupScreen
+import com.ovi.where.presentation.group.join.JoinGroupScreen
 import com.ovi.where.presentation.map.MapScreen
 import com.ovi.where.presentation.navigation.gatekeeper.AuthGatekeeperViewModel
 import com.ovi.where.presentation.onboarding.OnboardingScreen
@@ -46,14 +50,14 @@ import com.ovi.where.presentation.people.FriendRequestsScreen
 import com.ovi.where.presentation.people.UserProfileScreen
 import com.ovi.where.presentation.profile.edit.EditProfileScreen
 import com.ovi.where.presentation.search.SearchScreen
+import com.ovi.where.presentation.settings.AboutScreen
 import com.ovi.where.presentation.settings.AppearanceScreen
 import com.ovi.where.presentation.settings.DataStorageScreen
+import com.ovi.where.presentation.settings.HelpScreen
 import com.ovi.where.presentation.settings.NotificationPreferencesScreen
+import com.ovi.where.presentation.settings.PrivacyScreen
 import com.ovi.where.presentation.settings.SecurityScreen
 import com.ovi.where.presentation.settings.SettingsScreen
-import com.ovi.where.presentation.settings.PrivacyScreen
-import com.ovi.where.presentation.settings.HelpScreen
-import com.ovi.where.presentation.settings.AboutScreen
 
 private const val NAV_ANIM_DURATION = 300
 
@@ -339,6 +343,37 @@ fun AppNavGraph(
             )
         }
 
+        // ── My Profile (standalone, accessible from group members) ────────────
+        composable(Screen.MyProfile.route) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                com.ovi.where.presentation.profile.ProfileScreen(
+                    onNavigateToEditProfile = {
+                        navController.navigate(Screen.EditProfile.route) { launchSingleTop = true }
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate(Screen.Settings.route) { launchSingleTop = true }
+                    },
+                    onNavigateToMessages = { navController.popBackStack() },
+                    onNavigateToGroups = { navController.popBackStack() },
+                    onNavigateToLocationSharing = { navController.popBackStack() },
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 48.dp)
+                )
+                androidx.compose.material3.IconButton(
+                    onClick = { navController.popBackStack() },
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .statusBarsPadding()
+                        .padding(start = 4.dp, top = 4.dp)
+                ) {
+                    androidx.compose.material3.Icon(
+                        imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+
         // ── Settings ──────────────────────────────────────────────────────────
         composable(Screen.Settings.route) {
             SettingsScreen(
@@ -536,6 +571,57 @@ fun AppNavGraph(
             )
         }
 
+        // ── Add Group Members ─────────────────────────────────────────────────
+        composable(
+            route     = Screen.AddGroupMembers.ROUTE,
+            arguments = listOf(navArgument("groupId") { type = NavType.StringType })
+        ) { back ->
+            val groupId = back.arguments?.getString("groupId") ?: return@composable
+            com.ovi.where.presentation.group.AddGroupMembersScreen(
+                groupId = groupId,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // ── Group Members ─────────────────────────────────────────────────────
+        composable(
+            route     = Screen.GroupMembers.ROUTE,
+            arguments = listOf(navArgument("groupId") { type = NavType.StringType })
+        ) { back ->
+            val groupId = back.arguments?.getString("groupId") ?: return@composable
+            com.ovi.where.presentation.group.GroupMembersScreen(
+                groupId = groupId,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAddMembers = {
+                    navController.navigate(Screen.AddGroupMembers.createRoute(groupId)) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToUserProfile = { userId ->
+                    navController.navigate(Screen.UserProfile.createRoute(userId)) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToProfile = {
+                    navController.navigate(Screen.MyProfile.route) {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        // ── Group Nicknames ───────────────────────────────────────────────────
+        composable(
+            route     = "group_nicknames/{groupId}",
+            arguments = listOf(navArgument("groupId") { type = NavType.StringType })
+        ) { back ->
+            val groupId = back.arguments?.getString("groupId") ?: return@composable
+            com.ovi.where.presentation.group.GroupNicknamesScreen(
+                groupId = groupId,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
         // ── Group Info (Group info screen) ────────────────────────────────────
         composable(
             route     = Screen.GroupInfo.ROUTE,
@@ -546,13 +632,28 @@ fun AppNavGraph(
                 groupId                = groupId,
                 onNavigateBack         = { navController.popBackStack() },
                 onNavigateToMediaGallery = {
-                    // Navigate to media gallery using group's conversation ID if available
                     navController.navigate(Screen.MediaGallery.createRoute(groupId)) {
                         launchSingleTop = true
                     }
                 },
                 onNavigateToAddMembers = {
-                    // Placeholder — add members flow not yet implemented
+                    navController.navigate(Screen.AddGroupMembers.createRoute(groupId)) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToMembers = {
+                    navController.navigate(Screen.GroupMembers.createRoute(groupId)) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToNicknames = {
+                    navController.navigate("group_nicknames/$groupId") {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToSearch = {
+                    navController.previousBackStackEntry?.savedStateHandle?.set("activate_search", true)
+                    navController.popBackStack()
                 }
             )
         }

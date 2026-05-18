@@ -12,6 +12,9 @@ data class GroupInfoUiState(
     val inviteLink: String? = null,
     val isCurrentUserAdmin: Boolean = false,
     val sharedMedia: List<MediaThumbnail> = emptyList(),
+    val nicknames: Map<String, String> = emptyMap(),
+    val themeColor: String? = null,
+    val emojiShortcut: String? = null,
     val isMuted: Boolean = false,
     val isLoading: Boolean = true,
     val error: String? = null

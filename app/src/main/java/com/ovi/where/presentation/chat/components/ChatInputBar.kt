@@ -174,7 +174,7 @@ fun ChatInputBar(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(start = 16.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
-                    verticalAlignment = Alignment.Bottom
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     BasicTextField(
                         value = text,

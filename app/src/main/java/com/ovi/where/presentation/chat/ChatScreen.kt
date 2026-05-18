@@ -4,14 +4,9 @@ import android.Manifest
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,12 +17,9 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,7 +27,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -50,24 +41,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import coil.compose.AsyncImage
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.LocalReducedMotion
 import com.ovi.where.core.utils.showToast
@@ -75,26 +57,17 @@ import com.ovi.where.presentation.chat.components.AnimatedMessageBubble
 import com.ovi.where.presentation.chat.components.ChatBubble
 import com.ovi.where.presentation.chat.components.ChatEmptyState
 import com.ovi.where.presentation.chat.components.ChatInputBar
-import com.ovi.where.presentation.chat.components.ImageChatBubble
 import com.ovi.where.presentation.chat.components.DateSeparator
-import com.ovi.where.presentation.chat.components.ImageMessageBubble
-import com.ovi.where.presentation.chat.components.LinkPreviewCard
-import com.ovi.where.presentation.chat.components.LinkableText
-import com.ovi.where.presentation.chat.components.LocationMessageBubble
+import com.ovi.where.presentation.chat.components.ImageSizeLimitError
 import com.ovi.where.presentation.chat.components.MessageAnimationConstants
 import com.ovi.where.presentation.chat.components.MessageSearchBar
-import com.ovi.where.presentation.chat.components.MessageStatusIndicator
 import com.ovi.where.presentation.chat.components.NewMessageIndicator
 import com.ovi.where.presentation.chat.components.QueuedForSyncBanner
-import com.ovi.where.presentation.chat.components.ReactionBadges
 import com.ovi.where.presentation.chat.components.ReactionPickerOverlay
-import com.ovi.where.presentation.chat.components.ReadReceiptIndicator
 import com.ovi.where.presentation.chat.components.ReplyPreviewBar
 import com.ovi.where.presentation.chat.components.SwipeToReplyContainer
 import com.ovi.where.presentation.chat.components.TypingIndicator
-import com.ovi.where.presentation.chat.components.VoiceMessageBubble
 import com.ovi.where.presentation.model.BubbleDirection
-import com.ovi.where.presentation.model.MessageUiModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
@@ -632,6 +605,9 @@ fun ChatScreen(
                             }
 
                             Column {
+                                // Skip rendering for images that are part of a collage (rendered by the first item)
+                                if (message.isHiddenInCollage) return@Column
+
                                 // Date separator above this message if day boundary (Requirement 10.3, 10.4)
                                 if (message.showDateSeparator && message.dateSeparatorLabel != null) {
                                     DateSeparator(label = message.dateSeparatorLabel)
@@ -658,54 +634,25 @@ fun ChatScreen(
                                         val voiceProgress = if (voicePlaybackState.activeMessageId == message.id) voicePlaybackState.progress else 0f
                                         val voiceCurrentPos = if (voicePlaybackState.activeMessageId == message.id) voicePlaybackState.currentPositionMs else 0L
 
-                                        // Use ChatBubble for standard text messages (Requirements 4.1-4.9)
-                                        if (!message.isVoice && !message.isImage && !message.isLocation) {
-                                            ChatBubble(
-                                                message = message,
-                                                isGroupChat = isGroupConversation,
-                                                isFirstInGroup = message.isFirstInGroup,
-                                                isLastInGroup = message.isLastInGroup,
-                                                showSenderAvatar = message.isLastInGroup
-                                                        && message.direction == BubbleDirection.RECEIVED
-                                                        && isGroupConversation,
-                                                themeColor = conversationThemeColor
-                                            )
-                                        } else if (message.isImage) {
-                                            // Image messages with Messenger-style grouping
-                                            ImageChatBubble(
-                                                message = message,
-                                                isGroupChat = isGroupConversation,
-                                                isFirstInGroup = message.isFirstInGroup,
-                                                isLastInGroup = message.isLastInGroup,
-                                                showSenderAvatar = message.isLastInGroup
-                                                        && message.direction == BubbleDirection.RECEIVED
-                                                        && isGroupConversation,
-                                                onLongPress = onLongPress,
-                                                onRetry = onRetryMessage
-                                            )
-                                        } else {
-                                            // Fallback to existing MessageBubble for voice/image/location
-                                            MessageBubble(
-                                                message = message,
-                                                showAvatar = message.direction == BubbleDirection.RECEIVED
-                                                        && isGroupConversation
-                                                        && message.isLastInGroup,
-                                                maxWidth = screenWidth * 0.75f,
-                                                onLocationTap = onLocationTap,
-                                                onLongPress = onLongPress,
-                                                onRetry = onRetryMessage,
-                                                onReactionTap = onReactionTapHandler,
-                                                onVoicePlayPause = onVoicePlayPause,
-                                                onVoiceSeek = onVoiceSeek,
-                                                isVoicePlaying = isThisVoicePlaying,
-                                                voiceProgress = voiceProgress,
-                                                voiceCurrentPositionMs = voiceCurrentPos,
-                                                searchQuery = searchQuery,
-                                                isSearchHighlighted = isSearchHighlighted,
-                                                isCurrentSearchResult = isCurrentSearchResult,
-                                                themeColor = conversationThemeColor
-                                            )
-                                        }
+                                        // Single unified ChatBubble for ALL message types
+                                        ChatBubble(
+                                            message = message,
+                                            isGroupChat = isGroupConversation,
+                                            isFirstInGroup = message.isFirstInGroup,
+                                            isLastInGroup = message.isLastInGroup,
+                                            showSenderAvatar = message.isLastInGroup
+                                                    && message.direction == BubbleDirection.RECEIVED
+                                                    && isGroupConversation,
+                                            themeColor = conversationThemeColor,
+                                            onLongPress = onLongPress,
+                                            onRetry = onRetryMessage,
+                                            onLocationTap = onLocationTap,
+                                            onVoicePlayPause = onVoicePlayPause,
+                                            onVoiceSeek = onVoiceSeek,
+                                            isVoicePlaying = isThisVoicePlaying,
+                                            voiceProgress = voiceProgress,
+                                            voiceCurrentPositionMs = voiceCurrentPos
+                                        )
                                     }
                                 }
                             }
@@ -775,6 +722,9 @@ fun ChatScreen(
                 )
             }
 
+            // ── Image size limit error (Requirement 6.7) ──────────────────────
+            ImageSizeLimitError(visible = uiState.showImageSizeError)
+
             // ── Input bar (Messenger-style, Requirements 5.1-5.6) ──────────────
             ChatInputBar(
                 text = uiState.inputText,
@@ -842,322 +792,4 @@ fun ChatScreen(
         onDismiss = viewModel::dismissReactionPicker
     )
 }
-
-// ── Bubble shape per DESIGN.md Section 6.7 ────────────────────────────────────
-// Requirement 16.1:
-// - Sent: Radius Large (16dp) all corners except bottom-right = Radius XS (4dp)
-// - Received: Radius Large (16dp) all corners except bottom-left = Radius XS (4dp)
-
-private val BubbleRadiusLarge = 16.dp
-private val BubbleRadiusTail = 4.dp
-
-private val SentBubbleShape = RoundedCornerShape(
-    topStart = BubbleRadiusLarge,
-    topEnd = BubbleRadiusLarge,
-    bottomStart = BubbleRadiusLarge,
-    bottomEnd = BubbleRadiusTail  // tail on sent side (bottom-right)
-)
-
-private val ReceivedBubbleShape = RoundedCornerShape(
-    topStart = BubbleRadiusLarge,
-    topEnd = BubbleRadiusLarge,
-    bottomStart = BubbleRadiusTail,  // tail on received side (bottom-left)
-    bottomEnd = BubbleRadiusLarge
-)
-
-private fun bubbleShape(isSent: Boolean) = if (isSent) SentBubbleShape else ReceivedBubbleShape
-
-// ── Message bubble ────────────────────────────────────────────────────────────
-
-@Composable
-private fun MessageBubble(
-    message: MessageUiModel,
-    showAvatar: Boolean,
-    maxWidth: androidx.compose.ui.unit.Dp,
-    onLocationTap: () -> Unit,
-    onLongPress: () -> Unit = {},
-    onRetry: () -> Unit = {},
-    onReactionTap: (String) -> Unit = {},
-    onVoicePlayPause: (() -> Unit)? = null,
-    onVoiceSeek: ((Float) -> Unit)? = null,
-    isVoicePlaying: Boolean = false,
-    voiceProgress: Float = 0f,
-    voiceCurrentPositionMs: Long = 0L,
-    searchQuery: String? = null,
-    isSearchHighlighted: Boolean = false,
-    isCurrentSearchResult: Boolean = false,
-    themeColor: androidx.compose.ui.graphics.Color? = null
-) {
-    val isSent = message.direction == BubbleDirection.SENT
-
-    // Requirement 16.1: Sent = Accent Primary (primary), Received = Background Elevated (surfaceContainerHigh)
-    val bubbleColor = if (isSent) {
-        themeColor ?: MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.surfaceContainerHigh
-    }
-    val textColor = if (isSent) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onSurface
-    }
-    val secondaryTextColor = if (isSent) {
-        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isSent) Arrangement.End else Arrangement.Start,
-        verticalAlignment = Alignment.Bottom
-    ) {
-        // Avatar for received group messages
-        if (!isSent && showAvatar) {
-            if (!message.senderPhotoUrl.isNullOrEmpty()) {
-                AsyncImage(
-                    model = message.senderPhotoUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(28.dp).clip(CircleShape)
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = message.senderName.take(1).uppercase(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            Spacer(Modifier.width(Dimens.spaceSmall))
-        } else if (!isSent) {
-            Spacer(Modifier.width(36.dp))
-        }
-
-        Column(
-            horizontalAlignment = if (isSent) Alignment.End else Alignment.Start
-        ) {
-            if (!isSent && showAvatar) {
-                Text(
-                    text = message.senderName,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = Dimens.spaceSmall, bottom = 2.dp)
-                )
-            }
-
-            // ── Image message bubble (Task 19.1, Requirement 27.5) ────────────
-            // Progress bar during PENDING, error overlay with retry on FAILED,
-            // 4:3 placeholder while loading.
-            if (message.isImage) {
-                Box(
-                    modifier = Modifier
-                        .widthIn(max = maxWidth)
-                        .pointerInput(message.id) {
-                            detectTapGestures(
-                                onLongPress = { onLongPress() }
-                            )
-                        }
-                ) {
-                    ImageMessageBubble(
-                        imageUrl = message.imageUrl,
-                        thumbnailUrl = message.thumbnailUrl,
-                        uploadProgress = message.uploadProgress,
-                        status = message.status,
-                        onRetry = onRetry
-                    )
-                }
-            }
-            // ── Location message bubble (Task 19.1, Requirement 27.6) ─────────
-            // LocationOn icon + text + locationLabel; tap navigates to group map if groupId non-null.
-            else if (message.isLocation) {
-                Surface(
-                    shape = bubbleShape(isSent),
-                    color = bubbleColor,
-                    modifier = Modifier
-                        .widthIn(max = maxWidth)
-                        .clip(bubbleShape(isSent))
-                        .clickableIf(true) { onLocationTap() }
-                        .pointerInput(message.id) {
-                            detectTapGestures(
-                                onLongPress = { onLongPress() }
-                            )
-                        }
-                ) {
-                    LocationMessageBubble(
-                        latitude = message.latitude ?: 0.0,
-                        longitude = message.longitude ?: 0.0
-                    )
-                }
-            } else if (message.isVoice && message.voiceDurationMs != null) {
-                // Voice message bubble (Requirements 11.8, 11.9, 11.10)
-                Surface(
-                    shape = bubbleShape(isSent),
-                    color = bubbleColor,
-                    modifier = Modifier
-                        .widthIn(max = maxWidth, min = 200.dp)
-                        .pointerInput(message.id) {
-                            detectTapGestures(
-                                onLongPress = { onLongPress() }
-                            )
-                        }
-                ) {
-                    VoiceMessageBubble(
-                        durationMs = message.voiceDurationMs,
-                        isPlaying = isVoicePlaying,
-                        progress = voiceProgress,
-                        currentPositionMs = voiceCurrentPositionMs,
-                        onPlayPause = { onVoicePlayPause?.invoke() },
-                        onSeek = { progress -> onVoiceSeek?.invoke(progress) },
-                        accentColor = if (isSent) {
-                            MaterialTheme.colorScheme.onPrimary
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        },
-                        textColor = secondaryTextColor,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                    )
-                }
-            } else {
-                Surface(
-                    shape = bubbleShape(isSent),
-                    color = bubbleColor,
-                    modifier = Modifier
-                        .widthIn(max = maxWidth)
-                        .pointerInput(message.id) {
-                            detectTapGestures(
-                                onLongPress = { onLongPress() }
-                            )
-                        }
-                ) {
-                    // Requirement 13.3: Highlight matching text with primary color bg at 30% opacity
-                    if (isSearchHighlighted && searchQuery != null && searchQuery.length >= 2) {
-                        val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                        Text(
-                            text = buildHighlightedText(message.text, searchQuery, highlightColor),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = textColor,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
-                        )
-                    } else {
-                        // Requirement 12.3: Render URLs as tappable hyperlinks
-                        LinkableText(
-                            text = message.text,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = textColor,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
-                        )
-                    }
-                }
-            }
-
-            // Requirement 12.1: Render link preview card below message text
-            if (message.hasLinkPreview && message.linkPreviewUrl != null && message.linkPreviewTitle != null) {
-                LinkPreviewCard(
-                    url = message.linkPreviewUrl,
-                    title = message.linkPreviewTitle,
-                    description = message.linkPreviewDescription,
-                    imageUrl = message.linkPreviewImageUrl,
-                    domain = message.linkPreviewDomain ?: "",
-                    modifier = Modifier.widthIn(max = maxWidth)
-                )
-            }
-
-            // ── Reaction badges below message (Task 19.1) ─────────────────────
-            if (message.reactions.isNotEmpty()) {
-                ReactionBadges(
-                    reactions = message.reactions,
-                    onReactionTap = onReactionTap
-                )
-            }
-
-            // Pre-computed time from MessageUiModel — no formatting in the composable
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = 2.dp)
-            ) {
-                Text(
-                    text = message.formattedTime,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                // ── Message Status Indicator (Requirement 1.12, 2.12) ─────────────
-                // Shows progressive delivery status: PENDING → SENT → DELIVERED → READ
-                if (isSent) {
-                    MessageStatusIndicator(
-                        status = message.status,
-                        direction = message.direction
-                    )
-                }
-            }
-
-            // ── Read Receipt Indicator (Task 19.1, Requirement 27.3) ──────────
-            // Below sent messages with readBy >= 1 non-sender;
-            // DoneAll icon primary + up to 3 avatars + "+N"
-            if (isSent && message.readBy.isNotEmpty()) {
-                ReadReceiptIndicator(
-                    readBy = message.readBy,
-                    readByPhotoUrls = message.readByPhotoUrls,
-                    direction = message.direction
-                )
-            }
-        }
-    }
-}
-
-private fun Modifier.clickableIf(enabled: Boolean, onClick: () -> Unit): Modifier =
-    if (enabled) this.clickable { onClick() } else this
-
-/**
- * Builds an AnnotatedString with search query matches highlighted.
- * Highlights all occurrences of the query (case-insensitive) with the given background color.
- *
- * Requirement 13.3: Highlight matching text with primary color background at 30% opacity.
- */
-private fun buildHighlightedText(
-    text: String,
-    query: String,
-    highlightColor: Color
-): AnnotatedString {
-    return buildAnnotatedString {
-        if (query.isBlank()) {
-            append(text)
-            return@buildAnnotatedString
-        }
-
-        val lowerText = text.lowercase()
-        val lowerQuery = query.lowercase()
-        var currentIndex = 0
-
-        while (currentIndex < text.length) {
-            val matchIndex = lowerText.indexOf(lowerQuery, currentIndex)
-            if (matchIndex == -1) {
-                // No more matches — append the rest
-                append(text.substring(currentIndex))
-                break
-            }
-
-            // Append text before the match
-            if (matchIndex > currentIndex) {
-                append(text.substring(currentIndex, matchIndex))
-            }
-
-            // Append the matched text with highlight
-            withStyle(SpanStyle(background = highlightColor)) {
-                append(text.substring(matchIndex, matchIndex + query.length))
-            }
-
-            currentIndex = matchIndex + query.length
-        }
-    }
-}
-
 

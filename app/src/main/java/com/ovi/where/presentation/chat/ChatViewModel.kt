@@ -1176,7 +1176,16 @@ class ChatViewModel @Inject constructor(
     fun sendImageMessage(imageUri: Uri) {
         val convId = _uiState.value.conversationId ?: return
         viewModelScope.launch {
-            messageRepositoryImpl.sendImageMessage(convId, imageUri)
+            _uiState.value = _uiState.value.copy(showImageSizeError = false)
+            val result = messageRepositoryImpl.sendImageMessage(convId, imageUri)
+            if (result is Resource.Error && result.message?.contains("10MB") == true) {
+                _uiState.value = _uiState.value.copy(showImageSizeError = true)
+                // Auto-dismiss after 4 seconds
+                delay(4000)
+                _uiState.value = _uiState.value.copy(showImageSizeError = false)
+            } else if (result is Resource.Error) {
+                _snackbarEvent.tryEmit(SnackbarEvent(result.message ?: "Failed to send image"))
+            }
         }
     }
 
@@ -2635,7 +2644,45 @@ class ChatViewModel @Inject constructor(
             )
         }
 
-        return result
+        // Second pass: detect consecutive image groups and mark collage metadata
+        val finalResult = mutableListOf<MessageUiModel>()
+        var i = 0
+        while (i < result.size) {
+            val msg = result[i]
+            if (msg.isImage && !msg.imageUrl.isNullOrBlank()) {
+                // Collect consecutive images from the same sender
+                val collageUrls = mutableListOf(msg.imageUrl!!)
+                var j = i + 1
+                while (j < result.size && j - i < 5) {
+                    val next = result[j]
+                    if (next.isImage && !next.imageUrl.isNullOrBlank()
+                        && next.senderId == msg.senderId
+                        && !next.showDateSeparator
+                    ) {
+                        collageUrls.add(next.imageUrl!!)
+                        j++
+                    } else break
+                }
+
+                if (collageUrls.size > 1) {
+                    // First image gets the collage URLs
+                    finalResult.add(msg.copy(imageCollageUrls = collageUrls))
+                    // Remaining images are hidden
+                    for (k in (i + 1) until j) {
+                        finalResult.add(result[k].copy(isHiddenInCollage = true))
+                    }
+                    i = j
+                } else {
+                    finalResult.add(msg)
+                    i++
+                }
+            } else {
+                finalResult.add(msg)
+                i++
+            }
+        }
+
+        return finalResult
     }
 
     companion object {
@@ -2896,7 +2943,10 @@ data class ChatUiState(
     /** List of member suggestions for the mention popup (Requirements 14.1, 14.5, 14.6). */
     val mentionSuggestions: List<MentionEngine.MentionMember> = emptyList(),
     /** List of mentioned user IDs for the current message being composed (Requirement 14.3). */
-    val mentionedUserIds: List<String> = emptyList()
+    val mentionedUserIds: List<String> = emptyList(),
+    // ─── Image Size Error State ───────────────────────────────────────────────
+    /** Whether to show the image size limit error inline (Requirement 6.7). */
+    val showImageSizeError: Boolean = false
 )
 
 /**

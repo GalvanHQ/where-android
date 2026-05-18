@@ -100,7 +100,12 @@ data class MessageUiModel(
     /** Whether a date separator should be shown above this message. */
     val showDateSeparator: Boolean = false,
     /** Label for the date separator ("Today", "Yesterday", or formatted date). */
-    val dateSeparatorLabel: String? = null
+    val dateSeparatorLabel: String? = null,
+    // ─── Image Collage Metadata ──────────────────────────────────────────────
+    /** For consecutive image messages: IDs of all images in this collage group (only set on first). */
+    val imageCollageUrls: List<String> = emptyList(),
+    /** Whether this image message should be hidden (it's rendered as part of a collage on a previous item). */
+    val isHiddenInCollage: Boolean = false
 )
 
 /**

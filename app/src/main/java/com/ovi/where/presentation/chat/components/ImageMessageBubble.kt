@@ -2,7 +2,11 @@ package com.ovi.where.presentation.chat.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,12 +28,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.gestures.detectTapGestures
 import coil.compose.SubcomposeAsyncImage
 import com.ovi.where.domain.model.MessageStatus
 
@@ -193,3 +199,180 @@ fun ImageSizeLimitError(
 
 /** Default aspect ratio for image placeholders (4:3). */
 private const val DEFAULT_ASPECT_RATIO = 4f / 3f
+
+/**
+ * Messenger-style image collage grid for 2-5 consecutive images.
+ * Layouts:
+ * - 2 images: side by side (1:1 each)
+ * - 3 images: 1 large left + 2 stacked right
+ * - 4 images: 2x2 grid
+ * - 5 images: 2 top + 3 bottom
+ */
+@Composable
+fun ImageCollageGrid(
+    imageUrls: List<String>,
+    onImageTap: (String) -> Unit,
+    onLongPress: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val gap = 2.dp
+    val cornerRadius = 12.dp
+
+    Box(
+        modifier = modifier
+            .widthIn(max = 260.dp)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(cornerRadius))
+    ) {
+        when (imageUrls.size) {
+            2 -> {
+                Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    imageUrls.forEach { url ->
+                        CollageImage(
+                            url = url,
+                            modifier = Modifier
+                                .weight(1f)
+                                .aspectRatio(1f),
+                            onTap = { onImageTap(url) },
+                            onLongPress = onLongPress
+                        )
+                    }
+                }
+            }
+            3 -> {
+                Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    CollageImage(
+                        url = imageUrls[0],
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(0.75f),
+                        onTap = { onImageTap(imageUrls[0]) },
+                        onLongPress = onLongPress
+                    )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(gap)
+                    ) {
+                        CollageImage(
+                            url = imageUrls[1],
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            onTap = { onImageTap(imageUrls[1]) },
+                            onLongPress = onLongPress
+                        )
+                        CollageImage(
+                            url = imageUrls[2],
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            onTap = { onImageTap(imageUrls[2]) },
+                            onLongPress = onLongPress
+                        )
+                    }
+                }
+            }
+            4 -> {
+                Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(gap)
+                    ) {
+                        CollageImage(
+                            url = imageUrls[0],
+                            modifier = Modifier.weight(1f).aspectRatio(1f),
+                            onTap = { onImageTap(imageUrls[0]) },
+                            onLongPress = onLongPress
+                        )
+                        CollageImage(
+                            url = imageUrls[1],
+                            modifier = Modifier.weight(1f).aspectRatio(1f),
+                            onTap = { onImageTap(imageUrls[1]) },
+                            onLongPress = onLongPress
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(gap)
+                    ) {
+                        CollageImage(
+                            url = imageUrls[2],
+                            modifier = Modifier.weight(1f).aspectRatio(1f),
+                            onTap = { onImageTap(imageUrls[2]) },
+                            onLongPress = onLongPress
+                        )
+                        CollageImage(
+                            url = imageUrls[3],
+                            modifier = Modifier.weight(1f).aspectRatio(1f),
+                            onTap = { onImageTap(imageUrls[3]) },
+                            onLongPress = onLongPress
+                        )
+                    }
+                }
+            }
+            else -> {
+                // 5 images: 2 top + 3 bottom
+                Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(gap)
+                    ) {
+                        CollageImage(
+                            url = imageUrls[0],
+                            modifier = Modifier.weight(1f).aspectRatio(1f),
+                            onTap = { onImageTap(imageUrls[0]) },
+                            onLongPress = onLongPress
+                        )
+                        CollageImage(
+                            url = imageUrls[1],
+                            modifier = Modifier.weight(1f).aspectRatio(1f),
+                            onTap = { onImageTap(imageUrls[1]) },
+                            onLongPress = onLongPress
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(gap)
+                    ) {
+                        for (k in 2 until imageUrls.size.coerceAtMost(5)) {
+                            CollageImage(
+                                url = imageUrls[k],
+                                modifier = Modifier.weight(1f).aspectRatio(1f),
+                                onTap = { onImageTap(imageUrls[k]) },
+                                onLongPress = onLongPress
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollageImage(
+    url: String,
+    modifier: Modifier,
+    onTap: () -> Unit,
+    onLongPress: () -> Unit
+) {
+    SubcomposeAsyncImage(
+        model = url,
+        contentDescription = "Photo",
+        contentScale = ContentScale.Crop,
+        modifier = modifier
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(2.dp))
+            .pointerInput(url) {
+                detectTapGestures(
+                    onTap = { onTap() },
+                    onLongPress = { onLongPress() }
+                )
+            },
+        loading = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            )
+        }
+    )
+}

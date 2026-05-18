@@ -317,7 +317,17 @@ class ConversationRepositoryImpl @Inject constructor(
                                 parseRecentMessageToEntity(convId, map)
                             }
                             if (messageEntities.isNotEmpty()) {
-                                messageDao.upsertAll(messageEntities)
+                                // Only upsert messages that don't already exist in Room
+                                // (avoids overwriting optimistic inserts with incomplete data)
+                                for (entity in messageEntities) {
+                                    val existing = messageDao.getById(entity.id)
+                                    if (existing == null) {
+                                        messageDao.insert(entity)
+                                    } else if (existing.imageUrl.isNullOrBlank() && !entity.imageUrl.isNullOrBlank()) {
+                                        // Update imageUrl if the existing one is blank but new one has it
+                                        messageDao.updateImageUrl(entity.id, entity.imageUrl!!)
+                                    }
+                                }
                             }
                         } catch (_: Exception) { /* non-critical */ }
                     }

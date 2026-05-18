@@ -62,8 +62,9 @@ class ImageCompressor @Inject constructor() {
      * @return CompressionResult with compressed file or error
      */
     fun compress(context: Context, imageUri: Uri): CompressionResult {
-        // Step 1: Validate MIME type
+        // Step 1: Validate MIME type (fallback to extension-based detection for file:// URIs)
         val mimeType = context.contentResolver.getType(imageUri)
+            ?: guessMimeTypeFromUri(imageUri)
         if (mimeType == null || mimeType !in ACCEPTED_MIME_TYPES) {
             return CompressionResult.Error(
                 "Unsupported image format. Accepted formats: JPEG, PNG, WebP, HEIF"
@@ -214,5 +215,22 @@ class ImageCompressor @Inject constructor() {
         val resized = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
         if (resized != bitmap) bitmap.recycle()
         return resized
+    }
+
+    /**
+     * Guesses MIME type from URI path extension when contentResolver.getType() returns null.
+     * This happens for file:// URIs on many devices.
+     */
+    private fun guessMimeTypeFromUri(uri: Uri): String? {
+        val path = uri.path ?: uri.toString()
+        return when {
+            path.endsWith(".jpg", ignoreCase = true) || path.endsWith(".jpeg", ignoreCase = true) -> "image/jpeg"
+            path.endsWith(".png", ignoreCase = true) -> "image/png"
+            path.endsWith(".webp", ignoreCase = true) -> "image/webp"
+            path.endsWith(".heif", ignoreCase = true) || path.endsWith(".heic", ignoreCase = true) -> "image/heif"
+            // Default to JPEG for temp files without proper extension (gallery_*.jpg)
+            path.contains("gallery_") || path.contains("chat_img_") -> "image/jpeg"
+            else -> null
+        }
     }
 }

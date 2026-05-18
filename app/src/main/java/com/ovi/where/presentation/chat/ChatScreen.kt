@@ -75,6 +75,7 @@ import com.ovi.where.presentation.chat.components.AnimatedMessageBubble
 import com.ovi.where.presentation.chat.components.ChatBubble
 import com.ovi.where.presentation.chat.components.ChatEmptyState
 import com.ovi.where.presentation.chat.components.ChatInputBar
+import com.ovi.where.presentation.chat.components.ImageChatBubble
 import com.ovi.where.presentation.chat.components.DateSeparator
 import com.ovi.where.presentation.chat.components.ImageMessageBubble
 import com.ovi.where.presentation.chat.components.LinkPreviewCard
@@ -172,23 +173,12 @@ fun ChatScreen(
         }
     }
 
-    // ── Image Attachment: Gallery picker via PhotoPicker API ───────────────────
-    // PhotoPicker URIs lose read permission after callback scope ends.
-    // Copy to local cache file immediately so background coroutine can access.
+    // ── Image Attachment: Gallery picker with multi-select (max 5) ──────────────
     val galleryLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
-    ) { uri: android.net.Uri? ->
-        uri?.let { sourceUri ->
-            try {
-                // Persist read permission for the duration of this process
-                context.contentResolver.takePersistableUriPermission(
-                    sourceUri,
-                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            } catch (_: SecurityException) {
-                // Some providers don't support persistable permissions — fallback to copy
-            }
-            // Copy to cache file for reliable background access
+        ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<android.net.Uri> ->
+        val selected = uris.take(5) // Max 5 photos
+        for (sourceUri in selected) {
             val cacheFile = java.io.File.createTempFile("gallery_", ".jpg", context.cacheDir)
             try {
                 context.contentResolver.openInputStream(sourceUri)?.use { input ->
@@ -680,6 +670,19 @@ fun ChatScreen(
                                                         && isGroupConversation,
                                                 themeColor = conversationThemeColor
                                             )
+                                        } else if (message.isImage) {
+                                            // Image messages with Messenger-style grouping
+                                            ImageChatBubble(
+                                                message = message,
+                                                isGroupChat = isGroupConversation,
+                                                isFirstInGroup = message.isFirstInGroup,
+                                                isLastInGroup = message.isLastInGroup,
+                                                showSenderAvatar = message.isLastInGroup
+                                                        && message.direction == BubbleDirection.RECEIVED
+                                                        && isGroupConversation,
+                                                onLongPress = onLongPress,
+                                                onRetry = onRetryMessage
+                                            )
                                         } else {
                                             // Fallback to existing MessageBubble for voice/image/location
                                             MessageBubble(
@@ -794,12 +797,8 @@ fun ChatScreen(
                     }
                 },
                 onAttachmentTap = {
-                    // Launch system PhotoPicker for image selection
-                    galleryLauncher.launch(
-                        androidx.activity.result.PickVisualMediaRequest(
-                            ActivityResultContracts.PickVisualMedia.ImageOnly
-                        )
-                    )
+                    // Launch system image picker (multi-select, max 5)
+                    galleryLauncher.launch("image/*")
                 },
                 // Voice recording state & callbacks
                 isVoiceRecording = uiState.isVoiceRecording,
@@ -958,9 +957,7 @@ private fun MessageBubble(
             // Progress bar during PENDING, error overlay with retry on FAILED,
             // 4:3 placeholder while loading.
             if (message.isImage) {
-                Surface(
-                    shape = bubbleShape(isSent),
-                    color = bubbleColor,
+                Box(
                     modifier = Modifier
                         .widthIn(max = maxWidth)
                         .pointerInput(message.id) {

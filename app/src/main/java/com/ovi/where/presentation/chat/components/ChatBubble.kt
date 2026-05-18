@@ -2,6 +2,7 @@ package com.ovi.where.presentation.chat.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +42,7 @@ import com.ovi.where.presentation.model.MessageUiModel
  * Unified chat bubble composable — handles text, image, voice, and location messages.
  * Uses Messenger-style grouped corners for consecutive messages from the same sender.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun ChatBubble(
     message: MessageUiModel,
@@ -220,9 +222,10 @@ fun ChatBubble(
                         color = backgroundColor,
                         modifier = Modifier
                             .widthIn(max = maxBubbleWidth)
-                            .pointerInput(message.id) {
-                                detectTapGestures(onLongPress = { onLongPress() })
-                            }
+                            .combinedClickable(
+                                onClick = { },
+                                onLongClick = { onLongPress() }
+                            )
                     ) {
                         Column(
                             modifier = Modifier.padding(
@@ -250,7 +253,7 @@ fun ChatBubble(
                                         modifier = Modifier
                                     )
                                 } else {
-                                    Text(
+                                    LinkableText(
                                         text = message.text,
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = textColor
@@ -285,6 +288,16 @@ fun ChatBubble(
                 modifier = Modifier.padding(
                     start = if (!isSent && isGroupChat) 36.dp else 0.dp
                 )
+            )
+        }
+
+        // Read receipt indicator (sent messages with readers)
+        if (isSent && message.readBy.isNotEmpty()) {
+            ReadReceiptIndicator(
+                readBy = message.readBy,
+                readByPhotoUrls = message.readByPhotoUrls,
+                direction = message.direction,
+                modifier = Modifier.padding(top = 2.dp)
             )
         }
 

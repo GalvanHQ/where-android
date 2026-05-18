@@ -59,6 +59,7 @@ import com.ovi.where.presentation.chat.components.ChatEmptyState
 import com.ovi.where.presentation.chat.components.ChatInputBar
 import com.ovi.where.presentation.chat.components.DateSeparator
 import com.ovi.where.presentation.chat.components.ImageSizeLimitError
+import com.ovi.where.presentation.chat.components.MentionSuggestionPopup
 import com.ovi.where.presentation.chat.components.MessageAnimationConstants
 import com.ovi.where.presentation.chat.components.MessageSearchBar
 import com.ovi.where.presentation.chat.components.NewMessageIndicator
@@ -728,6 +729,14 @@ fun ChatScreen(
                 ReplyPreviewBar(
                     replyingToMessage = replyingTo,
                     onDismiss = { viewModel.clearReply() }
+                )
+            }
+
+            // ── Mention suggestion popup (Requirement 14.1) ─────────────────
+            if (uiState.isMentionPopupVisible && uiState.mentionSuggestions.isNotEmpty()) {
+                MentionSuggestionPopup(
+                    suggestions = uiState.mentionSuggestions,
+                    onMemberSelected = { member -> viewModel.selectMention(member) }
                 )
             }
 

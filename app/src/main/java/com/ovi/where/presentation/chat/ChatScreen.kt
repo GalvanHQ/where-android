@@ -700,7 +700,7 @@ fun ChatScreen(
                                                 isGroupChat = isGroupConversation,
                                                 isFirstInGroup = message.isFirstInGroup,
                                                 isLastInGroup = message.isLastInGroup,
-                                                showSenderAvatar = message.isFirstInGroup
+                                                showSenderAvatar = message.isLastInGroup
                                                         && message.direction == BubbleDirection.RECEIVED
                                                         && isGroupConversation,
                                                 themeColor = conversationThemeColor
@@ -711,7 +711,7 @@ fun ChatScreen(
                                                 message = message,
                                                 showAvatar = message.direction == BubbleDirection.RECEIVED
                                                         && isGroupConversation
-                                                        && message.isFirstInGroup,
+                                                        && message.isLastInGroup,
                                                 maxWidth = screenWidth * 0.75f,
                                                 onLocationTap = onLocationTap,
                                                 onLongPress = onLongPress,

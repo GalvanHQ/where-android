@@ -95,6 +95,8 @@ data class MessageUiModel(
     val isFirstInGroup: Boolean = true,
     /** Whether this message is the last in a sender group (same sender within 2 min). */
     val isLastInGroup: Boolean = true,
+    /** Whether to show the timestamp below this message (Messenger-style: only after time gaps). */
+    val showTimestamp: Boolean = true,
     /** Whether a date separator should be shown above this message. */
     val showDateSeparator: Boolean = false,
     /** Label for the date separator ("Today", "Yesterday", or formatted date). */

@@ -49,46 +49,12 @@ fun formatConversationTimestamp(timestamp: Long): String {
     return SimpleDateFormat("dd/MM/yy", Locale.getDefault()).format(Date(timestamp))
 }
 
-/** Formats a millisecond timestamp for message timestamps with date context.
- *  - Today: "2:32 PM" (12h with AM/PM)
- *  - Yesterday: "Yesterday, 2:32 PM"
- *  - Within current week: "Mon, 2:32 PM" (abbreviated day name + time)
- *  - Older: "12 Jan, 2:32 PM" (day month + time)
+/** Formats a millisecond timestamp for message bubbles (Messenger style).
+ *  Shows only the time — date context is provided by date separators above message groups.
+ *  - "2:32 PM" (12h with AM/PM, always just the time)
  */
 fun formatMessageTime(timestamp: Long): String {
-    val now = Calendar.getInstance()
-    val msgCal = Calendar.getInstance().apply { time = Date(timestamp) }
-    val timeStr = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(timestamp))
-
-    // Today check: same year and same day-of-year
-    val isToday = now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) &&
-            now.get(Calendar.DAY_OF_YEAR) == msgCal.get(Calendar.DAY_OF_YEAR)
-    if (isToday) {
-        return timeStr
-    }
-
-    // Yesterday check
-    val yesterday = Calendar.getInstance().apply {
-        timeInMillis = now.timeInMillis
-        add(Calendar.DATE, -1)
-    }
-    val isYesterday = yesterday.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) &&
-            yesterday.get(Calendar.DAY_OF_YEAR) == msgCal.get(Calendar.DAY_OF_YEAR)
-    if (isYesterday) {
-        return "Yesterday, $timeStr"
-    }
-
-    // Same calendar week check: same year and same week-of-year
-    val isSameWeek = now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) &&
-            now.get(Calendar.WEEK_OF_YEAR) == msgCal.get(Calendar.WEEK_OF_YEAR)
-    if (isSameWeek) {
-        val dayName = SimpleDateFormat("EEE", Locale.getDefault()).format(Date(timestamp))
-        return "$dayName, $timeStr"
-    }
-
-    // Older messages: "12 Jan, 2:32 PM"
-    val dateStr = SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(timestamp))
-    return "$dateStr, $timeStr"
+    return SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(timestamp))
 }
 
 /** Returns yyyy-MM-dd key for grouping messages by date. */

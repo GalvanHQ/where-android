@@ -2608,6 +2608,14 @@ class ChatViewModel @Inject constructor(
             val isFirstInGroup = !sameGroupAsPrev
             val isLastInGroup = !sameGroupAsNext
 
+            // Messenger-style timestamp visibility:
+            // Show time only when there's a significant gap (5+ min) to the next message,
+            // or it's the very last message in the conversation.
+            val showTimestamp = isLastInGroup && (
+                next == null || nextTimestamp == null ||
+                (nextTimestamp - currentTimestamp) >= TIMESTAMP_DISPLAY_THRESHOLD_MS
+            )
+
             // Date separator: show when dateKey differs from previous message or for the first message
             val showDateSeparator = prev == null || current.dateKey != prev.dateKey
             val dateSeparatorLabel = if (showDateSeparator) {
@@ -2620,6 +2628,7 @@ class ChatViewModel @Inject constructor(
                 current.copy(
                     isFirstInGroup = isFirstInGroup,
                     isLastInGroup = isLastInGroup,
+                    showTimestamp = showTimestamp,
                     showDateSeparator = showDateSeparator,
                     dateSeparatorLabel = dateSeparatorLabel
                 )
@@ -2698,6 +2707,9 @@ class ChatViewModel @Inject constructor(
 
         /** Maximum time difference (ms) between consecutive messages to form a group (Requirements 4.6, 4.7). */
         const val MESSAGE_GROUP_THRESHOLD_MS = 120_000L
+
+        /** Minimum time gap (ms) between groups to show a timestamp (Messenger-style: 5 minutes). */
+        const val TIMESTAMP_DISPLAY_THRESHOLD_MS = 300_000L
 
         /**
          * Formats the remaining time for the live location sharing banner.

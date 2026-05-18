@@ -1,12 +1,10 @@
 package com.ovi.where.presentation.chat.components
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,7 +16,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.contentDescription
@@ -26,19 +23,18 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ovi.where.domain.model.MessageStatus
 import com.ovi.where.presentation.model.BubbleDirection
 import com.ovi.where.presentation.model.MessageUiModel
 
 /**
- * Material 3 styled chat bubble composable.
+ * Material 3 styled chat bubble composable with Messenger-style grouped corners.
  *
- * Renders sent messages right-aligned with primary color background and white text,
- * and received messages left-aligned with surfaceContainerHigh background and onSurface text.
- * Applies asymmetric corner radii to create a "tail" effect on the last bubble in a group.
- *
- * Timestamp and status indicator are displayed inline at the bottom-end of the bubble
- * in a compact row for a modern, clean chat UX.
+ * When consecutive messages are from the same sender (within 2 min threshold),
+ * bubbles use adaptive corner radii to create a visually connected group:
+ * - Single message: full rounded with tail
+ * - First in group: rounded top, tight bottom on sender side
+ * - Middle in group: tight corners on sender side
+ * - Last in group: tight top on sender side, tail at bottom
  *
  * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 2.2, 2.3, 2.4
  */
@@ -56,8 +52,12 @@ fun ChatBubble(
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val maxBubbleWidth = screenWidth * 0.75f
 
-    // Corner radius: 18dp all corners, 4dp on tail corner for last bubble in group
-    val bubbleShape = computeBubbleShape(isSent = isSent, isLastInGroup = isLastInGroup)
+    // Messenger-style adaptive corner radii
+    val bubbleShape = computeBubbleShape(
+        isSent = isSent,
+        isFirstInGroup = isFirstInGroup,
+        isLastInGroup = isLastInGroup
+    )
 
     // Bubble colors — use themeColor for sent bubbles if provided
     val backgroundColor = if (isSent) {
@@ -70,18 +70,17 @@ fun ChatBubble(
     } else {
         MaterialTheme.colorScheme.onSurface
     }
-    val metaColor = if (isSent) {
-        Color.White.copy(alpha = 0.7f)
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
 
     // Resolve sender name: show "Unknown" when blank (Requirement 2.4)
     val resolvedSenderName = message.senderName.ifBlank { "Unknown" }
 
+    // Spacing between grouped messages is tighter than between groups
+    val topPadding = if (isFirstInGroup) 0.dp else 2.dp
+
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .padding(top = topPadding)
             .semantics { contentDescription = "Chat message from $resolvedSenderName" },
         horizontalAlignment = if (isSent) Alignment.End else Alignment.Start
     ) {
@@ -94,7 +93,7 @@ fun ChatBubble(
                 ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(
-                    start = if (showSenderAvatar) 36.dp else 0.dp,
+                    start = 36.dp,
                     bottom = 2.dp
                 )
             )
@@ -105,9 +104,9 @@ fun ChatBubble(
             horizontalArrangement = if (isSent) Arrangement.End else Arrangement.Start,
             modifier = Modifier.fillMaxWidth()
         ) {
-            // Sender avatar for first received bubble in group chats (Requirement 4.8)
+            // Sender avatar for last received bubble in group chats (Messenger style)
             if (!isSent && isGroupChat) {
-                if (isFirstInGroup && showSenderAvatar) {
+                if (isLastInGroup && showSenderAvatar) {
                     ConversationAvatar(
                         name = resolvedSenderName,
                         photoUrl = message.senderPhotoUrl,
@@ -135,7 +134,7 @@ fun ChatBubble(
                         start = 12.dp,
                         end = 12.dp,
                         top = 8.dp,
-                        bottom = 6.dp
+                        bottom = 8.dp
                     )
                 ) {
                     // Message text
@@ -146,32 +145,34 @@ fun ChatBubble(
                             color = textColor
                         )
                     }
+                }
+            }
+        }
 
-                    // Timestamp + Status indicator row — aligned to end
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Row(
-                        modifier = Modifier.align(Alignment.End),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        // Formatted time (e.g. "2:32 PM")
-                        Text(
-                            text = message.formattedTime,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 11.sp
-                            ),
-                            color = metaColor
-                        )
+        // Messenger-style: timestamp + status shown outside bubble, only after time gaps
+        if (message.showTimestamp) {
+            Row(
+                modifier = Modifier.padding(
+                    start = if (!isSent && isGroupChat) 36.dp else 0.dp,
+                    top = 2.dp
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start
+            ) {
+                Text(
+                    text = message.formattedTime,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 11.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-                        // Status indicator for sent messages only
-                        if (isSent) {
-                            Spacer(modifier = Modifier.width(3.dp))
-                            MessageStatusIndicator(
-                                status = message.status,
-                                direction = message.direction
-                            )
-                        }
-                    }
+                if (isSent) {
+                    Spacer(modifier = Modifier.width(3.dp))
+                    MessageStatusIndicator(
+                        status = message.status,
+                        direction = message.direction
+                    )
                 }
             }
         }
@@ -179,37 +180,43 @@ fun ChatBubble(
 }
 
 /**
- * Computes the bubble shape based on direction and group position.
+ * Computes Messenger-style bubble shape based on direction and group position.
  *
- * - Intermediate bubbles (not last in group): 18dp all corners
- * - Last bubble in group: 18dp on all corners except the tail corner (4dp)
- *   - Sent: tail at bottom-right
- *   - Received: tail at bottom-left
+ * Corner logic (18dp = full round, 4dp = tight/connected):
  *
- * Requirements: 4.3, 4.7
+ * SENT (right-aligned):
+ * - Single:  [18, 18, 18, 4]  — tail bottom-right
+ * - First:   [18, 18, 18, 4]  — rounded top, tight bottom-right
+ * - Middle:  [18, 4, 18, 4]   — tight right side
+ * - Last:    [18, 4, 18, 4]   — tight top-right, tail bottom-right
+ *
+ * RECEIVED (left-aligned):
+ * - Single:  [18, 18, 4, 18]  — tail bottom-left
+ * - First:   [18, 18, 4, 18]  — rounded top, tight bottom-left
+ * - Middle:  [4, 18, 4, 18]   — tight left side
+ * - Last:    [4, 18, 4, 18]   — tight top-left, tail bottom-left
  */
-internal fun computeBubbleShape(isSent: Boolean, isLastInGroup: Boolean): RoundedCornerShape {
-    val fullRadius = 18.dp
-    val tailRadius = 4.dp
+internal fun computeBubbleShape(
+    isSent: Boolean,
+    isFirstInGroup: Boolean = true,
+    isLastInGroup: Boolean = true
+): RoundedCornerShape {
+    val full = 18.dp
+    val tight = 4.dp
 
-    return if (!isLastInGroup) {
-        // Intermediate bubble: all corners 18dp
-        RoundedCornerShape(fullRadius)
-    } else if (isSent) {
-        // Last sent bubble: tail at bottom-right
-        RoundedCornerShape(
-            topStart = fullRadius,
-            topEnd = fullRadius,
-            bottomStart = fullRadius,
-            bottomEnd = tailRadius
-        )
-    } else {
-        // Last received bubble: tail at bottom-left
-        RoundedCornerShape(
-            topStart = fullRadius,
-            topEnd = fullRadius,
-            bottomStart = tailRadius,
-            bottomEnd = fullRadius
-        )
+    val isSingle = isFirstInGroup && isLastInGroup
+    val isMiddle = !isFirstInGroup && !isLastInGroup
+
+    return when {
+        isSent && isSingle -> RoundedCornerShape(full, full, tight, full)
+        isSent && isFirstInGroup -> RoundedCornerShape(full, full, tight, full)
+        isSent && isMiddle -> RoundedCornerShape(full, tight, tight, full)
+        isSent && isLastInGroup -> RoundedCornerShape(full, tight, tight, full)
+        // Received
+        !isSent && isSingle -> RoundedCornerShape(full, full, full, tight)
+        !isSent && isFirstInGroup -> RoundedCornerShape(full, full, full, tight)
+        !isSent && isMiddle -> RoundedCornerShape(tight, full, full, tight)
+        !isSent && isLastInGroup -> RoundedCornerShape(tight, full, full, tight)
+        else -> RoundedCornerShape(full)
     }
 }

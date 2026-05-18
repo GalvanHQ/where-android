@@ -123,46 +123,51 @@ class ChatBubbleTest {
     // ── Corner radius configuration (Requirement 4.3, 4.7) ─────────────────
 
     @Test
-    fun `computeBubbleShape returns 18dp all corners for intermediate bubble`() {
-        val shape = computeBubbleShape(isSent = true, isLastInGroup = false)
-        // Intermediate bubbles have uniform 18dp corners
-        assertEquals(
-            androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
-            shape
-        )
-    }
-
-    @Test
-    fun `computeBubbleShape returns tail at bottom-right for last sent bubble`() {
-        val shape = computeBubbleShape(isSent = true, isLastInGroup = true)
+    fun `computeBubbleShape returns tight right side for middle sent bubble`() {
+        val shape = computeBubbleShape(isSent = true, isFirstInGroup = false, isLastInGroup = false)
         val expected = androidx.compose.foundation.shape.RoundedCornerShape(
             topStart = 18.dp,
-            topEnd = 18.dp,
-            bottomStart = 18.dp,
-            bottomEnd = 4.dp
+            topEnd = 4.dp,
+            bottomEnd = 4.dp,
+            bottomStart = 18.dp
         )
         assertEquals(expected, shape)
     }
 
     @Test
-    fun `computeBubbleShape returns tail at bottom-left for last received bubble`() {
-        val shape = computeBubbleShape(isSent = false, isLastInGroup = true)
+    fun `computeBubbleShape returns tail at bottom-right for single sent bubble`() {
+        val shape = computeBubbleShape(isSent = true, isFirstInGroup = true, isLastInGroup = true)
         val expected = androidx.compose.foundation.shape.RoundedCornerShape(
             topStart = 18.dp,
             topEnd = 18.dp,
-            bottomStart = 4.dp,
-            bottomEnd = 18.dp
+            bottomEnd = 4.dp,
+            bottomStart = 18.dp
         )
         assertEquals(expected, shape)
     }
 
     @Test
-    fun `computeBubbleShape returns 18dp all corners for intermediate received bubble`() {
-        val shape = computeBubbleShape(isSent = false, isLastInGroup = false)
-        assertEquals(
-            androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
-            shape
+    fun `computeBubbleShape returns tail at bottom-left for single received bubble`() {
+        val shape = computeBubbleShape(isSent = false, isFirstInGroup = true, isLastInGroup = true)
+        val expected = androidx.compose.foundation.shape.RoundedCornerShape(
+            topStart = 18.dp,
+            topEnd = 18.dp,
+            bottomEnd = 18.dp,
+            bottomStart = 4.dp
         )
+        assertEquals(expected, shape)
+    }
+
+    @Test
+    fun `computeBubbleShape returns tight left side for middle received bubble`() {
+        val shape = computeBubbleShape(isSent = false, isFirstInGroup = false, isLastInGroup = false)
+        val expected = androidx.compose.foundation.shape.RoundedCornerShape(
+            topStart = 4.dp,
+            topEnd = 18.dp,
+            bottomEnd = 18.dp,
+            bottomStart = 4.dp
+        )
+        assertEquals(expected, shape)
     }
 
     // ── Max width constraint (Requirement 4.4) ──────────────────────────────

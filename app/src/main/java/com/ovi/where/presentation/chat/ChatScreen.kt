@@ -450,7 +450,16 @@ fun ChatScreen(
             // ── Message list ──────────────────────────────────────────────────
             Box(modifier = Modifier.weight(1f).fillMaxSize()) {
                 if (uiState.isLoading || uiState.conversation == null) {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(28.dp),
+                            strokeWidth = 2.5.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 } else if (uiState.messages.isEmpty()) {
                     // Requirement 10.5: Centered empty state with illustration and "Say hi!" prompt
                     ChatEmptyState(modifier = Modifier.align(Alignment.Center))
@@ -479,8 +488,8 @@ fun ChatScreen(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(
-                            horizontal = Dimens.spaceLarge,
-                            vertical = Dimens.spaceMedium
+                            horizontal = Dimens.spaceMedium,
+                            vertical = Dimens.spaceSmall
                         )
                     ) {
                         // ── Pagination loading indicator at top (Requirement 2.3) ──
@@ -493,12 +502,13 @@ fun ChatScreen(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = Dimens.spaceMedium),
+                                        .padding(vertical = 12.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
-                                        strokeWidth = 2.dp
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -583,6 +593,11 @@ fun ChatScreen(
                                 { emoji: String -> viewModel.toggleReaction(message.id, emoji) }
                             }
 
+                            // Long-press on reaction pill → open "who reacted" details sheet.
+                            val onReactionLongPress = remember(message.id) {
+                                { viewModel.showReactionDetails(message.id) }
+                            }
+
                             val onVoicePlayPause = remember(message.id, message.voiceUrl, message.voiceDurationMs) {
                                 if (message.isVoice && message.voiceUrl != null && message.voiceDurationMs != null) {
                                     {
@@ -659,6 +674,7 @@ fun ChatScreen(
                                                 }
                                             },
                                             onReactionTap = onReactionTapHandler,
+                                            onReactionLongPress = onReactionLongPress,
                                             onVoicePlayPause = onVoicePlayPause,
                                             onVoiceSeek = onVoiceSeek,
                                             isVoicePlaying = isThisVoicePlaying,
@@ -711,16 +727,6 @@ fun ChatScreen(
                     modifier = Modifier.align(Alignment.BottomCenter)
                 )
             }
-
-            // ── Typing indicator (outside LazyColumn for AnimatedVisibility, Requirement 27.4) ──
-            // Show when typingIndicatorText non-null; animated 3-dot + formatted text
-            TypingIndicator(
-                typingText = if (uiState.typingUserName != null && uiState.typingIndicatorText == null) {
-                    "${uiState.typingUserName} is typing\u2026"
-                } else {
-                    null
-                }
-            )
 
             // ── Reply preview bar (Requirements 8.1, 8.6, 8.7) ───────────────
             // Shown when the user swipes a message or taps Reply in context menu.
@@ -812,5 +818,20 @@ fun ChatScreen(
         onEmojiSelected = viewModel::onReactionSelected,
         onDismiss = viewModel::dismissReactionPicker
     )
+
+    // ── Reaction details bottom sheet ────────────────────────────────────────
+    val reactionDetailsId = uiState.reactionDetailsMessageId
+    if (reactionDetailsId != null) {
+        val reactors = remember(reactionDetailsId, uiState.messages) {
+            viewModel.buildReactorsForDetails(reactionDetailsId)
+        }
+        com.ovi.where.presentation.chat.components.ReactionsDetailsSheet(
+            reactors = reactors,
+            onDismiss = viewModel::dismissReactionDetails,
+            onRemoveOwnReaction = { emoji ->
+                viewModel.toggleReaction(reactionDetailsId, emoji)
+            }
+        )
+    }
 }
 

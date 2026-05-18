@@ -49,13 +49,13 @@ fun ReplyPreviewBar(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(topStart = Dimens.cornerSmall, topEnd = Dimens.cornerSmall)
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 0.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Accent vertical bar indicator
@@ -67,19 +67,19 @@ fun ReplyPreviewBar(
                     .background(MaterialTheme.colorScheme.primary)
             )
 
-            Spacer(Modifier.width(Dimens.spaceMedium))
+            Spacer(Modifier.width(10.dp))
 
             // Reply content
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = replyingToMessage.senderName,
-                    style = MaterialTheme.typography.labelMedium,
+                    text = "Replying to ${replyingToMessage.senderName}",
+                    style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(Modifier.height(Dimens.spaceXSmall))
+                Spacer(Modifier.height(2.dp))
                 Text(
                     text = when {
                         replyingToMessage.isImage -> "📷 Photo"
@@ -96,14 +96,14 @@ fun ReplyPreviewBar(
 
             // Image thumbnail for image replies
             if (replyingToMessage.isImage && !replyingToMessage.imageUrl.isNullOrBlank()) {
-                Spacer(Modifier.width(Dimens.spaceMedium))
+                Spacer(Modifier.width(10.dp))
                 coil.compose.AsyncImage(
                     model = replyingToMessage.imageUrl,
                     contentDescription = "Reply image",
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                     modifier = Modifier
                         .size(36.dp)
-                        .clip(RoundedCornerShape(4.dp))
+                        .clip(RoundedCornerShape(6.dp))
                 )
             }
 
@@ -111,14 +111,14 @@ fun ReplyPreviewBar(
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(28.dp)
                     .semantics { contentDescription = "Dismiss reply" }
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(Dimens.iconSizeSmall)
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }

@@ -47,6 +47,7 @@ import com.ovi.where.presentation.model.formatMessageDateKey
 import com.ovi.where.presentation.model.formatMessageTime
 import com.ovi.where.presentation.model.toUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
@@ -232,7 +233,17 @@ class ChatViewModel @Inject constructor(
                         timeFormatter = ::formatMessageTime,
                         dateKeyFormatter = ::formatMessageDateKey,
                         nicknames = _uiState.value.conversation?.nicknames ?: emptyMap()
-                    )
+                    ).let { ui ->
+                        // Resolve reader photo URLs from the participant metadata cache so
+                        // the ReadReceiptIndicator can render avatar(s) instead of empty
+                        // placeholders. Falls back to nulls when no photos are known.
+                        if (ui.readBy.isEmpty()) ui
+                        else ui.copy(
+                            readByPhotoUrls = ui.readBy
+                                .map { userId -> participantPhotos[userId] }
+                                .toImmutableList()
+                        )
+                    }
                 }
                 // Compute message grouping metadata (Requirements 4.6, 4.7, 10.3)
                 val timestamps = windowedMessages.map { it.timestamp }
@@ -1967,6 +1978,45 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
+     * Opens the bottom sheet listing everyone who reacted to a message,
+     * grouped by emoji. Triggered by long-pressing a [ReactionBadges] pill.
+     */
+    fun showReactionDetails(messageId: String) {
+        _uiState.value = _uiState.value.copy(reactionDetailsMessageId = messageId)
+    }
+
+    /** Dismisses the reaction-details bottom sheet. */
+    fun dismissReactionDetails() {
+        _uiState.value = _uiState.value.copy(reactionDetailsMessageId = null)
+    }
+
+    /**
+     * Builds a flat list of [com.ovi.where.presentation.chat.components.Reactor] entries
+     * for the currently-open reaction-details sheet, joined with cached participant
+     * metadata (name + photo).
+     */
+    fun buildReactorsForDetails(messageId: String):
+        List<com.ovi.where.presentation.chat.components.Reactor> {
+        val message = _uiState.value.messages.firstOrNull { it.id == messageId } ?: return emptyList()
+        val nicknames = _uiState.value.conversation?.nicknames ?: emptyMap()
+        val uid = currentUserId
+        return message.reactions.flatMap { (emoji, userIds) ->
+            userIds.map { userId ->
+                val displayName = nicknames[userId]?.takeIf { it.isNotBlank() }
+                    ?: participantNames[userId]
+                    ?: ""
+                com.ovi.where.presentation.chat.components.Reactor(
+                    userId = userId,
+                    displayName = displayName,
+                    photoUrl = participantPhotos[userId],
+                    emoji = emoji,
+                    isCurrentUser = userId == uid
+                )
+            }
+        }
+    }
+
+    /**
      * Shows the delete confirmation dialog.
      *
      * Requirement 9.7: Display confirmation dialog before deleting.
@@ -2470,6 +2520,14 @@ class ChatViewModel @Inject constructor(
                     emptyMap()
                 }
 
+                // Populate participant metadata so message UI models (read receipts,
+                // sender avatars, nicknames) can resolve photos and names for any
+                // group member without an extra fetch.
+                userMap.values.forEach { user ->
+                    participantNames[user.id] = user.displayName
+                    participantPhotos[user.id] = user.photoUrl
+                }
+
                 cachedMentionMembers = members.map { member ->
                     val user = userMap[member.userId]
                     MentionEngine.MentionMember(
@@ -2950,6 +3008,8 @@ data class ChatUiState(
     val showReactionPicker: Boolean = false,
     /** The message ID for which the reaction picker is shown. */
     val reactionPickerMessageId: String? = null,
+    /** When non-null, a bottom sheet listing who reacted to this message is shown. */
+    val reactionDetailsMessageId: String? = null,
     // ─── Message Search State (Task 8.1) ──────────────────────────────────────
     /** Whether the search bar is currently active/visible (Requirement 13.1). */
     val isSearchActive: Boolean = false,

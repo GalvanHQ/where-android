@@ -75,6 +75,7 @@ import com.ovi.where.core.constants.AppConstants.PULL_TO_REFRESH_TIMEOUT_MS
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.domain.model.MessageStatus
 import com.ovi.where.presentation.chat.components.ConversationAvatar
+import com.ovi.where.presentation.chat.components.UnreadBadge
 import com.ovi.where.presentation.common.LIST_ITEM_ANIMATION_DURATION_MS
 import com.ovi.where.presentation.common.search.SearchBarTapTarget
 import com.ovi.where.presentation.model.ConversationUiModel
@@ -540,15 +541,10 @@ internal fun ConversationRow(
             }
         }
 
-        // Trailing: unread dot indicator (Messenger uses a filled dot, not a number)
+        // Trailing: unread badge — numbered pill for ≥1 unread, capped at "99+"
         if (hasUnread) {
             Spacer(Modifier.width(8.dp))
-            Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
-            )
+            UnreadBadge(count = conversation.unreadCount)
         }
     }
 }

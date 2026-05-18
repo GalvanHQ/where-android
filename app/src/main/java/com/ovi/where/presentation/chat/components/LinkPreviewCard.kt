@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import androidx.compose.ui.graphics.Color
 
@@ -53,20 +54,23 @@ fun LinkPreviewCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 4.dp)
             .clickable {
                 // Requirement 12.4: Open URL in system browser via implicit intent
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                 context.startActivity(intent)
             },
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column {
-            // Thumbnail image with max height of 160dp (Requirement 12.1)
+            // Thumbnail image with max height of 180dp
             if (!imageUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = imageUrl,
@@ -74,18 +78,21 @@ fun LinkPreviewCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 160.dp)
-                        .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                        .heightIn(max = 180.dp)
+                        .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))
                 )
             }
 
             Column(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
-                // Domain name
+                // Domain name — uppercase + tracked for clean preview header look
                 Text(
-                    text = domain,
-                    style = MaterialTheme.typography.labelSmall,
+                    text = domain.uppercase(),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        letterSpacing = 0.5.sp,
+                        fontSize = 10.sp
+                    ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -96,9 +103,10 @@ fun LinkPreviewCard(
                     text = title,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 2.dp)
+                    modifier = Modifier.padding(top = 3.dp)
                 )
 
                 // Description (omitted if title was missing in metadata per Req 12.6)
@@ -109,7 +117,7 @@ fun LinkPreviewCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 2.dp)
+                        modifier = Modifier.padding(top = 3.dp)
                     )
                 }
             }

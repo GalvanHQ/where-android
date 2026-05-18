@@ -1,9 +1,14 @@
 package com.ovi.where.presentation.chat.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,26 +27,50 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.presentation.model.BubbleDirection
 import com.ovi.where.presentation.model.MessageUiModel
 
+// ─── Layout constants ────────────────────────────────────────────────────────
+private val AvatarSize = 28.dp
+private val AvatarTrack = 36.dp           // avatar size + spacing — keeps received text aligned
+private val BubbleVerticalGap = 2.dp      // tight gap between consecutive bubbles in a group
+private val BubbleGroupGap = 8.dp         // larger gap between message groups
+private val FullCorner = 18.dp
+private val TightCorner = 6.dp
+private val BubbleHorizontalPadding = 14.dp
+private val BubbleVerticalPadding = 9.dp
+private val ReactionOverlap = 20.dp       // how far reaction badges overlap the bubble
+
 /**
- * Unified chat bubble composable — handles text, image, voice, and location messages.
- * Uses Messenger-style grouped corners for consecutive messages from the same sender.
+ * Unified, professional chat bubble — handles text, image, voice, and location messages
+ * with Messenger / Telegram-grade polish.
+ *
+ * Highlights:
+ *   - Smooth press feedback (subtle scale-down on press)
+ *   - Messenger-style grouped corners that adapt to first / middle / last in group
+ *   - Per-sender colored sender name in groups (Telegram-style)
+ *   - Reaction badges that overlap the bubble corner
+ *   - Failed messages get a soft error border + retry-on-tap affordance
+ *   - Read receipts only render under the LAST sent bubble in a group
+ *   - Timestamp + status indicator stay outside the bubble for clean readability
  */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -56,6 +86,7 @@ fun ChatBubble(
     onLocationTap: () -> Unit = {},
     onReplyQuoteTap: (String) -> Unit = {},
     onReactionTap: (String) -> Unit = {},
+    onReactionLongPress: () -> Unit = {},
     onVoicePlayPause: (() -> Unit)? = null,
     onVoiceSeek: ((Float) -> Unit)? = null,
     isVoicePlaying: Boolean = false,
@@ -65,7 +96,8 @@ fun ChatBubble(
 ) {
     val isSent = message.direction == BubbleDirection.SENT
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-    val maxBubbleWidth = screenWidth * 0.75f
+    val maxBubbleWidth = screenWidth * 0.78f
+    val isFailed = message.status == com.ovi.where.domain.model.MessageStatus.FAILED
 
     val bubbleShape = computeBubbleShape(
         isSent = isSent,
@@ -73,22 +105,39 @@ fun ChatBubble(
         isLastInGroup = isLastInGroup
     )
 
-    val backgroundColor = if (isSent) {
-        themeColor ?: MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.surfaceContainerHigh
-    }
+    val sentBubbleColor = themeColor ?: MaterialTheme.colorScheme.primary
+    val receivedBubbleColor = MaterialTheme.colorScheme.surfaceContainerHigh
+    val backgroundColor = if (isSent) sentBubbleColor else receivedBubbleColor
     val textColor = if (isSent) Color.White else MaterialTheme.colorScheme.onSurface
-    val secondaryTextColor = if (isSent) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
+    val secondaryTextColor = if (isSent) {
+        Color.White.copy(alpha = 0.78f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
     val resolvedSenderName = message.senderName.ifBlank { "Unknown" }
-    val topPadding = if (isFirstInGroup) 0.dp else 2.dp
 
-    // Full-screen image viewer state
+    // Tighter spacing: minimal gap inside a group, larger gap between groups.
+    val topPadding = when {
+        isFirstInGroup && !isSent && isGroupChat -> BubbleGroupGap
+        isFirstInGroup -> BubbleGroupGap
+        else -> BubbleVerticalGap
+    }
+
+    // Press-down scale feedback for tactile, professional feel.
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = tween(durationMillis = 90),
+        label = "bubblePressScale"
+    )
+
+    // Full-screen image viewer state (preserved from previous impl).
     var showFullScreen by remember { mutableStateOf(false) }
     var fullScreenUrl by remember { mutableStateOf("") }
     var fullScreenUrls by remember { mutableStateOf(emptyList<String>()) }
-    var fullScreenInitialIndex by remember { mutableStateOf(0) }
+    var fullScreenInitialIndex by remember { mutableIntStateOf(0) }
 
     Column(
         modifier = modifier
@@ -97,13 +146,17 @@ fun ChatBubble(
             .semantics { contentDescription = "Chat message from $resolvedSenderName" },
         horizontalAlignment = if (isSent) Alignment.End else Alignment.Start
     ) {
-        // Sender name (group chats, received, first in group)
+        // ── Sender name (group chats, received, first in group) ────────────
+        // Telegram-style: per-sender colored name for quick visual scanning.
         if (!isSent && isGroupChat && isFirstInGroup) {
             Text(
                 text = resolvedSenderName,
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 36.dp, bottom = 2.dp)
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp
+                ),
+                color = senderNameColor(message.senderId),
+                modifier = Modifier.padding(start = AvatarTrack, bottom = 3.dp)
             )
         }
 
@@ -112,170 +165,221 @@ fun ChatBubble(
             horizontalArrangement = if (isSent) Arrangement.End else Arrangement.Start,
             modifier = Modifier.fillMaxWidth()
         ) {
-            // Avatar (last bubble only, received, group chat)
+            // ── Avatar (group chats, received, last bubble) ────────────────
             if (!isSent && isGroupChat) {
                 if (isLastInGroup && showSenderAvatar) {
                     ConversationAvatar(
                         name = resolvedSenderName,
                         photoUrl = message.senderPhotoUrl,
                         isOnline = false,
-                        size = 28.dp,
+                        size = AvatarSize,
                         indicatorSize = 0.dp,
                         indicatorBorderWidth = 0.dp,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(AvatarSize)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                 } else {
-                    Spacer(modifier = Modifier.width(36.dp))
+                    Spacer(modifier = Modifier.width(AvatarTrack))
                 }
             }
 
-            // ── Bubble content based on message type ─────────────────────
-            when {
-                // IMAGE COLLAGE (multiple consecutive images)
-                message.isImage && message.imageCollageUrls.size > 1 -> {
-                    ImageCollageGrid(
-                        imageUrls = message.imageCollageUrls,
-                        onImageTap = { url ->
-                            fullScreenUrl = url
-                            fullScreenUrls = message.imageCollageUrls
-                            fullScreenInitialIndex = message.imageCollageUrls.indexOf(url).coerceAtLeast(0)
-                            showFullScreen = true
-                        },
-                        onLongPress = onLongPress
-                    )
-                }
+            // ── Bubble + reactions overlay container ───────────────────────
+            Box {
+                val bubbleModifier = Modifier.scale(scale)
 
-                // SINGLE IMAGE
-                message.isImage -> {
-                    ImageMessageBubble(
-                        imageUrl = message.imageUrl,
-                        thumbnailUrl = message.thumbnailUrl,
-                        uploadProgress = message.uploadProgress,
-                        status = message.status,
-                        onRetry = onRetry,
-                        modifier = Modifier.pointerInput(message.id) {
-                            detectTapGestures(
-                                onTap = {
-                                    if (!message.imageUrl.isNullOrBlank()) {
-                                        fullScreenUrl = message.imageUrl!!
-                                        fullScreenUrls = listOf(message.imageUrl!!)
-                                        fullScreenInitialIndex = 0
-                                        showFullScreen = true
-                                    }
+                // Bubble content based on message type.
+                when {
+                    // IMAGE COLLAGE (multiple consecutive images)
+                    message.isImage && message.imageCollageUrls.size > 1 -> {
+                        Box(modifier = bubbleModifier) {
+                            ImageCollageGrid(
+                                imageUrls = message.imageCollageUrls,
+                                onImageTap = { url ->
+                                    fullScreenUrl = url
+                                    fullScreenUrls = message.imageCollageUrls
+                                    fullScreenInitialIndex = message.imageCollageUrls
+                                        .indexOf(url).coerceAtLeast(0)
+                                    showFullScreen = true
                                 },
-                                onLongPress = { onLongPress() }
+                                onLongPress = onLongPress
                             )
                         }
-                    )
-                }
-
-                // VOICE
-                message.isVoice && message.voiceDurationMs != null -> {
-                    Surface(
-                        shape = bubbleShape,
-                        color = backgroundColor,
-                        modifier = Modifier
-                            .widthIn(max = maxBubbleWidth, min = 200.dp)
-                            .pointerInput(message.id) {
-                                detectTapGestures(onLongPress = { onLongPress() })
-                            }
-                    ) {
-                        VoiceMessageBubble(
-                            durationMs = message.voiceDurationMs,
-                            isPlaying = isVoicePlaying,
-                            progress = voiceProgress,
-                            currentPositionMs = voiceCurrentPositionMs,
-                            onPlayPause = { onVoicePlayPause?.invoke() },
-                            onSeek = { p -> onVoiceSeek?.invoke(p) },
-                            accentColor = if (isSent) Color.White else MaterialTheme.colorScheme.primary,
-                            textColor = secondaryTextColor,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
                     }
-                }
 
-                // LOCATION
-                message.isLocation -> {
-                    Surface(
-                        shape = bubbleShape,
-                        color = backgroundColor,
-                        modifier = Modifier
-                            .widthIn(max = maxBubbleWidth)
-                            .clip(bubbleShape)
-                            .clickable { onLocationTap() }
-                            .pointerInput(message.id) {
-                                detectTapGestures(onLongPress = { onLongPress() })
-                            }
-                    ) {
-                        LocationMessageBubble(
-                            latitude = message.latitude ?: 0.0,
-                            longitude = message.longitude ?: 0.0
-                        )
+                    // SINGLE IMAGE
+                    message.isImage -> {
+                        Box(modifier = bubbleModifier) {
+                            ImageMessageBubble(
+                                imageUrl = message.imageUrl,
+                                thumbnailUrl = message.thumbnailUrl,
+                                uploadProgress = message.uploadProgress,
+                                status = message.status,
+                                onRetry = onRetry,
+                                modifier = Modifier.pointerInput(message.id) {
+                                    detectTapGestures(
+                                        onTap = {
+                                            if (!message.imageUrl.isNullOrBlank()) {
+                                                fullScreenUrl = message.imageUrl!!
+                                                fullScreenUrls = listOf(message.imageUrl!!)
+                                                fullScreenInitialIndex = 0
+                                                showFullScreen = true
+                                            }
+                                        },
+                                        onLongPress = { onLongPress() }
+                                    )
+                                }
+                            )
+                        }
                     }
-                }
 
-                // TEXT (default)
-                else -> {
-                    Surface(
-                        shape = bubbleShape,
-                        color = backgroundColor,
-                        modifier = Modifier
-                            .widthIn(max = maxBubbleWidth)
-                            .combinedClickable(
-                                onClick = { },
-                                onLongClick = { onLongPress() }
-                            )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(
-                                start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp
-                            )
+                    // VOICE
+                    message.isVoice && message.voiceDurationMs != null -> {
+                        Surface(
+                            shape = bubbleShape,
+                            color = backgroundColor,
+                            modifier = bubbleModifier
+                                .widthIn(max = maxBubbleWidth, min = 220.dp)
+                                .pointerInput(message.id) {
+                                    detectTapGestures(onLongPress = { onLongPress() })
+                                }
                         ) {
-                            // Reply quote block
-                            if (message.replyToText != null) {
-                                ReplyQuoteBlock(
-                                    senderName = message.replyToSenderName ?: "",
-                                    text = message.replyToText,
-                                    isSent = isSent,
-                                    onClick = {
-                                        message.replyToId?.let { onReplyQuoteTap(it) }
-                                    }
-                                )
-                            }
+                            VoiceMessageBubble(
+                                durationMs = message.voiceDurationMs,
+                                isPlaying = isVoicePlaying,
+                                progress = voiceProgress,
+                                currentPositionMs = voiceCurrentPositionMs,
+                                onPlayPause = { onVoicePlayPause?.invoke() },
+                                onSeek = { p -> onVoiceSeek?.invoke(p) },
+                                accentColor = if (isSent) Color.White else MaterialTheme.colorScheme.primary,
+                                textColor = secondaryTextColor,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
 
-                            if (message.text.isNotEmpty()) {
-                                if (message.mentionedUserIds.isNotEmpty()) {
-                                    // Use buildMentionAnnotatedString with regex-detected ranges
-                                    val mentionRegex = Regex("""@\w+""")
-                                    val ranges = mentionRegex.findAll(message.text)
-                                        .map { it.range }
-                                        .toList()
-                                    val styledText = buildMentionAnnotatedString(
-                                        text = message.text,
-                                        mentionRanges = ranges,
-                                        primaryColor = if (isSent) Color.White else MaterialTheme.colorScheme.primary
+                    // LOCATION
+                    message.isLocation -> {
+                        Surface(
+                            shape = bubbleShape,
+                            color = backgroundColor,
+                            modifier = bubbleModifier
+                                .widthIn(max = maxBubbleWidth)
+                                .clip(bubbleShape)
+                                .clickable { onLocationTap() }
+                                .pointerInput(message.id) {
+                                    detectTapGestures(onLongPress = { onLongPress() })
+                                }
+                        ) {
+                            LocationMessageBubble(
+                                latitude = message.latitude ?: 0.0,
+                                longitude = message.longitude ?: 0.0
+                            )
+                        }
+                    }
+
+                    // TEXT (default)
+                    else -> {
+                        val errorBorder = if (isFailed) {
+                            Modifier.border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
+                                shape = bubbleShape
+                            )
+                        } else Modifier
+
+                        Surface(
+                            shape = bubbleShape,
+                            color = backgroundColor,
+                            modifier = bubbleModifier
+                                .widthIn(max = maxBubbleWidth)
+                                .then(errorBorder)
+                                .combinedClickable(
+                                    interactionSource = interactionSource,
+                                    indication = androidx.compose.foundation.LocalIndication.current,
+                                    onClick = { if (isFailed) onRetry() },
+                                    onLongClick = { onLongPress() }
+                                )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(
+                                    horizontal = BubbleHorizontalPadding,
+                                    vertical = BubbleVerticalPadding
+                                )
+                            ) {
+                                // Reply quote block
+                                if (message.replyToText != null) {
+                                    ReplyQuoteBlock(
+                                        senderName = message.replyToSenderName ?: "",
+                                        text = message.replyToText,
+                                        isSent = isSent,
+                                        onClick = {
+                                            message.replyToId?.let { onReplyQuoteTap(it) }
+                                        }
                                     )
-                                    Text(
-                                        text = styledText,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = textColor
-                                    )
-                                } else {
-                                    LinkableText(
-                                        text = message.text,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = textColor
-                                    )
+                                }
+
+                                if (message.text.isNotEmpty()) {
+                                    if (message.mentionedUserIds.isNotEmpty()) {
+                                        val mentionRegex = Regex("""@\w+""")
+                                        val ranges = mentionRegex.findAll(message.text)
+                                            .map { it.range }
+                                            .toList()
+                                        val styledText = buildMentionAnnotatedString(
+                                            text = message.text,
+                                            mentionRanges = ranges,
+                                            primaryColor = if (isSent) Color.White
+                                            else MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = styledText,
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontSize = 15.sp,
+                                                lineHeight = 20.sp
+                                            ),
+                                            color = textColor
+                                        )
+                                    } else {
+                                        LinkableText(
+                                            text = message.text,
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontSize = 15.sp,
+                                                lineHeight = 20.sp
+                                            ),
+                                            color = textColor
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
+
+                // ── Reactions: pinned to the bubble's bottom-corner, overlapping ─
+                if (message.reactions.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .align(if (isSent) Alignment.BottomStart else Alignment.BottomEnd)
+                            .offset(
+                                x = if (isSent) 8.dp else (-8).dp,
+                                y = ReactionOverlap
+                            )
+                    ) {
+                        ReactionBadges(
+                            reactions = message.reactions,
+                            onReactionTap = onReactionTap,
+                            onLongPress = onReactionLongPress
+                        )
+                    }
+                }
             }
         }
 
-        // Link preview outside the Row (proper placement below bubble)
+        // Add bottom space when reactions overlap so the next message doesn't collide.
+        if (message.reactions.isNotEmpty()) {
+            Spacer(Modifier.height(ReactionOverlap + 4.dp))
+        }
+
+        // ── Link preview (proper placement below bubble) ─────────────────
         if (message.hasLinkPreview && message.linkPreviewUrl != null && message.linkPreviewTitle != null) {
             LinkPreviewCard(
                 url = message.linkPreviewUrl,
@@ -285,57 +389,69 @@ fun ChatBubble(
                 domain = message.linkPreviewDomain ?: "",
                 modifier = Modifier
                     .widthIn(max = maxBubbleWidth)
-                    .padding(start = if (!isSent && isGroupChat) 36.dp else 0.dp)
+                    .padding(
+                        top = 4.dp,
+                        start = if (!isSent && isGroupChat) AvatarTrack else 0.dp
+                    )
             )
         }
 
-        // Reaction badges below the bubble
-        if (message.reactions.isNotEmpty()) {
-            ReactionBadges(
-                reactions = message.reactions,
-                onReactionTap = onReactionTap,
-                modifier = Modifier.padding(
-                    start = if (!isSent && isGroupChat) 36.dp else 0.dp
-                )
+        // ── Read receipts: only on the LAST sent bubble in a group ───────
+        // (handled by the unified MessageDeliveryIndicator below)
+
+        // ── Failure helper text ──────────────────────────────────────────
+        if (isSent && isFailed) {
+            Text(
+                text = "Tap to retry",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 2.dp, end = 2.dp)
             )
         }
 
-        // Read receipt indicator (sent messages with readers)
-        if (isSent && message.readBy.isNotEmpty()) {
-            ReadReceiptIndicator(
-                readBy = message.readBy,
-                readByPhotoUrls = message.readByPhotoUrls,
-                direction = message.direction,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-        }
-
-        // Timestamp outside bubble (only after time gaps)
-        if (message.showTimestamp) {
+        // ── Timestamp + status / read indicator (outside bubble) ─────────
+        // Below the LAST sent bubble in a group:
+        //   - If unread by anyone yet → MessageStatusIndicator (circle morph: pending/sent/delivered/failed)
+        //   - Once read by someone     → ReadReceiptIndicator replaces the circle with reader avatar(s)
+        // (Messenger pattern: the two indicators are mutually exclusive in the same slot.)
+        val showStatusOrReceipt = isSent && isLastInGroup
+        if (message.showTimestamp || showStatusOrReceipt) {
             Row(
                 modifier = Modifier.padding(
-                    start = if (!isSent && isGroupChat) 36.dp else 0.dp,
-                    top = 2.dp
+                    start = if (!isSent && isGroupChat) AvatarTrack else 0.dp,
+                    top = 4.dp
                 ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = message.formattedTime,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (isSent) {
-                    Spacer(modifier = Modifier.width(3.dp))
-                    MessageStatusIndicator(
-                        status = message.status,
-                        direction = message.direction
+                if (message.showTimestamp) {
+                    Text(
+                        text = message.formattedTime,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
                     )
+                }
+                if (showStatusOrReceipt) {
+                    if (message.showTimestamp) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+                    if (message.readBy.isNotEmpty()) {
+                        ReadReceiptIndicator(
+                            readBy = message.readBy,
+                            readByPhotoUrls = message.readByPhotoUrls,
+                            direction = message.direction
+                        )
+                    } else {
+                        MessageStatusIndicator(
+                            status = message.status,
+                            direction = message.direction
+                        )
+                    }
                 }
             }
         }
     }
 
-    // Full-screen image viewer
+    // Full-screen image viewer.
     if (showFullScreen && fullScreenUrl.isNotBlank()) {
         FullScreenImageViewer(
             imageUrl = fullScreenUrl,
@@ -346,16 +462,31 @@ fun ChatBubble(
     }
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Telegram-style per-sender accent color for the sender name above received bubbles.
+ * Deterministic — same userId always gets the same hue.
+ */
+private fun senderNameColor(senderId: String): Color {
+    if (senderId.isBlank()) return AvatarColors.first()
+    val index = senderId.hashCode().and(0x7FFFFFFF) % AvatarColors.size
+    return AvatarColors[index]
+}
+
 /**
  * Computes Messenger-style bubble shape based on direction and group position.
+ *
+ * - Outer corners (away from sender side): always full radius
+ * - Inner corners (toward sender side): tight when grouped with adjacent bubble
  */
 internal fun computeBubbleShape(
     isSent: Boolean,
     isFirstInGroup: Boolean = true,
     isLastInGroup: Boolean = true
 ): RoundedCornerShape {
-    val full = 18.dp
-    val tight = 4.dp
+    val full = FullCorner
+    val tight = TightCorner
     val isSingle = isFirstInGroup && isLastInGroup
     val isMiddle = !isFirstInGroup && !isLastInGroup
 
@@ -374,7 +505,10 @@ internal fun computeBubbleShape(
 
 /**
  * Reply quote block shown inside the bubble above the message text.
- * Shows a vertical accent bar + sender name + quoted text.
+ * Compact, with an accent bar + sender name + truncated quoted text.
+ *
+ * - For sent bubbles: white-tinted translucent background to set it off from the bubble fill
+ * - For received bubbles: primary-tinted background for the same separation effect
  */
 @Composable
 private fun ReplyQuoteBlock(
@@ -384,21 +518,31 @@ private fun ReplyQuoteBlock(
     onClick: () -> Unit = {}
 ) {
     val accentColor = if (isSent) {
-        Color.White.copy(alpha = 0.6f)
+        Color.White
     } else {
         MaterialTheme.colorScheme.primary
     }
     val nameColor = if (isSent) Color.White else MaterialTheme.colorScheme.primary
-    val textColor = if (isSent) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
+    val textColor = if (isSent) {
+        Color.White.copy(alpha = 0.85f)
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    val backgroundTint = if (isSent) {
+        Color.White.copy(alpha = 0.18f)
+    } else {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(4.dp))
+            .clip(RoundedCornerShape(10.dp))
+            .background(backgroundTint)
             .clickable(onClick = onClick)
-            .padding(bottom = 6.dp)
+            .padding(start = 0.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)
     ) {
-        // Vertical accent bar
+        // Vertical accent bar at the leading edge.
         Box(
             modifier = Modifier
                 .width(3.dp)
@@ -406,11 +550,11 @@ private fun ReplyQuoteBlock(
                 .background(accentColor, RoundedCornerShape(2.dp))
         )
         Spacer(modifier = Modifier.width(8.dp))
-        Column {
+        Column(modifier = Modifier.padding(end = 4.dp)) {
             if (senderName.isNotBlank()) {
                 Text(
                     text = senderName,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                     color = nameColor,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1
@@ -418,11 +562,12 @@ private fun ReplyQuoteBlock(
             }
             Text(
                 text = text,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
                 color = textColor,
                 maxLines = 2,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
+    Spacer(modifier = Modifier.height(6.dp))
 }

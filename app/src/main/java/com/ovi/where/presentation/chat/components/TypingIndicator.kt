@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -31,19 +32,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.ovi.where.core.theme.Dimens
+import androidx.compose.ui.unit.sp
 
 /**
- * Animated 3-dot typing indicator displayed below the last message, above the input.
+ * Animated typing indicator rendered as a tiny received-style bubble with bouncing dots,
+ * plus an optional caption below ("{name} is typing…").
  *
- * Shows:
- * - "{name} is typing…" for 1:1 conversations (Requirement 7.2)
- * - "{name1}, {name2} +N are typing…" for groups with max 2 names (Requirement 7.6)
- * - Animated bouncing dots
- *
- * Requirements: 7.2, 7.6
+ * Visual style mirrors a real received message bubble (left-aligned, surfaceContainerHigh,
+ * rounded with a tight bottom-left corner) so the typing context is unmistakable.
  */
 @Composable
 fun TypingIndicator(
@@ -52,33 +51,43 @@ fun TypingIndicator(
 ) {
     AnimatedVisibility(
         visible = typingText != null,
-        enter = fadeIn() + slideInVertically { it },
-        exit = fadeOut() + slideOutVertically { it }
+        enter = fadeIn() + slideInVertically { it / 2 },
+        exit = fadeOut() + slideOutVertically { it / 2 }
     ) {
-        Surface(
+        Row(
             modifier = modifier
-                .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall)
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp)
                 .semantics { contentDescription = typingText ?: "" },
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shape = RoundedCornerShape(Dimens.cornerMedium)
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start
         ) {
-            Row(
-                modifier = Modifier.padding(
-                    horizontal = Dimens.spaceLarge,
-                    vertical = Dimens.spaceMedium
-                ),
-                verticalAlignment = Alignment.CenterVertically
+            // Bubble with bouncing dots — same shape language as a received "first" bubble.
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = RoundedCornerShape(
+                    topStart = 18.dp,
+                    topEnd = 18.dp,
+                    bottomEnd = 18.dp,
+                    bottomStart = 6.dp
+                )
             ) {
-                // Animated 3-dot indicator
-                BouncingDots()
+                Box(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    BouncingDots()
+                }
+            }
 
-                Spacer(Modifier.width(Dimens.spaceMedium))
-
-                // Typing text
+            if (!typingText.isNullOrBlank()) {
+                Spacer(Modifier.width(8.dp))
                 Text(
-                    text = typingText ?: "",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = typingText,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Normal
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
         }
@@ -87,7 +96,6 @@ fun TypingIndicator(
 
 /**
  * Three dots that bounce in sequence to indicate typing activity.
- * Each dot bounces with a staggered delay for a wave effect.
  */
 @Composable
 private fun BouncingDots(
@@ -97,7 +105,7 @@ private fun BouncingDots(
 
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         repeat(DOT_COUNT) { index ->
@@ -121,14 +129,14 @@ private fun BouncingDots(
                     .size(DOT_SIZE_DP.dp)
                     .offset { IntOffset(0, offsetY.dp.roundToPx()) }
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
             )
         }
     }
 }
 
 private const val DOT_COUNT = 3
-private const val DOT_SIZE_DP = 6
+private const val DOT_SIZE_DP = 7
 private const val DOT_BOUNCE_HEIGHT = 4f
 private const val ANIMATION_DURATION_MS = 1200
 private const val DOT_STAGGER_DELAY_MS = 150

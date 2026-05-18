@@ -124,6 +124,7 @@ sealed class ServerFrame {
     @Serializable @SerialName("read_receipt")
     data class ReadReceipt(
         val messageId: String = "",
+        val messageIds: List<String> = emptyList(),
         val userId: String = "",
         val timestamp: Long = 0L
     ) : ServerFrame()

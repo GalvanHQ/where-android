@@ -246,29 +246,21 @@ fun ChatBubble(
 
                             if (message.text.isNotEmpty()) {
                                 if (message.mentionedUserIds.isNotEmpty()) {
-                                    // Style @mentions: find @word patterns and highlight them
+                                    // Use buildMentionAnnotatedString with regex-detected ranges
                                     val mentionRegex = Regex("""@\w+""")
-                                    val mentionRanges = mentionRegex.findAll(message.text)
+                                    val ranges = mentionRegex.findAll(message.text)
                                         .map { it.range }
                                         .toList()
-                                    if (mentionRanges.isNotEmpty()) {
-                                        val annotatedText = buildMentionAnnotatedString(
-                                            text = message.text,
-                                            mentionRanges = mentionRanges,
-                                            primaryColor = if (isSent) Color.White else MaterialTheme.colorScheme.primary
-                                        )
-                                        Text(
-                                            text = annotatedText,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = textColor
-                                        )
-                                    } else {
-                                        LinkableText(
-                                            text = message.text,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = textColor
-                                        )
-                                    }
+                                    val styledText = buildMentionAnnotatedString(
+                                        text = message.text,
+                                        mentionRanges = ranges,
+                                        primaryColor = if (isSent) Color.White else MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = styledText,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = textColor
+                                    )
                                 } else {
                                     LinkableText(
                                         text = message.text,

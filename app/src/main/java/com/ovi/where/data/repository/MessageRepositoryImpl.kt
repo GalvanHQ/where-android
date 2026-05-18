@@ -1030,16 +1030,24 @@ class MessageRepositoryImpl @Inject constructor(
      * Requirement 5.2, 5.4
      */
     private suspend fun handleReadReceipt(frame: ServerFrame.ReadReceipt) {
-        val entity = messageDao.getById(frame.messageId) ?: return
+        // Handle batch read receipts (multiple message IDs)
+        val messageIds = frame.messageIds.ifEmpty {
+            if (frame.messageId.isNotBlank() && frame.messageId != "latest") {
+                listOf(frame.messageId)
+            } else {
+                return // No valid message IDs
+            }
+        }
 
-        // Parse existing readBy list
-        val currentReadBy = parseReadByJson(entity.readByJson).toMutableList()
+        for (messageId in messageIds) {
+            val entity = messageDao.getById(messageId) ?: continue
 
-        // Only add if not already present (no duplicates, monotonic growth)
-        if (frame.userId !in currentReadBy) {
-            currentReadBy.add(frame.userId)
-            val updatedJson = serializeReadByList(currentReadBy)
-            messageDao.updateReadBy(frame.messageId, updatedJson)
+            val currentReadBy = parseReadByJson(entity.readByJson).toMutableList()
+            if (frame.userId !in currentReadBy) {
+                currentReadBy.add(frame.userId)
+                val updatedJson = serializeReadByList(currentReadBy)
+                messageDao.updateReadBy(messageId, updatedJson)
+            }
         }
     }
 

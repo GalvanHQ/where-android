@@ -332,9 +332,13 @@ const initializeSockets = (io) => {
                     transaction.update(convRef, updateData);
                 });
 
-                // Broadcast read receipt to room
+                // Broadcast read receipt to room — include all message IDs that were marked read
+                const readMessageIds = recentMessages
+                    .filter(m => m.senderId !== uid && (m.readBy || []).includes(uid))
+                    .map(m => m.id);
+
                 socket.to(conversationId).emit('read_receipt', {
-                    messageId: 'latest',
+                    messageIds: readMessageIds,
                     userId: uid,
                     timestamp: now
                 });

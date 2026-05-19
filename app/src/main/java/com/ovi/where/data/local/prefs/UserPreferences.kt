@@ -24,6 +24,13 @@ class UserPreferences @Inject constructor(
         val BATTERY_SAVER_MODE = booleanPreferencesKey("battery_saver_mode")
         val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
         val LOCATION_OFF_DIALOG_SHOWN = booleanPreferencesKey("location_off_dialog_shown")
+        // Sharing session persistence for service restart recovery
+        val SHARING_TARGET_ID = stringPreferencesKey("sharing_target_id")
+        val SHARING_EXPIRES_AT = longPreferencesKey("sharing_expires_at")
+        // Last-used share target for quick re-share UX
+        val LAST_SHARE_TARGET_ID = stringPreferencesKey("last_share_target_id")
+        val LAST_SHARE_TARGET_NAME = stringPreferencesKey("last_share_target_name")
+        val LAST_SHARE_DURATION = longPreferencesKey("last_share_duration")
     }
 
     val userId: Flow<String?> = dataStore.data.map { preferences ->
@@ -99,6 +106,43 @@ class UserPreferences @Inject constructor(
     suspend fun setLocationOffDialogShown(shown: Boolean) {
         dataStore.edit { preferences ->
             preferences[Keys.LOCATION_OFF_DIALOG_SHOWN] = shown
+        }
+    }
+
+    // ── Sharing session persistence ───────────────────────────────────────────
+
+    val sharingTargetId: Flow<String?> = dataStore.data.map { it[Keys.SHARING_TARGET_ID] }
+    val sharingExpiresAt: Flow<Long?> = dataStore.data.map { it[Keys.SHARING_EXPIRES_AT] }
+
+    suspend fun saveSharingSession(targetId: String, expiresAtMillis: Long?) {
+        dataStore.edit { prefs ->
+            prefs[Keys.SHARING_TARGET_ID] = targetId
+            if (expiresAtMillis != null) {
+                prefs[Keys.SHARING_EXPIRES_AT] = expiresAtMillis
+            } else {
+                prefs.remove(Keys.SHARING_EXPIRES_AT)
+            }
+        }
+    }
+
+    suspend fun clearSharingSession() {
+        dataStore.edit { prefs ->
+            prefs.remove(Keys.SHARING_TARGET_ID)
+            prefs.remove(Keys.SHARING_EXPIRES_AT)
+        }
+    }
+
+    // ── Last-used share target (quick re-share UX) ────────────────────────────
+
+    val lastShareTargetId: Flow<String?> = dataStore.data.map { it[Keys.LAST_SHARE_TARGET_ID] }
+    val lastShareTargetName: Flow<String?> = dataStore.data.map { it[Keys.LAST_SHARE_TARGET_NAME] }
+    val lastShareDuration: Flow<Long?> = dataStore.data.map { it[Keys.LAST_SHARE_DURATION] }
+
+    suspend fun saveLastShareTarget(targetId: String, targetName: String, durationMinutes: Long) {
+        dataStore.edit { prefs ->
+            prefs[Keys.LAST_SHARE_TARGET_ID] = targetId
+            prefs[Keys.LAST_SHARE_TARGET_NAME] = targetName
+            prefs[Keys.LAST_SHARE_DURATION] = durationMinutes
         }
     }
 

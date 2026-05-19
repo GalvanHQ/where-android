@@ -130,6 +130,7 @@ import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.LocationUtils
 import com.ovi.where.core.utils.showToast
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 
@@ -260,10 +261,18 @@ fun GlobalMapScreen(
 
     // ── Sharing countdown timer ───────────────────────────────────────────────
     var sharingSecondsRemaining by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(uiState.isSharing) {
-        if (uiState.isSharing) {
-            // ViewModel doesn't expose sharingExpiresAt yet, show "Sharing live"
-            sharingSecondsRemaining = null
+    LaunchedEffect(uiState.isSharing, uiState.sharingExpiresAt) {
+        if (uiState.isSharing && uiState.sharingExpiresAt != null) {
+            // Tick every second to update the countdown
+            while (true) {
+                val remaining = (uiState.sharingExpiresAt!! - System.currentTimeMillis()) / 1000L
+                if (remaining <= 0) {
+                    sharingSecondsRemaining = null
+                    break
+                }
+                sharingSecondsRemaining = remaining
+                delay(1000L)
+            }
         } else {
             sharingSecondsRemaining = null
         }
@@ -465,86 +474,85 @@ fun GlobalMapScreen(
                 }
             }
 
-            // ── Location off banner ───────────────────────────────────────────
-            if (!uiState.isLocationEnabled) {
-                Card(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 64.dp, start = Dimens.spaceLarge, end = Dimens.spaceLarge),
-                    shape = MaterialTheme.shapes.extraLarge,
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall),
-                        verticalAlignment = Alignment.CenterVertically
+            // ── Stacked status banners (location off + sharing) ──────────────────
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 56.dp, start = Dimens.spaceLarge, end = Dimens.spaceLarge),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
+            ) {
+                // ── Location off banner
+                if (!uiState.isLocationEnabled) {
+                    Card(
+                        shape = MaterialTheme.shapes.extraLarge,
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
                     ) {
-                        Icon(
-                            Icons.Default.LocationOff,
-                            contentDescription = null,
-                            modifier = Modifier.size(Dimens.iconSizeMedium),
-                            tint = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        Spacer(Modifier.width(Dimens.spaceSmall))
-                        Text(
-                            text = "Location is turned off",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.weight(1f)
-                        )
-                        TextButton(onClick = {
-                            context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-                        }) {
-                            Text(
-                                text = "Enable",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.LocationOff,
+                                contentDescription = null,
+                                modifier = Modifier.size(Dimens.iconSizeMedium),
+                                tint = MaterialTheme.colorScheme.onErrorContainer
                             )
+                            Spacer(Modifier.width(Dimens.spaceSmall))
+                            Text(
+                                text = "Location is turned off",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(onClick = {
+                                context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                            }) {
+                                Text(
+                                    text = "Enable",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            // ── Sharing status banner ─────────────────────────────────────────
-            if (uiState.isSharing) {
-                Card(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(
-                            top = if (!uiState.isLocationEnabled) 130.dp else 120.dp,
-                            start = Dimens.spaceLarge,
-                            end = Dimens.spaceLarge
-                        ),
-                    shape = MaterialTheme.shapes.medium,
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(
-                            horizontal = Dimens.spaceLarge,
-                            vertical = Dimens.spaceSmall
-                        ),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        SharingPulseDot()
-                        Spacer(Modifier.width(Dimens.spaceSmall))
-                        val sharingTargetName = (uiState.groups + uiState.directTargets).firstOrNull { it.id == uiState.sharingGroupId }?.name ?: "target"
-                        val timerText = if (sharingSecondsRemaining != null) {
-                            val mins = sharingSecondsRemaining!! / 60
-                            val secs = sharingSecondsRemaining!! % 60
-                            " • ${"%02d:%02d".format(mins, secs)} remaining"
-                        } else {
-                            ""
-                        }
-                        Text(
-                            text = "Sharing live with $sharingTargetName$timerText",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                // ── Sharing status banner
+                if (uiState.isSharing) {
+                    Card(
+                        shape = MaterialTheme.shapes.medium,
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer
                         )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(
+                                horizontal = Dimens.spaceLarge,
+                                vertical = Dimens.spaceSmall
+                            ),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            SharingPulseDot()
+                            Spacer(Modifier.width(Dimens.spaceSmall))
+                            val sharingTargetName = (uiState.groups + uiState.directTargets).firstOrNull { it.id == uiState.sharingGroupId }?.name ?: "target"
+                            val timerText = if (sharingSecondsRemaining != null) {
+                                val mins = sharingSecondsRemaining!! / 60
+                                val secs = sharingSecondsRemaining!! % 60
+                                " • ${"%02d:%02d".format(mins, secs)} remaining"
+                            } else {
+                                ""
+                            }
+                            Text(
+                                text = "Sharing live with $sharingTargetName$timerText",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
                     }
                 }
             }
@@ -1078,6 +1086,16 @@ private fun FriendAvatarChip(
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1
             )
+            // ETA display
+            friend.etaText?.let { eta ->
+                Text(
+                    text = "~$eta",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
+                )
+            }
         }
     }
 }

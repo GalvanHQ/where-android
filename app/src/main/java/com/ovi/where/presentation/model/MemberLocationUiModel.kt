@@ -11,13 +11,23 @@ data class MemberLocationUiModel(
     val longitude: Double,
     val timeAgo: String,
     val hasValidLocation: Boolean,
-    val isActive: Boolean
+    val isActive: Boolean,
+    /** Distance from the current user in meters (null if user location unavailable). */
+    val distanceMeters: Double? = null,
+    /** Formatted ETA string (e.g., "5 min", "12 min") based on speed or driving estimate. */
+    val etaText: String? = null,
+    /** Speed in m/s for directional/movement indicators. */
+    val speed: Float = 0f,
+    /** Bearing in degrees for directional arrow display. */
+    val bearing: Float = 0f
 )
 
 fun SharedLocation.toUiModel(
     displayName: String = userId,
     timeAgoText: String,
-    photoUrl: String? = null
+    photoUrl: String? = null,
+    distanceMeters: Double? = null,
+    etaText: String? = null
 ): MemberLocationUiModel {
     return MemberLocationUiModel(
         id = id,
@@ -28,6 +38,10 @@ fun SharedLocation.toUiModel(
         longitude = longitude,
         timeAgo = timeAgoText,
         hasValidLocation = latitude != 0.0 && longitude != 0.0,
-        isActive = isSharingActive
+        isActive = isSharingActive,
+        distanceMeters = distanceMeters,
+        etaText = etaText,
+        speed = speed,
+        bearing = bearing
     )
 }

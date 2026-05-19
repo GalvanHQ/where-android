@@ -18,5 +18,6 @@ data class SharedLocation(
     val visibleTo: List<String> = emptyList(),
     // Display info for live location bubble rendering
     val displayName: String = "",
+    val photoUrl: String? = null,
     val sharingStartedAt: Long = 0L
 )

@@ -35,7 +35,7 @@ import com.ovi.where.data.local.entity.VoiceMessageCacheEntity
         LinkPreviewCacheEntity::class,
         OnlineStatusEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -172,6 +172,17 @@ abstract class AppDatabase : RoomDatabase() {
                 // Track lastSeen alongside online status so we can render
                 // Messenger-style "Active 5m ago" subtitles when a user is offline.
                 db.execSQL("ALTER TABLE `online_status` ADD COLUMN `lastSeen` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add denormalized profile and targeting fields to shared_location table
+                // for cache-first display without additional lookups (Req 10.1, 10.4)
+                db.execSQL("ALTER TABLE `shared_location` ADD COLUMN `photoUrl` TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE `shared_location` ADD COLUMN `targetType` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `shared_location` ADD COLUMN `targetId` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `shared_location` ADD COLUMN `visibleTo` TEXT DEFAULT NULL")
             }
         }
     }

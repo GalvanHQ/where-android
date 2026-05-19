@@ -266,7 +266,15 @@ fun MapScreen(
                 uiSettings = MapUiSettings(
                     myLocationButtonEnabled = false,
                     zoomControlsEnabled = false
-                )
+                ),
+                onMapLongClick = { latLng ->
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                    viewModel.setMeetupDestination(
+                        latitude = latLng.latitude,
+                        longitude = latLng.longitude,
+                        name = "Meetup Point"
+                    )
+                }
             ) {
                 // Member markers — geo-anchored via MarkerComposable
                 val validLocations = uiState.locations.filter { it.hasValidLocation }
@@ -368,6 +376,68 @@ fun MapScreen(
                         )
                     }
                 }
+
+                // ── Meetup Destination Marker ─────────────────────────────────
+                val destination = uiState.meetupDestination
+                if (destination != null && destination.hasValidLocation) {
+                    val destMarkerState = remember(destination.latitude, destination.longitude) {
+                        MarkerState(position = LatLng(destination.latitude, destination.longitude))
+                    }
+                    MarkerComposable(
+                        state = destMarkerState,
+                        title = destination.name.ifEmpty { "Meetup Point" },
+                        snippet = uiState.myEtaToDestination?.let { "ETA: ~$it" },
+                        zIndex = 8f,
+                        onClick = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            scope.launch {
+                                cameraPositionState.animate(
+                                    CameraUpdateFactory.newLatLngZoom(
+                                        LatLng(destination.latitude, destination.longitude), 15f
+                                    ),
+                                    durationMs = 600
+                                )
+                            }
+                            true
+                        }
+                    ) {
+                        // Destination flag pin
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .shadow(6.dp, CircleShape)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.error)
+                                    .border(3.dp, MaterialTheme.colorScheme.surface, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = "Meetup destination",
+                                    tint = MaterialTheme.colorScheme.onError,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            // Tail
+                            val destTailColor = MaterialTheme.colorScheme.surface
+                            Box(
+                                modifier = Modifier
+                                    .width(12.dp)
+                                    .height(8.dp)
+                                    .drawBehind {
+                                        val path = Path().apply {
+                                            moveTo(0f, 0f)
+                                            lineTo(size.width, 0f)
+                                            lineTo(size.width / 2f, size.height)
+                                            close()
+                                        }
+                                        drawPath(path, color = destTailColor)
+                                    }
+                            )
+                        }
+                    }
+                }
             }
 
             // Sharing status banner
@@ -405,6 +475,23 @@ fun MapScreen(
 
             if (uiState.isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }
+
+            // ── Meetup Destination Card ───────────────────────────────────────
+            val meetupDest = uiState.meetupDestination
+            if (meetupDest != null && meetupDest.hasValidLocation) {
+                val distanceText = uiState.myDistanceToDestination?.let { dist ->
+                    com.ovi.where.core.utils.LocationUtils.formatDistance(context, dist)
+                }
+                MeetupDestinationCard(
+                    destination = meetupDest,
+                    distanceText = distanceText,
+                    etaText = uiState.myEtaToDestination,
+                    onClear = { viewModel.clearMeetupDestination() },
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = if (uiState.isSharing) 80.dp else 56.dp)
+                )
             }
 
             uiState.error?.let { error ->
@@ -598,11 +685,21 @@ fun MemberLocationItem(
                 myLatitude, myLongitude,
                 location.latitude, location.longitude
             )
-            Text(
-                text = com.ovi.where.core.utils.LocationUtils.formatDistance(context, distance),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = com.ovi.where.core.utils.LocationUtils.formatDistance(context, distance),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                // ETA display
+                location.etaText?.let { eta ->
+                    Text(
+                        text = "~$eta",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
+            }
             Spacer(Modifier.width(Dimens.spaceSmall))
         }
 

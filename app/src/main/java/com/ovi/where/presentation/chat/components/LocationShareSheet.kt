@@ -1,6 +1,11 @@
 package com.ovi.where.presentation.chat.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -38,6 +43,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -354,7 +360,7 @@ private fun DurationChip(
 
 /**
  * Persistent banner shown below the chat header while live location sharing is active.
- * Shows "Sharing live location · Xh Ym" with a Stop button.
+ * Shows "Sharing live location · Xh Ym" with a Stop button and pulsing indicator.
  */
 @Composable
 fun LiveLocationSharingBanner(
@@ -362,9 +368,20 @@ fun LiveLocationSharingBanner(
     onStop: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val infiniteTransition = rememberInfiniteTransition(label = "banner_pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "banner_pulse_alpha"
+    )
+
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = Color(0xFF4CAF50).copy(alpha = 0.1f),
+        color = Color(0xFF4CAF50).copy(alpha = 0.08f),
         tonalElevation = 0.dp
     ) {
         Row(
@@ -373,13 +390,22 @@ fun LiveLocationSharingBanner(
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Pulsing location icon
-            Icon(
-                imageVector = Icons.Filled.ShareLocation,
-                contentDescription = null,
-                tint = Color(0xFF4CAF50),
-                modifier = Modifier.size(18.dp)
-            )
+            // Pulsing green dot + location icon
+            Box(contentAlignment = Alignment.Center) {
+                // Pulsing ring
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF4CAF50).copy(alpha = pulseAlpha * 0.2f))
+                )
+                Icon(
+                    imageVector = Icons.Filled.ShareLocation,
+                    contentDescription = null,
+                    tint = Color(0xFF4CAF50),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(

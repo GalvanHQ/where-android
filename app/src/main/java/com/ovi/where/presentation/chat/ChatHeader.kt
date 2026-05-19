@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -63,6 +64,7 @@ fun ChatHeader(
     onNavigateBack: () -> Unit,
     onNavigateToGroupInfo: (String) -> Unit,
     onNavigateToConversationInfo: (String) -> Unit = {},
+    onMapTap: () -> Unit = {},
     onlineMemberCount: Int = 0,
     isOtherUserFriend: Boolean = true,
     modifier: Modifier = Modifier
@@ -147,7 +149,19 @@ fun ChatHeader(
                     }
                 }
 
-                // Trailing action icon: info only (call buttons removed)
+                // Trailing action icons: map + info
+                IconButton(
+                    onClick = onMapTap,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Map,
+                        contentDescription = "Show map",
+                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 IconButton(
                     onClick = {
                         if (conversation.isGroup) {

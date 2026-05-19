@@ -1571,6 +1571,14 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
+     * Toggles the mini-map overlay visibility on the chat screen.
+     * Shows active location sharers in this conversation on a compact map.
+     */
+    fun toggleMiniMap() {
+        _uiState.value = _uiState.value.copy(showMiniMap = !_uiState.value.showMiniMap)
+    }
+
+    /**
      * Dismisses the live location error message.
      */
     fun dismissLiveLocationError() {
@@ -3201,7 +3209,10 @@ data class ChatUiState(
     val mentionRanges: List<IntRange> = emptyList(),
     // ─── Image Size Error State ───────────────────────────────────────────────
     /** Whether to show the image size limit error inline (Requirement 6.7). */
-    val showImageSizeError: Boolean = false
+    val showImageSizeError: Boolean = false,
+    // ─── Mini Map Overlay State ───────────────────────────────────────────────
+    /** Whether the mini-map overlay is visible on top of the chat. */
+    val showMiniMap: Boolean = false
 )
 
 /**

@@ -12,14 +12,14 @@ import com.ovi.where.core.constants.AppConstants.MILLIS_PER_HOUR
 import com.ovi.where.core.constants.AppConstants.MILLIS_PER_MINUTE
 import com.ovi.where.data.location.LocationManager
 import com.ovi.where.domain.repository.LocationRepository
-import com.ovi.where.domain.usecase.location.ObserveGroupLocationsUseCase
+import com.ovi.where.domain.usecase.location.ObserveActiveLocationsUseCase
 import com.ovi.where.domain.usecase.location.StartLocationSharingUseCase
 import com.ovi.where.domain.usecase.location.StopLocationSharingUseCase
-import com.ovi.where.domain.usecase.user.GetUsersUseCase
 import com.ovi.where.presentation.model.MemberLocationUiModel
 import com.ovi.where.presentation.model.toUiModel
 import com.ovi.where.service.LocationTrackingService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,11 +32,10 @@ import javax.inject.Inject
 @HiltViewModel
 class MapViewModel @Inject constructor(
     application: Application,
-    private val observeGroupLocationsUseCase: ObserveGroupLocationsUseCase,
+    private val observeActiveLocationsUseCase: ObserveActiveLocationsUseCase,
     private val startLocationSharingUseCase: StartLocationSharingUseCase,
     private val stopLocationSharingUseCase: StopLocationSharingUseCase,
     private val locationManager: LocationManager,
-    private val getUsersUseCase: GetUsersUseCase,
     private val locationRepository: LocationRepository
 ) : AndroidViewModel(application) {
 
@@ -47,8 +46,7 @@ class MapViewModel @Inject constructor(
     val uiEvent = _uiEvent.receiveAsFlow()
 
     private var currentGroupId: String? = null
-    private val userDisplayNames = mutableMapOf<String, String>()
-    private val userPhotoUrls = mutableMapOf<String, String?>()
+    private var locationObserverJob: Job? = null
 
     fun observeLocations(groupId: String) {
         currentGroupId = groupId
@@ -59,37 +57,86 @@ class MapViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isSharing = isSharing)
         }
 
+        // Observe meetup destination
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-            observeGroupLocationsUseCase(groupId)
-                .distinctUntilChanged()
-                .collect { locations ->
-                    val unknownIds = locations.map { it.userId }
-                        .filter { !userDisplayNames.containsKey(it) }
-                    if (unknownIds.isNotEmpty()) fetchDisplayNames(unknownIds)
-
-                    _uiState.value = _uiState.value.copy(
-                        locations = locations.map { sharedLocation ->
-                            sharedLocation.toUiModel(
-                                displayName = userDisplayNames[sharedLocation.userId] ?: sharedLocation.userId,
-                                timeAgoText = formatTimeAgo(sharedLocation.timestamp),
-                                photoUrl = userPhotoUrls[sharedLocation.userId]
-                            )
-                        },
-                        isLoading = false,
-                        isEmpty = locations.isEmpty()
-                    )
-                }
-        }
-    }
-
-    private suspend fun fetchDisplayNames(userIds: List<String>) {
-        when (val result = getUsersUseCase(userIds)) {
-            is Resource.Success -> result.data?.forEach { user ->
-                userDisplayNames[user.id] = user.displayName
-                userPhotoUrls[user.id] = user.photoUrl
+            locationRepository.observeMeetupDestination(groupId).collect { destination ->
+                _uiState.value = _uiState.value.copy(meetupDestination = destination)
+                updateDistanceToDestination()
             }
-            else -> {}
+        }
+
+        // Use consolidated listener and filter client-side by targetId.
+        // This eliminates per-group Firestore subcollection listeners.
+        // Firebase read optimization: single listener shared across all groups,
+        // client-side filtering costs 0 additional reads.
+        locationObserverJob?.cancel()
+        locationObserverJob = viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                observeActiveLocationsUseCase()
+                    .distinctUntilChanged()
+                    .collect { allLocations ->
+                        // Client-side filter: only show locations targeting this group
+                        val locations = allLocations.filter { loc ->
+                            loc.targetId == groupId && loc.isSharingActive &&
+                                (loc.sharingExpiresAt == 0L ||
+                                 loc.sharingExpiresAt == Long.MAX_VALUE ||
+                                 System.currentTimeMillis() < loc.sharingExpiresAt)
+                        }
+
+                        _uiState.value = _uiState.value.copy(
+                            locations = locations.map { sharedLocation ->
+                                // Use denormalized displayName/photoUrl from the location doc
+                                // No separate user profile reads needed
+                                val displayName = sharedLocation.displayName.ifEmpty { sharedLocation.userId }
+                                val photoUrl = sharedLocation.photoUrl
+                                val timeAgoText = formatTimeAgo(sharedLocation.timestamp)
+
+                                // Compute distance and ETA from my location
+                                val myLat = _uiState.value.myLatitude
+                                val myLng = _uiState.value.myLongitude
+                                val hasMy = _uiState.value.hasMyLocation
+                                val hasValid = sharedLocation.latitude != 0.0 && sharedLocation.longitude != 0.0
+
+                                val distance = if (hasMy && hasValid && myLat != 0.0 && myLng != 0.0) {
+                                    com.ovi.where.core.utils.LocationUtils.calculateDistance(
+                                        myLat, myLng,
+                                        sharedLocation.latitude, sharedLocation.longitude
+                                    )
+                                } else null
+
+                                val eta = if (distance != null && distance > 50.0) {
+                                    val speedMps = if (sharedLocation.speed > 1f) {
+                                        sharedLocation.speed.toDouble()
+                                    } else {
+                                        13.9 // Default driving speed ~50 km/h
+                                    }
+                                    val etaSeconds = com.ovi.where.core.utils.LocationUtils.calculateETA(distance, speedMps)
+                                    if (etaSeconds < 3600L) {
+                                        "${etaSeconds / 60} min"
+                                    } else {
+                                        "${etaSeconds / 3600}h ${(etaSeconds % 3600) / 60}m"
+                                    }
+                                } else null
+
+                                sharedLocation.toUiModel(
+                                    displayName = displayName,
+                                    timeAgoText = timeAgoText,
+                                    photoUrl = photoUrl,
+                                    distanceMeters = distance,
+                                    etaText = eta
+                                )
+                            },
+                            isLoading = false,
+                            isEmpty = locations.isEmpty()
+                        )
+                    }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = e.message ?: "Failed to observe locations"
+                )
+            }
         }
     }
 
@@ -136,6 +183,7 @@ class MapViewModel @Inject constructor(
                     myLongitude = loc.longitude,
                     hasMyLocation = true
                 )
+                updateDistanceToDestination()
             }
         }
     }
@@ -150,6 +198,54 @@ class MapViewModel @Inject constructor(
         ctx.startService(LocationTrackingService.createStopIntent(ctx))
     }
 
+    // ── Meetup Destination Actions ────────────────────────────────────────────
+
+    /**
+     * Sets a meetup destination for the current group.
+     * Called when the user long-presses on the map or uses the destination picker.
+     */
+    fun setMeetupDestination(latitude: Double, longitude: Double, name: String, address: String = "") {
+        val groupId = currentGroupId ?: return
+        viewModelScope.launch {
+            locationRepository.setMeetupDestination(groupId, latitude, longitude, name, address)
+        }
+    }
+
+    /** Clears the active meetup destination. */
+    fun clearMeetupDestination() {
+        val groupId = currentGroupId ?: return
+        viewModelScope.launch {
+            locationRepository.clearMeetupDestination(groupId)
+        }
+    }
+
+    /** Recomputes distance and ETA from my location to the meetup destination. */
+    private fun updateDistanceToDestination() {
+        val state = _uiState.value
+        val dest = state.meetupDestination
+        if (dest == null || !dest.hasValidLocation || !state.hasMyLocation ||
+            state.myLatitude == 0.0 || state.myLongitude == 0.0
+        ) {
+            _uiState.value = state.copy(myDistanceToDestination = null, myEtaToDestination = null)
+            return
+        }
+
+        val distance = com.ovi.where.core.utils.LocationUtils.calculateDistance(
+            state.myLatitude, state.myLongitude,
+            dest.latitude, dest.longitude
+        )
+        val etaSeconds = com.ovi.where.core.utils.LocationUtils.calculateETA(distance)
+        val etaText = when {
+            etaSeconds < 60 -> "< 1 min"
+            etaSeconds < 3600 -> "${etaSeconds / 60} min"
+            else -> "${etaSeconds / 3600}h ${(etaSeconds % 3600) / 60}m"
+        }
+        _uiState.value = state.copy(
+            myDistanceToDestination = distance,
+            myEtaToDestination = etaText
+        )
+    }
+
     private fun formatTimeAgo(timestamp: Long): String {
         val ctx = getApplication<Application>()
         val diff = System.currentTimeMillis() - timestamp
@@ -159,6 +255,11 @@ class MapViewModel @Inject constructor(
             diff < MILLIS_PER_DAY     -> ctx.getString(R.string.time_hours_ago, diff / MILLIS_PER_HOUR)
             else                      -> ctx.getString(R.string.time_days_ago, diff / MILLIS_PER_DAY)
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        locationObserverJob?.cancel()
     }
 }
 
@@ -170,5 +271,11 @@ data class MapUiState(
     val isSharing: Boolean = false,
     val isLoading: Boolean = false,
     val isEmpty: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    /** Active meetup destination for this group (null if none set). */
+    val meetupDestination: com.ovi.where.domain.model.MeetupDestination? = null,
+    /** Distance from my location to the meetup destination in meters. */
+    val myDistanceToDestination: Double? = null,
+    /** Formatted ETA from my location to the meetup destination. */
+    val myEtaToDestination: String? = null
 )

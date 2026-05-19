@@ -281,6 +281,16 @@ class ChatSocketIoClient @Inject constructor() {
         socket?.emit("remove_reaction", payload)
     }
 
+    /**
+     * Emits a location_update event via Socket.IO for real-time peer location sharing.
+     * Called by LocationRepository on each GPS fix (throttled by speed state).
+     * Fire-and-forget: failures are logged by the caller.
+     */
+    fun emitLocationUpdate(payload: JSONObject) {
+        if (_connectionState.value != ConnectionState.CONNECTED) return
+        socket?.emit("location_update", payload)
+    }
+
     // --- Reconnection Logic ---
 
     /**

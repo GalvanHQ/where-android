@@ -4,6 +4,24 @@ const { v4: uuidv4 } = require('uuid');
 /** Max number of recent messages embedded inside a conversation doc. */
 const MAX_RECENT_MESSAGES = 50;
 
+/**
+ * Validates a location_update frame has all required fields within valid ranges.
+ * @param {Object} frame - The location update payload
+ * @returns {boolean} true if valid
+ */
+function validateLocationFrame(frame) {
+    if (!frame) return false;
+    const { userId, latitude, longitude, accuracy, speed, bearing, timestamp } = frame;
+    if (typeof userId !== 'string' || userId.trim() === '') return false;
+    if (typeof latitude !== 'number' || latitude < -90 || latitude > 90) return false;
+    if (typeof longitude !== 'number' || longitude < -180 || longitude > 180) return false;
+    if (typeof accuracy !== 'number' || accuracy < 0) return false;
+    if (typeof speed !== 'number' || speed < 0) return false;
+    if (typeof bearing !== 'number' || bearing < 0 || bearing > 360) return false;
+    if (typeof timestamp !== 'number' || timestamp <= 0) return false;
+    return true;
+}
+
 const initializeSockets = (io) => {
     // Middleware for authentication
     io.use(async (socket, next) => {
@@ -25,6 +43,30 @@ const initializeSockets = (io) => {
         const userName = socket.user.name || 'User';
         const userPhotoUrl = socket.user.picture || null;
         const conversationId = socket.handshake.query.conversationId;
+        const locationRoom = socket.handshake.query.locationRoom;
+
+        // ── Location Room Join ────────────────────────────────────────────────
+        // Clients can join a location room for real-time location relay.
+        // This bypasses Firestore reads entirely for connected peers.
+        if (locationRoom) {
+            socket.join(locationRoom);
+            socket.locationRoom = locationRoom;
+        }
+
+        // ── Location Update Relay ─────────────────────────────────────────────
+        // Validates and broadcasts location_update frames to all peers in the
+        // same location room. Server does NOT persist to Firestore — the sending
+        // client handles its own write.
+        socket.on('location_update', (data) => {
+            if (!socket.locationRoom) return;
+            if (!validateLocationFrame(data)) return;
+
+            // Ensure userId matches authenticated user (prevent spoofing)
+            if (data.userId !== uid) return;
+
+            // Broadcast to all other clients in the same location room
+            socket.to(socket.locationRoom).emit('location_update', data);
+        });
 
         if (conversationId) {
             // Verify participant
@@ -361,6 +403,12 @@ const initializeSockets = (io) => {
                 socket.to(conversationId).emit('presence', {
                     userId: uid,
                     status: 'offline'
+                });
+            }
+            // Broadcast location_user_offline to location room peers
+            if (socket.locationRoom) {
+                socket.to(socket.locationRoom).emit('location_user_offline', {
+                    userId: uid
                 });
             }
         });

@@ -49,4 +49,12 @@ interface LocationDao {
      */
     @Query("SELECT * FROM shared_location WHERE userId = :userId LIMIT 1")
     suspend fun getCachedLocationForUser(userId: String): SharedLocationEntity?
+
+    /**
+     * Observes cached locations filtered by targetId for group-specific views.
+     * Eliminates the need for per-group Firestore listeners.
+     * Returns only active locations ordered by most recent first.
+     */
+    @Query("SELECT * FROM shared_location WHERE targetId = :targetId AND isSharingActive = 1 ORDER BY timestamp DESC")
+    fun observeByTargetId(targetId: String): Flow<List<SharedLocationEntity>>
 }

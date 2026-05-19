@@ -1,6 +1,7 @@
 package com.ovi.where.domain.repository
 
 import com.ovi.where.core.common.Resource
+import com.ovi.where.domain.model.MeetupDestination
 import com.ovi.where.domain.model.SharedLocation
 import kotlinx.coroutines.flow.Flow
 
@@ -57,4 +58,24 @@ interface LocationRepository {
 
     /** Populate visibleTo field for a group share (fetches group member UIDs). */
     suspend fun getGroupMemberIds(groupId: String): List<String>
+
+    // ── Meetup Destination ────────────────────────────────────────────────────
+
+    /**
+     * Sets a meetup destination for a group. All members will see this pin on the map
+     * along with their distance and ETA to the destination.
+     */
+    suspend fun setMeetupDestination(
+        groupId: String,
+        latitude: Double,
+        longitude: Double,
+        name: String,
+        address: String = ""
+    ): Resource<Unit>
+
+    /** Clears the active meetup destination for a group. */
+    suspend fun clearMeetupDestination(groupId: String): Resource<Unit>
+
+    /** Observes the meetup destination for a group (real-time updates). */
+    fun observeMeetupDestination(groupId: String): Flow<MeetupDestination?>
 }

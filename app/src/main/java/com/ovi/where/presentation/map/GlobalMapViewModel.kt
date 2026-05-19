@@ -34,6 +34,7 @@ import com.ovi.where.domain.usecase.user.GetUsersUseCase
 import com.ovi.where.domain.usecase.auth.ObserveCurrentUserUseCase
 import com.ovi.where.service.LocationTrackingService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import timber.log.Timber
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -41,6 +42,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -62,7 +64,11 @@ data class FriendLocationUiModel(
     val isActive: Boolean,
     val groupId: String,
     val groupName: String,
-    val distanceMeters: Float? = null
+    val distanceMeters: Float? = null,
+    /** Formatted ETA string (e.g., "5 min", "1h 12m"). Null if distance < 50m or no user location. */
+    val etaText: String? = null,
+    /** Raw epoch millis for timeAgo recalculation on ticker */
+    val lastUpdatedTimestamp: Long = 0L
 )
 
 /** Simple group representation for the filter pill / sheet. */
@@ -113,6 +119,13 @@ class GlobalMapViewModel @Inject constructor(
     // Auto-refresh timeAgo ticker
     private var timeAgoRefreshJob: Job? = null
 
+    // Sharing countdown ticker
+    private var countdownJob: Job? = null
+
+    // Cache raw SharedLocation list for re-processing without re-subscribing
+    @Volatile
+    private var lastRawLocations: List<SharedLocation> = emptyList()
+
     val currentUserId: String? get() = firebaseAuth.currentUser?.uid
 
     private val locationProviderReceiver = object : BroadcastReceiver() {
@@ -133,12 +146,112 @@ class GlobalMapViewModel @Inject constructor(
         registerLocationProviderReceiver()
         startTimeAgoTicker()
         autoLocateOnLaunch()
+        restoreSharingState()
     }
 
     /** Auto-locate user on first launch (like Google Maps). */
     private fun autoLocateOnLaunch() {
         viewModelScope.launch {
             locateMe()
+        }
+    }
+
+    /**
+     * Restores sharing state from persisted session data on ViewModel init.
+     * If the persisted session has already expired, clears it and stops the service.
+     * Otherwise, restores the countdown and sharing indicator.
+     *
+     * Requirement 12.5: Restore within 2 seconds of ViewModel initialization.
+     * Requirement 12.6: If expired, set inactive and clear instead of restoring.
+     */
+    private fun restoreSharingState() {
+        viewModelScope.launch {
+            try {
+                val savedTargetId = userPreferences.sharingTargetId.first()
+                val savedExpiry = userPreferences.sharingExpiresAt.first()
+
+                if (savedTargetId.isNullOrEmpty()) return@launch
+
+                val now = System.currentTimeMillis()
+
+                // Check if session already expired
+                if (savedExpiry != null && now >= savedExpiry) {
+                    // Expired — clean up
+                    Timber.d("restoreSharingState: persisted session expired, cleaning up")
+                    _uiState.value = _uiState.value.copy(
+                        isSharing = false,
+                        sharingGroupId = null,
+                        sharingExpiresAt = null,
+                        sharingCountdown = null
+                    )
+                    userPreferences.clearSharingSession()
+                    stopLocationService()
+                    return@launch
+                }
+
+                // Restore active session
+                _uiState.value = _uiState.value.copy(
+                    isSharing = true,
+                    sharingGroupId = savedTargetId,
+                    sharingExpiresAt = savedExpiry,
+                    sharingCountdown = formatCountdown(savedExpiry)
+                )
+                startCountdownTicker()
+            } catch (e: Exception) {
+                Timber.e(e, "restoreSharingState failed")
+            }
+        }
+    }
+
+    /**
+     * Starts a countdown ticker that updates the sharing countdown string every 60s.
+     * On session expiry, updates state to inactive and stops the tracking service.
+     *
+     * Requirement 12.1: Format as "Xh Ym" when ≥ 60 min, "Xm" when < 60 min.
+     * Requirement 12.4: On expiry, stop service within 5 seconds.
+     */
+    private fun startCountdownTicker() {
+        countdownJob?.cancel()
+        countdownJob = viewModelScope.launch {
+            while (true) {
+                delay(60_000L) // Update every 60 seconds
+                val expiresAt = _uiState.value.sharingExpiresAt ?: break // Continuous — no countdown
+                val now = System.currentTimeMillis()
+
+                if (now >= expiresAt) {
+                    // Session expired — clean up
+                    _uiState.value = _uiState.value.copy(
+                        isSharing = false,
+                        sharingGroupId = null,
+                        sharingExpiresAt = null,
+                        sharingCountdown = null
+                    )
+                    stopLocationService()
+                    userPreferences.clearSharingSession()
+                    _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.toast_sharing_stopped)))
+                    break
+                }
+
+                _uiState.value = _uiState.value.copy(
+                    sharingCountdown = formatCountdown(expiresAt)
+                )
+            }
+        }
+    }
+
+    /**
+     * Formats the remaining time until expiry as a countdown string.
+     * Returns "Xh Ym" when ≥ 60 minutes remain, "Xm" when < 60 minutes.
+     * Returns null for continuous sessions (no expiry).
+     */
+    private fun formatCountdown(expiresAt: Long?): String? {
+        if (expiresAt == null || expiresAt == Long.MAX_VALUE) return null
+        val remainingMs = expiresAt - System.currentTimeMillis()
+        if (remainingMs <= 0) return null
+        val minutes = remainingMs / MILLIS_PER_MINUTE
+        return when {
+            minutes >= 60 -> "${minutes / 60}h ${minutes % 60}m"
+            else -> "${minutes}m"
         }
     }
 
@@ -226,6 +339,12 @@ class GlobalMapViewModel @Inject constructor(
     /**
      * Single consolidated Firestore listener for ALL locations visible to current user.
      * Replaces N per-group listeners + direct location listener.
+     *
+     * Firebase read optimization: This is a SINGLE snapshot listener on the
+     * `activeLocations` collection filtered by `visibleTo` array-contains.
+     * Firestore counts 1 read per document returned per snapshot emission.
+     * Re-processing (filter change, user cache update) reuses [lastRawLocations]
+     * without triggering additional Firestore reads.
      */
     private fun observeConsolidatedLocations() {
         locationStreamJob?.cancel()
@@ -233,6 +352,7 @@ class GlobalMapViewModel @Inject constructor(
             observeActiveLocationsUseCase()
                 .distinctUntilChanged()
                 .collect { locations ->
+                    lastRawLocations = locations
                     processLocationUpdates(locations)
                 }
         }
@@ -256,21 +376,32 @@ class GlobalMapViewModel @Inject constructor(
             .mapValues { (_, entries) -> entries.maxByOrNull { it.timestamp }!! }
             .values.toList()
 
-        // Debounced user profile fetch for unknown IDs
-        val unknownIds = deduped.map { it.userId }.filter { !userCache.containsKey(it) }
-        if (unknownIds.isNotEmpty()) {
-            debouncedFetchUsers(unknownIds)
-        }
-
         // Build UI models with distance-from-me
+        // Use denormalized displayName/photoUrl from location documents first,
+        // then fall back to in-memory user cache, then userId as last resort.
+        // This eliminates separate Firestore user profile reads.
         val myLat = _uiState.value.myLatitude
         val myLng = _uiState.value.myLongitude
         val hasMyLoc = _uiState.value.hasMyLocation
         val groups = _uiState.value.groups
         val directTargets = _uiState.value.directTargets
 
+        // Only fetch user profiles for locations with empty denormalized fields
+        val unknownIds = deduped
+            .filter { it.displayName.isEmpty() && !userCache.containsKey(it.userId) }
+            .map { it.userId }
+        if (unknownIds.isNotEmpty()) {
+            debouncedFetchUsers(unknownIds)
+        }
+
         val friendLocations = deduped.map { loc ->
-            val user = userCache[loc.userId]
+            // Fallback chain: denormalized field → in-memory cache → userId
+            val displayName = loc.displayName.ifEmpty {
+                userCache[loc.userId]?.displayName ?: loc.userId
+            }
+            val photoUrl = loc.photoUrl?.takeIf { it.isNotEmpty() }
+                ?: userCache[loc.userId]?.photoUrl
+
             val target = groups.firstOrNull { it.id == loc.targetId }
                 ?: directTargets.firstOrNull { it.id == loc.targetId }
             val groupName = target?.name ?: if (loc.targetType == "direct") "Direct" else ""
@@ -281,21 +412,27 @@ class GlobalMapViewModel @Inject constructor(
                 results[0]
             } else null
 
+            // Stale indicator: mark locations > 5 minutes old
+            val isStale = loc.timestamp > 0L &&
+                (System.currentTimeMillis() - loc.timestamp) > 5 * 60_000L
+
             FriendLocationUiModel(
                 userId = loc.userId,
-                displayName = user?.displayName ?: loc.userId,
-                username = user?.username ?: "",
-                photoUrl = user?.photoUrl,
+                displayName = displayName,
+                username = userCache[loc.userId]?.username ?: "",
+                photoUrl = photoUrl,
                 latitude = loc.latitude,
                 longitude = loc.longitude,
                 accuracy = loc.accuracy,
                 speed = loc.speed,
                 bearing = loc.bearing,
                 timeAgo = formatTimeAgo(loc.timestamp),
-                isActive = loc.isSharingActive,
+                isActive = loc.isSharingActive && !isStale,
                 groupId = loc.targetId,
                 groupName = groupName,
-                distanceMeters = distance
+                distanceMeters = distance,
+                etaText = computeEta(distance, loc.speed),
+                lastUpdatedTimestamp = loc.timestamp
             )
         }
 
@@ -320,20 +457,28 @@ class GlobalMapViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Fetches user profiles and re-processes current locations to update display names.
+     * Uses [lastRawLocations] to avoid triggering another Firestore read.
+     */
     private suspend fun fetchUsers(userIds: List<String>) {
         when (val result = getUsersUseCase(userIds)) {
             is Resource.Success -> {
                 result.data?.forEach { user -> userCache[user.id] = user }
-                // Re-trigger UI rebuild with cached data
-                observeActiveLocationsUseCase()
-                    .distinctUntilChanged()
-                    // Just take 1 to trigger a rebuild, the ongoing collector handles the rest
+                // Re-process with cached data — no additional Firestore reads
+                if (lastRawLocations.isNotEmpty()) {
+                    processLocationUpdates(lastRawLocations)
+                }
             }
             else -> {}
         }
     }
 
-    /** Auto-refresh timeAgo every 30s */
+    /**
+     * Auto-refresh timeAgo every 30s.
+     * Recalculates formatted time strings from raw timestamps and increments
+     * [GlobalMapUiState.timeAgoTick] to break StateFlow structural equality.
+     */
     private fun startTimeAgoTicker() {
         timeAgoRefreshJob?.cancel()
         timeAgoRefreshJob = viewModelScope.launch {
@@ -343,46 +488,69 @@ class GlobalMapViewModel @Inject constructor(
                 if (current.friendLocations.isNotEmpty()) {
                     _uiState.value = current.copy(
                         friendLocations = current.friendLocations.map { friend ->
-                            friend // timeAgo recalculated on next location update
-                        }
+                            friend.copy(timeAgo = formatTimeAgo(friend.lastUpdatedTimestamp))
+                        },
+                        timeAgoTick = current.timeAgoTick + 1
                     )
                 }
             }
         }
     }
 
+    /**
+     * Checks sharing status using a SINGLE Firestore read on the consolidated
+     * `activeLocations/{uid}` document, instead of N reads per group + N reads per friend.
+     *
+     * Firebase read optimization: Reduces from (groups.size + directTargets.size) × 2 reads
+     * down to exactly 1 read. Each call previously triggered 2 reads per target (consolidated + legacy).
+     */
     private fun checkAllSharingSessions() {
         viewModelScope.launch {
-            val groups = _uiState.value.groups
-            val directTargets = _uiState.value.directTargets
+            try {
+                val uid = currentUserId ?: return@launch
+                // Single read: check consolidated activeLocations doc for current user
+                val isActive = locationRepository.checkSharingStatus(
+                    _uiState.value.sharingGroupId ?: ""
+                )
+                if (isActive && _uiState.value.sharingGroupId != null) {
+                    _uiState.value = _uiState.value.copy(
+                        isSharing = true
+                    )
+                    return@launch
+                }
 
-            for (group in groups) {
-                if (locationRepository.checkSharingStatus(group.id)) {
-                    _uiState.value = _uiState.value.copy(
-                        isSharing = true,
-                        sharingGroupId = group.id
-                    )
-                    return@launch
+                // Fallback: check in-memory sessions first (0 reads)
+                val groups = _uiState.value.groups
+                val directTargets = _uiState.value.directTargets
+                val allTargets = groups + directTargets
+                for (target in allTargets) {
+                    if (locationRepository.isSharingLocation(target.id)) {
+                        _uiState.value = _uiState.value.copy(
+                            isSharing = true,
+                            sharingGroupId = target.id
+                        )
+                        return@launch
+                    }
                 }
-            }
-            for (target in directTargets) {
-                if (locationRepository.checkSharingStatus(target.id)) {
-                    _uiState.value = _uiState.value.copy(
-                        isSharing = true,
-                        sharingGroupId = target.id
-                    )
-                    return@launch
-                }
+            } catch (e: Exception) {
+                Timber.e(e, "checkAllSharingSessions failed")
             }
         }
     }
 
     // ── Actions ───────────────────────────────────────────────────────────────
 
+    /**
+     * Applies a group filter and re-processes cached locations.
+     * Does NOT restart the Firestore listener — reuses [lastRawLocations].
+     * Firebase read optimization: 0 additional reads on filter change.
+     */
     fun setGroupFilter(filter: GroupFilter?) {
         _uiState.value = _uiState.value.copy(activeGroupFilter = filter)
-        // Re-process with new filter applied
-        observeConsolidatedLocations()
+        // Re-process cached data without re-subscribing to Firestore
+        if (lastRawLocations.isNotEmpty()) {
+            processLocationUpdates(lastRawLocations)
+        }
     }
 
     fun selectFriend(friend: FriendLocationUiModel?) {
@@ -410,12 +578,18 @@ class GlobalMapViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true, showShareSheet = false)
             when (val result = startLocationSharingUseCase(groupId, durationMinutes)) {
                 is Resource.Success -> {
+                    val expiresAt = if (durationMinutes > 0) {
+                        System.currentTimeMillis() + durationMinutes * MILLIS_PER_MINUTE
+                    } else null
                     _uiState.value = _uiState.value.copy(
                         isSharing = true,
                         sharingGroupId = groupId,
+                        sharingExpiresAt = expiresAt,
+                        sharingCountdown = formatCountdown(expiresAt),
                         isLoading = false
                     )
                     startLocationService(groupId, durationMinutes)
+                    startCountdownTicker()
                     _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.toast_sharing_started)))
                 }
                 is Resource.Error -> {
@@ -432,7 +606,13 @@ class GlobalMapViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = stopLocationSharingUseCase(groupId)) {
                 is Resource.Success -> {
-                    _uiState.value = _uiState.value.copy(isSharing = false, sharingGroupId = null)
+                    countdownJob?.cancel()
+                    _uiState.value = _uiState.value.copy(
+                        isSharing = false,
+                        sharingGroupId = null,
+                        sharingExpiresAt = null,
+                        sharingCountdown = null
+                    )
                     stopLocationService()
                     _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.toast_sharing_stopped)))
                 }
@@ -488,6 +668,25 @@ class GlobalMapViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Computes a human-readable ETA string based on distance and speed.
+     *
+     * Strategy:
+     * - If the friend is moving (speed > 1 m/s), use their actual speed
+     * - Otherwise, assume average driving speed (~50 km/h = 13.9 m/s)
+     * - Returns null if distance < 50m (already arrived) or distance is null
+     */
+    private fun computeEta(distanceMeters: Float?, friendSpeed: Float): String? {
+        if (distanceMeters == null || distanceMeters < 50f) return null
+        val speedMps = if (friendSpeed > 1f) friendSpeed.toDouble() else 13.9
+        val etaSeconds = (distanceMeters / speedMps).toLong()
+        return when {
+            etaSeconds < 60 -> "< 1 min"
+            etaSeconds < 3600 -> "${etaSeconds / 60} min"
+            else -> "${etaSeconds / 3600}h ${(etaSeconds % 3600) / 60}m"
+        }
+    }
+
     private fun startLocationService(groupId: String, durationMinutes: Long) {
         val ctx = getApplication<Application>()
         ctx.startForegroundService(LocationTrackingService.createStartIntent(ctx, groupId, durationMinutes))
@@ -521,6 +720,7 @@ class GlobalMapViewModel @Inject constructor(
         locationStreamJob?.cancel()
         friendsJob?.cancel()
         timeAgoRefreshJob?.cancel()
+        countdownJob?.cancel()
         unregisterLocationProviderReceiver()
     }
 }
@@ -539,6 +739,10 @@ data class GlobalMapUiState(
     // Sharing
     val isSharing: Boolean = false,
     val sharingGroupId: String? = null,
+    /** Epoch millis when the current sharing session expires (null = continuous). */
+    val sharingExpiresAt: Long? = null,
+    /** Formatted countdown string: "Xh Ym" or "Xm". Null for continuous sessions. */
+    val sharingCountdown: String? = null,
     // UI state
     val selectedFriend: FriendLocationUiModel? = null,
     val showFriendSheet: Boolean = false,
@@ -548,5 +752,7 @@ data class GlobalMapUiState(
     val myPhotoUrl: String? = null,
     val isLocationEnabled: Boolean = true,
     val isLoading: Boolean = true,
-    val error: String? = null
+    val error: String? = null,
+    /** Monotonic counter to break StateFlow structural equality on timeAgo refresh. */
+    val timeAgoTick: Long = 0L
 )

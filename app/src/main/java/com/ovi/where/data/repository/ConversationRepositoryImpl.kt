@@ -72,6 +72,14 @@ class ConversationRepositoryImpl @Inject constructor(
     private val currentUid: String?
         get() = firebaseAuth.currentUser?.uid
 
+    /**
+     * In-memory set of conversation IDs that the current user has soft-deleted this session.
+     * Used to prevent REST API fetches from re-inserting deleted conversations into Room.
+     * Cleared on sign-out / app restart (which is fine — the Firestore listener handles
+     * the persistent filtering via the `deletedBy` array field).
+     */
+    private val locallyDeletedIds = mutableSetOf<String>()
+
     private suspend fun getIdToken(): String {
         return firebaseAuth.currentUser?.getIdToken(false)?.await()?.token ?: ""
     }
@@ -221,7 +229,7 @@ class ConversationRepositoryImpl @Inject constructor(
                     )
                 } else incoming
             }
-            conversationDao.upsertAll(mergedEntities)
+            conversationDao.upsertAll(mergedEntities.filter { it.id !in locallyDeletedIds })
             Resource.Success(Unit)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to fetch initial conversations")
@@ -229,17 +237,33 @@ class ConversationRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Deletes a conversation from the local Room database.
-     * The conversation will reappear on next Firestore sync if it still exists server-side.
+     * Soft-deletes a conversation for the current user.
+     * Adds the user's ID to the Firestore `deletedBy` array so the conversation
+     * won't reappear on sync (the Firestore listener already filters these out).
+     * Also removes from Room for immediate UI feedback.
      */
-    override suspend fun deleteConversation(conversationId: String): Resource<Unit> {
-        return try {
-            conversationDao.deleteById(conversationId)
-            Resource.Success(Unit)
-        } catch (e: Exception) {
-            Resource.Error(e.message ?: "Failed to delete conversation")
+    override suspend fun deleteConversation(conversationId: String): Resource<Unit> =
+        withContext(Dispatchers.IO) {
+            val uid = currentUid ?: return@withContext Resource.Error("User not authenticated")
+            try {
+                // Track locally so REST fetches don't re-insert it
+                locallyDeletedIds.add(conversationId)
+
+                // Write to Firestore first — adds user to deletedBy array
+                firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
+                    .document(conversationId)
+                    .update("deletedBy", com.google.firebase.firestore.FieldValue.arrayUnion(uid))
+                    .await()
+
+                // Then remove from Room for immediate UI feedback
+                conversationDao.deleteById(conversationId)
+                Resource.Success(Unit)
+            } catch (e: Exception) {
+                // If Firestore write fails, still try to remove locally
+                try { conversationDao.deleteById(conversationId) } catch (_: Exception) {}
+                Resource.Error(e.message ?: "Failed to delete conversation")
+            }
         }
-    }
 
     /**
      * Starts the Firestore snapshot listener if not already running.
@@ -736,7 +760,7 @@ class ConversationRepositoryImpl @Inject constructor(
                         )
                     } else incoming
                 }
-                conversationDao.upsertAll(mergedEntities)
+                conversationDao.upsertAll(mergedEntities.filter { it.id !in locallyDeletedIds })
                 // Update cache metadata with current timestamp (and ETag if available)
                 cacheStalenessChecker.updateMetadata(CACHE_KEY_CONVERSATIONS)
             },
@@ -808,7 +832,7 @@ class ConversationRepositoryImpl @Inject constructor(
                         )
                     } else incoming
                 }
-                conversationDao.upsertAll(mergedEntities)
+                conversationDao.upsertAll(mergedEntities.filter { it.id !in locallyDeletedIds })
                 cacheStalenessChecker.updateMetadata(CACHE_KEY_CONVERSATIONS)
             },
             shouldFetch = { true }, // Always fetch on explicit refresh

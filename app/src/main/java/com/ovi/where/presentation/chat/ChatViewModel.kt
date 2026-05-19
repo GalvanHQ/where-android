@@ -106,7 +106,8 @@ class ChatViewModel @Inject constructor(
     private val muteGroupMemberUseCase: MuteGroupMemberUseCase,
     private val voiceRecorder: VoiceRecorder,
     private val onlineStatusDao: OnlineStatusDao,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val getOrCreateDirectConversationUseCase: com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
 ) : AndroidViewModel(application) {
 
     /**
@@ -352,6 +353,12 @@ class ChatViewModel @Inject constructor(
 
     /** Cached resolved profile photo URLs for DM participants (userId -> photoUrl). */
     private val participantPhotos = mutableMapOf<String, String?>()
+
+    /** Cached set of user IDs that are friends with the current user. */
+    private val cachedFriendIds = mutableSetOf<String>()
+
+    /** Cached friendship status per user ID for the avatar-tap sheet. */
+    private val cachedFriendshipStatus = mutableMapOf<String, com.ovi.where.presentation.chat.components.FriendshipAction>()
 
     /**
      * Tracks which user IDs are currently online (from presence frames).
@@ -2025,6 +2032,75 @@ class ChatViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(reactionDetailsMessageId = null)
     }
 
+    /** Shows the user details bottom sheet for a sender avatar tap. */
+    fun showUserDetailsSheet(userId: String) {
+        _uiState.value = _uiState.value.copy(avatarSheetUserId = userId)
+    }
+
+    /** Dismisses the user details bottom sheet. */
+    fun dismissUserDetailsSheet() {
+        _uiState.value = _uiState.value.copy(avatarSheetUserId = null)
+    }
+
+    /**
+     * Builds [com.ovi.where.presentation.chat.components.SheetUserDetails] for the
+     * avatar-tap bottom sheet from cached participant metadata.
+     */
+    fun buildSheetUserDetails(userId: String): com.ovi.where.presentation.chat.components.SheetUserDetails {
+        return com.ovi.where.presentation.chat.components.SheetUserDetails(
+            userId = userId,
+            displayName = participantNames[userId] ?: "",
+            photoUrl = participantPhotos[userId],
+            isOnline = userId in onlineUserIds,
+            friendshipStatus = cachedFriendshipStatus[userId]
+                ?: com.ovi.where.presentation.chat.components.FriendshipAction.NONE
+        )
+    }
+
+    /**
+     * Sends a friend request to the given user from the avatar sheet.
+     */
+    fun sendFriendRequest(userId: String) {
+        viewModelScope.launch {
+            friendshipRepository.sendFriendRequest(userId)
+            cachedFriendshipStatus[userId] = com.ovi.where.presentation.chat.components.FriendshipAction.PENDING_OUTGOING
+            dismissUserDetailsSheet()
+        }
+    }
+
+    /**
+     * Accepts an incoming friend request from the avatar sheet.
+     */
+    fun acceptFriendRequest(userId: String) {
+        viewModelScope.launch {
+            friendshipRepository.acceptFriendRequest(userId)
+            cachedFriendIds.add(userId)
+            cachedFriendshipStatus[userId] = com.ovi.where.presentation.chat.components.FriendshipAction.ACCEPTED
+            dismissUserDetailsSheet()
+        }
+    }
+
+    /**
+     * Opens or creates a direct conversation with the given user and emits a
+     * navigation event so ChatScreen can navigate to it.
+     */
+    private val _navigateToChatEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val navigateToChatEvent: kotlinx.coroutines.flow.SharedFlow<String> = _navigateToChatEvent.asSharedFlow()
+
+    fun openDirectChat(userId: String) {
+        viewModelScope.launch {
+            dismissUserDetailsSheet()
+            when (val result = getOrCreateDirectConversationUseCase(userId)) {
+                is Resource.Success -> {
+                    result.data?.id?.let { conversationId ->
+                        _navigateToChatEvent.emit(conversationId)
+                    }
+                }
+                else -> { /* silently fail */ }
+            }
+        }
+    }
+
     /**
      * Builds a flat list of [com.ovi.where.presentation.chat.components.Reactor] entries
      * for the currently-open reaction-details sheet, joined with cached participant
@@ -2563,6 +2639,32 @@ class ChatViewModel @Inject constructor(
                     participantPhotos[user.id] = user.photoUrl
                 }
 
+                // Cache friendship status for each member (for avatar-tap sheet)
+                val uid = currentUserId ?: ""
+                for (userId in userIds) {
+                    if (userId == uid) continue
+                    try {
+                        val status = friendshipRepository.getFriendshipStatus(userId)
+                        val action = when (status) {
+                            FriendshipStatus.ACCEPTED -> {
+                                cachedFriendIds.add(userId)
+                                com.ovi.where.presentation.chat.components.FriendshipAction.ACCEPTED
+                            }
+                            FriendshipStatus.PENDING -> {
+                                // Need to determine direction: did I send it or did they?
+                                val friendship = friendshipRepository.getFriendship(userId)
+                                if (friendship != null && friendship.requesterId == uid) {
+                                    com.ovi.where.presentation.chat.components.FriendshipAction.PENDING_OUTGOING
+                                } else {
+                                    com.ovi.where.presentation.chat.components.FriendshipAction.PENDING_INCOMING
+                                }
+                            }
+                            else -> com.ovi.where.presentation.chat.components.FriendshipAction.NONE
+                        }
+                        cachedFriendshipStatus[userId] = action
+                    } catch (_: Exception) { /* best-effort */ }
+                }
+
                 cachedMentionMembers = members.map { member ->
                     val user = userMap[member.userId]
                     MentionEngine.MentionMember(
@@ -2757,17 +2859,19 @@ class ChatViewModel @Inject constructor(
             val isLastInGroup = !sameGroupAsNext
 
             // Messenger-style timestamp visibility:
-            // Show time only when there's a significant gap (5+ min) to the next message,
-            // or it's the very last message in the conversation.
-            val showTimestamp = isLastInGroup && (
-                next == null || nextTimestamp == null ||
-                (nextTimestamp - currentTimestamp) >= TIMESTAMP_DISPLAY_THRESHOLD_MS
+            // Show a centered timestamp separator when there's a significant gap (5+ min)
+            // to the PREVIOUS message, or it's the first message in the conversation.
+            // This replaces per-bubble timestamps entirely.
+            val showTimestamp = isFirstInGroup && (
+                prev == null || prevTimestamp == null ||
+                (currentTimestamp - prevTimestamp) >= TIMESTAMP_DISPLAY_THRESHOLD_MS
             )
 
             // Date separator: show when dateKey differs from previous message or for the first message
-            val showDateSeparator = prev == null || current.dateKey != prev.dateKey
+            // OR when there's a time gap (showTimestamp). The label includes time.
+            val showDateSeparator = showTimestamp || (prev == null || current.dateKey != prev.dateKey)
             val dateSeparatorLabel = if (showDateSeparator) {
-                formatDateSeparatorLabel(current.dateKey, clock)
+                formatMessageTime(currentTimestamp)
             } else {
                 null
             }
@@ -3051,6 +3155,8 @@ data class ChatUiState(
     val reactionPickerMessageId: String? = null,
     /** When non-null, a bottom sheet listing who reacted to this message is shown. */
     val reactionDetailsMessageId: String? = null,
+    /** When non-null, a user details bottom sheet is shown for this sender ID. */
+    val avatarSheetUserId: String? = null,
     // ─── Message Search State (Task 8.1) ──────────────────────────────────────
     /** Whether the search bar is currently active/visible (Requirement 13.1). */
     val isSearchActive: Boolean = false,

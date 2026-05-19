@@ -89,6 +89,7 @@ fun ChatBubble(
     onReactionLongPress: () -> Unit = {},
     onBubbleTap: () -> Unit = {},
     isTapped: Boolean = false,
+    onAvatarClick: () -> Unit = {},
     onVoicePlayPause: (() -> Unit)? = null,
     onVoiceSeek: ((Float) -> Unit)? = null,
     isVoicePlaying: Boolean = false,
@@ -177,7 +178,10 @@ fun ChatBubble(
                         size = AvatarSize,
                         indicatorSize = 0.dp,
                         indicatorBorderWidth = 0.dp,
-                        modifier = Modifier.size(AvatarSize)
+                        modifier = Modifier
+                            .size(AvatarSize)
+                            .clip(androidx.compose.foundation.shape.CircleShape)
+                            .clickable { onAvatarClick() }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                 } else {
@@ -295,6 +299,7 @@ fun ChatBubble(
                             modifier = bubbleModifier
                                 .widthIn(max = maxBubbleWidth)
                                 .then(errorBorder)
+                                .clip(bubbleShape)
                                 .combinedClickable(
                                     interactionSource = interactionSource,
                                     indication = androidx.compose.foundation.LocalIndication.current,
@@ -411,60 +416,32 @@ fun ChatBubble(
             )
         }
 
-        // ── Status / read indicator (Messenger-style) ─────────────────────
-        // Only the VERY LAST sent message in the entire conversation shows an
-        // indicator. Either:
-        //   - Read receipt avatar (if someone has read it)
-        //   - Status circle (pending/sent/delivered/failed)
-        // Older sent messages show nothing. Timestamp is separate (shown on gap).
-        if (message.showReadReceipt) {
-            // This is the last read sent message → show reader avatar
+        // ── Delivery indicator only (no per-bubble timestamp) ─────────────
+        // Messenger shows timestamps in the centered separator, not per-bubble.
+        // Only the last sent message shows status/receipt indicator.
+        // Tapping any sent bubble reveals its status inline.
+        if (message.showReadReceipt || message.showStatusIndicator || (isTapped && isSent)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(
-                    start = if (!isSent && isGroupChat) AvatarTrack else 0.dp,
-                    top = 4.dp
-                ),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End
-            ) {
-                ReadReceiptIndicator(
-                    readBy = message.readBy,
-                    readByPhotoUrls = message.readByPhotoUrls,
-                    direction = message.direction
-                )
-            }
-        } else if (isSent && isLastInGroup && message.readBy.isEmpty()) {
-            // Check if this is the very last sent message overall (no later sent messages exist).
-            // We approximate this by: isLastInGroup + showTimestamp (which means it's the tail).
-            // The ViewModel sets showReadReceipt only on the furthest-read message.
-            // For the absolute last sent message that hasn't been read yet, show status.
-            // But we only show it if showTimestamp is true (meaning it's at a group boundary).
-        }
-
-        // Timestamp (shown independently based on time gaps)
-        // ── Timestamp (Messenger-style: hidden by default, revealed on tap) ─
-        if (isTapped || message.showTimestamp) {
-            Row(
-                modifier = Modifier.padding(
-                    start = if (!isSent && isGroupChat) AvatarTrack else 0.dp,
-                    top = 4.dp
-                ),
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = message.formattedTime,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
-                )
-                // When tapped, also show status for sent messages (tap-to-reveal)
-                if (isTapped && isSent && !message.showReadReceipt && !message.showStatusIndicator) {
-                    Spacer(modifier = Modifier.width(6.dp))
-                    MessageStatusIndicator(
-                        status = message.status,
-                        direction = message.direction
-                    )
+                when {
+                    message.showReadReceipt -> {
+                        ReadReceiptIndicator(
+                            readBy = message.readBy,
+                            readByPhotoUrls = message.readByPhotoUrls,
+                            direction = message.direction
+                        )
+                    }
+                    else -> {
+                        MessageStatusIndicator(
+                            status = message.status,
+                            direction = message.direction
+                        )
+                    }
                 }
             }
         }

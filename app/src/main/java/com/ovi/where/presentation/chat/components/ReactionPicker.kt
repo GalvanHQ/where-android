@@ -16,12 +16,14 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -37,7 +39,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.LocalReducedMotion
 
 /**
@@ -110,14 +111,15 @@ fun ReactionPickerOverlay(
                     )
                     .semantics { contentDescription = "Reaction picker" }
             ) {
-                Row(
+                LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 8.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    contentPadding = PaddingValues(horizontal = 4.dp)
                 ) {
-                    REACTION_EMOJIS.forEach { emoji ->
+                    items(REACTION_EMOJIS) { emoji ->
                         ReactionEmojiButton(
                             emoji = emoji,
                             onClick = { onEmojiSelected(emoji) }
@@ -161,7 +163,7 @@ private fun ReactionEmojiButton(
     ) {
         Text(
             text = emoji,
-            fontSize = 24.sp,
+            fontSize = 30.sp,
             modifier = Modifier.scale(scale)
         )
     }

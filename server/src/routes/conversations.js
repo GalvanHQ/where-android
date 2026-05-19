@@ -25,23 +25,34 @@ router.get('/', async (req, res) => {
             .orderBy('lastMessageTimestamp', 'desc')
             .get();
 
-        const conversations = snapshot.docs.map(doc => {
-            const data = doc.data();
-            const unreadCounts = data.unreadCounts || {};
-            return {
-                id: doc.id,
-                type: data.type || 'direct',
-                participantIds: data.participantIds || [],
-                groupId: data.groupId || null,
-                name: data.name || '',
-                photoUrl: data.photoUrl || null,
-                lastMessageText: data.lastMessageText || '',
-                lastMessageSenderId: data.lastMessageSenderId || '',
-                lastMessageTimestamp: data.lastMessageTimestamp || 0,
-                unreadCount: unreadCounts[uid] || 0,
-                createdAt: data.createdAt || 0
-            };
-        });
+        const conversations = snapshot.docs
+            .filter(doc => {
+                // Filter out conversations soft-deleted by this user
+                const deletedBy = doc.data().deletedBy || [];
+                return !deletedBy.includes(uid);
+            })
+            .filter(doc => {
+                // Filter out conversations archived by this user
+                const archivedBy = doc.data().archivedBy || [];
+                return !archivedBy.includes(uid);
+            })
+            .map(doc => {
+                const data = doc.data();
+                const unreadCounts = data.unreadCounts || {};
+                return {
+                    id: doc.id,
+                    type: data.type || 'direct',
+                    participantIds: data.participantIds || [],
+                    groupId: data.groupId || null,
+                    name: data.name || '',
+                    photoUrl: data.photoUrl || null,
+                    lastMessageText: data.lastMessageText || '',
+                    lastMessageSenderId: data.lastMessageSenderId || '',
+                    lastMessageTimestamp: data.lastMessageTimestamp || 0,
+                    unreadCount: unreadCounts[uid] || 0,
+                    createdAt: data.createdAt || 0
+                };
+            });
 
         res.json(conversations);
     } catch (error) {

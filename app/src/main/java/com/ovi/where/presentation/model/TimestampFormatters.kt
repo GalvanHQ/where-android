@@ -50,11 +50,38 @@ fun formatConversationTimestamp(timestamp: Long): String {
 }
 
 /** Formats a millisecond timestamp for message bubbles (Messenger style).
- *  Shows only the time — date context is provided by date separators above message groups.
- *  - "2:32 PM" (12h with AM/PM, always just the time)
+ *  Shows relative date + time:
+ *  - Today → "2:32 PM"
+ *  - Yesterday → "Yesterday 9:15 AM"
+ *  - Same week → "Monday 4:10 PM"
+ *  - Older → "Jan 15 2:32 PM"
  */
 fun formatMessageTime(timestamp: Long): String {
-    return SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(timestamp))
+    val now = Calendar.getInstance()
+    val msgCal = Calendar.getInstance().apply { time = Date(timestamp) }
+    val timeStr = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(timestamp))
+
+    val isSameDay = now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) &&
+            now.get(Calendar.DAY_OF_YEAR) == msgCal.get(Calendar.DAY_OF_YEAR)
+    if (isSameDay) return "$timeStr"
+
+    val yesterday = Calendar.getInstance().apply {
+        timeInMillis = now.timeInMillis
+        add(Calendar.DATE, -1)
+    }
+    val isYesterday = yesterday.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) &&
+            yesterday.get(Calendar.DAY_OF_YEAR) == msgCal.get(Calendar.DAY_OF_YEAR)
+    if (isYesterday) return "Yesterday $timeStr"
+
+    val isSameWeek = now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) &&
+            now.get(Calendar.WEEK_OF_YEAR) == msgCal.get(Calendar.WEEK_OF_YEAR)
+    if (isSameWeek) {
+        val dayName = SimpleDateFormat("EEEE", Locale.getDefault()).format(Date(timestamp))
+        return "$dayName $timeStr"
+    }
+
+    val dateStr = SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(timestamp))
+    return "$dateStr $timeStr"
 }
 
 /** Returns yyyy-MM-dd key for grouping messages by date. */

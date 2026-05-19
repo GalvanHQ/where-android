@@ -523,6 +523,12 @@ fun AppNavGraph(
                     navController.navigate(Screen.ConversationInfo.createRoute(convId)) {
                         launchSingleTop = true
                     }
+                },
+                onNavigateToChat = { convId ->
+                    navController.navigate(Screen.Chat.createRoute(convId)) {
+                        popUpTo(Screen.Chat.ROUTE) { inclusive = true }
+                        launchSingleTop = true
+                    }
                 }
             )
         }

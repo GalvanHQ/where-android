@@ -100,6 +100,7 @@ fun ChatScreen(
     onNavigateToEditGroup: (String) -> Unit = {},
     onNavigateToMediaGallery: (String) -> Unit = {},
     onNavigateToConversationInfo: (String) -> Unit = {},
+    onNavigateToChat: (String) -> Unit = {},
     viewModel: ChatViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -368,8 +369,16 @@ fun ChatScreen(
         )
     }
 
+    // ── Navigate to DM from avatar sheet "Message" button ────────────────────
+    LaunchedEffect(Unit) {
+        viewModel.navigateToChatEvent.collect { targetConversationId ->
+            onNavigateToChat(targetConversationId)
+        }
+    }
+
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             ChatHeader(
                 conversation = uiState.conversation,
@@ -677,6 +686,7 @@ fun ChatScreen(
                                             onReactionLongPress = onReactionLongPress,
                                             onBubbleTap = { viewModel.toggleMessageTimestamp(message.id) },
                                             isTapped = uiState.tappedMessageId == message.id,
+                                            onAvatarClick = { viewModel.showUserDetailsSheet(message.senderId) },
                                             onVoicePlayPause = onVoicePlayPause,
                                             onVoiceSeek = onVoiceSeek,
                                             isVoicePlaying = isThisVoicePlaying,
@@ -832,6 +842,31 @@ fun ChatScreen(
             onDismiss = viewModel::dismissReactionDetails,
             onRemoveOwnReaction = { emoji ->
                 viewModel.toggleReaction(reactionDetailsId, emoji)
+            }
+        )
+    }
+
+    // ── User details bottom sheet (avatar tap in group chat) ─────────────────
+    val avatarSheetUserId = uiState.avatarSheetUserId
+    if (avatarSheetUserId != null) {
+        val userDetails = remember(avatarSheetUserId) {
+            viewModel.buildSheetUserDetails(avatarSheetUserId)
+        }
+        com.ovi.where.presentation.chat.components.UserDetailsSheet(
+            user = userDetails,
+            onDismiss = viewModel::dismissUserDetailsSheet,
+            onViewProfile = { userId ->
+                viewModel.dismissUserDetailsSheet()
+                onNavigateToUserProfile(userId)
+            },
+            onMessage = { userId ->
+                viewModel.openDirectChat(userId)
+            },
+            onAddFriend = { userId ->
+                viewModel.sendFriendRequest(userId)
+            },
+            onAcceptRequest = { userId ->
+                viewModel.acceptFriendRequest(userId)
             }
         )
     }

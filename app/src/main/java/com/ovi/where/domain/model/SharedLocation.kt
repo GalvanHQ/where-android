@@ -1,5 +1,7 @@
 package com.ovi.where.domain.model
 
+import com.google.firebase.firestore.PropertyName
+
 data class SharedLocation(
     val id: String = "",
     val userId: String = "",
@@ -20,4 +22,30 @@ data class SharedLocation(
     val displayName: String = "",
     val photoUrl: String? = null,
     val sharingStartedAt: Long = 0L
-)
+) {
+    /**
+     * Secondary constructor for Firestore deserialization.
+     * Firestore stores all numbers as Double/Long, so Float fields need conversion.
+     * This constructor accepts Double for accuracy/speed/bearing and converts to Float.
+     */
+    @Suppress("unused")
+    constructor() : this(
+        id = "",
+        userId = "",
+        groupId = "",
+        latitude = 0.0,
+        longitude = 0.0,
+        accuracy = 0f,
+        speed = 0f,
+        bearing = 0f,
+        timestamp = 0L,
+        isSharingActive = false,
+        sharingExpiresAt = 0L,
+        targetType = "group",
+        targetId = "",
+        visibleTo = emptyList(),
+        displayName = "",
+        photoUrl = null,
+        sharingStartedAt = 0L
+    )
+}

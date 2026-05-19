@@ -116,6 +116,39 @@ class LocationRepositoryImpl @Inject constructor(
      */
     private fun isMoving(speed: Float): Boolean = speed > SPEED_MOVING_THRESHOLD
 
+    /**
+     * Safely parses a Firestore document into a SharedLocation.
+     * Handles Firestore's number type coercion (all numbers stored as Double/Long)
+     * which causes toObject() to fail silently with Float fields.
+     */
+    private fun parseSharedLocation(docId: String, data: Map<String, Any>?): SharedLocation? {
+        if (data == null) return null
+        return try {
+            SharedLocation(
+                id = docId,
+                userId = data["userId"] as? String ?: "",
+                groupId = data["targetId"] as? String ?: data["groupId"] as? String ?: "",
+                latitude = (data["latitude"] as? Number)?.toDouble() ?: 0.0,
+                longitude = (data["longitude"] as? Number)?.toDouble() ?: 0.0,
+                accuracy = (data["accuracy"] as? Number)?.toFloat() ?: 0f,
+                speed = (data["speed"] as? Number)?.toFloat() ?: 0f,
+                bearing = (data["bearing"] as? Number)?.toFloat() ?: 0f,
+                timestamp = (data["timestamp"] as? Number)?.toLong() ?: 0L,
+                isSharingActive = data["isSharingActive"] as? Boolean ?: false,
+                sharingExpiresAt = (data["sharingExpiresAt"] as? Number)?.toLong() ?: 0L,
+                targetType = data["targetType"] as? String ?: "group",
+                targetId = data["targetId"] as? String ?: "",
+                visibleTo = (data["visibleTo"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                displayName = data["displayName"] as? String ?: "",
+                photoUrl = data["photoUrl"] as? String,
+                sharingStartedAt = (data["sharingStartedAt"] as? Number)?.toLong() ?: 0L
+            )
+        } catch (e: Exception) {
+            Timber.w(e, "parseSharedLocation: failed to parse doc=$docId")
+            null
+        }
+    }
+
     override suspend fun startLocationSharing(groupId: String, durationMinutes: Long): Resource<Unit> {
         return try {
             val uid = currentUid ?: return Resource.Error("Not authenticated")
@@ -370,21 +403,22 @@ class LocationRepositoryImpl @Inject constructor(
                 Timber.d("observeActiveLocations: received ${snapshot?.documents?.size ?: 0} documents")
 
                 val locations = snapshot?.documents?.mapNotNull { doc ->
-                    val location = doc.toObject(SharedLocation::class.java)
-                    if (location != null) {
+                    try {
+                        val location = parseSharedLocation(doc.id, doc.data)
+                            ?: return@mapNotNull null
+
                         val now = System.currentTimeMillis()
                         val stillActive = location.isSharingActive &&
                             (location.sharingExpiresAt == 0L ||
                              location.sharingExpiresAt == Long.MAX_VALUE ||
                              now < location.sharingExpiresAt)
                         if (stillActive && location.userId != uid) {
-                            location.copy(
-                                id = doc.id,
-                                isSharingActive = true,
-                                groupId = location.targetId
-                            )
+                            location
                         } else null
-                    } else null
+                    } catch (e: Exception) {
+                        Timber.w(e, "observeActiveLocations: failed to parse doc=${doc.id}")
+                        null
+                    }
                 } ?: emptyList()
 
                 // Persist-before-emit: write to Room cache BEFORE emitting to UI

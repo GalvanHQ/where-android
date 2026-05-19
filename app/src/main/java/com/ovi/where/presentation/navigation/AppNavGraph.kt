@@ -647,6 +647,11 @@ fun AppNavGraph(
                 onNavigateToSearch = {
                     navController.previousBackStackEntry?.savedStateHandle?.set("activate_search", true)
                     navController.popBackStack()
+                },
+                onNavigateToGroupMap = {
+                    navController.navigate(Screen.GroupMap.createRoute(groupId)) {
+                        launchSingleTop = true
+                    }
                 }
             )
         }

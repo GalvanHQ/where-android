@@ -675,6 +675,8 @@ fun ChatScreen(
                                             },
                                             onReactionTap = onReactionTapHandler,
                                             onReactionLongPress = onReactionLongPress,
+                                            onBubbleTap = { viewModel.toggleMessageTimestamp(message.id) },
+                                            isTapped = uiState.tappedMessageId == message.id,
                                             onVoicePlayPause = onVoicePlayPause,
                                             onVoiceSeek = onVoiceSeek,
                                             isVoicePlaying = isThisVoicePlaying,

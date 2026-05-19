@@ -2008,6 +2008,18 @@ class ChatViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(reactionDetailsMessageId = messageId)
     }
 
+    /**
+     * Toggles the tap-to-reveal timestamp for a message.
+     * Messenger hides timestamps by default; tapping a bubble reveals its time + status.
+     * Tapping again (or tapping a different bubble) hides it.
+     */
+    fun toggleMessageTimestamp(messageId: String) {
+        val current = _uiState.value.tappedMessageId
+        _uiState.value = _uiState.value.copy(
+            tappedMessageId = if (current == messageId) null else messageId
+        )
+    }
+
     /** Dismisses the reaction-details bottom sheet. */
     fun dismissReactionDetails() {
         _uiState.value = _uiState.value.copy(reactionDetailsMessageId = null)
@@ -2948,6 +2960,12 @@ data class ChatUiState(
      * Each entry is a pair of (dateKey, list of messages for that date).
      */
     val groupedMessages: List<Pair<String, List<MessageUiModel>>> = emptyList(),
+    /**
+     * ID of the message whose timestamp is currently revealed (tap-to-show).
+     * Messenger hides timestamps by default; tapping a bubble reveals it.
+     * Null means no message has its timestamp expanded.
+     */
+    val tappedMessageId: String? = null,
     val inputText: String = "",
     val isSending: Boolean = false,
     val isLoading: Boolean = true,

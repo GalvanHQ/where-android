@@ -87,6 +87,8 @@ fun ChatBubble(
     onReplyQuoteTap: (String) -> Unit = {},
     onReactionTap: (String) -> Unit = {},
     onReactionLongPress: () -> Unit = {},
+    onBubbleTap: () -> Unit = {},
+    isTapped: Boolean = false,
     onVoicePlayPause: (() -> Unit)? = null,
     onVoiceSeek: ((Float) -> Unit)? = null,
     isVoicePlaying: Boolean = false,
@@ -296,7 +298,7 @@ fun ChatBubble(
                                 .combinedClickable(
                                     interactionSource = interactionSource,
                                     indication = androidx.compose.foundation.LocalIndication.current,
-                                    onClick = { if (isFailed) onRetry() },
+                                    onClick = { if (isFailed) onRetry() else onBubbleTap() },
                                     onLongClick = { onLongPress() }
                                 )
                         ) {
@@ -442,7 +444,8 @@ fun ChatBubble(
         }
 
         // Timestamp (shown independently based on time gaps)
-        if (message.showTimestamp) {
+        // ── Timestamp (Messenger-style: hidden by default, revealed on tap) ─
+        if (isTapped || message.showTimestamp) {
             Row(
                 modifier = Modifier.padding(
                     start = if (!isSent && isGroupChat) AvatarTrack else 0.dp,
@@ -455,6 +458,14 @@ fun ChatBubble(
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
                 )
+                // When tapped, also show status for sent messages (tap-to-reveal)
+                if (isTapped && isSent && !message.showReadReceipt && !message.showStatusIndicator) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    MessageStatusIndicator(
+                        status = message.status,
+                        direction = message.direction
+                    )
+                }
             }
         }
     }

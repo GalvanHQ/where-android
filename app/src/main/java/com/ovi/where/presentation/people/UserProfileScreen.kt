@@ -101,6 +101,18 @@ fun UserProfileScreen(
 
     LaunchedEffect(userId) { viewModel.loadUser(userId) }
 
+    // Start location service when sharing is activated from this screen
+    val context = LocalContext.current
+    LaunchedEffect(uiState.locationSharingActive, uiState.locationSharingTargetId) {
+        if (uiState.locationSharingActive && uiState.locationSharingTargetId != null) {
+            val intent = com.ovi.where.service.LocationTrackingService.createStartIntent(
+                context, uiState.locationSharingTargetId!!, 60L
+            )
+            context.startForegroundService(intent)
+            android.widget.Toast.makeText(context, "Sharing location for 1 hour", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
     LaunchedEffect(navigateToChat) {
         navigateToChat?.let { conversationId ->
             onNavigateToChat(conversationId)
@@ -409,7 +421,7 @@ fun UserProfileScreen(
                                             Text("Message", style = MaterialTheme.typography.labelLarge)
                                         }
                                         OutlinedButton(
-                                            onClick = { onNavigateBack() },
+                                            onClick = { viewModel.startLocationSharingWithFriend(userId) },
                                             modifier = Modifier.weight(1f).height(44.dp),
                                             shape = RoundedCornerShape(Dimens.cornerSmall),
                                             colors = ButtonDefaults.outlinedButtonColors(

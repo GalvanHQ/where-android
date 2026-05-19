@@ -55,7 +55,8 @@ class UserProfileViewModel @Inject constructor(
     private val blockUserUseCase: BlockUserUseCase,
     private val unblockUserUseCase: UnblockUserUseCase,
     private val getOrCreateDirectConversationUseCase: GetOrCreateDirectConversationUseCase,
-    private val firebaseAuth: FirebaseAuth
+    private val firebaseAuth: FirebaseAuth,
+    private val locationRepository: com.ovi.where.domain.repository.LocationRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UserProfileUiState())
@@ -227,6 +228,29 @@ class UserProfileViewModel @Inject constructor(
         _navigateToChat.value = null
     }
 
+    /**
+     * Starts sharing live location with this friend (direct share).
+     * Uses 1 hour as default duration. The target is "direct:{friendId}".
+     * The UI layer is responsible for starting the LocationTrackingService.
+     */
+    fun startLocationSharingWithFriend(friendId: String) {
+        viewModelScope.launch {
+            val targetId = "direct:$friendId"
+            when (val result = locationRepository.startLocationSharing(targetId, 60L)) {
+                is Resource.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        locationSharingActive = true,
+                        locationSharingTargetId = targetId
+                    )
+                }
+                is Resource.Error -> {
+                    mapErrorToSnackbar(result.message)
+                }
+                else -> {}
+            }
+        }
+    }
+
     fun onRetry(userId: String) {
         loadUser(userId)
     }
@@ -304,5 +328,9 @@ data class UserProfileUiState(
     val profile: OtherUserProfileUiModel? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val notFound: Boolean = false
+    val notFound: Boolean = false,
+    /** Whether location sharing was just started with this friend. */
+    val locationSharingActive: Boolean = false,
+    /** The target ID for the active location sharing session (e.g., "direct:friendId"). */
+    val locationSharingTargetId: String? = null
 )

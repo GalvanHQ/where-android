@@ -539,13 +539,16 @@ fun GlobalMapScreen(
                         ) {
                             SharingPulseDot()
                             Spacer(Modifier.width(Dimens.spaceSmall))
-                            val sharingTargetName = (uiState.groups + uiState.directTargets).firstOrNull { it.id == uiState.sharingGroupId }?.name ?: "target"
+                            val sharingTargetName = (uiState.groups + uiState.directTargets)
+                                .firstOrNull { it.id == uiState.sharingGroupId }?.name
+                                ?: if (uiState.sharingGroupId?.startsWith("direct:") == true) "friend"
+                                else "group"
                             val timerText = if (sharingSecondsRemaining != null) {
                                 val mins = sharingSecondsRemaining!! / 60
                                 val secs = sharingSecondsRemaining!! % 60
                                 " • ${"%02d:%02d".format(mins, secs)} remaining"
                             } else {
-                                ""
+                                " • Until you stop"
                             }
                             Text(
                                 text = "Sharing live with $sharingTargetName$timerText",

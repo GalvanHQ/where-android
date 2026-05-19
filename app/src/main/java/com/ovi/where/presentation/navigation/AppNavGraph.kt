@@ -509,16 +509,6 @@ fun AppNavGraph(
                         launchSingleTop = true
                     }
                 },
-                onNavigateToEditGroup = { groupId ->
-                    navController.navigate(Screen.GroupInfo.createRoute(groupId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToMediaGallery = { convId ->
-                    navController.navigate(Screen.MediaGallery.createRoute(convId)) {
-                        launchSingleTop = true
-                    }
-                },
                 onNavigateToConversationInfo = { convId ->
                     navController.navigate(Screen.ConversationInfo.createRoute(convId)) {
                         launchSingleTop = true

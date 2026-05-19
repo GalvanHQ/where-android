@@ -4,9 +4,12 @@ import android.Manifest
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,6 +38,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,11 +47,11 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.toColorInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -63,7 +68,6 @@ import com.ovi.where.presentation.chat.components.MentionSuggestionPopup
 import com.ovi.where.presentation.chat.components.MessageAnimationConstants
 import com.ovi.where.presentation.chat.components.MessageSearchBar
 import com.ovi.where.presentation.chat.components.NewMessageIndicator
-import com.ovi.where.presentation.chat.components.QueuedForSyncBanner
 import com.ovi.where.presentation.chat.components.ReactionPickerOverlay
 import com.ovi.where.presentation.chat.components.ReplyPreviewBar
 import com.ovi.where.presentation.chat.components.SwipeToReplyContainer
@@ -97,8 +101,6 @@ fun ChatScreen(
     onNavigateToUserProfile: (String) -> Unit = {},
     onNavigateToGroupInfo: (String) -> Unit = {},
     onNavigateToGroupMap: (String) -> Unit = {},
-    onNavigateToEditGroup: (String) -> Unit = {},
-    onNavigateToMediaGallery: (String) -> Unit = {},
     onNavigateToConversationInfo: (String) -> Unit = {},
     onNavigateToChat: (String) -> Unit = {},
     viewModel: ChatViewModel = hiltViewModel()
@@ -106,8 +108,6 @@ fun ChatScreen(
     val uiState by viewModel.uiState.collectAsState()
     val voicePlaybackState by viewModel.voicePlaybackController.playbackState.collectAsState()
     val listState = rememberLazyListState()
-    val currentUserId = viewModel.currentUserId
-    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -117,7 +117,7 @@ fun ChatScreen(
     val themeColorHex = uiState.conversation?.themeColor
     val conversationThemeColor: androidx.compose.ui.graphics.Color? = remember(themeColorHex) {
         if (themeColorHex.isNullOrBlank()) null
-        else try { androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(themeColorHex)) } catch (_: Exception) { null }
+        else try { androidx.compose.ui.graphics.Color(themeColorHex.toColorInt()) } catch (_: Exception) { null }
     }
     val reducedMotion = LocalReducedMotion.current
     val density = LocalDensity.current
@@ -126,11 +126,11 @@ fun ChatScreen(
     // Track IDs of messages that have just appeared and should animate in.
     var newMessageIds by remember { mutableStateOf(setOf<String>()) }
     // Track the previous message count to detect new arrivals.
-    var previousMessageCount by remember { mutableStateOf(0) }
+    var previousMessageCount by remember { mutableIntStateOf(0) }
     // Track whether to show the "new message" indicator (Requirement 23.4).
     var showNewMessageIndicator by remember { mutableStateOf(false) }
     // Count of unread messages while scrolled up.
-    var newMessageUnreadCount by remember { mutableStateOf(0) }
+    var newMessageUnreadCount by remember { mutableIntStateOf(0) }
 
     // FocusRequester for the input field — used by swipe-to-reply to focus input (Requirement 8.3)
     val inputFocusRequester = remember { FocusRequester() }
@@ -397,9 +397,40 @@ fun ChatScreen(
                 .imePadding()
                 .navigationBarsPadding()
         ) {
-            // ── Queued for sync banner (Requirement 7.6) ──────────────────────
-            // Non-modal 48dp banner shown when a write action is attempted while offline.
-            QueuedForSyncBanner(visible = uiState.showQueuedForSyncBanner)
+            // ── No Internet Connection banner ─────────────────────────────────
+            // Shown whenever the device is offline. Replaces the old "Queued for sync"
+            // banner which only appeared on write attempts.
+            androidx.compose.animation.AnimatedVisibility(
+                visible = uiState.isOffline,
+                enter = androidx.compose.animation.expandVertically(
+                    expandFrom = Alignment.Top
+                ),
+                exit = androidx.compose.animation.shrinkVertically(
+                    shrinkTowards = Alignment.Top
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CloudOff,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "No Internet Connection",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
 
 
             // ── Message Search Bar (Task 8.1, Requirements 13.1-13.7) ─────────

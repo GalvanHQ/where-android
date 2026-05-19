@@ -90,18 +90,14 @@ fun MiniMapOverlay(
     onExpandToFullMap: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = expandVertically(expandFrom = Alignment.Top, animationSpec = spring(dampingRatio = 0.8f)) + fadeIn(),
-        exit = shrinkVertically(shrinkTowards = Alignment.Top, animationSpec = tween(200)) + fadeOut(),
-        modifier = modifier
+    if (!visible) return
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
+        shadowElevation = 12.dp,
+        color = MaterialTheme.colorScheme.surface
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
-            shadowElevation = 12.dp,
-            color = MaterialTheme.colorScheme.surface
-        ) {
             Column {
                 Box(
                     modifier = Modifier
@@ -111,7 +107,8 @@ fun MiniMapOverlay(
                     val validLocations = locations.filter { it.latitude != 0.0 && it.longitude != 0.0 }
 
                     if (validLocations.isEmpty()) {
-                        // Premium empty state
+                        // Loading/empty state — don't immediately say "no one sharing"
+                        // because data might still be loading from cache
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -125,20 +122,11 @@ fun MiniMapOverlay(
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    Icons.Filled.ShareLocation,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(40.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                                )
-                                Spacer(Modifier.height(10.dp))
-                                Text(
-                                    text = "No one is sharing location",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                )
-                            }
+                            androidx.compose.material3.CircularProgressIndicator(
+                                modifier = Modifier.size(28.dp),
+                                strokeWidth = 2.5.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     } else {
                         val cameraPositionState = rememberCameraPositionState {
@@ -196,7 +184,8 @@ fun MiniMapOverlay(
                                     title = loc.displayName.ifEmpty { loc.userId },
                                     zIndex = 10f
                                 ) {
-                                    PulsingMarker(
+                                    PulsingAvatarMarker(
+                                        photoUrl = loc.photoUrl,
                                         initial = loc.displayName.firstOrNull()?.uppercase() ?: "?",
                                         color = MarkerColors[index % MarkerColors.size]
                                     )
@@ -301,6 +290,56 @@ fun MiniMapOverlay(
                         }
                     }
                 }
+            }
+        }
+    }
+
+
+@Composable
+private fun PulsingAvatarMarker(photoUrl: String?, initial: String, color: Color) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f, targetValue = 1.5f,
+        animationSpec = infiniteRepeatable(tween(1400), RepeatMode.Reverse),
+        label = "scale"
+    )
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.5f, targetValue = 0f,
+        animationSpec = infiniteRepeatable(tween(1400), RepeatMode.Reverse),
+        label = "alpha"
+    )
+
+    Box(contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .scale(pulseScale)
+                .clip(CircleShape)
+                .background(color.copy(alpha = pulseAlpha))
+        )
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(color)
+                .border(2.5.dp, Color.White, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!photoUrl.isNullOrEmpty()) {
+                coil.compose.AsyncImage(
+                    model = photoUrl,
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                )
+            } else {
+                Text(
+                    text = initial,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.Bold, fontSize = 14.sp
+                    ),
+                    color = Color.White
+                )
             }
         }
     }

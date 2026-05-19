@@ -6,7 +6,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
@@ -19,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -97,34 +101,21 @@ fun MainScaffold(
     val currentRoute = navBackStackEntry?.destination?.route
     val profilePhotoUrl by viewModel.profilePhotoUrl.collectAsState()
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            WhereBottomBar(
-                currentRoute = currentRoute,
-                profilePhotoUrl = profilePhotoUrl,
-                onTabClick = { tab ->
-                    if (currentRoute != tab.route) {
-                        bottomNavController.navigate(tab.route) {
-                            popUpTo(BottomTab.Map.route) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
+    // Google Maps style: no parent Scaffold wrapping the content.
+    // The map screen uses BottomSheetScaffold as its own root.
+    // The bottom nav is overlaid on top with highest z-order.
+    Box(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = bottomNavController,
             startDestination = BottomTab.Map.route,
-            modifier = Modifier.background(MaterialTheme.colorScheme.background),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
             enterTransition = { fadeIn(tween(200)) },
             exitTransition = { fadeOut(tween(200)) }
         ) {
             composable(BottomTab.Map.route) {
                 GlobalMapScreen(
-                    contentPadding = paddingValues,
                     onNavigateToChat = onNavigateToChat,
                     onNavigateToUserProfile = onNavigateToUserProfile,
                     onNavigateToGroupMap = onNavigateToGroupMap
@@ -132,7 +123,7 @@ fun MainScaffold(
             }
             composable(BottomTab.Chats.route) {
                 ChatsScreen(
-                    contentPadding = paddingValues,
+                    contentPadding = PaddingValues(bottom = 80.dp),
                     onNavigateToChat = onNavigateToChat,
                     onNavigateToNewMessage = onNavigateToNewMessage,
                     onNavigateToSearch = { onNavigateToSearch("chats") }
@@ -140,7 +131,7 @@ fun MainScaffold(
             }
             composable(BottomTab.People.route) {
                 PeopleScreen(
-                    contentPadding = paddingValues,
+                    contentPadding = PaddingValues(bottom = 80.dp),
                     onNavigateToUserProfile = onNavigateToUserProfile,
                     onNavigateToChat = onNavigateToChat,
                     onNavigateToFriendRequests = onNavigateToFriendRequests,
@@ -151,7 +142,7 @@ fun MainScaffold(
                 ProfileScreen(
                     onNavigateToEditProfile = onNavigateToEditProfile,
                     onNavigateToSettings = onNavigateToSettings,
-                    contentPadding = paddingValues,
+                    contentPadding = PaddingValues(bottom = 80.dp),
                     onNavigateToMessages = {
                         bottomNavController.navigate(BottomTab.Chats.route) {
                             popUpTo(BottomTab.Map.route) { saveState = true }
@@ -176,6 +167,22 @@ fun MainScaffold(
                 )
             }
         }
+
+        // Bottom nav overlaid on top (highest z-order, like Google Maps)
+        WhereBottomBar(
+            currentRoute = currentRoute,
+            profilePhotoUrl = profilePhotoUrl,
+            onTabClick = { tab ->
+                if (currentRoute != tab.route) {
+                    bottomNavController.navigate(tab.route) {
+                        popUpTo(BottomTab.Map.route) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            },
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 
@@ -183,9 +190,11 @@ fun MainScaffold(
 private fun WhereBottomBar(
     currentRoute: String?,
     profilePhotoUrl: String?,
-    onTabClick: (BottomTab) -> Unit
+    onTabClick: (BottomTab) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     NavigationBar(
+        modifier = modifier,
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 3.dp
     ) {

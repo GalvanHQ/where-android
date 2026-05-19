@@ -137,7 +137,6 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GlobalMapScreen(
-    @Suppress("unused") contentPadding: PaddingValues = PaddingValues(),
     onNavigateToChat: (String) -> Unit = {},
     onNavigateToUserProfile: (String) -> Unit = {},
     onNavigateToGroupMap: (String) -> Unit = {},
@@ -304,8 +303,9 @@ fun GlobalMapScreen(
     val shareSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val mapTypeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Sheet peek height — matches Google Maps: just drag handle + title visible
-    val sheetPeekHeight = if (uiState.friendLocations.isNotEmpty()) 140.dp else 0.dp
+    // Google Maps style: no parent Scaffold clipping us.
+    // sheetPeekHeight is just the content peek height.
+    val sheetPeekHeight = if (uiState.friendLocations.isNotEmpty()) 130.dp else 0.dp
 
     val bottomSheetScaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberStandardBottomSheetState(
@@ -384,16 +384,18 @@ fun GlobalMapScreen(
                             )
                         }
                     }
-                    Spacer(Modifier.height(16.dp))
+                    // Bottom padding to keep content above the nav bar when expanded
+                    Spacer(Modifier.height(80.dp))
                 }
             } else {
-                // Empty placeholder when no friends sharing
+                // Empty: minimal spacer
                 Spacer(Modifier.height(1.dp))
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
+        // innerPadding.bottom = sheetPeekHeight, so FABs at BottomEnd sit above the sheet
         Box(
             modifier = Modifier
                 .fillMaxSize()

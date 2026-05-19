@@ -1,9 +1,27 @@
 package com.ovi.where.core.constants
 
 object AppConstants {
-    // Location
+    // Location — Adaptive intervals based on movement state
     const val LOCATION_UPDATE_INTERVAL = 5000L
     const val LOCATION_FASTEST_INTERVAL = 3000L
+
+    /** Interval when user is moving (walking/driving). High accuracy, frequent updates. */
+    const val LOCATION_INTERVAL_MOVING_MS = 5_000L
+
+    /** Interval when user is stationary (speed < threshold). Saves battery. */
+    const val LOCATION_INTERVAL_IDLE_MS = 30_000L
+
+    /** Interval when user is in background but sharing is active. Balanced. */
+    const val LOCATION_INTERVAL_BACKGROUND_MS = 15_000L
+
+    /** Speed threshold (m/s) below which user is considered stationary (~1 km/h). */
+    const val LOCATION_IDLE_SPEED_THRESHOLD = 0.3f
+
+    /** Minimum displacement (meters) to trigger an update when idle. */
+    const val LOCATION_MIN_DISPLACEMENT_METERS = 10f
+
+    /** Radius (meters) for arrival detection geofence. */
+    const val ARRIVAL_RADIUS_METERS = 100.0
 
     // Notifications
     const val NOTIFICATION_ID = 1001
@@ -19,7 +37,10 @@ object AppConstants {
     const val FIRESTORE_COLLECTION_DIRECT_LOCATION_SHARES = "directLocationShares"
     const val FIRESTORE_COLLECTION_ACTIVE_LOCATIONS = "activeLocations"
 
-    // Write throttle (ms) — skip Firestore writes if less than this since last write
+    // Write throttle — speed-dependent (see LocationRepositoryImpl companion object)
+    // Moving (speed > 1 m/s): 10s interval
+    // Stationary (speed ≤ 1 m/s): 30s interval
+    @Deprecated("Use speed-dependent throttle in LocationRepositoryImpl instead")
     const val LOCATION_WRITE_THROTTLE_MS = 15_000L
 
     // ── Time Constants ────────────────────────────────────────────────────────

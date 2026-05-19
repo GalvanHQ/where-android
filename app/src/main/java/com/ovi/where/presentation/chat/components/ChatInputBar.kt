@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,9 +58,9 @@ import androidx.compose.ui.unit.sp
  * Premium chat input bar.
  *
  * Layout (collapsed):  [+] │ Message...  [🎤] │ [➤/👍]
- * Layout (expanded):   [✕] [📷] [🖼️] │ Message...  [🎤] │ [➤/👍]
+ * Layout (expanded):   [✕] [📷] [🖼️] [📍] │ Message...  [🎤] │ [➤/👍]
  *
- * - Plus expands inline to show Camera + Gallery icons (no dropdown/popup)
+ * - Plus expands inline to show Camera + Gallery + Location icons (no dropdown/popup)
  * - Mic inside the pill for voice recording
  * - Right: Send (when typing) or Emoji shortcut (when set)
  */
@@ -70,6 +71,7 @@ fun ChatInputBar(
     onSend: () -> Unit,
     onCameraTap: () -> Unit,
     onAttachmentTap: () -> Unit,
+    onLocationTap: () -> Unit = {},
     isVoiceRecording: Boolean = false,
     voiceRecordingDurationMs: Long = 0L,
     voiceWaveformAmplitudes: List<Float> = emptyList(),
@@ -146,6 +148,16 @@ fun ChatInputBar(
                             )
                         ) {
                             Icon(Icons.Filled.Image, "Gallery", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        IconButton(
+                            onClick = { expanded = false; onLocationTap() },
+                            modifier = Modifier.size(38.dp),
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            )
+                        ) {
+                            Icon(Icons.Filled.LocationOn, "Location", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 } else {

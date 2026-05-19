@@ -283,6 +283,33 @@ fun ChatBubble(
                         }
                     }
 
+                    // LIVE LOCATION (real-time sharing session)
+                    message.isLiveLocation -> {
+                        Box(
+                            modifier = bubbleModifier
+                                .widthIn(max = maxBubbleWidth)
+                                .pointerInput(message.id) {
+                                    detectTapGestures(onLongPress = { onLongPress() })
+                                }
+                        ) {
+                            LiveLocationBubble(
+                                sharedLocation = com.ovi.where.domain.model.SharedLocation(
+                                    id = message.locationSharingSessionId ?: message.id,
+                                    userId = message.senderId,
+                                    latitude = message.latitude ?: 0.0,
+                                    longitude = message.longitude ?: 0.0,
+                                    timestamp = System.currentTimeMillis(),
+                                    isSharingActive = true,
+                                    sharingStartedAt = 0L
+                                ),
+                                isSessionActive = true,
+                                senderDisplayName = message.senderName,
+                                isGroupConversation = true,
+                                onTapNavigateToMap = { onLocationTap() }
+                            )
+                        }
+                    }
+
                     // TEXT (default)
                     else -> {
                         val errorBorder = if (isFailed) {

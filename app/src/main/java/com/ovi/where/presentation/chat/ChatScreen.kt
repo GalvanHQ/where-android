@@ -64,6 +64,9 @@ import com.ovi.where.presentation.chat.components.ChatEmptyState
 import com.ovi.where.presentation.chat.components.ChatInputBar
 import com.ovi.where.presentation.chat.components.DateSeparator
 import com.ovi.where.presentation.chat.components.ImageSizeLimitError
+import com.ovi.where.presentation.chat.components.LiveLocationSharingBanner
+import com.ovi.where.presentation.chat.components.LocationShareSheet
+import com.ovi.where.presentation.chat.components.MiniMapOverlay
 import com.ovi.where.presentation.chat.components.MentionSuggestionPopup
 import com.ovi.where.presentation.chat.components.MessageAnimationConstants
 import com.ovi.where.presentation.chat.components.MessageSearchBar
@@ -385,6 +388,7 @@ fun ChatScreen(
                 onNavigateBack = onNavigateBack,
                 onNavigateToGroupInfo = onNavigateToGroupInfo,
                 onNavigateToConversationInfo = onNavigateToConversationInfo,
+                onMapTap = { viewModel.toggleMiniMap() },
                 onlineMemberCount = uiState.onlineMemberCount,
                 isOtherUserFriend = uiState.isOtherUserFriend
             )
@@ -432,6 +436,28 @@ fun ChatScreen(
                 }
             }
 
+
+            // ── Live Location Sharing Banner ──────────────────────────────────
+            // Persistent banner shown while the user is actively sharing their live location.
+            if (uiState.isLiveLocationSharingActive) {
+                LiveLocationSharingBanner(
+                    timeRemaining = uiState.liveLocationTimeRemaining,
+                    onStop = viewModel::stopLiveLocationSharing
+                )
+            }
+
+            // ── Mini Map Overlay ──────────────────────────────────────────────
+            // Slides down from top showing all active location sharers in this conversation.
+            MiniMapOverlay(
+                visible = uiState.showMiniMap,
+                locations = uiState.cachedLocations,
+                onClose = { viewModel.toggleMiniMap() },
+                onExpandToFullMap = {
+                    viewModel.toggleMiniMap()
+                    val gId = uiState.conversation?.groupId
+                    if (gId != null) onNavigateToGroupMap(gId)
+                }
+            )
 
             // ── Message Search Bar (Task 8.1, Requirements 13.1-13.7) ─────────
             if (uiState.isSearchActive) {
@@ -595,6 +621,7 @@ fun ChatScreen(
                                     msg.isVoice -> "voice_bubble"
                                     msg.isImage -> "image_bubble"
                                     msg.isLocation -> "location_bubble"
+                                    msg.isLiveLocation -> "live_location_bubble"
                                     else -> "text_bubble"
                                 }
                             }
@@ -819,6 +846,10 @@ fun ChatScreen(
                     // Launch system image picker (multi-select, max 5)
                     galleryLauncher.launch("image/*")
                 },
+                onLocationTap = {
+                    // Show location sharing bottom sheet (live location + current location)
+                    viewModel.onLocationShareButtonTap()
+                },
                 // Voice recording state & callbacks
                 isVoiceRecording = uiState.isVoiceRecording,
                 voiceRecordingDurationMs = uiState.voiceRecordingDurationMs,
@@ -845,6 +876,51 @@ fun ChatScreen(
                 },
                 themeColor = conversationThemeColor,
                 mentionRanges = uiState.mentionRanges
+            )
+        }
+    }
+
+    // ── Location Share Bottom Sheet ───────────────────────────────────────────
+    // Shows options (current location / live location) and duration picker.
+    LocationShareSheet(
+        state = uiState.locationBottomSheetState,
+        showLiveLocationOption = uiState.showLiveLocationOption,
+        selectedDurationMinutes = uiState.selectedDurationMinutes,
+        onShareCurrentLocation = {
+            // Request location permission then send current location as a pin
+            if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                viewModel.dismissLocationBottomSheet()
+                viewModel.requestCurrentLocationAndSend()
+            } else {
+                viewModel.dismissLocationBottomSheet()
+                locationPermissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    )
+                )
+            }
+        },
+        onShareLiveLocationSelected = viewModel::onShareLiveLocationSelected,
+        onDurationSelected = viewModel::onDurationSelected,
+        onConfirm = {
+            val hasPermission = context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            viewModel.onConfirmLiveLocationSharing(hasPermission)
+        },
+        onDismiss = viewModel::dismissLocationBottomSheet
+    )
+
+    // ── Live Location Permission Request ──────────────────────────────────────
+    if (uiState.liveLocationPermissionNeeded) {
+        LaunchedEffect(Unit) {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
             )
         }
     }

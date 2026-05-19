@@ -89,6 +89,7 @@ service cloud.firestore {
       }
 
       match /locations/{userId} {
+        // DEPRECATED: remove after migration to consolidated activeLocations collection
         allow read: if isAuthenticated()
           && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
         allow write: if request.auth.uid == userId;
@@ -132,6 +133,7 @@ service cloud.firestore {
     }
 
     // ===== DIRECT LOCATION SHARES =====
+    // DEPRECATED: remove after migration to consolidated activeLocations collection
     match /directLocationShares/{shareId} {
       allow read, write: if isAuthenticated()
         && request.auth.uid in resource.data.participantIds;
@@ -139,6 +141,7 @@ service cloud.firestore {
         && request.auth.uid in request.resource.data.participantIds;
 
       match /locations/{userId} {
+        // DEPRECATED: remove after migration to consolidated activeLocations collection
         allow read: if isAuthenticated()
           && request.auth.uid in get(/databases/$(database)/documents/directLocationShares/$(shareId)).data.participantIds;
         allow write: if isAuthenticated() && request.auth.uid == userId;

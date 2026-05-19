@@ -74,6 +74,13 @@ data class MessageUiModel(
     val voiceUrl: String? = null,
     /** Duration of the voice message in milliseconds. */
     val voiceDurationMs: Long? = null,
+    // ─── Live Location (Chat-based live sharing) ──────────────────────────────
+    /** Whether this message represents an active/ended live location sharing session. */
+    val isLiveLocation: Boolean = false,
+    /** Session ID for live location sharing (used to correlate with SharedLocation data). */
+    val locationSharingSessionId: String? = null,
+    /** Duration in minutes for the live location sharing session. */
+    val locationSharingDurationMinutes: Long? = null,
     // ─── Link Preview (Task 7.1) ──────────────────────────────────────────────
     /** Whether this message has a link preview to display. */
     val hasLinkPreview: Boolean = false,
@@ -141,6 +148,7 @@ fun Message.toUiModel(
 ): MessageUiModel {
     val direction = if (senderId == currentUserId) BubbleDirection.SENT else BubbleDirection.RECEIVED
     val isLocation = type == MessageType.LOCATION
+    val isLiveLocation = type == MessageType.LIVE_LOCATION
     val isImage = type == MessageType.IMAGE
     val isVoice = type == MessageType.VOICE
     val locationLabel = if (isLocation && latitude != null && longitude != null) {
@@ -172,6 +180,7 @@ fun Message.toUiModel(
         senderInitials = initials,
         text           = when {
             isLocation -> "Shared a location"
+            isLiveLocation -> "📍 Live location"
             isImage -> ""
             isVoice -> ""
             else -> text
@@ -197,6 +206,9 @@ fun Message.toUiModel(
         isVoice        = isVoice,
         voiceUrl       = voiceUrl,
         voiceDurationMs = voiceDurationMs,
+        isLiveLocation = isLiveLocation,
+        locationSharingSessionId = locationSharingSessionId,
+        locationSharingDurationMinutes = locationSharingDurationMinutes,
         // Link preview: pre-compute whether preview exists and truncate title to 80 chars
         hasLinkPreview = linkPreviewUrl != null && linkPreviewTitle != null,
         linkPreviewUrl = linkPreviewUrl,

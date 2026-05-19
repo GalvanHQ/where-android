@@ -43,7 +43,6 @@ import com.ovi.where.presentation.chat.NewMessageScreen
 import com.ovi.where.presentation.chat.NicknamesScreen
 import com.ovi.where.presentation.group.create.CreateGroupScreen
 import com.ovi.where.presentation.group.join.JoinGroupScreen
-import com.ovi.where.presentation.map.MapScreen
 import com.ovi.where.presentation.navigation.gatekeeper.AuthGatekeeperViewModel
 import com.ovi.where.presentation.onboarding.OnboardingScreen
 import com.ovi.where.presentation.people.FriendRequestsScreen
@@ -707,16 +706,17 @@ fun AppNavGraph(
             )
         }
 
-        // ── Group Map ─────────────────────────────────────────────────────────
+        // ── Group Map (REMOVED — redirects to Main Map tab) ────────────────────
+        // The Global Map with group filter handles this now.
+        // All navigations to GroupMap just pop back to the Map tab.
         composable(
             route     = Screen.GroupMap.ROUTE,
             arguments = listOf(navArgument("groupId") { type = NavType.StringType })
-        ) { back ->
-            val groupId = back.arguments?.getString("groupId") ?: return@composable
-            MapScreen(
-                groupId        = groupId,
-                onNavigateBack = { navController.popBackStack() }
-            )
+        ) {
+            // Redirect: pop back to main (Map tab is the start destination)
+            LaunchedEffect(Unit) {
+                navController.popBackStack(Screen.Main.route, inclusive = false)
+            }
         }
 
         // ── Create Group ──────────────────────────────────────────────────────
@@ -732,10 +732,8 @@ fun AppNavGraph(
             JoinGroupScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onGroupJoined  = { groupId ->
-                    navController.navigate(Screen.GroupMap.createRoute(groupId)) {
-                        popUpTo(Screen.Main.route)
-                        launchSingleTop = true
-                    }
+                    // Navigate to main map tab instead of removed GroupMap
+                    navController.popBackStack(Screen.Main.route, inclusive = false)
                 }
             )
         }

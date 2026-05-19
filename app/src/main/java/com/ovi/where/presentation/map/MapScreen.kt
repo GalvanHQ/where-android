@@ -303,76 +303,32 @@ fun MapScreen(
                             true
                         }
                     ) {
-                        // Life360-style pin marker
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .shadow(6.dp, CircleShape)
-                                    .clip(CircleShape)
-                                    .background(avatarColor)
-                                    .border(3.dp, MaterialTheme.colorScheme.surface, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                var bitmap by remember(location.photoUrl) {
-                                    mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(
-                                        null
-                                    )
-                                }
-                                val context = LocalContext.current
+                        // Life360-style pin marker (shared component)
+                        var bitmap by remember(location.photoUrl) {
+                            mutableStateOf<android.graphics.Bitmap?>(null)
+                        }
+                        val context = LocalContext.current
 
-                                LaunchedEffect(location.photoUrl) {
-                                    if (!location.photoUrl.isNullOrEmpty()) {
-                                        val request = coil.request.ImageRequest.Builder(context)
-                                            .data(location.photoUrl)
-                                            .size(coil.size.Size.ORIGINAL)
-                                            .allowHardware(false)
-                                            .build()
-                                        val result = context.imageLoader.execute(request)
-                                        if (result is coil.request.SuccessResult) {
-                                            val drawable = result.drawable
-                                            val b =
-                                                (drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
-                                                    ?: drawable.toBitmap()
-                                            bitmap = b.asImageBitmap()
-                                        }
-                                    }
-                                }
-
-                                if (bitmap != null) {
-                                    androidx.compose.foundation.Image(
-                                        bitmap = bitmap!!,
-                                        contentDescription = location.displayName,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                } else {
-                                    Text(
-                                        text = location.displayName.take(1).uppercase(),
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                        LaunchedEffect(location.photoUrl) {
+                            if (!location.photoUrl.isNullOrEmpty()) {
+                                val request = coil.request.ImageRequest.Builder(context)
+                                    .data(location.photoUrl)
+                                    .size(128)
+                                    .allowHardware(false)
+                                    .build()
+                                val result = context.imageLoader.execute(request)
+                                if (result is coil.request.SuccessResult) {
+                                    val drawable = result.drawable
+                                    bitmap = (drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                                        ?: drawable.toBitmap()
                                 }
                             }
                         }
-                        // Triangle tail
-                        val tailColor = MaterialTheme.colorScheme.surface
-                        Box(
-                            modifier = Modifier
-                                .width(14.dp)
-                                .height(10.dp)
-                                .drawBehind {
-                                    val path = Path().apply {
-                                        moveTo(0f, 0f)
-                                        lineTo(size.width, 0f)
-                                        lineTo(size.width / 2f, size.height)
-                                        close()
-                                    }
-                                    drawPath(path, color = tailColor)
-                                }
+
+                        com.ovi.where.presentation.map.components.Life360PinMarker(
+                            avatarBitmap = bitmap,
+                            fallbackLabel = location.displayName.take(1).uppercase(),
+                            accentColor = com.ovi.where.presentation.map.components.avatarColorForUser(location.userId)
                         )
                     }
                 }

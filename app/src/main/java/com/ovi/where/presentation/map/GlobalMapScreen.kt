@@ -9,14 +9,11 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,7 +23,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,7 +35,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,7 +52,9 @@ import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -68,14 +65,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -107,6 +106,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
@@ -304,15 +304,100 @@ fun GlobalMapScreen(
     val shareSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val mapTypeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    Scaffold(
+    // Sheet peek height — matches Google Maps: just drag handle + title visible
+    val sheetPeekHeight = if (uiState.friendLocations.isNotEmpty()) 140.dp else 0.dp
+
+    val bottomSheetScaffoldState = rememberBottomSheetScaffoldState(
+        bottomSheetState = rememberStandardBottomSheetState(
+            initialValue = SheetValue.PartiallyExpanded
+        )
+    )
+
+    BottomSheetScaffold(
+        scaffoldState = bottomSheetScaffoldState,
+        sheetPeekHeight = sheetPeekHeight,
+        sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        sheetContainerColor = MaterialTheme.colorScheme.surfaceDim,
+        sheetShadowElevation = 16.dp,
+        sheetTonalElevation = 2.dp,
+        sheetDragHandle = {
+            if (uiState.friendLocations.isNotEmpty()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Spacer(Modifier.height(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(40.dp)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f))
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
+        },
+        sheetContent = {
+            if (uiState.friendLocations.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 100.dp, max = 500.dp)
+                ) {
+                    // Header
+                    Text(
+                        text = "${uiState.friendLocations.size} friend${if (uiState.friendLocations.size != 1) "s" else ""} sharing",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                    Spacer(Modifier.height(14.dp))
+
+                    // Vertical list of friends
+                    LazyColumn(
+                        modifier = Modifier.weight(1f, fill = false),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(items = uiState.friendLocations, key = { it.userId }) { friend ->
+                            FriendAvatarChip(
+                                friend = friend,
+                                myLatitude = uiState.myLatitude,
+                                myLongitude = uiState.myLongitude,
+                                hasMyLocation = uiState.hasMyLocation,
+                                onClick = {
+                                    viewModel.selectFriend(friend)
+                                    if (friend.latitude != 0.0) {
+                                        scope.launch {
+                                            cameraPositionState.animate(
+                                                CameraUpdateFactory.newLatLngZoom(
+                                                    LatLng(friend.latitude, friend.longitude),
+                                                    15f
+                                                ),
+                                                durationMs = 600
+                                            )
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+            } else {
+                // Empty placeholder when no friends sharing
+                Spacer(Modifier.height(1.dp))
+            }
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = MaterialTheme.colorScheme.background
-    ) { scaffoldPadding ->
+    ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(scaffoldPadding)
+                .padding(innerPadding)
         ) {
             // ── Map ───────────────────────────────────────────────────────────
             GoogleMap(
@@ -616,7 +701,7 @@ fun GlobalMapScreen(
                     .align(Alignment.BottomEnd)
                     .padding(
                         end = Dimens.spaceLarge,
-                        bottom = if (uiState.friendLocations.isNotEmpty()) 220.dp else 160.dp
+                        bottom = Dimens.spaceLarge
                     ),
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
@@ -735,63 +820,6 @@ fun GlobalMapScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-                }
-            }
-
-            // ── Active sharers bottom strip ───────────────────────────────────
-            AnimatedVisibility(
-                visible = uiState.friendLocations.isNotEmpty(),
-                modifier = Modifier.align(Alignment.BottomCenter),
-                enter = slideInVertically(initialOffsetY = { it }),
-                exit = slideOutVertically(targetOffsetY = { it })
-            ) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            start = Dimens.spaceMedium,
-                            end = Dimens.spaceMedium,
-                            top = Dimens.spaceMedium,
-                            bottom = 84.dp
-                        ),
-                    shape = MaterialTheme.shapes.large,
-                    elevation = CardDefaults.cardElevation(Dimens.cardElevationHigh),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Column(modifier = Modifier.padding(Dimens.spaceLarge)) {
-                        Text(
-                            text = "${uiState.friendLocations.size} friend${if (uiState.friendLocations.size != 1) "s" else ""} sharing",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(Dimens.spaceMedium))
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
-                        ) {
-                            items(items = uiState.friendLocations, key = { it.userId }) { friend ->
-                                FriendAvatarChip(
-                                    friend = friend,
-                                    myLatitude = uiState.myLatitude,
-                                    myLongitude = uiState.myLongitude,
-                                    hasMyLocation = uiState.hasMyLocation,
-                                    onClick = {
-                                        viewModel.selectFriend(friend)
-                                        if (friend.latitude != 0.0) {
-                                            scope.launch {
-                                                cameraPositionState.animate(
-                                                    CameraUpdateFactory.newLatLngZoom(
-                                                        LatLng(friend.latitude, friend.longitude),
-                                                        15f
-                                                    ),
-                                                    durationMs = 600
-                                                )
-                                            }
-                                        }
-                                    }
-                                )
-                            }
-                        }
                     }
                 }
             }
@@ -1335,121 +1363,146 @@ private fun ShareTargetSheet(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(Dimens.spaceXLarge)
+            .padding(horizontal = 24.dp, vertical = 16.dp)
             .navigationBarsPadding()
     ) {
-        Text("Share Location", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(Dimens.spaceLarge))
+        // ── Header with icon ──────────────────────────────────────────────────
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.LocationOn,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column {
+                Text(
+                    "Share Location",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Choose who can see your live location",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
-        // ── Quick-share option (when a previous target exists) ────────────
+        Spacer(Modifier.height(20.dp))
+
+        // ── Quick-share (if previous target exists) ───────────────────────────
         if (lastShareTargetId != null && lastShareTargetName != null) {
             val durationLabel = when (lastShareDuration) {
-                15L -> "15m"
-                60L -> "1h"
-                240L -> "4h"
+                15L -> "15 min"
+                60L -> "1 hour"
+                240L -> "4 hours"
                 0L -> "until stopped"
                 else -> "${lastShareDuration}m"
             }
             Surface(
                 onClick = { onStart(lastShareTargetId, lastShareDuration) },
-                shape = MaterialTheme.shapes.medium,
+                shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.tertiaryContainer
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium),
+                        .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         Icons.Default.NearMe,
                         contentDescription = null,
-                        modifier = Modifier.size(Dimens.iconSizeMedium),
+                        modifier = Modifier.size(20.dp),
                         tint = MaterialTheme.colorScheme.onTertiaryContainer
                     )
-                    Spacer(Modifier.width(Dimens.spaceMedium))
+                    Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Quick share",
+                            "Quick share",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onTertiaryContainer
                         )
                         Text(
-                            text = "with $lastShareTargetName for $durationLabel",
+                            "$lastShareTargetName • $durationLabel",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
                         )
                     }
                     Icon(
-                        Icons.Default.LocationOn,
+                        Icons.Default.ArrowDropDown,
                         contentDescription = null,
-                        modifier = Modifier.size(Dimens.iconSizeSmall),
+                        modifier = Modifier.size(20.dp),
                         tint = MaterialTheme.colorScheme.onTertiaryContainer
                     )
                 }
             }
-            Spacer(Modifier.height(Dimens.spaceMedium))
+            Spacer(Modifier.height(16.dp))
             androidx.compose.material3.HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             )
-            Spacer(Modifier.height(Dimens.spaceMedium))
+            Spacer(Modifier.height(16.dp))
         }
 
+        // ── Target selection ──────────────────────────────────────────────────
         Text(
-            "Share with",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            "SHARE WITH",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            letterSpacing = 1.sp
         )
-        Spacer(Modifier.height(Dimens.spaceMedium))
+        Spacer(Modifier.height(10.dp))
 
         LazyColumn(
-            modifier = Modifier.heightIn(max = 280.dp),
-            verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
+            modifier = Modifier.heightIn(max = 240.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             items(targets, key = { it.id }) { target ->
                 val selected = selectedTargetId == target.id
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { selectedTargetId = target.id },
-                    shape = MaterialTheme.shapes.medium,
-                    color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (selected) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = if (selected) androidx.compose.foundation.BorderStroke(
+                        1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    ) else null
                 ) {
                     Row(
-                        modifier = Modifier.padding(
-                            horizontal = Dimens.spaceLarge,
-                            vertical = Dimens.spaceMedium
-                        ),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         TargetAvatar(target)
-                        Spacer(Modifier.width(Dimens.spaceMedium))
-                        Text(
-                            target.name,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Surface(
-                            shape = MaterialTheme.shapes.small,
-                            color = if (target.isDirect) MaterialTheme.colorScheme.tertiaryContainer
-                            else MaterialTheme.colorScheme.secondaryContainer
-                        ) {
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (target.isDirect) "Direct" else "Group",
+                                target.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                if (target.isDirect) "Direct message" else "Group",
                                 style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                color = if (target.isDirect) MaterialTheme.colorScheme.onTertiaryContainer
-                                else MaterialTheme.colorScheme.onSecondaryContainer
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         if (selected) {
-                            Spacer(Modifier.width(Dimens.spaceSmall))
                             Icon(
                                 Icons.Default.Check,
                                 null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(Dimens.iconSizeMedium)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
@@ -1460,84 +1513,83 @@ private fun ShareTargetSheet(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = Dimens.spaceXLarge),
+                            .padding(vertical = 32.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(
                             Icons.Default.Groups,
                             contentDescription = null,
                             modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                         )
-                        Spacer(Modifier.height(Dimens.spaceMedium))
+                        Spacer(Modifier.height(12.dp))
                         Text(
                             "No one to share with yet",
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Spacer(Modifier.height(Dimens.spaceSmall))
                         Text(
-                            "Add friends or join a group to start sharing your location",
+                            "Add friends or join a group first",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
         }
 
-        // Only show duration and start button when there are targets
         if (targets.isNotEmpty()) {
-            Spacer(Modifier.height(Dimens.spaceLarge))
-        Text(
-            "Duration",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(Dimens.spaceMedium))
+            Spacer(Modifier.height(20.dp))
 
-        // Segmented button row with 4 options
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
-        ) {
-            DurationSegment("15m", selectedDuration == 15L, Modifier.weight(1f)) { selectedDuration = 15L }
-            DurationSegment("1h", selectedDuration == 60L, Modifier.weight(1f)) { selectedDuration = 60L }
-            DurationSegment("4h", selectedDuration == 240L, Modifier.weight(1f)) { selectedDuration = 240L }
-            DurationSegment("Until I stop", selectedDuration == 0L, Modifier.weight(1f)) { selectedDuration = 0L }
-        }
-
-        Spacer(Modifier.height(Dimens.spaceXLarge))
-        Button(
-            onClick = {
-                if (selectedTargetId.isNotBlank()) onStart(
-                    selectedTargetId,
-                    selectedDuration
-                )
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(Dimens.buttonHeight),
-            shape = MaterialTheme.shapes.extraLarge
-        ) {
-            Icon(
-                Icons.Default.LocationOn,
-                contentDescription = null,
-                modifier = Modifier.size(Dimens.iconSizeMedium)
-            )
-            Spacer(Modifier.width(Dimens.spaceSmall))
+            // ── Duration selection ────────────────────────────────────────────
             Text(
-                text = "Start Sharing",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
+                "DURATION",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 1.sp
             )
-        }
+            Spacer(Modifier.height(10.dp))
 
-        Spacer(Modifier.height(Dimens.spaceLarge))
-        }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                DurationSegment("15m", selectedDuration == 15L, Modifier.weight(1f)) { selectedDuration = 15L }
+                DurationSegment("1h", selectedDuration == 60L, Modifier.weight(1f)) { selectedDuration = 60L }
+                DurationSegment("4h", selectedDuration == 240L, Modifier.weight(1f)) { selectedDuration = 240L }
+                DurationSegment("∞", selectedDuration == 0L, Modifier.weight(1f)) { selectedDuration = 0L }
+            }
 
-        Spacer(Modifier.height(Dimens.spaceLarge))
+            Spacer(Modifier.height(24.dp))
+
+            // ── Start button ──────────────────────────────────────────────────
+            Button(
+                onClick = {
+                    if (selectedTargetId.isNotBlank()) onStart(selectedTargetId, selectedDuration)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Icon(
+                    Icons.Default.NearMe,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "Start Sharing",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
     }
 }
 

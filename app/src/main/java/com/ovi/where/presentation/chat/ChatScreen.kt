@@ -23,9 +23,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -51,6 +54,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -65,7 +69,6 @@ import com.ovi.where.presentation.chat.components.ChatInputBar
 import com.ovi.where.presentation.chat.components.DateSeparator
 import com.ovi.where.presentation.chat.components.ImageSizeLimitError
 import com.ovi.where.presentation.chat.components.LiveLocationSharingBanner
-import com.ovi.where.presentation.chat.components.LocationShareSheet
 import com.ovi.where.presentation.chat.components.MiniMapOverlay
 import com.ovi.where.presentation.chat.components.MentionSuggestionPopup
 import com.ovi.where.presentation.chat.components.MessageAnimationConstants
@@ -454,8 +457,10 @@ fun ChatScreen(
                 onClose = { viewModel.toggleMiniMap() },
                 onExpandToFullMap = {
                     viewModel.toggleMiniMap()
+                    // Navigate to full map screen (redirects to Map tab)
                     val gId = uiState.conversation?.groupId
                     if (gId != null) onNavigateToGroupMap(gId)
+                    else onNavigateBack() // Fallback for DMs
                 }
             )
 
@@ -847,7 +852,8 @@ fun ChatScreen(
                     galleryLauncher.launch("image/*")
                 },
                 onLocationTap = {
-                    // Show location sharing bottom sheet (live location + current location)
+                    // Start location sharing with this conversation's group/friend
+                    // Uses the same flow as the map screen but pre-selects the target
                     viewModel.onLocationShareButtonTap()
                 },
                 // Voice recording state & callbacks
@@ -881,37 +887,102 @@ fun ChatScreen(
     }
 
     // ── Location Share Bottom Sheet ───────────────────────────────────────────
-    // Shows options (current location / live location) and duration picker.
-    LocationShareSheet(
-        state = uiState.locationBottomSheetState,
-        showLiveLocationOption = uiState.showLiveLocationOption,
-        selectedDurationMinutes = uiState.selectedDurationMinutes,
-        onShareCurrentLocation = {
-            // Request location permission then send current location as a pin
-            if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
-                android.content.pm.PackageManager.PERMISSION_GRANTED
+    // Simplified: no target picker needed (target = this conversation).
+    // Just shows duration picker and starts sharing immediately.
+    if (uiState.locationBottomSheetState != com.ovi.where.presentation.chat.LocationBottomSheetState.HIDDEN) {
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = { viewModel.dismissLocationBottomSheet() },
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            // Duration picker content
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
             ) {
-                viewModel.dismissLocationBottomSheet()
-                viewModel.requestCurrentLocationAndSend()
-            } else {
-                viewModel.dismissLocationBottomSheet()
-                locationPermissionLauncher.launch(
-                    arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                shape = androidx.compose.foundation.shape.CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Filled.LocationOn,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            "Share Live Location",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        )
+                        Text(
+                            "with ${uiState.conversation?.title ?: "this conversation"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                Text(
+                    "DURATION",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    letterSpacing = 1.sp
                 )
+                Spacer(Modifier.height(10.dp))
+
+                // Duration chips
+                val durations = listOf(15L to "15 min", 60L to "1 hour", 240L to "4 hours", 0L to "Until I stop")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    durations.forEach { (minutes, label) ->
+                        androidx.compose.material3.FilterChip(
+                            selected = uiState.selectedDurationMinutes == minutes,
+                            onClick = { viewModel.onDurationSelected(minutes) },
+                            label = { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(24.dp))
+
+                // Start button
+                Button(
+                    onClick = {
+                        val hasPermission = context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+                            android.content.pm.PackageManager.PERMISSION_GRANTED
+                        viewModel.onConfirmLiveLocationSharing(hasPermission)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(Icons.Filled.LocationOn, null, Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Start Sharing", style = MaterialTheme.typography.labelLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                }
+
+                Spacer(Modifier.height(16.dp))
             }
-        },
-        onShareLiveLocationSelected = viewModel::onShareLiveLocationSelected,
-        onDurationSelected = viewModel::onDurationSelected,
-        onConfirm = {
-            val hasPermission = context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
-                android.content.pm.PackageManager.PERMISSION_GRANTED
-            viewModel.onConfirmLiveLocationSharing(hasPermission)
-        },
-        onDismiss = viewModel::dismissLocationBottomSheet
-    )
+        }
+    }
 
     // ── Live Location Permission Request ──────────────────────────────────────
     if (uiState.liveLocationPermissionNeeded) {

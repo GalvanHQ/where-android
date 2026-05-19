@@ -1652,6 +1652,27 @@ class ChatViewModel @Inject constructor(
             }
         }
 
+        // Check if user is currently sharing with this conversation's target
+        // This makes the banner appear even if sharing was started from the map screen
+        viewModelScope.launch {
+            val conversation = _uiState.value.conversation ?: return@launch
+            val targetId = conversation.groupId ?: "direct:${conversation.otherUserId}"
+            val isSharing = locationRepository.checkSharingStatus(targetId)
+            if (isSharing) {
+                val expiresAt = locationRepository.getSharingExpiryTime(targetId)
+                _uiState.value = _uiState.value.copy(
+                    isLiveLocationSharingActive = true,
+                    liveLocationExpiresAt = expiresAt,
+                    liveLocationTimeRemaining = if (expiresAt != null && expiresAt != Long.MAX_VALUE) {
+                        val remaining = (expiresAt - System.currentTimeMillis()) / 60_000L
+                        if (remaining >= 60) "${remaining / 60}h ${remaining % 60}m"
+                        else "${remaining}m"
+                    } else null
+                )
+                startLocationSharingTimer(expiresAt ?: Long.MAX_VALUE)
+            }
+        }
+
         // Subscribe to real-time updates with Socket.IO primary / Firestore fallback (10s timeout)
         viewModelScope.launch {
             locationRepository.observeLocationsWithCacheFallback(

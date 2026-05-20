@@ -16,6 +16,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,17 +24,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -42,6 +47,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
@@ -50,7 +56,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Badge
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
@@ -80,6 +85,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -132,6 +138,12 @@ import com.ovi.where.core.utils.LocationUtils
 import com.ovi.where.core.utils.showToast
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+/**
+ * Bottom navigation bar content height (excludes system insets).
+ * Exported so the parent scaffold and the map screen agree on padding math.
+ */
+val MapNavBarHeight = 80.dp
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -277,11 +289,6 @@ fun GlobalMapScreen(
         }
     }
 
-    // ── Quick-share state (remembers last-used target) ──────────────────────
-    var lastShareTargetId by remember { mutableStateOf<String?>(null) }
-    var lastShareTargetName by remember { mutableStateOf<String?>(null) }
-    var lastShareDuration by remember { mutableLongStateOf(60L) }
-
     // ── Sharing start/stop visual feedback ────────────────────────────────────
     var wasSharing by remember { mutableStateOf(uiState.isSharing) }
     LaunchedEffect(uiState.isSharing) {
@@ -296,16 +303,24 @@ fun GlobalMapScreen(
     var mapType by remember { mutableStateOf(MapType.NORMAL) }
     var showMapTypeSheet by remember { mutableStateOf(false) }
     var showMyProfileSheet by remember { mutableStateOf(false) }
+    var showManageSharesSheet by remember { mutableStateOf(false) }
 
     // ── Bottom sheet state ────────────────────────────────────────────────────
     val friendSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val groupPickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val shareSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val mapTypeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val manageSharesSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Google Maps style: no parent Scaffold clipping us.
-    // sheetPeekHeight is just the content peek height.
-    val sheetPeekHeight = if (uiState.friendLocations.isNotEmpty()) 130.dp else 0.dp
+    // Google Maps style: map fills the entire screen behind the overlaid nav bar.
+    // The sheet's peek includes the nav bar height so its rounded corners sit
+    // ABOVE the nav bar (not behind it). A bottom Spacer in the sheet content
+    // keeps content from being hidden behind the nav bar.
+    val systemBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val totalNavBarHeight = MapNavBarHeight + systemBottomInset
+    // Peek shows: drag handle + hero header (~64dp) + avatars row (~80dp) when friends exist
+    val contentPeek = 250.dp
+    val sheetPeekHeight = contentPeek + totalNavBarHeight
 
     val bottomSheetScaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberStandardBottomSheetState(
@@ -316,95 +331,67 @@ fun GlobalMapScreen(
     BottomSheetScaffold(
         scaffoldState = bottomSheetScaffoldState,
         sheetPeekHeight = sheetPeekHeight,
-        sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        sheetShape = RoundedCornerShape(topStart = 38.dp, topEnd = 38.dp),
         sheetContainerColor = MaterialTheme.colorScheme.surfaceDim,
-        sheetShadowElevation = 16.dp,
-        sheetTonalElevation = 2.dp,
+        sheetShadowElevation = 12.dp,
+        sheetTonalElevation = 1.dp,
         sheetDragHandle = {
-            if (uiState.friendLocations.isNotEmpty()) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Spacer(Modifier.height(10.dp))
-                    Box(
-                        modifier = Modifier
-                            .width(40.dp)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f))
-                    )
-                    Spacer(Modifier.height(12.dp))
-                }
+            // Always-visible drag handle — signals to user that the sheet is draggable
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .width(36.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+                )
+                Spacer(Modifier.height(8.dp))
             }
         },
         sheetContent = {
-            if (uiState.friendLocations.isNotEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 100.dp, max = 500.dp)
-                ) {
-                    // Header
-                    Text(
-                        text = "${uiState.friendLocations.size} friend${if (uiState.friendLocations.size != 1) "s" else ""} sharing",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 20.dp)
-                    )
-                    Spacer(Modifier.height(14.dp))
-
-                    // Vertical list of friends
-                    LazyColumn(
-                        modifier = Modifier.weight(1f, fill = false),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(items = uiState.friendLocations, key = { it.userId }) { friend ->
-                            FriendAvatarChip(
-                                friend = friend,
-                                myLatitude = uiState.myLatitude,
-                                myLongitude = uiState.myLongitude,
-                                hasMyLocation = uiState.hasMyLocation,
-                                onClick = {
-                                    viewModel.selectFriend(friend)
-                                    if (friend.latitude != 0.0) {
-                                        scope.launch {
-                                            cameraPositionState.animate(
-                                                CameraUpdateFactory.newLatLngZoom(
-                                                    LatLng(friend.latitude, friend.longitude),
-                                                    15f
-                                                ),
-                                                durationMs = 600
-                                            )
-                                        }
-                                    }
-                                }
+            FriendsSheetContent(
+                friends = uiState.friendLocations,
+                myLatitude = uiState.myLatitude,
+                myLongitude = uiState.myLongitude,
+                hasMyLocation = uiState.hasMyLocation,
+                isSharing = uiState.isSharing,
+                activeFilter = uiState.activeGroupFilter,
+                bottomReservedSpace = totalNavBarHeight,
+                onFriendClick = { friend ->
+                    viewModel.selectFriend(friend)
+                    if (friend.latitude != 0.0) {
+                        scope.launch {
+                            cameraPositionState.animate(
+                                CameraUpdateFactory.newLatLngZoom(
+                                    LatLng(friend.latitude, friend.longitude),
+                                    15f
+                                ),
+                                durationMs = 600
                             )
                         }
                     }
-                    // Bottom padding to keep content above the nav bar when expanded
-                    Spacer(Modifier.height(80.dp))
+                },
+                onMessageFriend = { friend ->
+                    viewModel.openOrCreateDm(friend.userId)
                 }
-            } else {
-                // Empty: minimal spacer
-                Spacer(Modifier.height(1.dp))
-            }
+            )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        // innerPadding.bottom = sheetPeekHeight, so FABs at BottomEnd sit above the sheet
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            // ── Map ───────────────────────────────────────────────────────────
+        // innerPadding.bottom = sheetPeekHeight (sheet peek + nav bar height).
+        // Map fills the full Box behind everything; FABs and overlays use innerPadding
+        // so they sit above the sheet peek and bottom nav.
+        Box(modifier = Modifier.fillMaxSize()) {
+            // ── Map (full screen — behind sheet, nav bar, and FABs) ───────────
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
+                contentPadding = innerPadding,
                 properties = MapProperties(
                     mapType = mapType,
                     isMyLocationEnabled = false // we draw our own marker
@@ -510,52 +497,52 @@ fun GlobalMapScreen(
             }
 
 
-            // ── Group filter pill ─────────────────────────────────────────────
+            // ── Group filter pill (top center) ───────────────────────────────
+            // Premium floating pill with active-filter avatar, like Google Maps search bar
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(top = Dimens.spaceMedium)
+                    .padding(top = 12.dp)
                     .clickable { viewModel.showGroupPicker(true) },
-                shape = MaterialTheme.shapes.extraLarge,
+                shape = RoundedCornerShape(28.dp),
                 color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 4.dp,
-                shadowElevation = 4.dp
+                shadowElevation = 6.dp,
+                tonalElevation = 1.dp
             ) {
                 Row(
                     modifier = Modifier.padding(
-                        horizontal = Dimens.spaceLarge,
-                        vertical = Dimens.spaceMedium
+                        start = 8.dp,
+                        end = 16.dp,
+                        top = 8.dp,
+                        bottom = 8.dp
                     ),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Default.LocationOn, null,
-                        modifier = Modifier.size(Dimens.iconSizeSmall),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.width(Dimens.spaceSmall))
-                    Text(
-                        text = uiState.activeGroupFilter?.name ?: "All Friends",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    if (uiState.friendLocations.isNotEmpty()) {
-                        Spacer(Modifier.width(Dimens.spaceSmall))
-                        Badge(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        ) {
-                            Text(
-                                "${uiState.friendLocations.size}",
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
+                    FilterPillAvatar(filter = uiState.activeGroupFilter)
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = uiState.activeGroupFilter?.name ?: "All Friends",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = if (uiState.friendLocations.isEmpty()) "No one sharing"
+                            else "${uiState.friendLocations.size} ${if (uiState.friendLocations.size == 1) "person" else "people"} sharing",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
                     }
-                    Spacer(Modifier.width(Dimens.spaceXSmall))
+                    Spacer(Modifier.width(8.dp))
                     Icon(
-                        Icons.Default.ArrowDropDown, null,
-                        modifier = Modifier.size(Dimens.iconSizeMedium),
+                        Icons.Default.ArrowDropDown,
+                        null,
+                        modifier = Modifier.size(20.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -566,7 +553,7 @@ fun GlobalMapScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(top = 56.dp, start = Dimens.spaceLarge, end = Dimens.spaceLarge),
+                    .padding(top = 84.dp, start = Dimens.spaceLarge, end = Dimens.spaceLarge),
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
             ) {
                 // ── Location off banner
@@ -626,10 +613,15 @@ fun GlobalMapScreen(
                         ) {
                             SharingPulseDot()
                             Spacer(Modifier.width(Dimens.spaceSmall))
-                            val sharingTargetName = (uiState.groups + uiState.directTargets)
-                                .firstOrNull { it.id == uiState.sharingGroupId }?.name
-                                ?: if (uiState.sharingGroupId?.startsWith("direct:") == true) "friend"
-                                else "group"
+                            val allTargets = uiState.groups + uiState.directTargets
+                            val targetNames = uiState.sharingTargetIds
+                                .mapNotNull { id -> allTargets.firstOrNull { it.id == id }?.name }
+                            val sharingTargetLabel = when {
+                                targetNames.isEmpty() -> "your selection"
+                                targetNames.size == 1 -> targetNames[0]
+                                targetNames.size == 2 -> "${targetNames[0]} & ${targetNames[1]}"
+                                else -> "${targetNames[0]} & ${targetNames.size - 1} others"
+                            }
                             val timerText = if (sharingSecondsRemaining != null) {
                                 val mins = sharingSecondsRemaining!! / 60
                                 val secs = sharingSecondsRemaining!! % 60
@@ -638,7 +630,7 @@ fun GlobalMapScreen(
                                 " • Until you stop"
                             }
                             Text(
-                                text = "Sharing live with $sharingTargetName$timerText",
+                                text = "Sharing live with $sharingTargetLabel$timerText",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer
                             )
@@ -698,12 +690,16 @@ fun GlobalMapScreen(
             }
 
             // ── FABs (right side) ─────────────────────────────────────────────
+            // FABs use innerPadding to sit above the sheet peek (which already
+            // includes the bottom nav bar height). When the user pulls the sheet
+            // up, it slides over the FABs — exactly like Google Maps.
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
+                    .padding(innerPadding)
                     .padding(
                         end = Dimens.spaceLarge,
-                        bottom = Dimens.spaceLarge
+                        bottom = 20.dp
                     ),
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
@@ -711,13 +707,17 @@ fun GlobalMapScreen(
                 // Map type
                 SmallFloatingActionButton(
                     onClick = { showMapTypeSheet = true },
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = CircleShape
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    shape = CircleShape,
+                    elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
+                        defaultElevation = 6.dp,
+                        pressedElevation = 8.dp
+                    )
                 ) {
                     Icon(
                         imageVector = ImageVector.vectorResource(id = R.drawable.layers),
                         contentDescription = "Map type",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(Dimens.iconSizeMedium)
                     )
                 }
@@ -739,28 +739,36 @@ fun GlobalMapScreen(
                             )
                         )
                     },
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    shape = CircleShape
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    shape = CircleShape,
+                    elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
+                        defaultElevation = 6.dp,
+                        pressedElevation = 8.dp
+                    )
                 ) {
                     Icon(
                         imageVector = ImageVector.vectorResource(id = R.drawable.location_crosshairs),
                         contentDescription = stringResource(R.string.cd_my_location),
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.size(Dimens.iconSizeMedium)
                     )
                 }
 
-                // Share / Stop sharing
+                // Share / Stop sharing — primary FAB
                 if (uiState.isSharing) {
                     FloatingActionButton(
-                        onClick = { viewModel.stopSharing() },
+                        onClick = { showManageSharesSheet = true },
                         containerColor = MaterialTheme.colorScheme.errorContainer,
-                        shape = MaterialTheme.shapes.large
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        shape = CircleShape,
+                        elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
+                            defaultElevation = 8.dp,
+                            pressedElevation = 12.dp
+                        )
                     ) {
                         Icon(
                             Icons.Rounded.Stop,
                             contentDescription = stringResource(R.string.cd_stop_sharing),
-                            tint = MaterialTheme.colorScheme.onErrorContainer,
                             modifier = Modifier.size(Dimens.iconSizeLarge)
                         )
                     }
@@ -779,48 +787,17 @@ fun GlobalMapScreen(
                             }
                         },
                         containerColor = MaterialTheme.colorScheme.primary,
-                        shape = MaterialTheme.shapes.large
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        shape = CircleShape,
+                        elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
+                            defaultElevation = 8.dp,
+                            pressedElevation = 12.dp
+                        )
                     ) {
                         Icon(
                             imageVector = ImageVector.vectorResource(id = R.drawable.paper_plane),
                             contentDescription = stringResource(R.string.cd_share_location),
-                            tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(Dimens.iconSizeLarge)
-                        )
-                    }
-                }
-            }
-
-            // ── Empty state when no friends sharing ─────────────────────────
-            if (uiState.friendLocations.isEmpty() && !uiState.isLoading) {
-                Card(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 120.dp, start = 48.dp, end = 48.dp),
-                    shape = MaterialTheme.shapes.large,
-                    elevation = CardDefaults.cardElevation(2.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(
-                            horizontal = Dimens.spaceLarge,
-                            vertical = Dimens.spaceMedium
-                        ),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.LocationOff,
-                            contentDescription = null,
-                            modifier = Modifier.size(Dimens.iconSizeMedium),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.width(Dimens.spaceSmall))
-                        Text(
-                            text = "No friends sharing right now",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -853,6 +830,7 @@ fun GlobalMapScreen(
         ) {
             GroupFilterSheet(
                 groups = uiState.groups,
+                directTargets = uiState.directTargets,
                 activeFilter = uiState.activeGroupFilter,
                 onSelect = { filter ->
                     viewModel.setGroupFilter(filter)
@@ -871,22 +849,16 @@ fun GlobalMapScreen(
             ShareTargetSheet(
                 groups = uiState.groups,
                 directTargets = uiState.directTargets,
-                lastShareTargetId = lastShareTargetId,
-                lastShareTargetName = lastShareTargetName,
-                lastShareDuration = lastShareDuration,
-                onStart = { targetId, durationMinutes ->
-                    // Save last-used target for quick-share
-                    val allTargets = uiState.groups + uiState.directTargets
-                    lastShareTargetId = targetId
-                    lastShareTargetName = allTargets.firstOrNull { it.id == targetId }?.name
-                    lastShareDuration = durationMinutes
+                initiallySelected = uiState.sharingTargetIds,
+                onStart = { targetIds, durationMinutes ->
                     viewModel.showShareSheet(false)
-                    viewModel.startSharing(targetId, durationMinutes)
+                    viewModel.startSharing(targetIds, durationMinutes)
                 }
             )
         }
     }
 
+    // Map Type bottom sheet ───────────────────────────────────────────────────
     if (showMapTypeSheet) {
         ModalBottomSheet(
             onDismissRequest = { showMapTypeSheet = false },
@@ -897,6 +869,36 @@ fun GlobalMapScreen(
                 onSelect = {
                     mapType = it
                     showMapTypeSheet = false
+                }
+            )
+        }
+    }
+
+    // ── Manage active shares sheet ────────────────────────────────────────────
+    if (showManageSharesSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showManageSharesSheet = false },
+            sheetState = manageSharesSheetState
+        ) {
+            ManageSharesSheet(
+                activeTargetIds = uiState.sharingTargetIds,
+                groups = uiState.groups,
+                directTargets = uiState.directTargets,
+                sharingExpiresAt = uiState.sharingExpiresAt,
+                onAddMore = {
+                    showManageSharesSheet = false
+                    viewModel.showShareSheet(true)
+                },
+                onStopOne = { targetId ->
+                    viewModel.removeSharingTarget(targetId)
+                    // Auto-dismiss when last target removed
+                    if (uiState.sharingTargetIds.size <= 1) {
+                        showManageSharesSheet = false
+                    }
+                },
+                onStopAll = {
+                    viewModel.stopSharing()
+                    showManageSharesSheet = false
                 }
             )
         }
@@ -995,15 +997,15 @@ fun GlobalMapScreen(
                 if (uiState.isSharing) {
                     OutlinedButton(
                         onClick = {
-                            viewModel.stopSharing()
                             showMyProfileSheet = false
+                            showManageSharesSheet = true
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.medium
                     ) {
                         Icon(Icons.Rounded.Stop, null, modifier = Modifier.size(Dimens.iconSizeMedium))
                         Spacer(Modifier.width(Dimens.spaceSmall))
-                        Text("Stop Sharing")
+                        Text("Manage active shares")
                     }
                 } else {
                     Button(
@@ -1027,6 +1029,532 @@ fun GlobalMapScreen(
 }
 
 // ── Sub-composables ───────────────────────────────────────────────────────────
+
+/**
+ * Bottom sheet content shown on the map screen.
+ *
+ * Layout:
+ * - Peek (always visible above nav bar):
+ *     • Filter hero (active filter avatar + name + status)
+ *     • Horizontal scrolling row of friend avatars
+ * - Expanded:
+ *     • Same hero pinned + full vertical list of friend cards with distance/ETA/message.
+ */
+@Composable
+private fun FriendsSheetContent(
+    friends: List<FriendLocationUiModel>,
+    myLatitude: Double,
+    myLongitude: Double,
+    hasMyLocation: Boolean,
+    isSharing: Boolean,
+    activeFilter: GroupFilter?,
+    bottomReservedSpace: androidx.compose.ui.unit.Dp,
+    onFriendClick: (FriendLocationUiModel) -> Unit,
+    onMessageFriend: (FriendLocationUiModel) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 120.dp, max = 640.dp)
+    ) {
+        // ── Hero row (filter avatar + name + status) ──────────────────────────
+        SheetHeroHeader(
+            activeFilter = activeFilter,
+            friendsCount = friends.size,
+            isSharing = isSharing
+        )
+
+        if (friends.isEmpty()) {
+            SheetEmptyState(isSharing = isSharing)
+            Spacer(Modifier.height(bottomReservedSpace))
+            return@Column
+        }
+
+        // ── Horizontal avatars row (visible at peek) ─────────────────────────
+        Spacer(Modifier.height(4.dp))
+        androidx.compose.foundation.lazy.LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(items = friends, key = { "avatar-${it.userId}" }) { friend ->
+                FriendAvatarPeek(
+                    friend = friend,
+                    onClick = { onFriendClick(friend) }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+        androidx.compose.material3.HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        )
+
+        // ── Expanded list (visible when sheet is dragged up) ─────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Live locations",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "${friends.size}",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        LazyColumn(
+            modifier = Modifier.weight(1f, fill = false),
+            contentPadding = PaddingValues(
+                start = 12.dp,
+                end = 12.dp,
+                top = 0.dp,
+                bottom = bottomReservedSpace + 16.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(items = friends, key = { "card-${it.userId}" }) { friend ->
+                FriendCard(
+                    friend = friend,
+                    myLatitude = myLatitude,
+                    myLongitude = myLongitude,
+                    hasMyLocation = hasMyLocation,
+                    onClick = { onFriendClick(friend) },
+                    onMessage = { onMessageFriend(friend) }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Hero header at the top of the sheet — mirrors the filter pill, larger.
+ * Shows the active filter's avatar (group / user / "all friends") + name + meta.
+ */
+@Composable
+private fun SheetHeroHeader(
+    activeFilter: GroupFilter?,
+    friendsCount: Int,
+    isSharing: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SheetHeroAvatar(filter = activeFilter)
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = activeFilter?.name ?: "All Friends",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            val subtitleText = when {
+                friendsCount == 0 && isSharing -> "You're sharing live"
+                friendsCount == 0 -> "No one's sharing"
+                friendsCount == 1 -> "1 person sharing live"
+                else -> "$friendsCount people sharing live"
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (friendsCount > 0) {
+                    SharingPulseDot()
+                    Spacer(Modifier.width(6.dp))
+                }
+                Text(
+                    text = subtitleText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SheetHeroAvatar(filter: GroupFilter?) {
+    val size = 52.dp
+    when {
+        filter == null -> {
+            // "All Friends" — gradient-like primary tint
+            Box(
+                modifier = Modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Groups,
+                    null,
+                    modifier = Modifier.size(26.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        !filter.photoUrl.isNullOrEmpty() -> {
+            AsyncImage(
+                model = filter.photoUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            )
+        }
+        else -> {
+            // Fallback: initial letter on color background
+            val color = AvatarColors[filter.id.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
+            Box(
+                modifier = Modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(color),
+                contentAlignment = Alignment.Center
+            ) {
+                if (filter.isDirect) {
+                    Text(
+                        text = filter.name.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.surface
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Groups,
+                        null,
+                        modifier = Modifier.size(26.dp),
+                        tint = MaterialTheme.colorScheme.surface
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Smaller avatar used in the top filter pill. */
+@Composable
+private fun FilterPillAvatar(filter: GroupFilter?) {
+    val size = 36.dp
+    when {
+        filter == null -> {
+            Box(
+                modifier = Modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Groups,
+                    null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+        !filter.photoUrl.isNullOrEmpty() -> {
+            AsyncImage(
+                model = filter.photoUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            )
+        }
+        else -> {
+            val color = AvatarColors[filter.id.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
+            Box(
+                modifier = Modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(color),
+                contentAlignment = Alignment.Center
+            ) {
+                if (filter.isDirect) {
+                    Text(
+                        text = filter.name.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.surface
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Groups,
+                        null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.surface
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SheetEmptyState(isSharing: Boolean) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                if (isSharing) Icons.Default.LocationOn else Icons.Default.LocationOff,
+                null,
+                modifier = Modifier.size(28.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = if (isSharing) "You're sharing live" else "No one's sharing right now",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = if (isSharing) "Friends sharing back will appear here"
+            else "Tap the share button below to start",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+/** Compact avatar shown in the horizontal peek row. Tap zooms to that friend. */
+@Composable
+private fun FriendAvatarPeek(
+    friend: FriendLocationUiModel,
+    onClick: () -> Unit
+) {
+    val color = AvatarColors[friend.userId.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
+    Column(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp)
+            .width(64.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(contentAlignment = Alignment.BottomEnd) {
+            if (!friend.photoUrl.isNullOrEmpty()) {
+                AsyncImage(
+                    model = friend.photoUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(color),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = friend.displayName.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.surface
+                    )
+                }
+            }
+            if (friend.isActive) {
+                Box(
+                    modifier = Modifier
+                        .size(14.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(2.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.tertiary)
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = friend.displayName.substringBefore(" "),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+/**
+ * Premium friend card. Tap row → focus map. Tap message icon → open chat.
+ */
+@Composable
+private fun FriendCard(
+    friend: FriendLocationUiModel,
+    myLatitude: Double,
+    myLongitude: Double,
+    hasMyLocation: Boolean,
+    onClick: () -> Unit,
+    onMessage: () -> Unit
+) {
+    val context = LocalContext.current
+    val color = AvatarColors[friend.userId.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
+
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Avatar with active dot
+            Box(contentAlignment = Alignment.BottomEnd) {
+                if (!friend.photoUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = friend.photoUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(color),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = friend.displayName.take(1).uppercase(),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.surface
+                        )
+                    }
+                }
+                if (friend.isActive) {
+                    Box(
+                        modifier = Modifier
+                            .size(13.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(2.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.tertiary)
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+
+            // Name + meta row
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = friend.displayName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (hasMyLocation && friend.latitude != 0.0 && friend.longitude != 0.0) {
+                        val distance = LocationUtils.calculateDistance(
+                            myLatitude, myLongitude,
+                            friend.latitude, friend.longitude
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                        ) {
+                            Text(
+                                text = LocationUtils.formatDistance(context, distance),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                        friend.etaText?.let { eta ->
+                            Spacer(Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
+                            ) {
+                                Text(
+                                    text = "~$eta",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Text(
+                        text = friend.timeAgo.ifEmpty { "Just now" },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+            }
+
+            // Message icon button
+            Spacer(Modifier.width(8.dp))
+            Surface(
+                onClick = onMessage,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.ChatBubbleOutline,
+                        contentDescription = "Message ${friend.displayName}",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun SharingPulseDot() {
@@ -1266,6 +1794,7 @@ private fun FriendDetailSheet(
 @Composable
 private fun GroupFilterSheet(
     groups: List<GroupFilter>,
+    directTargets: List<GroupFilter>,
     activeFilter: GroupFilter?,
     onSelect: (GroupFilter?) -> Unit
 ) {
@@ -1275,33 +1804,53 @@ private fun GroupFilterSheet(
             .padding(Dimens.spaceXLarge)
             .navigationBarsPadding()
     ) {
-        Text("Filter", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text("Filter by", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(
+            text = "Show locations from a group or specific friend",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Spacer(Modifier.height(Dimens.spaceLarge))
 
         LazyColumn(
-            modifier = Modifier.heightIn(max = 420.dp),
+            modifier = Modifier.heightIn(max = 480.dp),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceXSmall)
         ) {
             item {
                 FilterRow(
+                    filter = null,
                     title = "All friends",
                     selected = activeFilter == null,
                     onClick = { onSelect(null) }
                 )
             }
-            item {
-                Spacer(Modifier.height(Dimens.spaceXSmall))
-                androidx.compose.material3.HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
-                Spacer(Modifier.height(Dimens.spaceXSmall))
+
+            if (groups.isNotEmpty()) {
+                item {
+                    FilterSectionHeader("GROUPS")
+                }
+                items(groups, key = { "g-${it.id}" }) { group ->
+                    FilterRow(
+                        filter = group,
+                        title = group.name,
+                        selected = activeFilter?.id == group.id,
+                        onClick = { onSelect(group) }
+                    )
+                }
             }
-            items(groups, key = { it.id }) { group ->
-                FilterRow(
-                    title = group.name,
-                    selected = activeFilter?.id == group.id,
-                    onClick = { onSelect(group) }
-                )
+
+            if (directTargets.isNotEmpty()) {
+                item {
+                    FilterSectionHeader("FRIENDS")
+                }
+                items(directTargets, key = { "d-${it.id}" }) { target ->
+                    FilterRow(
+                        filter = target,
+                        title = target.name,
+                        selected = activeFilter?.id == target.id,
+                        onClick = { onSelect(target) }
+                    )
+                }
             }
         }
 
@@ -1310,7 +1859,20 @@ private fun GroupFilterSheet(
 }
 
 @Composable
+private fun FilterSectionHeader(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        letterSpacing = 1.sp,
+        modifier = Modifier.padding(start = Dimens.spaceMedium, top = 12.dp, bottom = 4.dp)
+    )
+}
+
+@Composable
 private fun FilterRow(
+    filter: GroupFilter?,
     title: String,
     selected: Boolean,
     onClick: () -> Unit
@@ -1323,21 +1885,30 @@ private fun FilterRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium),
+                .padding(horizontal = Dimens.spaceMedium, vertical = Dimens.spaceMedium),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Default.Groups, null,
-                modifier = Modifier.size(Dimens.iconSizeMedium),
-                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.width(Dimens.spaceLarge))
-            Text(
-                title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                modifier = Modifier.weight(1f)
-            )
+            FilterPillAvatar(filter = filter)
+            Spacer(Modifier.width(Dimens.spaceMedium))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = when {
+                        filter == null -> "Everyone sharing with you"
+                        filter.isDirect -> "Direct share"
+                        else -> "Group"
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             if (selected) {
                 Icon(
                     Icons.Default.Check, null,
@@ -1349,50 +1920,63 @@ private fun FilterRow(
     }
 }
 
+/**
+ * Manage active shares sheet — lists every recipient the user is currently sharing with.
+ * Each row has its own "Stop" button so the user can end sharing for one recipient at
+ * a time without nuking the whole session. A "Stop all" footer button stops everything.
+ */
 @Composable
-private fun ShareTargetSheet(
+private fun ManageSharesSheet(
+    activeTargetIds: List<String>,
     groups: List<GroupFilter>,
     directTargets: List<GroupFilter>,
-    lastShareTargetId: String? = null,
-    lastShareTargetName: String? = null,
-    lastShareDuration: Long = 60L,
-    onStart: (String, Long) -> Unit
+    sharingExpiresAt: Long?,
+    onAddMore: () -> Unit,
+    onStopOne: (String) -> Unit,
+    onStopAll: () -> Unit
 ) {
-    val targets = groups + directTargets
-    var selectedTargetId by remember { mutableStateOf(targets.firstOrNull()?.id.orEmpty()) }
-    var selectedDuration by remember { mutableLongStateOf(60L) }
+    val allTargets = (directTargets + groups).associateBy { it.id }
+    val active = activeTargetIds.mapNotNull { id ->
+        allTargets[id] ?: GroupFilter(id = id, name = id, isDirect = id.startsWith("direct:"))
+    }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .padding(horizontal = 20.dp, vertical = 12.dp)
             .navigationBarsPadding()
     ) {
-        // ── Header with icon ──────────────────────────────────────────────────
+        // ── Header ────────────────────────────────────────────────────────────
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                    .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.Default.LocationOn,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
+                SharingPulseDot()
             }
             Spacer(Modifier.width(14.dp))
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Share Location",
+                    "Active shares",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
+                val subtitle = when {
+                    active.isEmpty() -> "Not sharing right now"
+                    sharingExpiresAt == null || sharingExpiresAt == Long.MAX_VALUE ->
+                        "${active.size} active • Until you stop"
+                    else -> {
+                        val mins = ((sharingExpiresAt - System.currentTimeMillis()) / 60_000L)
+                            .coerceAtLeast(0)
+                        val timer = if (mins >= 60) "${mins / 60}h ${mins % 60}m" else "${mins}m"
+                        "${active.size} active • $timer left"
+                    }
+                }
                 Text(
-                    "Choose who can see your live location",
+                    text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1401,196 +1985,477 @@ private fun ShareTargetSheet(
 
         Spacer(Modifier.height(20.dp))
 
-        // ── Quick-share (if previous target exists) ───────────────────────────
-        if (lastShareTargetId != null && lastShareTargetName != null) {
-            val durationLabel = when (lastShareDuration) {
-                15L -> "15 min"
-                60L -> "1 hour"
-                240L -> "4 hours"
-                0L -> "until stopped"
-                else -> "${lastShareDuration}m"
+        if (active.isEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            Text(
+                "No one to manage. Tap share to get started.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(24.dp))
+            return@Column
+        }
+
+        // ── Active recipient list ─────────────────────────────────────────────
+        Text(
+            "SHARING WITH",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            letterSpacing = 1.sp
+        )
+        Spacer(Modifier.height(8.dp))
+
+        LazyColumn(
+            modifier = Modifier.heightIn(max = 360.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            items(active, key = { "active-${it.id}" }) { target ->
+                ActiveShareRow(target = target, onStop = { onStopOne(target.id) })
             }
-            Surface(
-                onClick = { onStart(lastShareTargetId, lastShareDuration) },
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.tertiaryContainer
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // ── Footer actions ────────────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = onAddMore,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(50.dp),
+                shape = RoundedCornerShape(14.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.NearMe,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Quick share",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
-                        Text(
-                            "$lastShareTargetName • $durationLabel",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
-                        )
-                    }
-                    Icon(
-                        Icons.Default.ArrowDropDown,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer
+                Icon(
+                    Icons.Default.LocationOn,
+                    null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text("Add more", style = MaterialTheme.typography.labelLarge)
+            }
+            Button(
+                onClick = onStopAll,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(50.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+            ) {
+                Icon(
+                    Icons.Rounded.Stop,
+                    null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text("Stop all", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun ActiveShareRow(
+    target: GroupFilter,
+    onStop: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FilterPillAvatar(filter = target)
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    target.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SharingPulseDot()
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = if (target.isDirect) "Direct • Sharing live" else "Group • Sharing live",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
-            Spacer(Modifier.height(16.dp))
-            androidx.compose.material3.HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-            )
-            Spacer(Modifier.height(16.dp))
+            // Per-recipient stop button
+            Surface(
+                onClick = onStop,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Rounded.Stop,
+                        contentDescription = "Stop sharing with ${target.name}",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShareTargetSheet(
+    groups: List<GroupFilter>,
+    directTargets: List<GroupFilter>,
+    initiallySelected: List<String> = emptyList(),
+    initialDuration: Long = 60L,
+    onStart: (List<String>, Long) -> Unit
+) {
+    val targets = directTargets + groups
+    val selectedIds = remember(initiallySelected) {
+        mutableStateListOf<String>().apply { addAll(initiallySelected) }
+    }
+    var selectedDuration by remember { mutableLongStateOf(initialDuration) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .navigationBarsPadding()
+    ) {
+        // ── Header ────────────────────────────────────────────────────────────
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.LocationOn,
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Share live location",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = if (selectedIds.isEmpty()) "Pick friends or groups"
+                    else "${selectedIds.size} selected",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (selectedIds.isNotEmpty()) {
+                TextButton(onClick = { selectedIds.clear() }) {
+                    Text("Clear")
+                }
+            }
         }
 
-        // ── Target selection ──────────────────────────────────────────────────
+        Spacer(Modifier.height(16.dp))
+
+        if (targets.isEmpty()) {
+            ShareEmptyState()
+            return@Column
+        }
+
+        // ── Selected chips row (only visible when something is selected) ──────
+        if (selectedIds.isNotEmpty()) {
+            androidx.compose.foundation.lazy.LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 2.dp)
+            ) {
+                items(
+                    items = selectedIds.mapNotNull { id -> targets.firstOrNull { it.id == id } },
+                    key = { "chip-${it.id}" }
+                ) { target ->
+                    SelectedTargetChip(
+                        target = target,
+                        onRemove = { selectedIds.remove(target.id) }
+                    )
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+        }
+
+        // ── Friends section ───────────────────────────────────────────────────
+        LazyColumn(
+            modifier = Modifier.heightIn(max = 360.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (directTargets.isNotEmpty()) {
+                item { ShareSectionHeader("FRIENDS") }
+                items(directTargets, key = { "f-${it.id}" }) { target ->
+                    SelectableTargetRow(
+                        target = target,
+                        selected = target.id in selectedIds,
+                        onToggle = {
+                            if (target.id in selectedIds) selectedIds.remove(target.id)
+                            else selectedIds.add(target.id)
+                        }
+                    )
+                }
+            }
+            if (groups.isNotEmpty()) {
+                item { ShareSectionHeader("GROUPS") }
+                items(groups, key = { "g-${it.id}" }) { target ->
+                    SelectableTargetRow(
+                        target = target,
+                        selected = target.id in selectedIds,
+                        onToggle = {
+                            if (target.id in selectedIds) selectedIds.remove(target.id)
+                            else selectedIds.add(target.id)
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // ── Duration ──────────────────────────────────────────────────────────
         Text(
-            "SHARE WITH",
+            "DURATION",
             style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             letterSpacing = 1.sp
         )
         Spacer(Modifier.height(10.dp))
-
-        LazyColumn(
-            modifier = Modifier.heightIn(max = 240.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(targets, key = { it.id }) { target ->
-                val selected = selectedTargetId == target.id
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { selectedTargetId = target.id },
-                    shape = RoundedCornerShape(14.dp),
-                    color = if (selected) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    border = if (selected) androidx.compose.foundation.BorderStroke(
-                        1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                    ) else null
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TargetAvatar(target)
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                target.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                if (target.isDirect) "Direct message" else "Group",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        if (selected) {
-                            Icon(
-                                Icons.Default.Check,
-                                null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
-            }
-            if (targets.isEmpty()) {
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            Icons.Default.Groups,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "No one to share with yet",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            "Add friends or join a group first",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
+            DurationSegment("15m", selectedDuration == 15L, Modifier.weight(1f)) { selectedDuration = 15L }
+            DurationSegment("1h", selectedDuration == 60L, Modifier.weight(1f)) { selectedDuration = 60L }
+            DurationSegment("4h", selectedDuration == 240L, Modifier.weight(1f)) { selectedDuration = 240L }
+            DurationSegment("∞", selectedDuration == 0L, Modifier.weight(1f)) { selectedDuration = 0L }
         }
 
-        if (targets.isNotEmpty()) {
-            Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(20.dp))
 
-            // ── Duration selection ────────────────────────────────────────────
-            Text(
-                "DURATION",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                letterSpacing = 1.sp
+        // ── Start button ──────────────────────────────────────────────────────
+        Button(
+            onClick = {
+                if (selectedIds.isNotEmpty()) onStart(selectedIds.toList(), selectedDuration)
+            },
+            enabled = selectedIds.isNotEmpty(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
             )
-            Spacer(Modifier.height(10.dp))
+        ) {
+            Icon(
+                Icons.Default.NearMe,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = if (selectedIds.isEmpty()) "Pick someone to share with"
+                else "Share with ${selectedIds.size}",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+        }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                DurationSegment("15m", selectedDuration == 15L, Modifier.weight(1f)) { selectedDuration = 15L }
-                DurationSegment("1h", selectedDuration == 60L, Modifier.weight(1f)) { selectedDuration = 60L }
-                DurationSegment("4h", selectedDuration == 240L, Modifier.weight(1f)) { selectedDuration = 240L }
-                DurationSegment("∞", selectedDuration == 0L, Modifier.weight(1f)) { selectedDuration = 0L }
-            }
+        Spacer(Modifier.height(12.dp))
+    }
+}
 
-            Spacer(Modifier.height(24.dp))
+@Composable
+private fun ShareEmptyState() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.Groups,
+                contentDescription = null,
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "No one to share with yet",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Add friends or join a group first",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(24.dp))
+    }
+}
 
-            // ── Start button ──────────────────────────────────────────────────
-            Button(
-                onClick = {
-                    if (selectedTargetId.isNotBlank()) onStart(selectedTargetId, selectedDuration)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Icon(
-                    Icons.Default.NearMe,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(8.dp))
+@Composable
+private fun ShareSectionHeader(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        letterSpacing = 1.sp,
+        modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 4.dp)
+    )
+}
+
+@Composable
+private fun SelectableTargetRow(
+    target: GroupFilter,
+    selected: Boolean,
+    onToggle: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onToggle,
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer
+        else MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = if (selected) androidx.compose.foundation.BorderStroke(
+            1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+        ) else null
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FilterPillAvatar(filter = target)
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Start Sharing",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
+                    target.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    if (target.isDirect) "Direct share" else "Group",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            // Material checkbox-like indicator
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Check,
+                        null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .border(
+                            width = 1.5.dp,
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                            shape = CircleShape
+                        )
+                )
+            }
+        }
+    }
+}
 
-            Spacer(Modifier.height(16.dp))
+@Composable
+private fun SelectedTargetChip(
+    target: GroupFilter,
+    onRemove: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        modifier = Modifier.height(36.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 4.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Tiny avatar
+            Box(modifier = Modifier.size(28.dp)) {
+                FilterPillAvatar(filter = target)
+            }
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = target.name,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 120.dp)
+            )
+            Spacer(Modifier.width(4.dp))
+            Surface(
+                onClick = onRemove,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                modifier = Modifier.size(20.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Remove ${target.name}",
+                        modifier = Modifier.size(12.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
         }
     }
 }

@@ -106,7 +106,7 @@ fun UserProfileScreen(
     LaunchedEffect(uiState.locationSharingActive, uiState.locationSharingTargetId) {
         if (uiState.locationSharingActive && uiState.locationSharingTargetId != null) {
             val intent = com.ovi.where.service.LocationTrackingService.createStartIntent(
-                context, uiState.locationSharingTargetId!!, 60L
+                context, 60L
             )
             context.startForegroundService(intent)
             android.widget.Toast.makeText(context, "Sharing location for 1 hour", android.widget.Toast.LENGTH_SHORT).show()

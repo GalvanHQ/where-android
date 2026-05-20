@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 /**
@@ -295,6 +296,19 @@ class CreateGroupViewModel @Inject constructor(
                         val conversationId = when (conversationResult) {
                             is Resource.Success -> conversationResult.data?.id
                             else -> null
+                        }
+
+                        // Step 4: Write conversationId back to the group document
+                        if (conversationId != null) {
+                            try {
+                                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                    .collection("groups")
+                                    .document(group.id)
+                                    .update("conversationId", conversationId)
+                                    .await()
+                            } catch (e: Exception) {
+                                timber.log.Timber.w(e, "Failed to write conversationId to group doc")
+                            }
                         }
 
                         // Success: display invite code and prepare navigation

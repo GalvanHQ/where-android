@@ -57,7 +57,19 @@ class LocationRepositoryImpl @Inject constructor(
     private val currentPhotoUrl: String?
         get() = firebaseAuth.currentUser?.photoUrl?.toString()
 
-    private val activeSharingSessions = mutableMapOf<String, Long>()
+    /**
+     * Active sharing session state.
+     * - targetIds: list of group ids and "direct:{friendId}" entries the user is currently sharing with.
+     * - expiryTime: epoch ms (Long.MAX_VALUE = "until you stop").
+     * - visibleTo: union of all member ids across all targets (recomputed on add/remove).
+     */
+    private data class ActiveSharingSession(
+        val targetIds: List<String>,
+        val expiryTime: Long,
+        val visibleTo: List<String>
+    )
+    @Volatile
+    private var currentSession: ActiveSharingSession? = null
 
     // ── Speed-dependent write throttle state ──────────────────────────────────
     @Volatile
@@ -138,6 +150,9 @@ class LocationRepositoryImpl @Inject constructor(
                 sharingExpiresAt = (data["sharingExpiresAt"] as? Number)?.toLong() ?: 0L,
                 targetType = data["targetType"] as? String ?: "group",
                 targetId = data["targetId"] as? String ?: "",
+                targetIds = (data["targetIds"] as? List<*>)?.filterIsInstance<String>()
+                    ?: (data["targetId"] as? String)?.takeIf { it.isNotEmpty() }?.let { listOf(it) }
+                    ?: emptyList(),
                 visibleTo = (data["visibleTo"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
                 displayName = data["displayName"] as? String ?: "",
                 photoUrl = data["photoUrl"] as? String,
@@ -149,45 +164,70 @@ class LocationRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun startLocationSharing(groupId: String, durationMinutes: Long): Resource<Unit> {
+    /**
+     * Computes the union of member ids visible across the given target ids.
+     * For "direct:{friendId}" → [uid, friendId].
+     * For groupId → group member ids ∪ uid.
+     */
+    private suspend fun computeVisibleTo(uid: String, targetIds: List<String>): List<String> {
+        val visible = LinkedHashSet<String>()
+        visible.add(uid)
+        for (tid in targetIds) {
+            if (isDirectTarget(tid)) {
+                visible.add(directFriendId(tid))
+            } else {
+                runCatching { getGroupMemberIds(tid) }
+                    .getOrNull()
+                    ?.let { visible.addAll(it) }
+            }
+        }
+        return visible.toList()
+    }
+
+    /**
+     * Determines the targetType label for the location doc based on the target list.
+     * - empty → "group"
+     * - 1 direct → "direct"
+     * - 1 group → "group"
+     * - mixed / multiple → "multi"
+     */
+    private fun computeTargetType(targetIds: List<String>): String {
+        if (targetIds.size != 1) return if (targetIds.isEmpty()) "group" else "multi"
+        return if (isDirectTarget(targetIds[0])) "direct" else "group"
+    }
+
+    override suspend fun startLocationSharing(targetIds: List<String>, durationMinutes: Long): Resource<Unit> {
         return try {
             val uid = currentUid ?: return Resource.Error("Not authenticated")
+            val sanitized = targetIds.filter { it.isNotBlank() }.distinct()
+            if (sanitized.isEmpty()) {
+                return Resource.Error("Pick at least one friend or group to share with")
+            }
+
             val expiryTime = if (durationMinutes > 0) {
                 System.currentTimeMillis() + (durationMinutes * MILLIS_PER_MINUTE)
             } else {
                 Long.MAX_VALUE
             }
 
-            activeSharingSessions[groupId] = expiryTime
+            val visibleTo = computeVisibleTo(uid, sanitized)
+            currentSession = ActiveSharingSession(
+                targetIds = sanitized,
+                expiryTime = expiryTime,
+                visibleTo = visibleTo
+            )
 
-            val isDirect = isDirectTarget(groupId)
-            val targetType = if (isDirect) "direct" else "group"
-
-            // Build visibleTo list — MUST include all users who should see this location
-            val visibleTo = if (isDirect) {
-                val friendId = directFriendId(groupId)
-                listOf(uid, friendId)
-            } else {
-                val members = getGroupMemberIds(groupId)
-                if (uid !in members) members + uid else members
-            }
-
-            Timber.d("startLocationSharing: uid=$uid, groupId=$groupId, visibleTo=$visibleTo (${visibleTo.size} members)")
-
-            if (visibleTo.size <= 1) {
-                Timber.w("startLocationSharing: visibleTo has only ${visibleTo.size} entries — other users won't see this location!")
-            }
-
-            // Denormalized profile data — eliminates separate user profile reads on map
+            val targetType = computeTargetType(sanitized)
             val displayName = (currentDisplayName ?: "").take(50)
             val photoUrl = (currentPhotoUrl ?: "").take(2048)
 
-            // Single write to consolidated activeLocations collection
-            // Use set() WITHOUT merge to ensure clean state (no stale fields from previous sessions)
+            // Single write to consolidated activeLocations collection.
+            // We keep targetId (legacy single field) for backward compat — first id.
             val activeLocationData = hashMapOf(
                 "userId" to uid,
                 "targetType" to targetType,
-                "targetId" to groupId,
+                "targetId" to sanitized.first(),
+                "targetIds" to sanitized,
                 "isSharingActive" to true,
                 "sharingExpiresAt" to expiryTime,
                 "timestamp" to System.currentTimeMillis(),
@@ -205,8 +245,7 @@ class LocationRepositoryImpl @Inject constructor(
                 .set(activeLocationData)
                 .await()
 
-            Timber.d("startLocationSharing: activeLocations/$uid written successfully")
-
+            Timber.d("startLocationSharing: uid=$uid, targets=${sanitized.size}, visibleTo=${visibleTo.size}")
             Resource.Success(Unit)
         } catch (e: Exception) {
             Timber.e(e, "Failed to start location sharing")
@@ -214,19 +253,18 @@ class LocationRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun stopLocationSharing(groupId: String): Resource<Unit> {
+    override suspend fun stopLocationSharing(): Resource<Unit> {
         return try {
             val uid = currentUid ?: return Resource.Error("Not authenticated")
+            currentSession = null
 
-            activeSharingSessions.remove(groupId)
-
-            // Single write to consolidated doc
             firestore.collection(AppConstants.FIRESTORE_COLLECTION_ACTIVE_LOCATIONS)
                 .document(uid)
                 .set(
                     mapOf(
                         "isSharingActive" to false,
-                        "timestamp" to System.currentTimeMillis()
+                        "timestamp" to System.currentTimeMillis(),
+                        "targetIds" to emptyList<String>()
                     ),
                     SetOptions.merge()
                 ).await()
@@ -235,6 +273,69 @@ class LocationRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "Failed to stop location sharing")
             Resource.Error(e.message ?: "Failed to stop location sharing")
+        }
+    }
+
+    override suspend fun addSharingTarget(targetId: String): Resource<Unit> {
+        return try {
+            val uid = currentUid ?: return Resource.Error("Not authenticated")
+            val session = currentSession
+                ?: return Resource.Error("No active sharing session — start sharing first")
+            if (targetId.isBlank() || targetId in session.targetIds) {
+                return Resource.Success(Unit)
+            }
+
+            val newTargets = session.targetIds + targetId
+            val visibleTo = computeVisibleTo(uid, newTargets)
+            currentSession = session.copy(targetIds = newTargets, visibleTo = visibleTo)
+
+            firestore.collection(AppConstants.FIRESTORE_COLLECTION_ACTIVE_LOCATIONS)
+                .document(uid)
+                .set(
+                    mapOf(
+                        "targetIds" to newTargets,
+                        "targetType" to computeTargetType(newTargets),
+                        "visibleTo" to visibleTo,
+                        "timestamp" to System.currentTimeMillis()
+                    ),
+                    SetOptions.merge()
+                ).await()
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to add sharing target")
+            Resource.Error(e.message ?: "Failed to add sharing target")
+        }
+    }
+
+    override suspend fun removeSharingTarget(targetId: String): Resource<Unit> {
+        val session = currentSession ?: return Resource.Success(Unit)
+        if (targetId !in session.targetIds) return Resource.Success(Unit)
+
+        val newTargets = session.targetIds - targetId
+        if (newTargets.isEmpty()) {
+            // Last target removed → stop sharing entirely
+            return stopLocationSharing()
+        }
+        return try {
+            val uid = currentUid ?: return Resource.Error("Not authenticated")
+            val visibleTo = computeVisibleTo(uid, newTargets)
+            currentSession = session.copy(targetIds = newTargets, visibleTo = visibleTo)
+
+            firestore.collection(AppConstants.FIRESTORE_COLLECTION_ACTIVE_LOCATIONS)
+                .document(uid)
+                .set(
+                    mapOf(
+                        "targetIds" to newTargets,
+                        "targetType" to computeTargetType(newTargets),
+                        "visibleTo" to visibleTo,
+                        "timestamp" to System.currentTimeMillis()
+                    ),
+                    SetOptions.merge()
+                ).await()
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to remove sharing target")
+            Resource.Error(e.message ?: "Failed to remove sharing target")
         }
     }
 
@@ -754,32 +855,36 @@ class LocationRepositoryImpl @Inject constructor(
         awaitClose { listener.remove() }
     }
 
-    override fun isSharingLocation(groupId: String): Boolean {
-        val expiryTime = activeSharingSessions[groupId] ?: return false
-        return System.currentTimeMillis() < expiryTime
+    override fun isSharingLocation(): Boolean {
+        val session = currentSession ?: return false
+        if (session.expiryTime == Long.MAX_VALUE) return true
+        if (System.currentTimeMillis() < session.expiryTime) return true
+        currentSession = null
+        return false
     }
 
-    override fun getSharingExpiryTime(groupId: String): Long? {
-        return activeSharingSessions[groupId]
+    override fun getSharingTargetIds(): List<String> {
+        return if (isSharingLocation()) currentSession?.targetIds ?: emptyList() else emptyList()
     }
 
-    override suspend fun checkSharingStatus(groupId: String): Boolean {
+    override fun getSharingExpiryTime(): Long? = currentSession?.expiryTime
+
+    override suspend fun checkSharingStatus(): List<String> {
         return try {
-            val uid = currentUid ?: return false
+            val uid = currentUid ?: return emptyList()
 
-            // Step 1: Check in-memory cache first (0 Firestore reads)
-            val cachedExpiry = activeSharingSessions[groupId]
-            if (cachedExpiry != null) {
+            // Step 1: in-memory cache (0 reads)
+            val cached = currentSession
+            if (cached != null) {
                 val now = System.currentTimeMillis()
-                if (cachedExpiry == Long.MAX_VALUE || now < cachedExpiry) {
-                    return true
+                if (cached.expiryTime == Long.MAX_VALUE || now < cached.expiryTime) {
+                    return cached.targetIds
                 } else {
-                    // Expired — clean up
-                    activeSharingSessions.remove(groupId)
+                    currentSession = null
                 }
             }
 
-            // Step 2: Single doc read from consolidated collection (1 Firestore read)
+            // Step 2: single Firestore read
             val activeDoc = firestore.collection(AppConstants.FIRESTORE_COLLECTION_ACTIVE_LOCATIONS)
                 .document(uid)
                 .get()
@@ -788,20 +893,29 @@ class LocationRepositoryImpl @Inject constructor(
             if (activeDoc.exists()) {
                 val isActive = activeDoc.getBoolean("isSharingActive") ?: false
                 val expiresAt = activeDoc.getLong("sharingExpiresAt") ?: 0L
-                val targetId = activeDoc.getString("targetId") ?: ""
+                @Suppress("UNCHECKED_CAST")
+                val targetIds = (activeDoc.get("targetIds") as? List<String>)
+                    ?: activeDoc.getString("targetId")?.takeIf { it.isNotEmpty() }?.let { listOf(it) }
+                    ?: emptyList()
+                @Suppress("UNCHECKED_CAST")
+                val visibleTo = (activeDoc.get("visibleTo") as? List<String>) ?: emptyList()
                 val now = System.currentTimeMillis()
-                val stillActive = isActive && targetId == groupId &&
+                val stillActive = isActive && targetIds.isNotEmpty() &&
                     (expiresAt == Long.MAX_VALUE || now < expiresAt)
                 if (stillActive) {
-                    activeSharingSessions[groupId] = expiresAt
-                    return true
+                    currentSession = ActiveSharingSession(
+                        targetIds = targetIds,
+                        expiryTime = expiresAt,
+                        visibleTo = visibleTo
+                    )
+                    return targetIds
                 }
             }
 
-            false
+            emptyList()
         } catch (e: Exception) {
             Timber.e(e, "Failed to check sharing status")
-            false
+            emptyList()
         }
     }
 

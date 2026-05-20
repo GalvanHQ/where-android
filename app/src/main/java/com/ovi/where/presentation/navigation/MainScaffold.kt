@@ -9,7 +9,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
@@ -17,7 +19,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -40,6 +41,7 @@ import coil.request.ImageRequest
 import com.ovi.where.R
 import com.ovi.where.presentation.chat.ChatsScreen
 import com.ovi.where.presentation.map.GlobalMapScreen
+import com.ovi.where.presentation.map.MapNavBarHeight
 import com.ovi.where.presentation.people.PeopleScreen
 import com.ovi.where.presentation.profile.ProfileScreen
 
@@ -101,9 +103,14 @@ fun MainScaffold(
     val currentRoute = navBackStackEntry?.destination?.route
     val profilePhotoUrl by viewModel.profilePhotoUrl.collectAsState()
 
-    // Google Maps style: no parent Scaffold wrapping the content.
-    // The map screen uses BottomSheetScaffold as its own root.
-    // The bottom nav is overlaid on top with highest z-order.
+    // Total nav bar height = NavigationBar content (80dp) + system bottom inset.
+    // GlobalMapScreen reads MapNavBarHeight to offset its sheet peek correctly.
+    val systemBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val totalNavBarHeight = MapNavBarHeight + systemBottomInset
+    val nonMapContentPadding = PaddingValues(bottom = totalNavBarHeight)
+
+    // Google Maps style: map is full-screen behind everything.
+    // Bottom nav and bottom sheet are overlaid on top.
     Box(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = bottomNavController,
@@ -115,6 +122,8 @@ fun MainScaffold(
             exitTransition = { fadeOut(tween(200)) }
         ) {
             composable(BottomTab.Map.route) {
+                // Map fills the full screen behind the nav bar.
+                // GlobalMapScreen handles its own sheet/FAB layout.
                 GlobalMapScreen(
                     onNavigateToChat = onNavigateToChat,
                     onNavigateToUserProfile = onNavigateToUserProfile,
@@ -123,7 +132,7 @@ fun MainScaffold(
             }
             composable(BottomTab.Chats.route) {
                 ChatsScreen(
-                    contentPadding = PaddingValues(bottom = 80.dp),
+                    contentPadding = nonMapContentPadding,
                     onNavigateToChat = onNavigateToChat,
                     onNavigateToNewMessage = onNavigateToNewMessage,
                     onNavigateToSearch = { onNavigateToSearch("chats") }
@@ -131,7 +140,7 @@ fun MainScaffold(
             }
             composable(BottomTab.People.route) {
                 PeopleScreen(
-                    contentPadding = PaddingValues(bottom = 80.dp),
+                    contentPadding = nonMapContentPadding,
                     onNavigateToUserProfile = onNavigateToUserProfile,
                     onNavigateToChat = onNavigateToChat,
                     onNavigateToFriendRequests = onNavigateToFriendRequests,
@@ -142,7 +151,7 @@ fun MainScaffold(
                 ProfileScreen(
                     onNavigateToEditProfile = onNavigateToEditProfile,
                     onNavigateToSettings = onNavigateToSettings,
-                    contentPadding = PaddingValues(bottom = 80.dp),
+                    contentPadding = nonMapContentPadding,
                     onNavigateToMessages = {
                         bottomNavController.navigate(BottomTab.Chats.route) {
                             popUpTo(BottomTab.Map.route) { saveState = true }
@@ -168,7 +177,7 @@ fun MainScaffold(
             }
         }
 
-        // Bottom nav overlaid on top (highest z-order, like Google Maps)
+        // Overlaid bottom nav (Google Maps style)
         WhereBottomBar(
             currentRoute = currentRoute,
             profilePhotoUrl = profilePhotoUrl,

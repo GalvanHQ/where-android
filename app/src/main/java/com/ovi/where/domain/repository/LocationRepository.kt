@@ -6,8 +6,20 @@ import com.ovi.where.domain.model.SharedLocation
 import kotlinx.coroutines.flow.Flow
 
 interface LocationRepository {
-    suspend fun startLocationSharing(groupId: String, durationMinutes: Long): Resource<Unit>
-    suspend fun stopLocationSharing(groupId: String): Resource<Unit>
+    /**
+     * Starts a location sharing session for one or more targets (groups + direct friends).
+     * If a session already exists, this replaces the target set entirely.
+     */
+    suspend fun startLocationSharing(targetIds: List<String>, durationMinutes: Long): Resource<Unit>
+
+    /** Stops the active sharing session entirely. */
+    suspend fun stopLocationSharing(): Resource<Unit>
+
+    /** Adds one target to the active sharing session (no-op if session is not active). */
+    suspend fun addSharingTarget(targetId: String): Resource<Unit>
+
+    /** Removes one target from the active sharing session. Stops sharing if no targets remain. */
+    suspend fun removeSharingTarget(targetId: String): Resource<Unit>
     suspend fun updateLocation(
         groupId: String,
         latitude: Double,
@@ -49,12 +61,19 @@ interface LocationRepository {
     fun observeGroupLocations(groupId: String): Flow<List<SharedLocation>>
     fun observeDirectLocationShares(friendIds: List<String>): Flow<List<SharedLocation>>
     fun observeUserLocation(userId: String, groupId: String): Flow<SharedLocation?>
-    fun isSharingLocation(groupId: String): Boolean
-    fun getSharingExpiryTime(groupId: String): Long?
+
+    /** Whether there's any active sharing session. */
+    fun isSharingLocation(): Boolean
+
+    /** Returns the list of target ids the current user is sharing with (empty if not sharing). */
+    fun getSharingTargetIds(): List<String>
+
+    /** Returns the expiry time (epoch ms) of the active session, or null if not sharing. */
+    fun getSharingExpiryTime(): Long?
 
     /** Checks Firestore for an active sharing session and restores in-memory state.
-     *  Returns true if the user is currently sharing in this group. */
-    suspend fun checkSharingStatus(groupId: String): Boolean
+     *  Returns the list of target ids the user is currently sharing with (empty if none). */
+    suspend fun checkSharingStatus(): List<String>
 
     /** Populate visibleTo field for a group share (fetches group member UIDs). */
     suspend fun getGroupMemberIds(groupId: String): List<String>

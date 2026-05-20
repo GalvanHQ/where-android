@@ -1477,7 +1477,7 @@ class ChatViewModel @Inject constructor(
                     // Start LocationTrackingService (Requirement 1.3)
                     val context = getApplication<Application>()
                     val intent = LocationTrackingService.createStartIntent(
-                        context, groupId, durationMinutes
+                        context, durationMinutes
                     )
                     context.startForegroundService(intent)
 
@@ -1537,6 +1537,8 @@ class ChatViewModel @Inject constructor(
         val groupId = _uiState.value.conversation?.groupId ?: return
 
         viewModelScope.launch {
+            // Remove this conversation's target from the active session.
+            // If it's the last one, the repo stops the session entirely.
             val result = stopLocationSharingUseCase(groupId)
 
             // Remove banner within 300ms regardless of result (Requirement 1.5)
@@ -1652,14 +1654,15 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // Check if user is currently sharing with this conversation's target
-        // This makes the banner appear even if sharing was started from the map screen
+        // Check if user is currently sharing with this conversation's target.
+        // This makes the banner appear even if sharing was started from the map screen.
         viewModelScope.launch {
             val conversation = _uiState.value.conversation ?: return@launch
             val targetId = conversation.groupId ?: "direct:${conversation.otherUserId}"
-            val isSharing = locationRepository.checkSharingStatus(targetId)
-            if (isSharing) {
-                val expiresAt = locationRepository.getSharingExpiryTime(targetId)
+            val activeTargets = locationRepository.checkSharingStatus()
+            val isSharingHere = targetId in activeTargets
+            if (isSharingHere) {
+                val expiresAt = locationRepository.getSharingExpiryTime()
                 _uiState.value = _uiState.value.copy(
                     isLiveLocationSharingActive = true,
                     liveLocationExpiresAt = expiresAt,

@@ -15,8 +15,9 @@ data class SharedLocation(
     val isSharingActive: Boolean = false,
     val sharingExpiresAt: Long = 0L,
     // Consolidated location fields
-    val targetType: String = "group",  // "group" or "direct"
-    val targetId: String = "",         // groupId or "direct:friendId"
+    val targetType: String = "group",  // "group" or "direct" or "multi"
+    val targetId: String = "",         // legacy: single groupId or "direct:friendId"
+    val targetIds: List<String> = emptyList(), // multi-recipient: list of target ids
     val visibleTo: List<String> = emptyList(),
     // Display info for live location bubble rendering
     val displayName: String = "",
@@ -43,6 +44,7 @@ data class SharedLocation(
         sharingExpiresAt = 0L,
         targetType = "group",
         targetId = "",
+        targetIds = emptyList(),
         visibleTo = emptyList(),
         displayName = "",
         photoUrl = null,

@@ -7,7 +7,13 @@ import javax.inject.Inject
 class StopLocationSharingUseCase @Inject constructor(
     private val locationRepository: LocationRepository
 ) {
-    suspend operator fun invoke(groupId: String): Resource<Unit> {
-        return locationRepository.stopLocationSharing(groupId)
-    }
+    /** Stops the entire active sharing session. */
+    suspend operator fun invoke(): Resource<Unit> = locationRepository.stopLocationSharing()
+
+    /**
+     * Removes a single target from the active session. If it's the last target,
+     * the session is stopped entirely.
+     */
+    suspend operator fun invoke(targetId: String): Resource<Unit> =
+        locationRepository.removeSharingTarget(targetId)
 }

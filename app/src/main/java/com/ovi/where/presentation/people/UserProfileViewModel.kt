@@ -236,7 +236,7 @@ class UserProfileViewModel @Inject constructor(
     fun startLocationSharingWithFriend(friendId: String) {
         viewModelScope.launch {
             val targetId = "direct:$friendId"
-            when (val result = locationRepository.startLocationSharing(targetId, 60L)) {
+            when (val result = locationRepository.startLocationSharing(listOf(targetId), 60L)) {
                 is Resource.Success -> {
                     _uiState.value = _uiState.value.copy(
                         locationSharingActive = true,

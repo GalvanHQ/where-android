@@ -30,12 +30,10 @@ import javax.inject.Inject
 /**
  * Foreground service for continuous location tracking during an active sharing session.
  *
- * Key behaviors:
- * - Uses adaptive location updates (high-accuracy when moving, balanced when idle)
- * - Automatically expires based on the selected duration
- * - Updates the notification with remaining time every minute
- * - Sends a "sharing ended" notification on expiration
- * - Gracefully stops and cleans up Firestore state on expiry
+ * The service writes GPS samples to the consolidated `activeLocations/{uid}` document.
+ * The active session metadata (target list, visibleTo, expiry) is owned by the
+ * repository and persisted at start time. The service only needs to know whether
+ * a session is active and when it expires.
  */
 @AndroidEntryPoint
 class LocationTrackingService : Service() {
@@ -44,14 +42,14 @@ class LocationTrackingService : Service() {
 
     @Inject
     lateinit var locationManager: LocationManager
-    
+
     @Inject
     lateinit var locationRepository: LocationRepository
 
     @Inject
     lateinit var userPreferences: UserPreferences
-    
-    private var currentGroupId: String? = null
+
+    private var sessionActive = false
     private var expiresAt: Long? = null
     private var notificationManager: NotificationManager? = null
 
@@ -64,22 +62,21 @@ class LocationTrackingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
-                currentGroupId = intent.getStringExtra(EXTRA_GROUP_ID)
                 val duration = intent.getLongExtra(EXTRA_DURATION_MINUTES, -1L)
                 expiresAt = if (duration > 0) {
                     System.currentTimeMillis() + duration * MILLIS_PER_MINUTE
                 } else {
                     null // Continuous sharing (manual stop)
                 }
+                sessionActive = true
                 // Persist session state for restart recovery
                 serviceScope.launch {
-                    currentGroupId?.let { gid ->
-                        userPreferences.saveSharingSession(gid, expiresAt)
-                    }
+                    userPreferences.saveSharingSession(SESSION_ACTIVE_MARKER, expiresAt)
                 }
                 startForegroundService()
             }
             ACTION_STOP -> {
+                sessionActive = false
                 serviceScope.launch { userPreferences.clearSharingSession() }
                 stopSharing()
                 stopSelf()
@@ -89,10 +86,10 @@ class LocationTrackingService : Service() {
                 // Recover session from DataStore.
                 Timber.w("Service restarted with null intent — recovering from DataStore")
                 serviceScope.launch {
-                    val savedTargetId = userPreferences.sharingTargetId.first()
+                    val savedMarker = userPreferences.sharingTargetId.first()
                     val savedExpiry = userPreferences.sharingExpiresAt.first()
 
-                    if (savedTargetId.isNullOrEmpty()) {
+                    if (savedMarker.isNullOrEmpty()) {
                         Timber.i("No persisted session — stopping service")
                         stopSelf()
                         return@launch
@@ -101,17 +98,16 @@ class LocationTrackingService : Service() {
                     // Check if session already expired while service was dead
                     if (savedExpiry != null && System.currentTimeMillis() > savedExpiry) {
                         Timber.i("Persisted session already expired — cleaning up")
-                        locationRepository.stopLocationSharing(savedTargetId)
+                        locationRepository.stopLocationSharing()
                         userPreferences.clearSharingSession()
                         showExpirationNotification()
                         stopSelf()
                         return@launch
                     }
 
-                    // Restore active session
-                    currentGroupId = savedTargetId
+                    sessionActive = true
                     expiresAt = savedExpiry
-                    Timber.i("Recovered session: group=$savedTargetId, expires=$savedExpiry")
+                    Timber.i("Recovered session: expires=$savedExpiry")
                     startForegroundService()
                 }
             }
@@ -133,24 +129,26 @@ class LocationTrackingService : Service() {
      */
     @Suppress("MissingPermission")
     private fun startLocationTracking() {
-        val groupId = currentGroupId ?: return
-        
         serviceScope.launch {
             locationManager.getAdaptiveLocationUpdates()
                 .catch { e ->
                     Timber.e(e, "Location updates failed")
                 }
                 .collect { location ->
+                    if (!sessionActive) return@collect
+
                     // Check expiration
                     val currentExpiry = expiresAt
                     if (currentExpiry != null && System.currentTimeMillis() > currentExpiry) {
                         Timber.i("Location tracking session expired")
-                        onSessionExpired(groupId)
+                        onSessionExpired()
                         return@collect
                     }
 
+                    // groupId param is unused by the consolidated repository write —
+                    // pass empty string. The repo writes to activeLocations/{uid}.
                     locationRepository.updateLocation(
-                        groupId = groupId,
+                        groupId = "",
                         latitude = location.latitude,
                         longitude = location.longitude,
                         accuracy = location.accuracy,
@@ -184,9 +182,10 @@ class LocationTrackingService : Service() {
      * Called when the sharing session expires naturally.
      * Stops Firestore sharing, shows "ended" notification, and stops the service.
      */
-    private fun onSessionExpired(groupId: String) {
+    private fun onSessionExpired() {
+        sessionActive = false
         serviceScope.launch {
-            locationRepository.stopLocationSharing(groupId)
+            locationRepository.stopLocationSharing()
             userPreferences.clearSharingSession()
         }
         showExpirationNotification()
@@ -194,9 +193,8 @@ class LocationTrackingService : Service() {
     }
 
     private fun stopSharing() {
-        val groupId = currentGroupId ?: return
         serviceScope.launch {
-            locationRepository.stopLocationSharing(groupId)
+            locationRepository.stopLocationSharing()
             userPreferences.clearSharingSession()
         }
     }
@@ -287,18 +285,19 @@ class LocationTrackingService : Service() {
     companion object {
         const val ACTION_START = "ACTION_START"
         const val ACTION_STOP = "ACTION_STOP"
-        const val EXTRA_GROUP_ID = "EXTRA_GROUP_ID"
         const val EXTRA_DURATION_MINUTES = "EXTRA_DURATION_MINUTES"
         private const val EXPIRATION_NOTIFICATION_ID = 1002
-        
-        fun createStartIntent(context: Context, groupId: String, durationMinutes: Long): Intent {
+
+        /** Marker value persisted to indicate "a session is active" — actual targets owned by repo. */
+        private const val SESSION_ACTIVE_MARKER = "active"
+
+        fun createStartIntent(context: Context, durationMinutes: Long): Intent {
             return Intent(context, LocationTrackingService::class.java).apply {
                 action = ACTION_START
-                putExtra(EXTRA_GROUP_ID, groupId)
                 putExtra(EXTRA_DURATION_MINUTES, durationMinutes)
             }
         }
-        
+
         fun createStopIntent(context: Context): Intent {
             return Intent(context, LocationTrackingService::class.java).apply {
                 action = ACTION_STOP

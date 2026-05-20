@@ -457,8 +457,13 @@ fun ChatScreen(
                 onClose = { viewModel.toggleMiniMap() },
                 onExpandToFullMap = {
                     viewModel.toggleMiniMap()
-                    // Navigate back to reach the Map tab (home screen)
-                    onNavigateBack()
+                    val groupId = uiState.conversation?.groupId
+                    if (groupId != null) {
+                        onNavigateToGroupMap(groupId)
+                    } else {
+                        // DM conversation — navigate back to main (Map tab)
+                        onNavigateBack()
+                    }
                 }
             )
 

@@ -149,10 +149,16 @@ service cloud.firestore {
     }
 
     // ===== CONSOLIDATED ACTIVE LOCATIONS =====
+    // Single doc per user with their current sharing session. Supports multi-target
+    // sharing — `targetIds: List<String>` holds every recipient (group ids and
+    // "direct:{friendId}" entries) and `visibleTo: List<String>` is the union of
+    // member uids across all targets. Reads are gated by `visibleTo`, so when the
+    // user adds or removes a target the recipient list updates atomically.
     match /activeLocations/{userId} {
       allow read: if isAuthenticated()
         && (request.auth.uid == userId
             || request.auth.uid in resource.data.visibleTo);
+      // Only the document owner can write their own session.
       allow write: if isAuthenticated() && request.auth.uid == userId;
     }
   }

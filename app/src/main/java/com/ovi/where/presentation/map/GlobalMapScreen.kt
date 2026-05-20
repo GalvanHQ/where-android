@@ -44,6 +44,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Check
@@ -56,7 +57,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -136,7 +136,6 @@ import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.LocationUtils
 import com.ovi.where.core.utils.showToast
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -270,25 +269,6 @@ fun GlobalMapScreen(
         }
     }
 
-    // ── Sharing countdown timer ───────────────────────────────────────────────
-    var sharingSecondsRemaining by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(uiState.isSharing, uiState.sharingExpiresAt) {
-        if (uiState.isSharing && uiState.sharingExpiresAt != null) {
-            // Tick every second to update the countdown
-            while (true) {
-                val remaining = (uiState.sharingExpiresAt!! - System.currentTimeMillis()) / 1000L
-                if (remaining <= 0) {
-                    sharingSecondsRemaining = null
-                    break
-                }
-                sharingSecondsRemaining = remaining
-                delay(1000L)
-            }
-        } else {
-            sharingSecondsRemaining = null
-        }
-    }
-
     // ── Sharing start/stop visual feedback ────────────────────────────────────
     var wasSharing by remember { mutableStateOf(uiState.isSharing) }
     LaunchedEffect(uiState.isSharing) {
@@ -303,14 +283,16 @@ fun GlobalMapScreen(
     var mapType by remember { mutableStateOf(MapType.NORMAL) }
     var showMapTypeSheet by remember { mutableStateOf(false) }
     var showMyProfileSheet by remember { mutableStateOf(false) }
-    var showManageSharesSheet by remember { mutableStateOf(false) }
+
+    // Single persistent bottom sheet that switches views.
+    // Replaces multiple modal bottom sheets for cleaner UX.
+    var sheetView by remember { mutableStateOf(MapSheetView.Home) }
+    // Home view has two tabs: friends sharing with me / my active shares.
+    var homeTab by remember { mutableStateOf(MapHomeTab.Friends) }
 
     // ── Bottom sheet state ────────────────────────────────────────────────────
-    val friendSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val groupPickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val shareSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val mapTypeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val manageSharesSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Google Maps style: map fills the entire screen behind the overlaid nav bar.
     // The sheet's peek includes the nav bar height so its rounded corners sit
@@ -327,6 +309,13 @@ fun GlobalMapScreen(
             initialValue = SheetValue.PartiallyExpanded
         )
     )
+
+    // Auto-expand sheet when switching to a non-Home view (detail/share)
+    LaunchedEffect(sheetView) {
+        if (sheetView != MapSheetView.Home) {
+            scope.launch { bottomSheetScaffoldState.bottomSheetState.expand() }
+        }
+    }
 
     BottomSheetScaffold(
         scaffoldState = bottomSheetScaffoldState,
@@ -353,32 +342,113 @@ fun GlobalMapScreen(
             }
         },
         sheetContent = {
-            FriendsSheetContent(
-                friends = uiState.friendLocations,
-                myLatitude = uiState.myLatitude,
-                myLongitude = uiState.myLongitude,
-                hasMyLocation = uiState.hasMyLocation,
-                isSharing = uiState.isSharing,
-                activeFilter = uiState.activeGroupFilter,
-                bottomReservedSpace = totalNavBarHeight,
-                onFriendClick = { friend ->
-                    viewModel.selectFriend(friend)
-                    if (friend.latitude != 0.0) {
-                        scope.launch {
-                            cameraPositionState.animate(
-                                CameraUpdateFactory.newLatLngZoom(
-                                    LatLng(friend.latitude, friend.longitude),
-                                    15f
-                                ),
-                                durationMs = 600
-                            )
-                        }
-                    }
-                },
-                onMessageFriend = { friend ->
-                    viewModel.openOrCreateDm(friend.userId)
+            // Sync the active view with state changes
+            LaunchedEffect(uiState.selectedFriend?.userId) {
+                if (uiState.selectedFriend != null) {
+                    sheetView = MapSheetView.FriendDetail
                 }
-            )
+            }
+
+            when (sheetView) {
+                MapSheetView.FriendDetail -> {
+                    val friend = uiState.selectedFriend
+                    if (friend != null) {
+                        FriendDetailSheetContent(
+                            friend = friend,
+                            bottomReservedSpace = totalNavBarHeight,
+                            onMessage = {
+                                viewModel.openOrCreateDm(friend.userId)
+                                viewModel.dismissFriendSheet()
+                                sheetView = MapSheetView.Home
+                            },
+                            onNavigateToUserProfile = {
+                                onNavigateToUserProfile(friend.userId)
+                                viewModel.dismissFriendSheet()
+                                sheetView = MapSheetView.Home
+                            },
+                            onBack = {
+                                viewModel.dismissFriendSheet()
+                                sheetView = MapSheetView.Home
+                            }
+                        )
+                    } else {
+                        // Stale state — fall back to home
+                        sheetView = MapSheetView.Home
+                        Spacer(Modifier.height(1.dp))
+                    }
+                }
+                MapSheetView.Share -> {
+                    ShareTargetSheet(
+                        groups = uiState.groups,
+                        directTargets = uiState.directTargets,
+                        excludeTargetIds = uiState.sharingTargetIds,
+                        bottomReservedSpace = totalNavBarHeight,
+                        onCancel = { sheetView = MapSheetView.Home },
+                        onStart = { targetIds, durationMinutes ->
+                            if (uiState.isSharing) {
+                                targetIds.forEach { id ->
+                                    viewModel.addSharingTarget(id, durationMinutes)
+                                }
+                            } else {
+                                viewModel.startSharing(targetIds, durationMinutes)
+                            }
+                            // Land back on the My Shares tab to show what was just started.
+                            homeTab = MapHomeTab.MyShares
+                            sheetView = MapSheetView.Home
+                        }
+                    )
+                }
+                MapSheetView.Home -> {
+                    HomeSheetContent(
+                        homeTab = homeTab,
+                        onTabChange = { homeTab = it },
+                        friends = uiState.friendLocations,
+                        myLatitude = uiState.myLatitude,
+                        myLongitude = uiState.myLongitude,
+                        hasMyLocation = uiState.hasMyLocation,
+                        isSharing = uiState.isSharing,
+                        activeFilter = uiState.activeGroupFilter,
+                        sharingTargetIds = uiState.sharingTargetIds,
+                        sharingTargetExpiries = uiState.sharingTargetExpiries,
+                        groups = uiState.groups,
+                        directTargets = uiState.directTargets,
+                        bottomReservedSpace = totalNavBarHeight,
+                        onFriendClick = { friend ->
+                            viewModel.selectFriend(friend)
+                            if (friend.latitude != 0.0) {
+                                scope.launch {
+                                    cameraPositionState.animate(
+                                        CameraUpdateFactory.newLatLngZoom(
+                                            LatLng(friend.latitude, friend.longitude),
+                                            15f
+                                        ),
+                                        durationMs = 600
+                                    )
+                                }
+                            }
+                        },
+                        onMessageFriend = { viewModel.openOrCreateDm(it.userId) },
+                        onAddShare = {
+                            if (!locationGranted) {
+                                permissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                )
+                            } else {
+                                sheetView = MapSheetView.Share
+                            }
+                        },
+                        onStopOne = { targetId ->
+                            viewModel.removeSharingTarget(targetId)
+                        },
+                        onStopAll = {
+                            viewModel.stopSharing()
+                        }
+                    )
+                }
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background
@@ -595,48 +665,6 @@ fun GlobalMapScreen(
                         }
                     }
                 }
-
-                // ── Sharing status banner
-                if (uiState.isSharing) {
-                    Card(
-                        shape = MaterialTheme.shapes.medium,
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(
-                                horizontal = Dimens.spaceLarge,
-                                vertical = Dimens.spaceSmall
-                            ),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            SharingPulseDot()
-                            Spacer(Modifier.width(Dimens.spaceSmall))
-                            val allTargets = uiState.groups + uiState.directTargets
-                            val targetNames = uiState.sharingTargetIds
-                                .mapNotNull { id -> allTargets.firstOrNull { it.id == id }?.name }
-                            val sharingTargetLabel = when {
-                                targetNames.isEmpty() -> "your selection"
-                                targetNames.size == 1 -> targetNames[0]
-                                targetNames.size == 2 -> "${targetNames[0]} & ${targetNames[1]}"
-                                else -> "${targetNames[0]} & ${targetNames.size - 1} others"
-                            }
-                            val timerText = if (sharingSecondsRemaining != null) {
-                                val mins = sharingSecondsRemaining!! / 60
-                                val secs = sharingSecondsRemaining!! % 60
-                                " • ${"%02d:%02d".format(mins, secs)} remaining"
-                            } else {
-                                " • Until you stop"
-                            }
-                            Text(
-                                text = "Sharing live with $sharingTargetLabel$timerText",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
-                        }
-                    }
-                }
             }
 
             // ── Loading indicator ─────────────────────────────────────────────
@@ -757,7 +785,11 @@ fun GlobalMapScreen(
                 // Share / Stop sharing — primary FAB
                 if (uiState.isSharing) {
                     FloatingActionButton(
-                        onClick = { showManageSharesSheet = true },
+                        onClick = {
+                            sheetView = MapSheetView.Home
+                            homeTab = MapHomeTab.MyShares
+                            scope.launch { bottomSheetScaffoldState.bottomSheetState.expand() }
+                        },
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.onErrorContainer,
                         shape = CircleShape,
@@ -783,7 +815,8 @@ fun GlobalMapScreen(
                                     )
                                 )
                             } else {
-                                viewModel.showShareSheet(true)
+                                sheetView = MapSheetView.Share
+                                scope.launch { bottomSheetScaffoldState.bottomSheetState.expand() }
                             }
                         },
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -805,23 +838,6 @@ fun GlobalMapScreen(
         }
     }
 
-    // ── Friend detail bottom sheet ────────────────────────────────────────────
-    if (uiState.showFriendSheet && uiState.selectedFriend != null) {
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.dismissFriendSheet() },
-            sheetState = friendSheetState,
-            dragHandle = { BottomSheetDefaults.DragHandle() }
-        ) {
-            FriendDetailSheet(
-                friend = uiState.selectedFriend!!,
-                onMessage = { viewModel.openOrCreateDm(uiState.selectedFriend!!.userId); viewModel.dismissFriendSheet() },
-                onNavigateToUserProfile = onNavigateToUserProfile,
-                onNavigateToGroupMap = onNavigateToGroupMap,
-                onDismiss = { viewModel.dismissFriendSheet() }
-            )
-        }
-    }
-
     // ── Group filter bottom sheet ─────────────────────────────────────────────
     if (uiState.showGroupPicker) {
         ModalBottomSheet(
@@ -840,24 +856,6 @@ fun GlobalMapScreen(
         }
     }
 
-    // ── Share group picker sheet ──────────────────────────────────────────────
-    if (uiState.showShareSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.showShareSheet(false) },
-            sheetState = shareSheetState
-        ) {
-            ShareTargetSheet(
-                groups = uiState.groups,
-                directTargets = uiState.directTargets,
-                initiallySelected = uiState.sharingTargetIds,
-                onStart = { targetIds, durationMinutes ->
-                    viewModel.showShareSheet(false)
-                    viewModel.startSharing(targetIds, durationMinutes)
-                }
-            )
-        }
-    }
-
     // Map Type bottom sheet ───────────────────────────────────────────────────
     if (showMapTypeSheet) {
         ModalBottomSheet(
@@ -869,36 +867,6 @@ fun GlobalMapScreen(
                 onSelect = {
                     mapType = it
                     showMapTypeSheet = false
-                }
-            )
-        }
-    }
-
-    // ── Manage active shares sheet ────────────────────────────────────────────
-    if (showManageSharesSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showManageSharesSheet = false },
-            sheetState = manageSharesSheetState
-        ) {
-            ManageSharesSheet(
-                activeTargetIds = uiState.sharingTargetIds,
-                groups = uiState.groups,
-                directTargets = uiState.directTargets,
-                sharingExpiresAt = uiState.sharingExpiresAt,
-                onAddMore = {
-                    showManageSharesSheet = false
-                    viewModel.showShareSheet(true)
-                },
-                onStopOne = { targetId ->
-                    viewModel.removeSharingTarget(targetId)
-                    // Auto-dismiss when last target removed
-                    if (uiState.sharingTargetIds.size <= 1) {
-                        showManageSharesSheet = false
-                    }
-                },
-                onStopAll = {
-                    viewModel.stopSharing()
-                    showManageSharesSheet = false
                 }
             )
         }
@@ -998,7 +966,8 @@ fun GlobalMapScreen(
                     OutlinedButton(
                         onClick = {
                             showMyProfileSheet = false
-                            showManageSharesSheet = true
+                            sheetView = MapSheetView.Home
+                            homeTab = MapHomeTab.MyShares
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.medium
@@ -1011,7 +980,7 @@ fun GlobalMapScreen(
                     Button(
                         onClick = {
                             showMyProfileSheet = false
-                            viewModel.showShareSheet(true)
+                            sheetView = MapSheetView.Share
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.medium
@@ -1029,6 +998,534 @@ fun GlobalMapScreen(
 }
 
 // ── Sub-composables ───────────────────────────────────────────────────────────
+
+/** Top-level views in the persistent bottom sheet. */
+private enum class MapSheetView { Home, FriendDetail, Share }
+
+/** Tabs inside the Home view, toggled with two pill chips. */
+private enum class MapHomeTab { Friends, MyShares }
+
+/** Reusable circular back button used in detail/share/manage views. */
+@Composable
+private fun SheetBackButton(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.size(40.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+/**
+ * Home view of the bottom sheet — always shows two pill chips at the top:
+ * "Friends sharing" / "My shares". Each tab shows its own list (or empty state).
+ */
+@Composable
+private fun HomeSheetContent(
+    homeTab: MapHomeTab,
+    onTabChange: (MapHomeTab) -> Unit,
+    friends: List<FriendLocationUiModel>,
+    myLatitude: Double,
+    myLongitude: Double,
+    hasMyLocation: Boolean,
+    isSharing: Boolean,
+    activeFilter: GroupFilter?,
+    sharingTargetIds: List<String>,
+    sharingTargetExpiries: Map<String, Long>,
+    groups: List<GroupFilter>,
+    directTargets: List<GroupFilter>,
+    bottomReservedSpace: androidx.compose.ui.unit.Dp,
+    onFriendClick: (FriendLocationUiModel) -> Unit,
+    onMessageFriend: (FriendLocationUiModel) -> Unit,
+    onAddShare: () -> Unit,
+    onStopOne: (String) -> Unit,
+    onStopAll: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 24.dp)
+            .heightIn(min = 160.dp, max = 660.dp)
+    ) {
+        // ── Two-pill toggle ───────────────────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            HomeTabPill(
+                label = "Friends sharing",
+                count = friends.size,
+                selected = homeTab == MapHomeTab.Friends,
+                modifier = Modifier.weight(1f),
+                onClick = { onTabChange(MapHomeTab.Friends) }
+            )
+            HomeTabPill(
+                label = "My shares",
+                count = sharingTargetIds.size,
+                selected = homeTab == MapHomeTab.MyShares,
+                showLiveDot = isSharing,
+                modifier = Modifier.weight(1f),
+                onClick = { onTabChange(MapHomeTab.MyShares) }
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        when (homeTab) {
+            MapHomeTab.Friends -> FriendsTabContent(
+                friends = friends,
+                myLatitude = myLatitude,
+                myLongitude = myLongitude,
+                hasMyLocation = hasMyLocation,
+                activeFilter = activeFilter,
+                bottomReservedSpace = bottomReservedSpace,
+                onFriendClick = onFriendClick,
+                onMessageFriend = onMessageFriend
+            )
+            MapHomeTab.MyShares -> MySharesTabContent(
+                sharingTargetIds = sharingTargetIds,
+                sharingTargetExpiries = sharingTargetExpiries,
+                groups = groups,
+                directTargets = directTargets,
+                bottomReservedSpace = bottomReservedSpace,
+                onAddShare = onAddShare,
+                onStopOne = onStopOne,
+                onStopAll = onStopAll
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeTabPill(
+    label: String,
+    count: Int,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    showLiveDot: Boolean = false,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        color = if (selected) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = if (selected) MaterialTheme.colorScheme.onPrimary
+        else MaterialTheme.colorScheme.onSurface,
+        modifier = modifier.height(40.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (showLiveDot) {
+                SharingPulseDot()
+                Spacer(Modifier.width(6.dp))
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            if (count > 0) {
+                Spacer(Modifier.width(6.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (selected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.22f)
+                    else MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = if (selected) MaterialTheme.colorScheme.onPrimary
+                    else MaterialTheme.colorScheme.onPrimaryContainer
+                ) {
+                    Text(
+                        text = "$count",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FriendsTabContent(
+    friends: List<FriendLocationUiModel>,
+    myLatitude: Double,
+    myLongitude: Double,
+    hasMyLocation: Boolean,
+    activeFilter: GroupFilter?,
+    bottomReservedSpace: androidx.compose.ui.unit.Dp,
+    onFriendClick: (FriendLocationUiModel) -> Unit,
+    onMessageFriend: (FriendLocationUiModel) -> Unit
+) {
+    if (friends.isEmpty()) {
+        TabEmptyState(
+            icon = Icons.Default.LocationOff,
+            title = "No friends sharing",
+            subtitle = if (activeFilter != null)
+                "No one in ${activeFilter.name} is sharing live location."
+            else "When friends share their location, they'll appear here.",
+            bottomReservedSpace = bottomReservedSpace
+        )
+        return
+    }
+
+    // Horizontal avatar row at top, then full vertical list of cards
+    Spacer(Modifier.height(4.dp))
+    androidx.compose.foundation.lazy.LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(items = friends, key = { "avatar-${it.userId}" }) { friend ->
+            FriendAvatarPeek(friend = friend, onClick = { onFriendClick(friend) })
+        }
+    }
+
+    Spacer(Modifier.height(12.dp))
+    androidx.compose.material3.HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 20.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+    )
+
+    LazyColumn(
+        contentPadding = PaddingValues(
+            start = 12.dp,
+            end = 12.dp,
+            top = 12.dp,
+            bottom = bottomReservedSpace + 16.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(items = friends, key = { "card-${it.userId}" }) { friend ->
+            FriendCard(
+                friend = friend,
+                myLatitude = myLatitude,
+                myLongitude = myLongitude,
+                hasMyLocation = hasMyLocation,
+                onClick = { onFriendClick(friend) },
+                onMessage = { onMessageFriend(friend) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun MySharesTabContent(
+    sharingTargetIds: List<String>,
+    sharingTargetExpiries: Map<String, Long>,
+    groups: List<GroupFilter>,
+    directTargets: List<GroupFilter>,
+    bottomReservedSpace: androidx.compose.ui.unit.Dp,
+    onAddShare: () -> Unit,
+    onStopOne: (String) -> Unit,
+    onStopAll: () -> Unit
+) {
+    val allTargets = (directTargets + groups).associateBy { it.id }
+    val active = sharingTargetIds.mapNotNull { id ->
+        allTargets[id] ?: GroupFilter(id = id, name = id, isDirect = id.startsWith("direct:"))
+    }
+
+    if (active.isEmpty()) {
+        // Empty state with primary CTA to start sharing
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.LocationOn,
+                    null,
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "You're not sharing yet",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Pick friends or groups to share your live location with.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(20.dp))
+            Button(
+                onClick = onAddShare,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Share location", fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(bottomReservedSpace))
+        }
+        return
+    }
+
+    // Active list with per-target stop buttons + footer actions
+    LazyColumn(
+        contentPadding = PaddingValues(
+            start = 12.dp,
+            end = 12.dp,
+            top = 4.dp,
+            bottom = 12.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.heightIn(max = 380.dp)
+    ) {
+        items(active, key = { "active-${it.id}" }) { target ->
+            ActiveShareRow(
+                target = target,
+                expiry = sharingTargetExpiries[target.id],
+                onStop = { onStopOne(target.id) }
+            )
+        }
+    }
+
+    Spacer(Modifier.height(8.dp))
+
+    // Footer actions
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        OutlinedButton(
+            onClick = onAddShare,
+            modifier = Modifier
+                .weight(1f)
+                .height(48.dp),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Add more", style = MaterialTheme.typography.labelLarge)
+        }
+        Button(
+            onClick = onStopAll,
+            modifier = Modifier
+                .weight(1f)
+                .height(48.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer
+            )
+        ) {
+            Icon(Icons.Rounded.Stop, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Stop all", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        }
+    }
+    Spacer(Modifier.height(bottomReservedSpace))
+}
+
+@Composable
+private fun TabEmptyState(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    bottomReservedSpace: androidx.compose.ui.unit.Dp
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                icon,
+                null,
+                modifier = Modifier.size(28.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(bottomReservedSpace))
+    }
+}
+
+/** Friend detail view embedded in the persistent sheet (replaces the modal). */
+@Composable
+private fun FriendDetailSheetContent(
+    friend: FriendLocationUiModel,
+    bottomReservedSpace: androidx.compose.ui.unit.Dp,
+    onMessage: () -> Unit,
+    onNavigateToUserProfile: () -> Unit,
+    onBack: () -> Unit
+) {
+    val color = AvatarColors[friend.userId.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SheetBackButton(onBack)
+            Spacer(Modifier.weight(1f))
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Avatar
+        if (!friend.photoUrl.isNullOrEmpty()) {
+            AsyncImage(
+                model = friend.photoUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(Dimens.avatarSizeXLarge)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(Dimens.avatarSizeXLarge)
+                    .clip(CircleShape)
+                    .background(color),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = friend.displayName.take(1).uppercase(),
+                    style = MaterialTheme.typography.displaySmall,
+                    color = MaterialTheme.colorScheme.surface
+                )
+            }
+        }
+
+        Spacer(Modifier.height(Dimens.spaceLarge))
+
+        Text(text = friend.displayName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        if (friend.username.isNotEmpty()) {
+            Text(
+                text = "@${friend.username}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(Modifier.height(Dimens.spaceMedium))
+
+        // Live status
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (friend.isActive) {
+                SharingPulseDot()
+                Spacer(Modifier.width(Dimens.spaceSmall))
+                Text(
+                    text = "Sharing live${if (friend.groupName.isNotEmpty()) " • ${friend.groupName}" else ""}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    fontWeight = FontWeight.Medium
+                )
+            } else {
+                Icon(
+                    Icons.Default.LocationOff, null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(Dimens.spaceSmall))
+                Text(
+                    text = if (friend.timeAgo.isNotEmpty()) "Last seen ${friend.timeAgo}" else "Location not available",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(Modifier.height(Dimens.spaceXLarge))
+
+        // Actions
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
+        ) {
+            Button(
+                onClick = onMessage,
+                modifier = Modifier.weight(1f),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Icon(Icons.Default.ChatBubbleOutline, null, modifier = Modifier.size(Dimens.iconSizeMedium))
+                Spacer(Modifier.width(Dimens.spaceSmall))
+                Text("Message")
+            }
+            OutlinedButton(
+                onClick = onNavigateToUserProfile,
+                modifier = Modifier.weight(1f),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Icon(Icons.Default.Person, null, modifier = Modifier.size(Dimens.iconSizeMedium))
+                Spacer(Modifier.width(Dimens.spaceSmall))
+                Text("Profile")
+            }
+        }
+
+        Spacer(Modifier.height(Dimens.spaceLarge))
+        Spacer(Modifier.height(bottomReservedSpace))
+    }
+}
 
 /**
  * Bottom sheet content shown on the map screen.
@@ -1922,18 +2419,20 @@ private fun FilterRow(
 
 /**
  * Manage active shares sheet — lists every recipient the user is currently sharing with.
- * Each row has its own "Stop" button so the user can end sharing for one recipient at
- * a time without nuking the whole session. A "Stop all" footer button stops everything.
+ * Each row has its own per-target countdown and a stop button so the user can end
+ * sharing for one recipient at a time without nuking the whole session.
  */
 @Composable
 private fun ManageSharesSheet(
     activeTargetIds: List<String>,
+    activeExpiries: Map<String, Long>,
     groups: List<GroupFilter>,
     directTargets: List<GroupFilter>,
-    sharingExpiresAt: Long?,
+    bottomReservedSpace: androidx.compose.ui.unit.Dp = 0.dp,
     onAddMore: () -> Unit,
     onStopOne: (String) -> Unit,
-    onStopAll: () -> Unit
+    onStopAll: () -> Unit,
+    onBack: () -> Unit = {}
 ) {
     val allTargets = (directTargets + groups).associateBy { it.id }
     val active = activeTargetIds.mapNotNull { id ->
@@ -1944,10 +2443,11 @@ private fun ManageSharesSheet(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 12.dp)
-            .navigationBarsPadding()
     ) {
-        // ── Header ────────────────────────────────────────────────────────────
+        // ── Header with back button ───────────────────────────────────────────
         Row(verticalAlignment = Alignment.CenterVertically) {
+            SheetBackButton(onBack)
+            Spacer(Modifier.width(8.dp))
             Box(
                 modifier = Modifier
                     .size(44.dp)
@@ -1964,19 +2464,9 @@ private fun ManageSharesSheet(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                val subtitle = when {
-                    active.isEmpty() -> "Not sharing right now"
-                    sharingExpiresAt == null || sharingExpiresAt == Long.MAX_VALUE ->
-                        "${active.size} active • Until you stop"
-                    else -> {
-                        val mins = ((sharingExpiresAt - System.currentTimeMillis()) / 60_000L)
-                            .coerceAtLeast(0)
-                        val timer = if (mins >= 60) "${mins / 60}h ${mins % 60}m" else "${mins}m"
-                        "${active.size} active • $timer left"
-                    }
-                }
                 Text(
-                    text = subtitle,
+                    text = if (active.isEmpty()) "Not sharing right now"
+                    else "${active.size} active • Each has its own timer",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1997,6 +2487,7 @@ private fun ManageSharesSheet(
                 textAlign = TextAlign.Center
             )
             Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(bottomReservedSpace))
             return@Column
         }
 
@@ -2015,7 +2506,11 @@ private fun ManageSharesSheet(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             items(active, key = { "active-${it.id}" }) { target ->
-                ActiveShareRow(target = target, onStop = { onStopOne(target.id) })
+                ActiveShareRow(
+                    target = target,
+                    expiry = activeExpiries[target.id],
+                    onStop = { onStopOne(target.id) }
+                )
             }
         }
 
@@ -2063,12 +2558,14 @@ private fun ManageSharesSheet(
         }
 
         Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(bottomReservedSpace))
     }
 }
 
 @Composable
 private fun ActiveShareRow(
     target: GroupFilter,
+    expiry: Long?,
     onStop: () -> Unit
 ) {
     Surface(
@@ -2094,8 +2591,10 @@ private fun ActiveShareRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     SharingPulseDot()
                     Spacer(Modifier.width(6.dp))
+                    val typeLabel = if (target.isDirect) "Direct" else "Group"
+                    val timerLabel = formatExpiryLabel(expiry)
                     Text(
-                        text = if (target.isDirect) "Direct • Sharing live" else "Group • Sharing live",
+                        text = "$typeLabel • $timerLabel",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.tertiary,
                         fontWeight = FontWeight.Medium
@@ -2122,28 +2621,48 @@ private fun ActiveShareRow(
     }
 }
 
+/** Formats a per-target expiry into a short label like "Until you stop" or "12m left". */
+private fun formatExpiryLabel(expiry: Long?): String {
+    if (expiry == null || expiry == Long.MAX_VALUE) return "Until you stop"
+    val remainingMs = expiry - System.currentTimeMillis()
+    if (remainingMs <= 0) return "Ending"
+    val minutes = remainingMs / 60_000L
+    return when {
+        minutes < 1 -> "<1m left"
+        minutes < 60 -> "${minutes}m left"
+        else -> "${minutes / 60}h ${minutes % 60}m left"
+    }
+}
+
 @Composable
 private fun ShareTargetSheet(
     groups: List<GroupFilter>,
     directTargets: List<GroupFilter>,
-    initiallySelected: List<String> = emptyList(),
+    excludeTargetIds: List<String> = emptyList(),
     initialDuration: Long = 60L,
+    bottomReservedSpace: androidx.compose.ui.unit.Dp = 0.dp,
+    onCancel: () -> Unit = {},
     onStart: (List<String>, Long) -> Unit
 ) {
-    val targets = directTargets + groups
-    val selectedIds = remember(initiallySelected) {
-        mutableStateListOf<String>().apply { addAll(initiallySelected) }
+    val visibleGroups = remember(groups, excludeTargetIds) {
+        groups.filter { it.id !in excludeTargetIds }
     }
+    val visibleDirect = remember(directTargets, excludeTargetIds) {
+        directTargets.filter { it.id !in excludeTargetIds }
+    }
+    val targets = visibleDirect + visibleGroups
+    val selectedIds = remember { mutableStateListOf<String>() }
     var selectedDuration by remember { mutableLongStateOf(initialDuration) }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 12.dp)
-            .navigationBarsPadding()
     ) {
-        // ── Header ────────────────────────────────────────────────────────────
+        // ── Header with back button ───────────────────────────────────────────
         Row(verticalAlignment = Alignment.CenterVertically) {
+            SheetBackButton(onCancel)
+            Spacer(Modifier.width(8.dp))
             Box(
                 modifier = Modifier
                     .size(44.dp)
@@ -2183,6 +2702,7 @@ private fun ShareTargetSheet(
 
         if (targets.isEmpty()) {
             ShareEmptyState()
+            Spacer(Modifier.height(bottomReservedSpace))
             return@Column
         }
 
@@ -2210,9 +2730,9 @@ private fun ShareTargetSheet(
             modifier = Modifier.heightIn(max = 360.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            if (directTargets.isNotEmpty()) {
+            if (visibleDirect.isNotEmpty()) {
                 item { ShareSectionHeader("FRIENDS") }
-                items(directTargets, key = { "f-${it.id}" }) { target ->
+                items(visibleDirect, key = { "f-${it.id}" }) { target ->
                     SelectableTargetRow(
                         target = target,
                         selected = target.id in selectedIds,
@@ -2223,9 +2743,9 @@ private fun ShareTargetSheet(
                     )
                 }
             }
-            if (groups.isNotEmpty()) {
+            if (visibleGroups.isNotEmpty()) {
                 item { ShareSectionHeader("GROUPS") }
-                items(groups, key = { "g-${it.id}" }) { target ->
+                items(visibleGroups, key = { "g-${it.id}" }) { target ->
                     SelectableTargetRow(
                         target = target,
                         selected = target.id in selectedIds,
@@ -2290,6 +2810,7 @@ private fun ShareTargetSheet(
         }
 
         Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(bottomReservedSpace))
     }
 }
 

@@ -174,12 +174,13 @@ class GlobalMapViewModel @Inject constructor(
 
                 val now = System.currentTimeMillis()
 
-                // Check if session already expired
-                if (savedExpiry != null && now >= savedExpiry) {
+                // Quick check using the persisted overall expiry
+                if (savedExpiry != null && savedExpiry != Long.MAX_VALUE && now >= savedExpiry) {
                     Timber.d("restoreSharingState: persisted session expired, cleaning up")
                     _uiState.value = _uiState.value.copy(
                         isSharing = false,
                         sharingTargetIds = emptyList(),
+                        sharingTargetExpiries = emptyMap(),
                         sharingExpiresAt = null,
                         sharingCountdown = null
                     )
@@ -188,17 +189,20 @@ class GlobalMapViewModel @Inject constructor(
                     return@launch
                 }
 
-                // Restore active session — fetch authoritative targetIds from Firestore
+                // Restore active session — fetch authoritative targetIds + expiries from Firestore
                 val targetIds = locationRepository.checkSharingStatus()
                 if (targetIds.isEmpty()) {
                     userPreferences.clearSharingSession()
                     return@launch
                 }
+                val expiries = locationRepository.getTargetExpiries()
+                val overall = expiries.values.maxOrNull()
                 _uiState.value = _uiState.value.copy(
                     isSharing = true,
                     sharingTargetIds = targetIds,
-                    sharingExpiresAt = savedExpiry,
-                    sharingCountdown = formatCountdown(savedExpiry)
+                    sharingTargetExpiries = expiries,
+                    sharingExpiresAt = if (overall == Long.MAX_VALUE) null else overall,
+                    sharingCountdown = formatCountdown(if (overall == Long.MAX_VALUE) null else overall)
                 )
                 startCountdownTicker()
             } catch (e: Exception) {
@@ -211,14 +215,32 @@ class GlobalMapViewModel @Inject constructor(
         countdownJob?.cancel()
         countdownJob = viewModelScope.launch {
             while (true) {
-                delay(60_000L)
-                val expiresAt = _uiState.value.sharingExpiresAt ?: break
-                val now = System.currentTimeMillis()
+                delay(15_000L) // poll every 15s for finer per-target expiry granularity
+                val state = _uiState.value
+                val expiries = state.sharingTargetExpiries
+                if (expiries.isEmpty()) break
 
-                if (now >= expiresAt) {
+                val now = System.currentTimeMillis()
+                val expired = expiries.filterValues { it != Long.MAX_VALUE && it <= now }.keys
+                val active = expiries - expired
+
+                if (expired.isNotEmpty()) {
+                    // Stop each expired target server-side. Last one will end the session.
+                    expired.forEach { targetId ->
+                        stopLocationSharingUseCase(targetId)
+                    }
+                    val targetNames = expired.joinToString(", ") { id ->
+                        (state.groups + state.directTargets).firstOrNull { it.id == id }?.name ?: id
+                    }
+                    _uiEvent.send(UiEvent.ShowSnackbar(UiText.DynamicString("Stopped sharing with $targetNames")))
+                }
+
+                if (active.isEmpty()) {
+                    countdownJob?.cancel()
                     _uiState.value = _uiState.value.copy(
                         isSharing = false,
                         sharingTargetIds = emptyList(),
+                        sharingTargetExpiries = emptyMap(),
                         sharingExpiresAt = null,
                         sharingCountdown = null
                     )
@@ -228,8 +250,12 @@ class GlobalMapViewModel @Inject constructor(
                     break
                 }
 
+                val overall = active.values.maxOrNull()
                 _uiState.value = _uiState.value.copy(
-                    sharingCountdown = formatCountdown(expiresAt)
+                    sharingTargetIds = active.keys.toList(),
+                    sharingTargetExpiries = active,
+                    sharingExpiresAt = if (overall == Long.MAX_VALUE) null else overall,
+                    sharingCountdown = formatCountdown(if (overall == Long.MAX_VALUE) null else overall)
                 )
             }
         }
@@ -510,11 +536,15 @@ class GlobalMapViewModel @Inject constructor(
                 currentUserId ?: return@launch
                 val activeTargetIds = locationRepository.checkSharingStatus()
                 if (activeTargetIds.isNotEmpty()) {
+                    val expiries = locationRepository.getTargetExpiries()
+                    val overall = expiries.values.maxOrNull()
                     _uiState.value = _uiState.value.copy(
                         isSharing = true,
                         sharingTargetIds = activeTargetIds,
-                        sharingExpiresAt = locationRepository.getSharingExpiryTime()
+                        sharingTargetExpiries = expiries,
+                        sharingExpiresAt = if (overall == Long.MAX_VALUE) null else overall
                     )
+                    startCountdownTicker()
                 }
             } catch (e: Exception) {
                 Timber.e(e, "checkAllSharingSessions failed")
@@ -564,16 +594,19 @@ class GlobalMapViewModel @Inject constructor(
     fun startSharing(targetIds: List<String>, durationMinutes: Long) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, showShareSheet = false)
-            when (val result = startLocationSharingUseCase(targetIds, durationMinutes)) {
+            when (startLocationSharingUseCase(targetIds, durationMinutes)) {
                 is Resource.Success -> {
-                    val expiresAt = if (durationMinutes > 0) {
+                    val expiry = if (durationMinutes > 0) {
                         System.currentTimeMillis() + durationMinutes * MILLIS_PER_MINUTE
-                    } else null
+                    } else Long.MAX_VALUE
+                    val expiries = targetIds.associateWith { expiry }
+                    val overall = expiries.values.maxOrNull()
                     _uiState.value = _uiState.value.copy(
                         isSharing = true,
                         sharingTargetIds = targetIds,
-                        sharingExpiresAt = expiresAt,
-                        sharingCountdown = formatCountdown(expiresAt),
+                        sharingTargetExpiries = expiries,
+                        sharingExpiresAt = if (overall == Long.MAX_VALUE) null else overall,
+                        sharingCountdown = formatCountdown(if (overall == Long.MAX_VALUE) null else overall),
                         isLoading = false
                     )
                     startLocationService(durationMinutes)
@@ -582,6 +615,41 @@ class GlobalMapViewModel @Inject constructor(
                 }
                 is Resource.Error -> {
                     _uiState.value = _uiState.value.copy(isLoading = false)
+                    _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.error_failed_start_sharing)))
+                }
+                else -> {}
+            }
+        }
+    }
+
+    /**
+     * Adds a single target with its own duration to the active sharing session.
+     * Existing targets keep their original expiries.
+     */
+    fun addSharingTarget(targetId: String, durationMinutes: Long) {
+        viewModelScope.launch {
+            // If no active session, fall back to start
+            if (!_uiState.value.isSharing) {
+                startSharing(listOf(targetId), durationMinutes)
+                return@launch
+            }
+            when (locationRepository.addSharingTarget(targetId, durationMinutes)) {
+                is Resource.Success -> {
+                    val newExpiry = if (durationMinutes > 0) {
+                        System.currentTimeMillis() + durationMinutes * MILLIS_PER_MINUTE
+                    } else Long.MAX_VALUE
+                    val newExpiries = _uiState.value.sharingTargetExpiries + (targetId to newExpiry)
+                    val overall = newExpiries.values.maxOrNull()
+                    _uiState.value = _uiState.value.copy(
+                        sharingTargetIds = newExpiries.keys.toList(),
+                        sharingTargetExpiries = newExpiries,
+                        sharingExpiresAt = if (overall == Long.MAX_VALUE) null else overall,
+                        sharingCountdown = formatCountdown(if (overall == Long.MAX_VALUE) null else overall)
+                    )
+                    // Ensure the ticker covers the new expiry
+                    startCountdownTicker()
+                }
+                is Resource.Error -> {
                     _uiEvent.send(UiEvent.ShowSnackbar(UiText.StringResource(R.string.error_failed_start_sharing)))
                 }
                 else -> {}
@@ -599,6 +667,7 @@ class GlobalMapViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         isSharing = false,
                         sharingTargetIds = emptyList(),
+                        sharingTargetExpiries = emptyMap(),
                         sharingExpiresAt = null,
                         sharingCountdown = null
                     )
@@ -618,18 +687,25 @@ class GlobalMapViewModel @Inject constructor(
         viewModelScope.launch {
             when (stopLocationSharingUseCase(targetId)) {
                 is Resource.Success -> {
-                    val newTargets = _uiState.value.sharingTargetIds - targetId
-                    if (newTargets.isEmpty()) {
+                    val newExpiries = _uiState.value.sharingTargetExpiries - targetId
+                    if (newExpiries.isEmpty()) {
                         countdownJob?.cancel()
                         _uiState.value = _uiState.value.copy(
                             isSharing = false,
                             sharingTargetIds = emptyList(),
+                            sharingTargetExpiries = emptyMap(),
                             sharingExpiresAt = null,
                             sharingCountdown = null
                         )
                         stopLocationService()
                     } else {
-                        _uiState.value = _uiState.value.copy(sharingTargetIds = newTargets)
+                        val overall = newExpiries.values.maxOrNull()
+                        _uiState.value = _uiState.value.copy(
+                            sharingTargetIds = newExpiries.keys.toList(),
+                            sharingTargetExpiries = newExpiries,
+                            sharingExpiresAt = if (overall == Long.MAX_VALUE) null else overall,
+                            sharingCountdown = formatCountdown(if (overall == Long.MAX_VALUE) null else overall)
+                        )
                     }
                 }
                 else -> {}
@@ -753,9 +829,11 @@ data class GlobalMapUiState(
     val isSharing: Boolean = false,
     /** List of target ids the user is currently sharing with (group ids + "direct:{friendId}" entries). */
     val sharingTargetIds: List<String> = emptyList(),
-    /** Epoch millis when the current sharing session expires (null = continuous). */
+    /** Per-target expiry map (epoch ms; Long.MAX_VALUE = "until you stop"). */
+    val sharingTargetExpiries: Map<String, Long> = emptyMap(),
+    /** Latest expiry across all targets (null = no session). */
     val sharingExpiresAt: Long? = null,
-    /** Formatted countdown string: "Xh Ym" or "Xm". Null for continuous sessions. */
+    /** Formatted countdown string for the latest-expiring target ("Xh Ym" or "Xm"). */
     val sharingCountdown: String? = null,
     // UI state
     val selectedFriend: FriendLocationUiModel? = null,

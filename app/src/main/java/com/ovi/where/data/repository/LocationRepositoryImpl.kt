@@ -59,15 +59,17 @@ class LocationRepositoryImpl @Inject constructor(
 
     /**
      * Active sharing session state.
-     * - targetIds: list of group ids and "direct:{friendId}" entries the user is currently sharing with.
-     * - expiryTime: epoch ms (Long.MAX_VALUE = "until you stop").
-     * - visibleTo: union of all member ids across all targets (recomputed on add/remove).
+     * - targetExpiries: per-target expiry map. The session is over when this is empty.
+     * - visibleTo: union of all member ids across all live targets (recomputed on add/remove).
      */
     private data class ActiveSharingSession(
-        val targetIds: List<String>,
-        val expiryTime: Long,
+        val targetExpiries: Map<String, Long>,
         val visibleTo: List<String>
-    )
+    ) {
+        val targetIds: List<String> get() = targetExpiries.keys.toList()
+        /** Latest expiry across all targets, used as the overall session deadline. */
+        val overallExpiry: Long? get() = targetExpiries.values.maxOrNull()
+    }
     @Volatile
     private var currentSession: ActiveSharingSession? = null
 
@@ -153,6 +155,14 @@ class LocationRepositoryImpl @Inject constructor(
                 targetIds = (data["targetIds"] as? List<*>)?.filterIsInstance<String>()
                     ?: (data["targetId"] as? String)?.takeIf { it.isNotEmpty() }?.let { listOf(it) }
                     ?: emptyList(),
+                targetExpiries = (data["targetExpiries"] as? Map<*, *>)
+                    ?.mapNotNull { (k, v) ->
+                        val key = k as? String ?: return@mapNotNull null
+                        val value = (v as? Number)?.toLong() ?: return@mapNotNull null
+                        key to value
+                    }
+                    ?.toMap()
+                    ?: emptyMap(),
                 visibleTo = (data["visibleTo"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
                 displayName = data["displayName"] as? String ?: "",
                 photoUrl = data["photoUrl"] as? String,
@@ -196,6 +206,26 @@ class LocationRepositoryImpl @Inject constructor(
         return if (isDirectTarget(targetIds[0])) "direct" else "group"
     }
 
+    /**
+     * Computes an expiry epoch ms from a duration in minutes.
+     * 0 (or negative) means "until stopped" → Long.MAX_VALUE.
+     */
+    private fun expiryFromDuration(durationMinutes: Long): Long {
+        return if (durationMinutes > 0) {
+            System.currentTimeMillis() + (durationMinutes * MILLIS_PER_MINUTE)
+        } else {
+            Long.MAX_VALUE
+        }
+    }
+
+    /**
+     * Drops any expired entries from a target→expiry map.
+     */
+    private fun pruneExpired(expiries: Map<String, Long>): Map<String, Long> {
+        val now = System.currentTimeMillis()
+        return expiries.filterValues { it == Long.MAX_VALUE || it > now }
+    }
+
     override suspend fun startLocationSharing(targetIds: List<String>, durationMinutes: Long): Resource<Unit> {
         return try {
             val uid = currentUid ?: return Resource.Error("Not authenticated")
@@ -204,16 +234,14 @@ class LocationRepositoryImpl @Inject constructor(
                 return Resource.Error("Pick at least one friend or group to share with")
             }
 
-            val expiryTime = if (durationMinutes > 0) {
-                System.currentTimeMillis() + (durationMinutes * MILLIS_PER_MINUTE)
-            } else {
-                Long.MAX_VALUE
-            }
+            val expiry = expiryFromDuration(durationMinutes)
+            // All targets in this start call get the same expiry. Existing targets
+            // are replaced wholesale (this is the "fresh start" entry point).
+            val targetExpiries = sanitized.associateWith { expiry }
 
             val visibleTo = computeVisibleTo(uid, sanitized)
             currentSession = ActiveSharingSession(
-                targetIds = sanitized,
-                expiryTime = expiryTime,
+                targetExpiries = targetExpiries,
                 visibleTo = visibleTo
             )
 
@@ -222,14 +250,15 @@ class LocationRepositoryImpl @Inject constructor(
             val photoUrl = (currentPhotoUrl ?: "").take(2048)
 
             // Single write to consolidated activeLocations collection.
-            // We keep targetId (legacy single field) for backward compat — first id.
+            // sharingExpiresAt = max(targetExpiries) so legacy readers still work.
             val activeLocationData = hashMapOf(
                 "userId" to uid,
                 "targetType" to targetType,
                 "targetId" to sanitized.first(),
                 "targetIds" to sanitized,
+                "targetExpiries" to targetExpiries,
                 "isSharingActive" to true,
-                "sharingExpiresAt" to expiryTime,
+                "sharingExpiresAt" to expiry,
                 "timestamp" to System.currentTimeMillis(),
                 "visibleTo" to visibleTo,
                 "displayName" to displayName,
@@ -264,7 +293,8 @@ class LocationRepositoryImpl @Inject constructor(
                     mapOf(
                         "isSharingActive" to false,
                         "timestamp" to System.currentTimeMillis(),
-                        "targetIds" to emptyList<String>()
+                        "targetIds" to emptyList<String>(),
+                        "targetExpiries" to emptyMap<String, Long>()
                     ),
                     SetOptions.merge()
                 ).await()
@@ -276,26 +306,32 @@ class LocationRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun addSharingTarget(targetId: String): Resource<Unit> {
+    override suspend fun addSharingTarget(targetId: String, durationMinutes: Long): Resource<Unit> {
         return try {
             val uid = currentUid ?: return Resource.Error("Not authenticated")
             val session = currentSession
                 ?: return Resource.Error("No active sharing session — start sharing first")
-            if (targetId.isBlank() || targetId in session.targetIds) {
+            if (targetId.isBlank() || targetId in session.targetExpiries) {
                 return Resource.Success(Unit)
             }
 
-            val newTargets = session.targetIds + targetId
+            val newExpiry = expiryFromDuration(durationMinutes)
+            // Existing per-target expiries are preserved — only the new target gets newExpiry.
+            val newExpiries = pruneExpired(session.targetExpiries) + (targetId to newExpiry)
+            val newTargets = newExpiries.keys.toList()
             val visibleTo = computeVisibleTo(uid, newTargets)
-            currentSession = session.copy(targetIds = newTargets, visibleTo = visibleTo)
+            currentSession = session.copy(targetExpiries = newExpiries, visibleTo = visibleTo)
 
             firestore.collection(AppConstants.FIRESTORE_COLLECTION_ACTIVE_LOCATIONS)
                 .document(uid)
                 .set(
                     mapOf(
                         "targetIds" to newTargets,
+                        "targetExpiries" to newExpiries,
                         "targetType" to computeTargetType(newTargets),
                         "visibleTo" to visibleTo,
+                        // sharingExpiresAt = max of all per-target expiries (legacy compat)
+                        "sharingExpiresAt" to (newExpiries.values.maxOrNull() ?: Long.MAX_VALUE),
                         "timestamp" to System.currentTimeMillis()
                     ),
                     SetOptions.merge()
@@ -309,25 +345,28 @@ class LocationRepositoryImpl @Inject constructor(
 
     override suspend fun removeSharingTarget(targetId: String): Resource<Unit> {
         val session = currentSession ?: return Resource.Success(Unit)
-        if (targetId !in session.targetIds) return Resource.Success(Unit)
+        if (targetId !in session.targetExpiries) return Resource.Success(Unit)
 
-        val newTargets = session.targetIds - targetId
-        if (newTargets.isEmpty()) {
+        val newExpiries = session.targetExpiries - targetId
+        if (newExpiries.isEmpty()) {
             // Last target removed → stop sharing entirely
             return stopLocationSharing()
         }
         return try {
             val uid = currentUid ?: return Resource.Error("Not authenticated")
+            val newTargets = newExpiries.keys.toList()
             val visibleTo = computeVisibleTo(uid, newTargets)
-            currentSession = session.copy(targetIds = newTargets, visibleTo = visibleTo)
+            currentSession = session.copy(targetExpiries = newExpiries, visibleTo = visibleTo)
 
             firestore.collection(AppConstants.FIRESTORE_COLLECTION_ACTIVE_LOCATIONS)
                 .document(uid)
                 .set(
                     mapOf(
                         "targetIds" to newTargets,
+                        "targetExpiries" to newExpiries,
                         "targetType" to computeTargetType(newTargets),
                         "visibleTo" to visibleTo,
+                        "sharingExpiresAt" to (newExpiries.values.maxOrNull() ?: Long.MAX_VALUE),
                         "timestamp" to System.currentTimeMillis()
                     ),
                     SetOptions.merge()
@@ -857,17 +896,30 @@ class LocationRepositoryImpl @Inject constructor(
 
     override fun isSharingLocation(): Boolean {
         val session = currentSession ?: return false
-        if (session.expiryTime == Long.MAX_VALUE) return true
-        if (System.currentTimeMillis() < session.expiryTime) return true
-        currentSession = null
-        return false
+        // Prune any expired targets; if nothing is left, the session is over.
+        val active = pruneExpired(session.targetExpiries)
+        if (active.isEmpty()) {
+            currentSession = null
+            return false
+        }
+        if (active.size != session.targetExpiries.size) {
+            // Reflect pruning in memory state
+            currentSession = session.copy(targetExpiries = active)
+        }
+        return true
     }
 
     override fun getSharingTargetIds(): List<String> {
         return if (isSharingLocation()) currentSession?.targetIds ?: emptyList() else emptyList()
     }
 
-    override fun getSharingExpiryTime(): Long? = currentSession?.expiryTime
+    override fun getTargetExpiries(): Map<String, Long> {
+        return if (isSharingLocation()) currentSession?.targetExpiries ?: emptyMap() else emptyMap()
+    }
+
+    override fun getSharingExpiryTime(): Long? {
+        return if (isSharingLocation()) currentSession?.overallExpiry else null
+    }
 
     override suspend fun checkSharingStatus(): List<String> {
         return try {
@@ -876,9 +928,12 @@ class LocationRepositoryImpl @Inject constructor(
             // Step 1: in-memory cache (0 reads)
             val cached = currentSession
             if (cached != null) {
-                val now = System.currentTimeMillis()
-                if (cached.expiryTime == Long.MAX_VALUE || now < cached.expiryTime) {
-                    return cached.targetIds
+                val active = pruneExpired(cached.targetExpiries)
+                if (active.isNotEmpty()) {
+                    if (active.size != cached.targetExpiries.size) {
+                        currentSession = cached.copy(targetExpiries = active)
+                    }
+                    return active.keys.toList()
                 } else {
                     currentSession = null
                 }
@@ -892,23 +947,36 @@ class LocationRepositoryImpl @Inject constructor(
 
             if (activeDoc.exists()) {
                 val isActive = activeDoc.getBoolean("isSharingActive") ?: false
-                val expiresAt = activeDoc.getLong("sharingExpiresAt") ?: 0L
+                val legacyExpiresAt = activeDoc.getLong("sharingExpiresAt") ?: 0L
+                @Suppress("UNCHECKED_CAST")
+                val rawExpiries = activeDoc.get("targetExpiries") as? Map<String, Any?>
                 @Suppress("UNCHECKED_CAST")
                 val targetIds = (activeDoc.get("targetIds") as? List<String>)
                     ?: activeDoc.getString("targetId")?.takeIf { it.isNotEmpty() }?.let { listOf(it) }
                     ?: emptyList()
                 @Suppress("UNCHECKED_CAST")
                 val visibleTo = (activeDoc.get("visibleTo") as? List<String>) ?: emptyList()
-                val now = System.currentTimeMillis()
-                val stillActive = isActive && targetIds.isNotEmpty() &&
-                    (expiresAt == Long.MAX_VALUE || now < expiresAt)
-                if (stillActive) {
+
+                // Build per-target expiries: prefer doc map, fall back to legacy single value
+                val targetExpiries: Map<String, Long> = when {
+                    rawExpiries != null -> rawExpiries
+                        .mapNotNull { (k, v) ->
+                            val ms = (v as? Number)?.toLong() ?: return@mapNotNull null
+                            k to ms
+                        }
+                        .toMap()
+                    else -> targetIds.associateWith {
+                        if (legacyExpiresAt > 0) legacyExpiresAt else Long.MAX_VALUE
+                    }
+                }
+                val activeExpiries = pruneExpired(targetExpiries)
+
+                if (isActive && activeExpiries.isNotEmpty()) {
                     currentSession = ActiveSharingSession(
-                        targetIds = targetIds,
-                        expiryTime = expiresAt,
+                        targetExpiries = activeExpiries,
                         visibleTo = visibleTo
                     )
-                    return targetIds
+                    return activeExpiries.keys.toList()
                 }
             }
 

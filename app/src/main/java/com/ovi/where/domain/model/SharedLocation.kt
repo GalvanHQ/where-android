@@ -18,6 +18,12 @@ data class SharedLocation(
     val targetType: String = "group",  // "group" or "direct" or "multi"
     val targetId: String = "",         // legacy: single groupId or "direct:friendId"
     val targetIds: List<String> = emptyList(), // multi-recipient: list of target ids
+    /**
+     * Per-target expiry (epoch millis). Long.MAX_VALUE means "until you stop".
+     * Each target has its own timer so adding new recipients doesn't truncate
+     * existing recipients' sessions.
+     */
+    val targetExpiries: Map<String, Long> = emptyMap(),
     val visibleTo: List<String> = emptyList(),
     // Display info for live location bubble rendering
     val displayName: String = "",
@@ -45,6 +51,7 @@ data class SharedLocation(
         targetType = "group",
         targetId = "",
         targetIds = emptyList(),
+        targetExpiries = emptyMap(),
         visibleTo = emptyList(),
         displayName = "",
         photoUrl = null,

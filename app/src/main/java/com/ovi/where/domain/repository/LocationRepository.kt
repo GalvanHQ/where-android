@@ -8,15 +8,21 @@ import kotlinx.coroutines.flow.Flow
 interface LocationRepository {
     /**
      * Starts a location sharing session for one or more targets (groups + direct friends).
-     * If a session already exists, this replaces the target set entirely.
+     * If a session already exists, this REPLACES the target set entirely. Each target
+     * gets the same expiry computed from [durationMinutes]. Use [addSharingTarget] to
+     * add a target with its own duration without affecting existing recipients.
      */
     suspend fun startLocationSharing(targetIds: List<String>, durationMinutes: Long): Resource<Unit>
 
     /** Stops the active sharing session entirely. */
     suspend fun stopLocationSharing(): Resource<Unit>
 
-    /** Adds one target to the active sharing session (no-op if session is not active). */
-    suspend fun addSharingTarget(targetId: String): Resource<Unit>
+    /**
+     * Adds one target to the active sharing session with its own duration.
+     * No-op if [targetId] is already in the session — use [removeSharingTarget] then add
+     * if you want to reset the timer for that target.
+     */
+    suspend fun addSharingTarget(targetId: String, durationMinutes: Long): Resource<Unit>
 
     /** Removes one target from the active sharing session. Stops sharing if no targets remain. */
     suspend fun removeSharingTarget(targetId: String): Resource<Unit>
@@ -68,7 +74,16 @@ interface LocationRepository {
     /** Returns the list of target ids the current user is sharing with (empty if not sharing). */
     fun getSharingTargetIds(): List<String>
 
-    /** Returns the expiry time (epoch ms) of the active session, or null if not sharing. */
+    /**
+     * Returns the per-target expiry map for the active session.
+     * Empty if not sharing. Long.MAX_VALUE means "until stopped".
+     */
+    fun getTargetExpiries(): Map<String, Long>
+
+    /**
+     * Returns the latest expiry across all targets, or null if not sharing.
+     * Used by the foreground service to schedule its overall stop time.
+     */
     fun getSharingExpiryTime(): Long?
 
     /** Checks Firestore for an active sharing session and restores in-memory state.

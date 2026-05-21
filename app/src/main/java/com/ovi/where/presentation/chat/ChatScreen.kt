@@ -893,6 +893,8 @@ fun ChatScreen(
     // Simplified: no target picker needed (target = this conversation).
     // Just shows duration picker and starts sharing immediately.
     if (uiState.locationBottomSheetState != com.ovi.where.presentation.chat.LocationBottomSheetState.HIDDEN) {
+        var showInfiniteConfirm by remember { mutableStateOf(false) }
+
         androidx.compose.material3.ModalBottomSheet(
             onDismissRequest = { viewModel.dismissLocationBottomSheet() },
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
@@ -955,7 +957,14 @@ fun ChatScreen(
                     durations.forEach { (minutes, label) ->
                         androidx.compose.material3.FilterChip(
                             selected = uiState.selectedDurationMinutes == minutes,
-                            onClick = { viewModel.onDurationSelected(minutes) },
+                            onClick = {
+                                if (minutes == 0L) {
+                                    // "Until I stop" — confirm before selecting (no time limit)
+                                    showInfiniteConfirm = true
+                                } else {
+                                    viewModel.onDurationSelected(minutes)
+                                }
+                            },
                             label = { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp)
@@ -984,6 +993,56 @@ fun ChatScreen(
 
                 Spacer(Modifier.height(16.dp))
             }
+        }
+
+        // ── Confirm "Until I stop" — explain the trade-offs before letting users pick it ──
+        if (showInfiniteConfirm) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showInfiniteConfirm = false },
+                icon = {
+                    Icon(
+                        Icons.Filled.LocationOn,
+                        contentDescription = null,
+                        modifier = Modifier.size(36.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
+                title = {
+                    Text(
+                        "Share until you stop?",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            "Your live location will keep streaming with no time limit. " +
+                                "It will only stop when you tap Stop or remove this share manually.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        InfiniteShareBulletInline("Drains more battery than a timed share")
+                        InfiniteShareBulletInline("${uiState.conversation?.title ?: "Recipients"} will keep seeing your location until you stop it")
+                        InfiniteShareBulletInline("You can stop anytime from this chat or the map")
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.onDurationSelected(0L)
+                            showInfiniteConfirm = false
+                        }
+                    ) {
+                        Text("Use no time limit", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showInfiniteConfirm = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
     }
 
@@ -1053,3 +1112,24 @@ fun ChatScreen(
     }
 }
 
+
+@Composable
+private fun InfiniteShareBulletInline(text: String) {
+    Row(
+        modifier = Modifier.padding(top = 4.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            "•",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}

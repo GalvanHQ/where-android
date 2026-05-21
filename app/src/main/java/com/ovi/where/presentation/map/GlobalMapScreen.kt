@@ -427,7 +427,22 @@ fun GlobalMapScreen(
                                 }
                             }
                         },
-                        onMessageFriend = { viewModel.openOrCreateDm(it.userId) },
+                        onShowOnMap = { friend ->
+                            // Collapse the sheet so the map is fully visible, then animate
+                            // camera to the friend with a smoother, deeper zoom.
+                            if (friend.latitude != 0.0 && friend.longitude != 0.0) {
+                                scope.launch {
+                                    bottomSheetScaffoldState.bottomSheetState.partialExpand()
+                                    cameraPositionState.animate(
+                                        CameraUpdateFactory.newLatLngZoom(
+                                            LatLng(friend.latitude, friend.longitude),
+                                            17f
+                                        ),
+                                        durationMs = 900
+                                    )
+                                }
+                            }
+                        },
                         onAddShare = {
                             if (!locationGranted) {
                                 permissionLauncher.launch(
@@ -792,14 +807,14 @@ fun GlobalMapScreen(
                         },
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                        shape = CircleShape,
+                        shape = RoundedCornerShape(24.dp),
                         elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
                             defaultElevation = 8.dp,
                             pressedElevation = 12.dp
                         )
                     ) {
                         Icon(
-                            Icons.Rounded.Stop,
+                            imageVector = Icons.Rounded.Stop,
                             contentDescription = stringResource(R.string.cd_stop_sharing),
                             modifier = Modifier.size(Dimens.iconSizeLarge)
                         )
@@ -821,14 +836,14 @@ fun GlobalMapScreen(
                         },
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
-                        shape = CircleShape,
+                        shape = RoundedCornerShape(24.dp),
                         elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
                             defaultElevation = 8.dp,
                             pressedElevation = 12.dp
                         )
                     ) {
                         Icon(
-                            imageVector = ImageVector.vectorResource(id = R.drawable.paper_plane),
+                            imageVector = ImageVector.vectorResource(id = R.drawable.location_arrow),
                             contentDescription = stringResource(R.string.cd_share_location),
                             modifier = Modifier.size(Dimens.iconSizeLarge)
                         )
@@ -842,7 +857,8 @@ fun GlobalMapScreen(
     if (uiState.showGroupPicker) {
         ModalBottomSheet(
             onDismissRequest = { viewModel.showGroupPicker(false) },
-            sheetState = groupPickerSheetState
+            sheetState = groupPickerSheetState,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
         ) {
             GroupFilterSheet(
                 groups = uiState.groups,
@@ -860,7 +876,8 @@ fun GlobalMapScreen(
     if (showMapTypeSheet) {
         ModalBottomSheet(
             onDismissRequest = { showMapTypeSheet = false },
-            sheetState = mapTypeSheetState
+            sheetState = mapTypeSheetState,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
         ) {
             MapTypeSheet(
                 selected = mapType,
@@ -875,7 +892,8 @@ fun GlobalMapScreen(
     // ── My profile bottom sheet (tap own marker) ──────────────────────────────
     if (showMyProfileSheet) {
         ModalBottomSheet(
-            onDismissRequest = { showMyProfileSheet = false }
+            onDismissRequest = { showMyProfileSheet = false },
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -1045,7 +1063,7 @@ private fun HomeSheetContent(
     directTargets: List<GroupFilter>,
     bottomReservedSpace: androidx.compose.ui.unit.Dp,
     onFriendClick: (FriendLocationUiModel) -> Unit,
-    onMessageFriend: (FriendLocationUiModel) -> Unit,
+    onShowOnMap: (FriendLocationUiModel) -> Unit,
     onAddShare: () -> Unit,
     onStopOne: (String) -> Unit,
     onStopAll: () -> Unit
@@ -1091,7 +1109,7 @@ private fun HomeSheetContent(
                 activeFilter = activeFilter,
                 bottomReservedSpace = bottomReservedSpace,
                 onFriendClick = onFriendClick,
-                onMessageFriend = onMessageFriend
+                onShowOnMap = onShowOnMap
             )
             MapHomeTab.MyShares -> MySharesTabContent(
                 sharingTargetIds = sharingTargetIds,
@@ -1174,7 +1192,7 @@ private fun FriendsTabContent(
     activeFilter: GroupFilter?,
     bottomReservedSpace: androidx.compose.ui.unit.Dp,
     onFriendClick: (FriendLocationUiModel) -> Unit,
-    onMessageFriend: (FriendLocationUiModel) -> Unit
+    onShowOnMap: (FriendLocationUiModel) -> Unit
 ) {
     if (friends.isEmpty()) {
         TabEmptyState(
@@ -1221,7 +1239,7 @@ private fun FriendsTabContent(
                 myLongitude = myLongitude,
                 hasMyLocation = hasMyLocation,
                 onClick = { onFriendClick(friend) },
-                onMessage = { onMessageFriend(friend) }
+                onShowOnMap = { onShowOnMap(friend) }
             )
         }
     }
@@ -1358,7 +1376,7 @@ private fun MySharesTabContent(
 
 @Composable
 private fun TabEmptyState(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     title: String,
     subtitle: String,
     bottomReservedSpace: androidx.compose.ui.unit.Dp
@@ -1527,223 +1545,6 @@ private fun FriendDetailSheetContent(
     }
 }
 
-/**
- * Bottom sheet content shown on the map screen.
- *
- * Layout:
- * - Peek (always visible above nav bar):
- *     • Filter hero (active filter avatar + name + status)
- *     • Horizontal scrolling row of friend avatars
- * - Expanded:
- *     • Same hero pinned + full vertical list of friend cards with distance/ETA/message.
- */
-@Composable
-private fun FriendsSheetContent(
-    friends: List<FriendLocationUiModel>,
-    myLatitude: Double,
-    myLongitude: Double,
-    hasMyLocation: Boolean,
-    isSharing: Boolean,
-    activeFilter: GroupFilter?,
-    bottomReservedSpace: androidx.compose.ui.unit.Dp,
-    onFriendClick: (FriendLocationUiModel) -> Unit,
-    onMessageFriend: (FriendLocationUiModel) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 120.dp, max = 640.dp)
-    ) {
-        // ── Hero row (filter avatar + name + status) ──────────────────────────
-        SheetHeroHeader(
-            activeFilter = activeFilter,
-            friendsCount = friends.size,
-            isSharing = isSharing
-        )
-
-        if (friends.isEmpty()) {
-            SheetEmptyState(isSharing = isSharing)
-            Spacer(Modifier.height(bottomReservedSpace))
-            return@Column
-        }
-
-        // ── Horizontal avatars row (visible at peek) ─────────────────────────
-        Spacer(Modifier.height(4.dp))
-        androidx.compose.foundation.lazy.LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(items = friends, key = { "avatar-${it.userId}" }) { friend ->
-                FriendAvatarPeek(
-                    friend = friend,
-                    onClick = { onFriendClick(friend) }
-                )
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-        androidx.compose.material3.HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 20.dp),
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-        )
-
-        // ── Expanded list (visible when sheet is dragged up) ─────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Live locations",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                text = "${friends.size}",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-
-        LazyColumn(
-            modifier = Modifier.weight(1f, fill = false),
-            contentPadding = PaddingValues(
-                start = 12.dp,
-                end = 12.dp,
-                top = 0.dp,
-                bottom = bottomReservedSpace + 16.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(items = friends, key = { "card-${it.userId}" }) { friend ->
-                FriendCard(
-                    friend = friend,
-                    myLatitude = myLatitude,
-                    myLongitude = myLongitude,
-                    hasMyLocation = hasMyLocation,
-                    onClick = { onFriendClick(friend) },
-                    onMessage = { onMessageFriend(friend) }
-                )
-            }
-        }
-    }
-}
-
-/**
- * Hero header at the top of the sheet — mirrors the filter pill, larger.
- * Shows the active filter's avatar (group / user / "all friends") + name + meta.
- */
-@Composable
-private fun SheetHeroHeader(
-    activeFilter: GroupFilter?,
-    friendsCount: Int,
-    isSharing: Boolean
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        SheetHeroAvatar(filter = activeFilter)
-        Spacer(Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = activeFilter?.name ?: "All Friends",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            val subtitleText = when {
-                friendsCount == 0 && isSharing -> "You're sharing live"
-                friendsCount == 0 -> "No one's sharing"
-                friendsCount == 1 -> "1 person sharing live"
-                else -> "$friendsCount people sharing live"
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (friendsCount > 0) {
-                    SharingPulseDot()
-                    Spacer(Modifier.width(6.dp))
-                }
-                Text(
-                    text = subtitleText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SheetHeroAvatar(filter: GroupFilter?) {
-    val size = 52.dp
-    when {
-        filter == null -> {
-            // "All Friends" — gradient-like primary tint
-            Box(
-                modifier = Modifier
-                    .size(size)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.Groups,
-                    null,
-                    modifier = Modifier.size(26.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-        !filter.photoUrl.isNullOrEmpty() -> {
-            AsyncImage(
-                model = filter.photoUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(size)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            )
-        }
-        else -> {
-            // Fallback: initial letter on color background
-            val color = AvatarColors[filter.id.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
-            Box(
-                modifier = Modifier
-                    .size(size)
-                    .clip(CircleShape)
-                    .background(color),
-                contentAlignment = Alignment.Center
-            ) {
-                if (filter.isDirect) {
-                    Text(
-                        text = filter.name.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.surface
-                    )
-                } else {
-                    Icon(
-                        Icons.Default.Groups,
-                        null,
-                        modifier = Modifier.size(26.dp),
-                        tint = MaterialTheme.colorScheme.surface
-                    )
-                }
-            }
-        }
-    }
-}
-
 /** Smaller avatar used in the top filter pill. */
 @Composable
 private fun FilterPillAvatar(filter: GroupFilter?) {
@@ -1802,47 +1603,6 @@ private fun FilterPillAvatar(filter: GroupFilter?) {
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun SheetEmptyState(isSharing: Boolean) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                if (isSharing) Icons.Default.LocationOn else Icons.Default.LocationOff,
-                null,
-                modifier = Modifier.size(28.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = if (isSharing) "You're sharing live" else "No one's sharing right now",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = if (isSharing) "Friends sharing back will appear here"
-            else "Tap the share button below to start",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
     }
 }
 
@@ -1920,7 +1680,7 @@ private fun FriendCard(
     myLongitude: Double,
     hasMyLocation: Boolean,
     onClick: () -> Unit,
-    onMessage: () -> Unit
+    onShowOnMap: () -> Unit
 ) {
     val context = LocalContext.current
     val color = AvatarColors[friend.userId.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
@@ -2032,18 +1792,18 @@ private fun FriendCard(
                 }
             }
 
-            // Message icon button
+            // Map navigation button — center & zoom on this friend
             Spacer(Modifier.width(8.dp))
             Surface(
-                onClick = onMessage,
+                onClick = onShowOnMap,
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(40.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        Icons.Default.ChatBubbleOutline,
-                        contentDescription = "Message ${friend.displayName}",
+                        imageVector = ImageVector.vectorResource(id = R.drawable.navigate_to),
+                        contentDescription = "Show ${friend.displayName} on map",
                         modifier = Modifier.size(18.dp),
                         tint = MaterialTheme.colorScheme.onPrimary
                     )
@@ -2417,151 +2177,6 @@ private fun FilterRow(
     }
 }
 
-/**
- * Manage active shares sheet — lists every recipient the user is currently sharing with.
- * Each row has its own per-target countdown and a stop button so the user can end
- * sharing for one recipient at a time without nuking the whole session.
- */
-@Composable
-private fun ManageSharesSheet(
-    activeTargetIds: List<String>,
-    activeExpiries: Map<String, Long>,
-    groups: List<GroupFilter>,
-    directTargets: List<GroupFilter>,
-    bottomReservedSpace: androidx.compose.ui.unit.Dp = 0.dp,
-    onAddMore: () -> Unit,
-    onStopOne: (String) -> Unit,
-    onStopAll: () -> Unit,
-    onBack: () -> Unit = {}
-) {
-    val allTargets = (directTargets + groups).associateBy { it.id }
-    val active = activeTargetIds.mapNotNull { id ->
-        allTargets[id] ?: GroupFilter(id = id, name = id, isDirect = id.startsWith("direct:"))
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-    ) {
-        // ── Header with back button ───────────────────────────────────────────
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SheetBackButton(onBack)
-            Spacer(Modifier.width(8.dp))
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center
-            ) {
-                SharingPulseDot()
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Active shares",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = if (active.isEmpty()) "Not sharing right now"
-                    else "${active.size} active • Each has its own timer",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        if (active.isEmpty()) {
-            Spacer(Modifier.height(24.dp))
-            Text(
-                "No one to manage. Tap share to get started.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                textAlign = TextAlign.Center
-            )
-            Spacer(Modifier.height(24.dp))
-            Spacer(Modifier.height(bottomReservedSpace))
-            return@Column
-        }
-
-        // ── Active recipient list ─────────────────────────────────────────────
-        Text(
-            "SHARING WITH",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            letterSpacing = 1.sp
-        )
-        Spacer(Modifier.height(8.dp))
-
-        LazyColumn(
-            modifier = Modifier.heightIn(max = 360.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            items(active, key = { "active-${it.id}" }) { target ->
-                ActiveShareRow(
-                    target = target,
-                    expiry = activeExpiries[target.id],
-                    onStop = { onStopOne(target.id) }
-                )
-            }
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        // ── Footer actions ────────────────────────────────────────────────────
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedButton(
-                onClick = onAddMore,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(50.dp),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Icon(
-                    Icons.Default.LocationOn,
-                    null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text("Add more", style = MaterialTheme.typography.labelLarge)
-            }
-            Button(
-                onClick = onStopAll,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(50.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                )
-            ) {
-                Icon(
-                    Icons.Rounded.Stop,
-                    null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text("Stop all", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-        Spacer(Modifier.height(bottomReservedSpace))
-    }
-}
-
 @Composable
 private fun ActiveShareRow(
     target: GroupFilter,
@@ -2653,6 +2268,7 @@ private fun ShareTargetSheet(
     val targets = visibleDirect + visibleGroups
     val selectedIds = remember { mutableStateListOf<String>() }
     var selectedDuration by remember { mutableLongStateOf(initialDuration) }
+    var showInfiniteConfirm by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -2776,7 +2392,59 @@ private fun ShareTargetSheet(
             DurationSegment("15m", selectedDuration == 15L, Modifier.weight(1f)) { selectedDuration = 15L }
             DurationSegment("1h", selectedDuration == 60L, Modifier.weight(1f)) { selectedDuration = 60L }
             DurationSegment("4h", selectedDuration == 240L, Modifier.weight(1f)) { selectedDuration = 240L }
-            DurationSegment("∞", selectedDuration == 0L, Modifier.weight(1f)) { selectedDuration = 0L }
+            DurationSegment("∞", selectedDuration == 0L, Modifier.weight(1f)) {
+                // Confirm continuous sharing — it has privacy implications and never auto-stops
+                showInfiniteConfirm = true
+            }
+        }
+
+        if (showInfiniteConfirm) {
+            AlertDialog(
+                onDismissRequest = { showInfiniteConfirm = false },
+                icon = {
+                    Icon(
+                        Icons.Rounded.LocationOn,
+                        contentDescription = null,
+                        modifier = Modifier.size(36.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
+                title = {
+                    Text(
+                        "Share until you stop?",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            "Your live location will keep streaming with no time limit. " +
+                                "It will only stop when you tap Stop or remove this share manually.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        InfiniteShareBullet("Drains more battery than a timed share")
+                        InfiniteShareBullet("Recipients keep seeing your location until you stop it")
+                        InfiniteShareBullet("You can stop anytime from the My shares tab")
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            selectedDuration = 0L
+                            showInfiniteConfirm = false
+                        }
+                    ) {
+                        Text("Use no time limit", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showInfiniteConfirm = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
 
         Spacer(Modifier.height(20.dp))
@@ -2982,6 +2650,27 @@ private fun SelectedTargetChip(
 }
 
 @Composable
+private fun InfiniteShareBullet(text: String) {
+    Row(
+        modifier = Modifier.padding(top = 4.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            "•",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
 private fun DurationSegment(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
@@ -3000,35 +2689,6 @@ private fun DurationSegment(text: String, selected: Boolean, modifier: Modifier 
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                 maxLines = 1
             )
-        }
-    }
-}
-
-@Composable
-private fun TargetAvatar(target: GroupFilter) {
-    if (target.isDirect && !target.photoUrl.isNullOrEmpty()) {
-        AsyncImage(
-            model = target.photoUrl,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(Dimens.avatarSizeMedium)
-                .clip(CircleShape)
-        )
-    } else {
-        Surface(
-            modifier = Modifier.size(Dimens.avatarSizeMedium),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.primary
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    if (target.isDirect) Icons.Default.Person else Icons.Default.Groups,
-                    null,
-                    modifier = Modifier.size(Dimens.iconSizeMedium)
-                )
-            }
         }
     }
 }

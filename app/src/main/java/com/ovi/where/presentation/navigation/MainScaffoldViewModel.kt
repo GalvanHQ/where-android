@@ -10,6 +10,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * View model for [WhereBottomBar]. Holds the current user's avatar URL so the
+ * Profile tab icon can render it.
+ */
 @HiltViewModel
 class MainScaffoldViewModel @Inject constructor(
     private val observeCurrentUserUseCase: ObserveCurrentUserUseCase

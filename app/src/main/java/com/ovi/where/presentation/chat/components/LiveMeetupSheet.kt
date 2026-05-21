@@ -158,7 +158,7 @@ fun LiveMeetupSheet(
                     ) {
                         Icon(
                             imageVector = ImageVector.vectorResource(id = R.drawable.map),
-                            contentDescription = null,
+                            contentDescription = "Open full map",
                             modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.primary
                         )

@@ -37,8 +37,21 @@ sealed class Screen(val route: String) {
 
     // ── Main scaffold (bottom tabs) ───────────────────────────────────────────
 
+    // ── Bottom tab destinations ──────────────────────────────────────────────
+    // Siblings of every other top-level route in [AppNavGraph]. The bottom bar
+    // is shown only when the current destination is one of these four routes.
+
     @Serializable
-    data object Main : Screen("main")
+    data object MapTab : Screen("tab_map")
+
+    @Serializable
+    data object ChatsTab : Screen("tab_chats")
+
+    @Serializable
+    data object PeopleTab : Screen("tab_people")
+
+    @Serializable
+    data object ProfileTab : Screen("tab_profile")
 
     // ── Profile sub-screens ───────────────────────────────────────────────────
 

@@ -8,7 +8,11 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -27,6 +31,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.navArgument
 import com.ovi.where.DeepLinkManager
 import com.ovi.where.core.crash.ActiveScreenTracker
@@ -36,6 +42,7 @@ import com.ovi.where.presentation.auth.login.LoginScreen
 import com.ovi.where.presentation.auth.signup.SignUpScreen
 import com.ovi.where.presentation.auth.verification.EmailVerificationScreen
 import com.ovi.where.presentation.chat.ChatScreen
+import com.ovi.where.presentation.chat.ChatsScreen
 import com.ovi.where.presentation.chat.ConversationInfoScreen
 import com.ovi.where.presentation.chat.GroupInfoScreen
 import com.ovi.where.presentation.chat.MediaGalleryScreen
@@ -43,10 +50,14 @@ import com.ovi.where.presentation.chat.NewMessageScreen
 import com.ovi.where.presentation.chat.NicknamesScreen
 import com.ovi.where.presentation.group.create.CreateGroupScreen
 import com.ovi.where.presentation.group.join.JoinGroupScreen
+import com.ovi.where.presentation.map.GlobalMapScreen
+import com.ovi.where.presentation.map.MapNavBarHeight
 import com.ovi.where.presentation.navigation.gatekeeper.AuthGatekeeperViewModel
 import com.ovi.where.presentation.onboarding.OnboardingScreen
 import com.ovi.where.presentation.people.FriendRequestsScreen
+import com.ovi.where.presentation.people.PeopleScreen
 import com.ovi.where.presentation.people.UserProfileScreen
+import com.ovi.where.presentation.profile.ProfileScreen
 import com.ovi.where.presentation.profile.edit.EditProfileScreen
 import com.ovi.where.presentation.search.SearchScreen
 import com.ovi.where.presentation.settings.AboutScreen
@@ -59,17 +70,36 @@ import com.ovi.where.presentation.settings.SecurityScreen
 import com.ovi.where.presentation.settings.SettingsScreen
 
 private const val NAV_ANIM_DURATION = 300
+private const val TAB_FADE_DURATION = 180
+
+/** Routes that show the bottom tab bar. Single source of truth. */
+internal val BottomTabRoutes = setOf(
+    Screen.MapTab.route,
+    Screen.ChatsTab.route,
+    Screen.PeopleTab.route,
+    Screen.ProfileTab.route
+)
+
+/**
+ * True when both endpoints of a navigation are tab routes — i.e. the user is
+ * switching between bottom tabs. Tabs are siblings (not a stack), so a quick
+ * cross-fade is the right feel; the slide animation is reserved for actual
+ * forward/back stack transitions like Chat ↔ UserProfile.
+ */
+private fun isTabSwitch(fromRoute: String?, toRoute: String?): Boolean =
+    fromRoute in BottomTabRoutes && toRoute in BottomTabRoutes
 
 /**
  * Root navigation graph.
  *
- * Replaces the legacy custom SplashScreen with a lightweight gatekeeper composable
- * that resolves auth state using [SplashViewModel] and routes accordingly:
- *   - Not onboarded          → Onboarding
- *   - Not logged in          → Login
- *   - Email not verified     → EmailVerification
- *   - Profile not complete   → CompleteProfile
- *   - All good               → Main (with optional deep-link)
+ * Single NavController for the whole app — including the bottom tabs. The
+ * tabs are siblings of every other top-level destination, which means any
+ * call to `navController.navigate(Screen.MapTab.route)` from anywhere works,
+ * and Compose Navigation handles back-stack + state restoration via
+ * `popUpTo + saveState + restoreState`. Same pattern as Now in Android.
+ *
+ * The bottom bar is rendered by [WhereBottomBar] in [MainScaffold] and shows
+ * itself only when the current destination is in [BottomTabRoutes].
  */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -97,704 +127,715 @@ fun AppNavGraph(
         }
     }
 
-    NavHost(
-        navController    = navController,
-        startDestination = startDestination,
-        modifier         = modifier.background(MaterialTheme.colorScheme.background),
-        enterTransition = {
-            slideInHorizontally(
-                initialOffsetX = { fullWidth -> fullWidth },
-                animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut)
-            ) + fadeIn(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
-        },
-        exitTransition = {
-            slideOutHorizontally(
-                targetOffsetX = { fullWidth -> -fullWidth / 4 },
-                animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut)
-            ) + fadeOut(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
-        },
-        popEnterTransition = {
-            slideInHorizontally(
-                initialOffsetX = { fullWidth -> -fullWidth / 4 },
-                animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut)
-            ) + fadeIn(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
-        },
-        popExitTransition = {
-            slideOutHorizontally(
-                targetOffsetX = { fullWidth -> fullWidth },
-                animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut)
-            ) + fadeOut(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
-        }
-    ) {
-        // ── Gatekeeper (replaces custom SplashScreen) ─────────────────────────
-        composable(
-            Screen.Gatekeeper.route,
-            enterTransition = { fadeIn(tween(0)) },
-            exitTransition  = { fadeOut(tween(300)) }
-        ) {
-            val viewModel: AuthGatekeeperViewModel = hiltViewModel()
-            val uiState by viewModel.uiState.collectAsState()
+    // ── Bottom-bar visibility derived from the current top-level destination ──
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+    val showBottomBar = currentRoute in BottomTabRoutes
 
-            LaunchedEffect(Unit) { viewModel.resolve() }
+    // ── Padding the tab content needs to leave for the overlaid bottom bar ────
+    val systemBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val totalNavBarHeight = MapNavBarHeight + systemBottomInset
+    val nonMapContentPadding = PaddingValues(bottom = totalNavBarHeight)
 
-            if (uiState.isLoading) {
-                // Minimal loading indicator during auth check
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        NavHost(
+            navController    = navController,
+            startDestination = startDestination,
+            modifier         = Modifier.fillMaxSize(),
+            enterTransition = {
+                if (isTabSwitch(initialState.destination.route, targetState.destination.route)) {
+                    // Tab ↔ tab: tabs are siblings, not a stack — a quick fade
+                    // feels instant without being abrupt.
+                    fadeIn(animationSpec = tween(durationMillis = TAB_FADE_DURATION))
+                } else {
+                    slideInHorizontally(
+                        initialOffsetX = { fullWidth -> fullWidth },
+                        animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut)
+                    ) + fadeIn(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
                 }
-            } else {
-                LaunchedEffect(uiState) {
-                    val target = when {
-                        !uiState.onboardingComplete -> Screen.Onboarding.route
-                        !uiState.isLoggedIn         -> Screen.Login.route
-                        !uiState.isEmailVerified    -> Screen.EmailVerification.route
-                        !uiState.isProfileComplete  -> Screen.CompleteProfile.route
-                        else                        -> Screen.Main.route
+            },
+            exitTransition = {
+                if (isTabSwitch(initialState.destination.route, targetState.destination.route)) {
+                    fadeOut(animationSpec = tween(durationMillis = TAB_FADE_DURATION))
+                } else {
+                    slideOutHorizontally(
+                        targetOffsetX = { fullWidth -> -fullWidth / 4 },
+                        animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut)
+                    ) + fadeOut(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
+                }
+            },
+            popEnterTransition = {
+                if (isTabSwitch(initialState.destination.route, targetState.destination.route)) {
+                    fadeIn(animationSpec = tween(durationMillis = TAB_FADE_DURATION))
+                } else {
+                    slideInHorizontally(
+                        initialOffsetX = { fullWidth -> -fullWidth / 4 },
+                        animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut)
+                    ) + fadeIn(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
+                }
+            },
+            popExitTransition = {
+                if (isTabSwitch(initialState.destination.route, targetState.destination.route)) {
+                    fadeOut(animationSpec = tween(durationMillis = TAB_FADE_DURATION))
+                } else {
+                    slideOutHorizontally(
+                        targetOffsetX = { fullWidth -> fullWidth },
+                        animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut)
+                    ) + fadeOut(animationSpec = tween(durationMillis = NAV_ANIM_DURATION, easing = EaseInOut))
+                }
+            }
+        ) {
+            // ── Gatekeeper (auth resolver) ────────────────────────────────────
+            composable(
+                Screen.Gatekeeper.route,
+                enterTransition = { fadeIn(tween(0)) },
+                exitTransition  = { fadeOut(tween(300)) }
+            ) {
+                val viewModel: AuthGatekeeperViewModel = hiltViewModel()
+                val uiState by viewModel.uiState.collectAsState()
+
+                LaunchedEffect(Unit) { viewModel.resolve() }
+
+                if (uiState.isLoading) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
                     }
-                    navController.navigate(target) {
-                        popUpTo(Screen.Gatekeeper.route) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                    if (target == Screen.Main.route && deepLinkRoute != null) {
-                        navigateToDeepLink(navController, deepLinkRoute)
+                } else {
+                    LaunchedEffect(uiState) {
+                        val target = when {
+                            !uiState.onboardingComplete -> Screen.Onboarding.route
+                            !uiState.isLoggedIn         -> Screen.Login.route
+                            !uiState.isEmailVerified    -> Screen.EmailVerification.route
+                            !uiState.isProfileComplete  -> Screen.CompleteProfile.route
+                            else                        -> Screen.MapTab.route
+                        }
+                        navController.navigate(target) {
+                            popUpTo(Screen.Gatekeeper.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                        if (target == Screen.MapTab.route && deepLinkRoute != null) {
+                            navigateToDeepLink(navController, deepLinkRoute)
+                        }
                     }
                 }
             }
-        }
 
-        // ── Onboarding ────────────────────────────────────────────────────────
-        composable(
-            Screen.Onboarding.route,
-            enterTransition = { fadeIn(tween(400)) },
-            exitTransition  = { fadeOut(tween(300)) }
-        ) {
-            OnboardingScreen(
-                onFinish = {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(Screen.Onboarding.route) { inclusive = true }
-                        launchSingleTop = true
+            // ── Onboarding ────────────────────────────────────────────────────
+            composable(
+                Screen.Onboarding.route,
+                enterTransition = { fadeIn(tween(400)) },
+                exitTransition  = { fadeOut(tween(300)) }
+            ) {
+                OnboardingScreen(
+                    onFinish = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(Screen.Onboarding.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
                     }
-                }
-            )
-        }
+                )
+            }
 
-        // ── Login ─────────────────────────────────────────────────────────────
-        composable(Screen.Login.route) {
-            LoginScreen(
-                onNavigateToSignUp = {
-                    navController.navigate(Screen.SignUp.route) {
-                        launchSingleTop = true
+            // ── Login ─────────────────────────────────────────────────────────
+            composable(Screen.Login.route) {
+                LoginScreen(
+                    onNavigateToSignUp = {
+                        navController.navigate(Screen.SignUp.route) { launchSingleTop = true }
+                    },
+                    onLoginSuccess = {
+                        navController.navigate(Screen.MapTab.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                        if (deepLinkRoute != null) {
+                            navigateToDeepLink(navController, deepLinkRoute)
+                        }
+                    },
+                    onNavigateToEmailVerification = {
+                        navController.navigate(Screen.EmailVerification.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToCompleteProfile = {
+                        navController.navigate(Screen.CompleteProfile.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToForgotPassword = {
+                        navController.navigate(Screen.ForgotPassword.route) {
+                            launchSingleTop = true
+                        }
                     }
-                },
-                onLoginSuccess = {
-                    navController.navigate(Screen.Main.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                    if (deepLinkRoute != null) {
-                        navigateToDeepLink(navController, deepLinkRoute)
-                    }
-                },
-                onNavigateToEmailVerification = {
-                    navController.navigate(Screen.EmailVerification.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToCompleteProfile = {
-                    navController.navigate(Screen.CompleteProfile.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToForgotPassword = {
-                    navController.navigate(Screen.ForgotPassword.route) {
-                        launchSingleTop = true
-                    }
-                }
-            )
-        }
+                )
+            }
 
-        // ── Sign Up ───────────────────────────────────────────────────────────
-        composable(Screen.SignUp.route) {
-            SignUpScreen(
-                onNavigateToLogin = { navController.popBackStack() },
-                onNavigateToEmailVerification = {
-                    navController.navigate(Screen.EmailVerification.route) {
-                        popUpTo(Screen.SignUp.route) { inclusive = true }
-                        launchSingleTop = true
+            composable(Screen.SignUp.route) {
+                SignUpScreen(
+                    onNavigateToLogin = { navController.popBackStack() },
+                    onNavigateToEmailVerification = {
+                        navController.navigate(Screen.EmailVerification.route) {
+                            popUpTo(Screen.SignUp.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
                     }
-                }
-            )
-        }
+                )
+            }
 
-        // ── Forgot Password ───────────────────────────────────────────────────
-        composable(Screen.ForgotPassword.route) {
-            ForgotPasswordScreen(onNavigateBack = { navController.popBackStack() })
-        }
+            composable(Screen.ForgotPassword.route) {
+                ForgotPasswordScreen(onNavigateBack = { navController.popBackStack() })
+            }
 
-        // ── Email Verification (blocking gate) ────────────────────────────────
-        composable(Screen.EmailVerification.route) {
-            EmailVerificationScreen(
-                onVerified = {
-                    // Route through gatekeeper to check profile completeness
-                    navController.navigate(Screen.Gatekeeper.route) {
-                        popUpTo(0) { inclusive = true }
-                        launchSingleTop = true
+            composable(Screen.EmailVerification.route) {
+                EmailVerificationScreen(
+                    onVerified = {
+                        navController.navigate(Screen.Gatekeeper.route) {
+                            popUpTo(0) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                    onSignOut = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) { inclusive = true }
+                            launchSingleTop = true
+                        }
                     }
-                },
-                onSignOut = {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(0) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                }
-            )
-        }
+                )
+            }
 
-        // ── Complete Profile (blocking gate for Google sign-in) ────────────────
-        composable(Screen.CompleteProfile.route) {
-            CompleteProfileScreen(
-                onProfileComplete = {
-                    navController.navigate(Screen.Main.route) {
-                        popUpTo(Screen.CompleteProfile.route) { inclusive = true }
-                        launchSingleTop = true
+            composable(Screen.CompleteProfile.route) {
+                CompleteProfileScreen(
+                    onProfileComplete = {
+                        navController.navigate(Screen.MapTab.route) {
+                            popUpTo(Screen.CompleteProfile.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
                     }
-                }
-            )
-        }
+                )
+            }
 
-        // ── Main scaffold (bottom tabs) ───────────────────────────────────────
-        composable(
-            Screen.Main.route,
-            enterTransition = { fadeIn(tween(400)) },
-            exitTransition  = { fadeOut(tween(300)) }
-        ) {
-            MainScaffold(
-                onNavigateToChat = { convId ->
-                    navController.navigate(Screen.Chat.createRoute(convId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToUserProfile = { userId ->
-                    navController.navigate(Screen.UserProfile.createRoute(userId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToGroupDetails = { groupId ->
-                    navController.navigate(Screen.GroupInfo.createRoute(groupId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToGroupMap = { groupId ->
-                    navController.navigate(Screen.GroupMap.createRoute(groupId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToCreateGroup = {
-                    navController.navigate(Screen.CreateGroup.route) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToJoinGroup = {
-                    navController.navigate(Screen.JoinGroup.route) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToNewMessage = {
-                    navController.navigate(Screen.NewMessage.route) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToFriendRequests = {
-                    navController.navigate(Screen.FriendRequests.route) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToSearch = { source ->
-                    navController.navigate(Screen.Search.createRoute(source)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToEditProfile = {
-                    navController.navigate(Screen.EditProfile.route) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToSettings = {
-                    navController.navigate(Screen.Settings.route) {
-                        launchSingleTop = true
-                    }
-                },
-                onLogout = {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(0) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                }
-            )
-        }
+            // ── Bottom-tab destinations ───────────────────────────────────────
+            // Each is a sibling of every other top-level destination. When the
+            // user taps a tab, navigate(...) with `popUpTo(MapTab) { saveState }`
+            // and `restoreState = true` — Compose Navigation handles tab state
+            // preservation for free.
 
-        // ── Edit Profile ──────────────────────────────────────────────────────
-        composable(Screen.EditProfile.route) {
-            EditProfileScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
+            composable(Screen.MapTab.route) {
+                GlobalMapScreen(
+                    onNavigateToChat = { convId ->
+                        navController.navigate(Screen.Chat.createRoute(convId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToUserProfile = { userId ->
+                        navController.navigate(Screen.UserProfile.createRoute(userId)) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
 
-        // ── My Profile (standalone, accessible from group members) ────────────
-        composable(Screen.MyProfile.route) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                com.ovi.where.presentation.profile.ProfileScreen(
+            composable(Screen.ChatsTab.route) {
+                ChatsScreen(
+                    contentPadding = nonMapContentPadding,
+                    onNavigateToChat = { convId ->
+                        navController.navigate(Screen.Chat.createRoute(convId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToNewMessage = {
+                        navController.navigate(Screen.NewMessage.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToSearch = {
+                        navController.navigate(Screen.Search.createRoute("chats")) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
+            composable(Screen.PeopleTab.route) {
+                PeopleScreen(
+                    contentPadding = nonMapContentPadding,
+                    onNavigateToUserProfile = { userId ->
+                        navController.navigate(Screen.UserProfile.createRoute(userId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToChat = { convId ->
+                        navController.navigate(Screen.Chat.createRoute(convId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToFriendRequests = {
+                        navController.navigate(Screen.FriendRequests.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToSearch = {
+                        navController.navigate(Screen.Search.createRoute("people")) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
+            composable(Screen.ProfileTab.route) {
+                ProfileScreen(
+                    contentPadding = nonMapContentPadding,
                     onNavigateToEditProfile = {
-                        navController.navigate(Screen.EditProfile.route) { launchSingleTop = true }
+                        navController.navigate(Screen.EditProfile.route) {
+                            launchSingleTop = true
+                        }
                     },
                     onNavigateToSettings = {
-                        navController.navigate(Screen.Settings.route) { launchSingleTop = true }
+                        navController.navigate(Screen.Settings.route) {
+                            launchSingleTop = true
+                        }
                     },
-                    onNavigateToMessages = { navController.popBackStack() },
-                    onNavigateToGroups = { navController.popBackStack() },
-                    onNavigateToLocationSharing = { navController.popBackStack() },
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 48.dp)
+                    onNavigateToMessages = {
+                        navController.navigateToTab(Screen.ChatsTab.route)
+                    },
+                    onNavigateToGroups = {
+                        navController.navigateToTab(Screen.PeopleTab.route)
+                    },
+                    onNavigateToLocationSharing = {
+                        navController.navigateToTab(Screen.MapTab.route)
+                    }
                 )
-                androidx.compose.material3.IconButton(
-                    onClick = { navController.popBackStack() },
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .statusBarsPadding()
-                        .padding(start = 4.dp, top = 4.dp)
-                ) {
-                    androidx.compose.material3.Icon(
-                        imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface
+            }
+
+            // ── Edit Profile ──────────────────────────────────────────────────
+            composable(Screen.EditProfile.route) {
+                EditProfileScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.MyProfile.route) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    ProfileScreen(
+                        onNavigateToEditProfile = {
+                            navController.navigate(Screen.EditProfile.route) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onNavigateToSettings = {
+                            navController.navigate(Screen.Settings.route) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onNavigateToMessages = { navController.popBackStack() },
+                        onNavigateToGroups = { navController.popBackStack() },
+                        onNavigateToLocationSharing = { navController.popBackStack() },
+                        contentPadding = PaddingValues(top = 48.dp)
                     )
+                    androidx.compose.material3.IconButton(
+                        onClick = { navController.popBackStack() },
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .statusBarsPadding()
+                            .padding(start = 4.dp, top = 4.dp)
+                    ) {
+                        androidx.compose.material3.Icon(
+                            imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
+            }
+
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onSignOut = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToNotificationPreferences = {
+                        navController.navigate(Screen.NotificationPreferences.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToAppearance = {
+                        navController.navigate(Screen.Appearance.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToDataStorage = {
+                        navController.navigate(Screen.DataStorage.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToSecurity = {
+                        navController.navigate(Screen.Security.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToPrivacy = {
+                        navController.navigate(Screen.Privacy.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToHelp = {
+                        navController.navigate(Screen.Help.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToAbout = {
+                        navController.navigate(Screen.About.route) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
+            composable(Screen.NotificationPreferences.route) {
+                NotificationPreferencesScreen(onNavigateBack = { navController.popBackStack() })
+            }
+            composable(Screen.Appearance.route) {
+                AppearanceScreen(onNavigateBack = { navController.popBackStack() })
+            }
+            composable(Screen.DataStorage.route) {
+                DataStorageScreen(onNavigateBack = { navController.popBackStack() })
+            }
+            composable(Screen.Security.route) {
+                SecurityScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToOnboarding = {
+                        navController.navigate(Screen.Onboarding.route) {
+                            popUpTo(0) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+            composable(Screen.Privacy.route) {
+                PrivacyScreen(onNavigateBack = { navController.popBackStack() })
+            }
+            composable(Screen.Help.route) {
+                HelpScreen(onNavigateBack = { navController.popBackStack() })
+            }
+            composable(Screen.About.route) {
+                AboutScreen(onNavigateBack = { navController.popBackStack() })
+            }
+
+            // ── Chat ──────────────────────────────────────────────────────────
+            composable(
+                route     = Screen.Chat.ROUTE,
+                arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
+            ) { back ->
+                val conversationId = back.arguments?.getString("conversationId") ?: return@composable
+                val searchTrigger = back.savedStateHandle.get<Boolean>("activate_search") ?: false
+                if (searchTrigger) {
+                    back.savedStateHandle["activate_search"] = false
+                }
+
+                ChatScreen(
+                    conversationId       = conversationId,
+                    startInSearchMode    = searchTrigger,
+                    onNavigateBack       = { navController.popBackStack() },
+                    onNavigateToUserProfile = { userId ->
+                        navController.navigate(Screen.UserProfile.createRoute(userId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToGroupInfo = { groupId ->
+                        navController.navigate(Screen.GroupInfo.createRoute(groupId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToGroupMap = { groupId ->
+                        navController.navigate(Screen.GroupMap.createRoute(groupId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToGlobalMap = {
+                        // Single-NavController win: just navigate to the Map
+                        // tab. popUpTo + saveState/restoreState gives us tab
+                        // state preservation and a clean back stack.
+                        navController.navigateToTab(Screen.MapTab.route)
+                    },
+                    onNavigateToConversationInfo = { convId ->
+                        navController.navigate(Screen.ConversationInfo.createRoute(convId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToChat = { convId ->
+                        navController.navigate(Screen.Chat.createRoute(convId)) {
+                            popUpTo(Screen.Chat.ROUTE) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
+            composable(
+                route     = Screen.ConversationInfo.ROUTE,
+                arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
+            ) { back ->
+                val conversationId = back.arguments?.getString("conversationId") ?: return@composable
+                ConversationInfoScreen(
+                    onNavigateBack         = { navController.popBackStack() },
+                    onNavigateToMediaGallery = {
+                        navController.navigate(Screen.MediaGallery.createRoute(conversationId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToUserProfile = { userId ->
+                        navController.navigate(Screen.UserProfile.createRoute(userId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToChat = {
+                        navController.previousBackStackEntry?.savedStateHandle?.set("activate_search", true)
+                        navController.popBackStack()
+                    },
+                    onNavigateToNicknames = {
+                        navController.navigate(Screen.Nicknames.createRoute(conversationId)) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
+            composable(
+                route     = Screen.Nicknames.ROUTE,
+                arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
+            ) {
+                NicknamesScreen(onNavigateBack = { navController.popBackStack() })
+            }
+
+            composable(
+                route     = Screen.AddGroupMembers.ROUTE,
+                arguments = listOf(navArgument("groupId") { type = NavType.StringType })
+            ) { back ->
+                val groupId = back.arguments?.getString("groupId") ?: return@composable
+                com.ovi.where.presentation.group.AddGroupMembersScreen(
+                    groupId = groupId,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                route     = Screen.GroupMembers.ROUTE,
+                arguments = listOf(navArgument("groupId") { type = NavType.StringType })
+            ) { back ->
+                val groupId = back.arguments?.getString("groupId") ?: return@composable
+                com.ovi.where.presentation.group.GroupMembersScreen(
+                    groupId = groupId,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToAddMembers = {
+                        navController.navigate(Screen.AddGroupMembers.createRoute(groupId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToUserProfile = { userId ->
+                        navController.navigate(Screen.UserProfile.createRoute(userId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToProfile = {
+                        navController.navigate(Screen.MyProfile.route) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
+            composable(
+                route     = "group_nicknames/{groupId}",
+                arguments = listOf(navArgument("groupId") { type = NavType.StringType })
+            ) { back ->
+                val groupId = back.arguments?.getString("groupId") ?: return@composable
+                com.ovi.where.presentation.group.GroupNicknamesScreen(
+                    groupId = groupId,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                route     = Screen.GroupInfo.ROUTE,
+                arguments = listOf(navArgument("groupId") { type = NavType.StringType })
+            ) { back ->
+                val groupId = back.arguments?.getString("groupId") ?: return@composable
+                GroupInfoScreen(
+                    onNavigateBack         = { navController.popBackStack() },
+                    onNavigateToMediaGallery = {
+                        navController.navigate(Screen.MediaGallery.createRoute(groupId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToAddMembers = {
+                        navController.navigate(Screen.AddGroupMembers.createRoute(groupId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToMembers = {
+                        navController.navigate(Screen.GroupMembers.createRoute(groupId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToNicknames = {
+                        navController.navigate("group_nicknames/$groupId") {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToSearch = {
+                        navController.previousBackStackEntry?.savedStateHandle?.set("activate_search", true)
+                        navController.popBackStack()
+                    },
+                    onNavigateToGroupMap = {
+                        navController.navigate(Screen.GroupMap.createRoute(groupId)) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
+            composable(
+                route     = Screen.UserProfile.ROUTE,
+                arguments = listOf(navArgument("userId") { type = NavType.StringType })
+            ) { back ->
+                val userId = back.arguments?.getString("userId") ?: return@composable
+                UserProfileScreen(
+                    userId         = userId,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToChat = { convId ->
+                        navController.navigate(Screen.Chat.createRoute(convId)) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
+            composable(Screen.FriendRequests.route) {
+                FriendRequestsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToUserProfile = { userId ->
+                        navController.navigate(Screen.UserProfile.createRoute(userId)) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
+            composable(
+                route = Screen.Search.ROUTE,
+                arguments = listOf(navArgument("source") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val source = backStackEntry.arguments?.getString("source") ?: "people"
+                SearchScreen(
+                    source = source,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToUserProfile = { userId ->
+                        navController.navigate(Screen.UserProfile.createRoute(userId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToChat = { conversationId ->
+                        navController.navigate(Screen.Chat.createRoute(conversationId)) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
+            // ── Group Map (legacy redirect) ───────────────────────────────────
+            composable(
+                route     = Screen.GroupMap.ROUTE,
+                arguments = listOf(navArgument("groupId") { type = NavType.StringType })
+            ) {
+                LaunchedEffect(Unit) {
+                    navController.navigateToTab(Screen.MapTab.route)
+                }
+            }
+
+            composable(Screen.CreateGroup.route) {
+                CreateGroupScreen(
+                    onNavigateBack  = { navController.popBackStack() },
+                    onGroupCreated  = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.JoinGroup.route) {
+                JoinGroupScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onGroupJoined  = {
+                        navController.navigateToTab(Screen.MapTab.route)
+                    }
+                )
+            }
+
+            composable(Screen.NewMessage.route) {
+                NewMessageScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToNewChat = {
+                        navController.navigate(Screen.Search.createRoute("chats")) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToCreateGroup = {
+                        navController.navigate(Screen.CreateGroup.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToJoinGroup = {
+                        navController.navigate(Screen.JoinGroup.route) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
+            composable(
+                route     = Screen.MediaGallery.ROUTE,
+                arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
+            ) {
+                MediaGalleryScreen(onNavigateBack = { navController.popBackStack() })
             }
         }
 
-        // ── Settings ──────────────────────────────────────────────────────────
-        composable(Screen.Settings.route) {
-            SettingsScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onSignOut = {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(0) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToNotificationPreferences = {
-                    navController.navigate(Screen.NotificationPreferences.route) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToAppearance = {
-                    navController.navigate(Screen.Appearance.route) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToDataStorage = {
-                    navController.navigate(Screen.DataStorage.route) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToSecurity = {
-                    navController.navigate(Screen.Security.route) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToPrivacy = {
-                    navController.navigate(Screen.Privacy.route) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToHelp = {
-                    navController.navigate(Screen.Help.route) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToAbout = {
-                    navController.navigate(Screen.About.route) {
-                        launchSingleTop = true
-                    }
-                }
-            )
-        }
-
-        // ── Notification Preferences ──────────────────────────────────────────
-        composable(Screen.NotificationPreferences.route) {
-            NotificationPreferencesScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        // ── Appearance ────────────────────────────────────────────────────────
-        composable(Screen.Appearance.route) {
-            AppearanceScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        // ── Data & Storage ────────────────────────────────────────────────────
-        composable(Screen.DataStorage.route) {
-            DataStorageScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        // ── Security ──────────────────────────────────────────────────────────
-        composable(Screen.Security.route) {
-            SecurityScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToOnboarding = {
-                    navController.navigate(Screen.Onboarding.route) {
-                        popUpTo(0) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                }
-            )
-        }
-
-        // ── Privacy ───────────────────────────────────────────────────────────
-        composable(Screen.Privacy.route) {
-            PrivacyScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        // ── Help & Support ────────────────────────────────────────────────────
-        composable(Screen.Help.route) {
-            HelpScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        // ── About ─────────────────────────────────────────────────────────────
-        composable(Screen.About.route) {
-            AboutScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        // ── Chat ──────────────────────────────────────────────────────────────
-        composable(
-            route     = Screen.Chat.ROUTE,
-            arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
-        ) { back ->
-            val conversationId = back.arguments?.getString("conversationId") ?: return@composable
-
-            // Observe search trigger from ConversationInfo screen
-            val searchTrigger = back.savedStateHandle.get<Boolean>("activate_search") ?: false
-            if (searchTrigger) {
-                back.savedStateHandle["activate_search"] = false
-            }
-
-            ChatScreen(
-                conversationId       = conversationId,
-                startInSearchMode    = searchTrigger,
-                onNavigateBack       = { navController.popBackStack() },
-                onNavigateToUserProfile = { userId ->
-                    navController.navigate(Screen.UserProfile.createRoute(userId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToGroupInfo = { groupId ->
-                    navController.navigate(Screen.GroupInfo.createRoute(groupId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToGroupMap = { groupId ->
-                    navController.navigate(Screen.GroupMap.createRoute(groupId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToConversationInfo = { convId ->
-                    navController.navigate(Screen.ConversationInfo.createRoute(convId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToChat = { convId ->
-                    navController.navigate(Screen.Chat.createRoute(convId)) {
-                        popUpTo(Screen.Chat.ROUTE) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                }
-            )
-        }
-
-        // ── Conversation Info (DM info screen) ────────────────────────────────
-        composable(
-            route     = Screen.ConversationInfo.ROUTE,
-            arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
-        ) { back ->
-            val conversationId = back.arguments?.getString("conversationId") ?: return@composable
-            ConversationInfoScreen(
-                onNavigateBack         = { navController.popBackStack() },
-                onNavigateToMediaGallery = {
-                    navController.navigate(Screen.MediaGallery.createRoute(conversationId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToUserProfile = { userId ->
-                    navController.navigate(Screen.UserProfile.createRoute(userId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToChat = {
-                    // Set result to trigger search mode in ChatScreen
-                    navController.previousBackStackEntry?.savedStateHandle?.set("activate_search", true)
-                    navController.popBackStack()
-                },
-                onNavigateToNicknames = {
-                    navController.navigate(Screen.Nicknames.createRoute(conversationId)) {
-                        launchSingleTop = true
-                    }
-                }
-            )
-        }
-
-        // ── Nicknames ─────────────────────────────────────────────────────────
-        composable(
-            route     = Screen.Nicknames.ROUTE,
-            arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
-        ) { back ->
-            val conversationId = back.arguments?.getString("conversationId") ?: return@composable
-            NicknamesScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        // ── Add Group Members ─────────────────────────────────────────────────
-        composable(
-            route     = Screen.AddGroupMembers.ROUTE,
-            arguments = listOf(navArgument("groupId") { type = NavType.StringType })
-        ) { back ->
-            val groupId = back.arguments?.getString("groupId") ?: return@composable
-            com.ovi.where.presentation.group.AddGroupMembersScreen(
-                groupId = groupId,
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        // ── Group Members ─────────────────────────────────────────────────────
-        composable(
-            route     = Screen.GroupMembers.ROUTE,
-            arguments = listOf(navArgument("groupId") { type = NavType.StringType })
-        ) { back ->
-            val groupId = back.arguments?.getString("groupId") ?: return@composable
-            com.ovi.where.presentation.group.GroupMembersScreen(
-                groupId = groupId,
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToAddMembers = {
-                    navController.navigate(Screen.AddGroupMembers.createRoute(groupId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToUserProfile = { userId ->
-                    navController.navigate(Screen.UserProfile.createRoute(userId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToProfile = {
-                    navController.navigate(Screen.MyProfile.route) {
-                        launchSingleTop = true
-                    }
-                }
-            )
-        }
-
-        // ── Group Nicknames ───────────────────────────────────────────────────
-        composable(
-            route     = "group_nicknames/{groupId}",
-            arguments = listOf(navArgument("groupId") { type = NavType.StringType })
-        ) { back ->
-            val groupId = back.arguments?.getString("groupId") ?: return@composable
-            com.ovi.where.presentation.group.GroupNicknamesScreen(
-                groupId = groupId,
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        // ── Group Info (Group info screen) ────────────────────────────────────
-        composable(
-            route     = Screen.GroupInfo.ROUTE,
-            arguments = listOf(navArgument("groupId") { type = NavType.StringType })
-        ) { back ->
-            val groupId = back.arguments?.getString("groupId") ?: return@composable
-            GroupInfoScreen(
-                onNavigateBack         = { navController.popBackStack() },
-                onNavigateToMediaGallery = {
-                    navController.navigate(Screen.MediaGallery.createRoute(groupId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToAddMembers = {
-                    navController.navigate(Screen.AddGroupMembers.createRoute(groupId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToMembers = {
-                    navController.navigate(Screen.GroupMembers.createRoute(groupId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToNicknames = {
-                    navController.navigate("group_nicknames/$groupId") {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToSearch = {
-                    navController.previousBackStackEntry?.savedStateHandle?.set("activate_search", true)
-                    navController.popBackStack()
-                },
-                onNavigateToGroupMap = {
-                    navController.navigate(Screen.GroupMap.createRoute(groupId)) {
-                        launchSingleTop = true
-                    }
-                }
-            )
-        }
-
-        // ── UserProfile ───────────────────────────────────────────────────────
-        composable(
-            route     = Screen.UserProfile.ROUTE,
-            arguments = listOf(navArgument("userId") { type = NavType.StringType })
-        ) { back ->
-            val userId = back.arguments?.getString("userId") ?: return@composable
-            UserProfileScreen(
-                userId         = userId,
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToChat = { convId ->
-                    navController.navigate(Screen.Chat.createRoute(convId)) {
-                        launchSingleTop = true
-                    }
-                }
-            )
-        }
-
-        // ── Friend Requests ───────────────────────────────────────────────────
-        composable(Screen.FriendRequests.route) {
-            FriendRequestsScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToUserProfile = { userId ->
-                    navController.navigate(Screen.UserProfile.createRoute(userId)) {
-                        launchSingleTop = true
-                    }
-                }
-            )
-        }
-
-        // ── Full-Screen Search (People / Chats) ──────────────────────────────
-        composable(
-            route = Screen.Search.ROUTE,
-            arguments = listOf(navArgument("source") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val source = backStackEntry.arguments?.getString("source") ?: "people"
-            SearchScreen(
-                source = source,
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToUserProfile = { userId ->
-                    navController.navigate(Screen.UserProfile.createRoute(userId)) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToChat = { conversationId ->
-                    navController.navigate(Screen.Chat.createRoute(conversationId)) {
-                        launchSingleTop = true
-                    }
-                }
-            )
-        }
-
-        // ── Group Map (REMOVED — redirects to Main Map tab) ────────────────────
-        // The Global Map with group filter handles this now.
-        // All navigations to GroupMap just pop back to the Map tab.
-        composable(
-            route     = Screen.GroupMap.ROUTE,
-            arguments = listOf(navArgument("groupId") { type = NavType.StringType })
-        ) {
-            // Redirect: pop back to main (Map tab is the start destination)
-            LaunchedEffect(Unit) {
-                navController.popBackStack(Screen.Main.route, inclusive = false)
-            }
-        }
-
-        // ── Create Group ──────────────────────────────────────────────────────
-        composable(Screen.CreateGroup.route) {
-            CreateGroupScreen(
-                onNavigateBack  = { navController.popBackStack() },
-                onGroupCreated  = { navController.popBackStack() }
-            )
-        }
-
-        // ── Join Group ────────────────────────────────────────────────────────
-        composable(Screen.JoinGroup.route) {
-            JoinGroupScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onGroupJoined  = { groupId ->
-                    // Navigate to main map tab instead of removed GroupMap
-                    navController.popBackStack(Screen.Main.route, inclusive = false)
-                }
-            )
-        }
-
-        // ── New Message ───────────────────────────────────────────────────────
-        composable(Screen.NewMessage.route) {
-            NewMessageScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToNewChat = {
-                    navController.navigate(Screen.Search.createRoute("chats")) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToCreateGroup = {
-                    navController.navigate(Screen.CreateGroup.route) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToJoinGroup = {
-                    navController.navigate(Screen.JoinGroup.route) {
-                        launchSingleTop = true
-                    }
-                }
-            )
-        }
-
-        // ── Media Gallery ─────────────────────────────────────────────────────
-        composable(
-            route     = Screen.MediaGallery.ROUTE,
-            arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
-        ) { back ->
-            val convId = back.arguments?.getString("conversationId") ?: return@composable
-            MediaGalleryScreen(
-                onNavigateBack = { navController.popBackStack() }
+        // ── Bottom bar overlay ───────────────────────────────────────────────
+        // Only renders on tab destinations. Centralising visibility here means
+        // every other top-level screen (Chat, Settings, etc.) automatically
+        // hides it without any per-screen plumbing.
+        if (showBottomBar) {
+            WhereBottomBar(
+                currentRoute = currentRoute,
+                onTabClick = { route -> navController.navigateToTab(route) },
+                modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
     }
 }
 
+/**
+ * Standard "select bottom tab" navigation, matching the NowInAndroid pattern.
+ *
+ * Anchors `popUpTo` at the graph's start destination so each tab's saved state
+ * is keyed by its own destination, not folded under another tab. With
+ * `saveState = true` + `restoreState = true`, Compose Navigation handles
+ * tab state preservation (scroll position, ViewModel state) automatically.
+ */
+internal fun NavHostController.navigateToTab(route: String) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) {
+            saveState = true
+        }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
+
 // ── Deep-link router ──────────────────────────────────────────────────────────
 
-/**
- * Parses a plain route string (e.g. "chat/CONV_ID", "friend_requests") and
- * navigates to the corresponding destination in the back stack.
- *
- * Registered deep link URI patterns (scheme "where://"):
- *   - chat/{id}           → Chat screen
- *   - user_profile/{id}   → UserProfile screen
- *   - group_details/{id}  → GroupDetails screen
- *   - group_map/{id}      → GroupMap screen
- *   - friend_requests     → FriendRequests screen
- *
- * **Authentication gatekeeper**: This function is only called AFTER the
- * [AuthGatekeeperViewModel] resolves successfully and the user reaches the
- * Main screen. Deep links received before auth completes are held in
- * [deepLinkRoute] parameter or [DeepLinkManager.pending] and processed
- * only after navigation to Main.
- *
- * **Unrecognized URIs**: Any route that does not match the registered patterns
- * is silently discarded (no crash, no navigation change).
- */
 internal fun navigateToDeepLink(navController: NavHostController, route: String) {
     val segments = route.split("/")
     when {
@@ -824,8 +865,7 @@ internal fun navigateToDeepLink(navController: NavHostController, route: String)
             }
         }
         else -> {
-            // Unrecognized deep link URI — discard silently without crashing.
-            // Other navigation operations continue to function normally.
+            // Unrecognized deep link URI — discard silently.
         }
     }
 }

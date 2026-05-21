@@ -174,10 +174,15 @@ class GlobalMapViewModel @Inject constructor(
         }
     }
 
-    /** Auto-locate user on first launch (like Google Maps). */
+    /**
+     * Silent auto-locate on ViewModel init (and when the user returns to the
+     * Map tab after the previous instance was cleared). Updates the marker
+     * position but does **not** request a camera move — otherwise every tab
+     * return would visibly zoom from the saved-state camera to the live fix.
+     */
     private fun autoLocateOnLaunch() {
         viewModelScope.launch {
-            locateMe()
+            locateMeInternal(moveCamera = false)
         }
     }
 
@@ -753,20 +758,28 @@ class GlobalMapViewModel @Inject constructor(
         }
     }
 
-    @Suppress("MissingPermission")
+    /** Public entry point — user-initiated (FAB tap, permission grant). Animates the camera. */
     fun locateMe() {
-        viewModelScope.launch {
-            locationManager.getCurrentLocation()?.let { loc ->
-                _uiState.value = _uiState.value.copy(
-                    myLatitude = loc.latitude,
-                    myLongitude = loc.longitude,
-                    hasMyLocation = true,
-                    requestCameraMove = true
-                )
-                // Persist for next cold start so the map opens here even
-                // if location services are off then.
-                userPreferences.saveLastKnownLocation(loc.latitude, loc.longitude)
-            }
+        viewModelScope.launch { locateMeInternal(moveCamera = true) }
+    }
+
+    /**
+     * Shared implementation. [moveCamera] controls whether we set
+     * `requestCameraMove = true` — only the user-initiated path should,
+     * so silent re-locates after tab navigation don't visibly snap.
+     */
+    @Suppress("MissingPermission")
+    private suspend fun locateMeInternal(moveCamera: Boolean) {
+        locationManager.getCurrentLocation()?.let { loc ->
+            _uiState.value = _uiState.value.copy(
+                myLatitude = loc.latitude,
+                myLongitude = loc.longitude,
+                hasMyLocation = true,
+                requestCameraMove = moveCamera || _uiState.value.requestCameraMove
+            )
+            // Persist for next cold start so the map opens here even
+            // if location services are off then.
+            userPreferences.saveLastKnownLocation(loc.latitude, loc.longitude)
         }
     }
 

@@ -1,17 +1,8 @@
 package com.ovi.where.presentation.navigation
 
 import androidx.annotation.DrawableRes
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
@@ -23,7 +14,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -31,176 +21,71 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.ovi.where.R
-import com.ovi.where.presentation.chat.ChatsScreen
-import com.ovi.where.presentation.map.GlobalMapScreen
-import com.ovi.where.presentation.map.MapNavBarHeight
-import com.ovi.where.presentation.people.PeopleScreen
-import com.ovi.where.presentation.profile.ProfileScreen
 
-private sealed class BottomTab(
+/**
+ * Bottom-tab definition. Routes match the [Screen] tab destinations so the
+ * bar can compare against `currentBackStackEntry.destination.route` directly.
+ */
+internal sealed class BottomTab(
     val route: String,
     @DrawableRes val selectedIconResId: Int,
     @DrawableRes val unselectedIconResId: Int,
     val label: String
 ) {
     object Map : BottomTab(
-        route = "tab_map",
+        route = Screen.MapTab.route,
         selectedIconResId = R.drawable.map_filled,
         unselectedIconResId = R.drawable.map_outlined,
         label = "Map"
     )
 
     object Chats : BottomTab(
-        route = "tab_chats",
+        route = Screen.ChatsTab.route,
         selectedIconResId = R.drawable.chat_filled,
         unselectedIconResId = R.drawable.chat_outlined,
         label = "Chats"
     )
 
     object People : BottomTab(
-        route = "tab_people",
+        route = Screen.PeopleTab.route,
         selectedIconResId = R.drawable.people_filled,
         unselectedIconResId = R.drawable.people_outlined,
         label = "People"
     )
 
     object Profile : BottomTab(
-        route = "tab_profile",
+        route = Screen.ProfileTab.route,
         selectedIconResId = R.drawable.profile_filled,
         unselectedIconResId = R.drawable.profile_outlined,
         label = "Profile"
     )
 }
 
-private val bottomTabs = listOf(BottomTab.Map, BottomTab.Chats, BottomTab.People, BottomTab.Profile)
+private val bottomTabs = listOf(
+    BottomTab.Map,
+    BottomTab.Chats,
+    BottomTab.People,
+    BottomTab.Profile
+)
 
+/**
+ * Bottom navigation bar overlaid on top of the main NavHost. Renders only
+ * when the current destination is one of the tab routes (gated by the caller
+ * in [AppNavGraph]). The Profile tab swaps its icon for the user's avatar.
+ */
 @Composable
-fun MainScaffold(
-    onNavigateToChat: (String) -> Unit,
-    onNavigateToUserProfile: (String) -> Unit,
-    onNavigateToGroupDetails: (String) -> Unit,
-    onNavigateToGroupMap: (String) -> Unit,
-    onNavigateToCreateGroup: () -> Unit,
-    onNavigateToJoinGroup: () -> Unit,
-    onNavigateToNewMessage: () -> Unit,
-    onNavigateToFriendRequests: () -> Unit,
-    onNavigateToSearch: (String) -> Unit,
-    onNavigateToEditProfile: () -> Unit,
-    onNavigateToSettings: () -> Unit,
-    onLogout: () -> Unit,
+internal fun WhereBottomBar(
+    currentRoute: String?,
+    onTabClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
     viewModel: MainScaffoldViewModel = hiltViewModel()
 ) {
-    val bottomNavController = rememberNavController()
-    val navBackStackEntry by bottomNavController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
     val profilePhotoUrl by viewModel.profilePhotoUrl.collectAsState()
 
-    // Total nav bar height = NavigationBar content (80dp) + system bottom inset.
-    // GlobalMapScreen reads MapNavBarHeight to offset its sheet peek correctly.
-    val systemBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val totalNavBarHeight = MapNavBarHeight + systemBottomInset
-    val nonMapContentPadding = PaddingValues(bottom = totalNavBarHeight)
-
-    // Google Maps style: map is full-screen behind everything.
-    // Bottom nav and bottom sheet are overlaid on top.
-    Box(modifier = Modifier.fillMaxSize()) {
-        NavHost(
-            navController = bottomNavController,
-            startDestination = BottomTab.Map.route,
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
-            enterTransition = { fadeIn(tween(200)) },
-            exitTransition = { fadeOut(tween(200)) }
-        ) {
-            composable(BottomTab.Map.route) {
-                // Map fills the full screen behind the nav bar.
-                // GlobalMapScreen handles its own sheet/FAB layout.
-                GlobalMapScreen(
-                    onNavigateToChat = onNavigateToChat,
-                    onNavigateToUserProfile = onNavigateToUserProfile
-                )
-            }
-            composable(BottomTab.Chats.route) {
-                ChatsScreen(
-                    contentPadding = nonMapContentPadding,
-                    onNavigateToChat = onNavigateToChat,
-                    onNavigateToNewMessage = onNavigateToNewMessage,
-                    onNavigateToSearch = { onNavigateToSearch("chats") }
-                )
-            }
-            composable(BottomTab.People.route) {
-                PeopleScreen(
-                    contentPadding = nonMapContentPadding,
-                    onNavigateToUserProfile = onNavigateToUserProfile,
-                    onNavigateToChat = onNavigateToChat,
-                    onNavigateToFriendRequests = onNavigateToFriendRequests,
-                    onNavigateToSearch = { onNavigateToSearch("people") }
-                )
-            }
-            composable(BottomTab.Profile.route) {
-                ProfileScreen(
-                    onNavigateToEditProfile = onNavigateToEditProfile,
-                    onNavigateToSettings = onNavigateToSettings,
-                    contentPadding = nonMapContentPadding,
-                    onNavigateToMessages = {
-                        bottomNavController.navigate(BottomTab.Chats.route) {
-                            popUpTo(BottomTab.Map.route) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                    onNavigateToGroups = {
-                        bottomNavController.navigate(BottomTab.People.route) {
-                            popUpTo(BottomTab.Map.route) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                    onNavigateToLocationSharing = {
-                        bottomNavController.navigate(BottomTab.Map.route) {
-                            popUpTo(BottomTab.Map.route) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-                )
-            }
-        }
-
-        // Overlaid bottom nav (Google Maps style)
-        WhereBottomBar(
-            currentRoute = currentRoute,
-            profilePhotoUrl = profilePhotoUrl,
-            onTabClick = { tab ->
-                if (currentRoute != tab.route) {
-                    bottomNavController.navigate(tab.route) {
-                        popUpTo(BottomTab.Map.route) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
-            },
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
-    }
-}
-
-@Composable
-private fun WhereBottomBar(
-    currentRoute: String?,
-    profilePhotoUrl: String?,
-    onTabClick: (BottomTab) -> Unit,
-    modifier: Modifier = Modifier
-) {
     NavigationBar(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.surface,
@@ -210,19 +95,16 @@ private fun WhereBottomBar(
             val selected = currentRoute == tab.route
             NavigationBarItem(
                 selected = selected,
-                onClick = { onTabClick(tab) },
+                onClick = { onTabClick(tab.route) },
                 icon = {
                     if (tab == BottomTab.Profile && !profilePhotoUrl.isNullOrEmpty()) {
-                        val selectedBorderModifier =
-                            if (selected) {
-                                Modifier.border(
-                                    width = 2.dp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    shape = CircleShape
-                                )
-                            } else {
-                                Modifier
-                            }
+                        val borderModifier = if (selected) {
+                            Modifier.border(
+                                width = 2.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = CircleShape
+                            )
+                        } else Modifier
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)
                                 .data(profilePhotoUrl)
@@ -239,11 +121,10 @@ private fun WhereBottomBar(
                                 .size(24.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .then(selectedBorderModifier)
+                                .then(borderModifier)
                         )
                     } else {
-                        val iconResId =
-                            if (selected) tab.selectedIconResId else tab.unselectedIconResId
+                        val iconResId = if (selected) tab.selectedIconResId else tab.unselectedIconResId
                         Icon(
                             painter = painterResource(id = iconResId),
                             contentDescription = tab.label,

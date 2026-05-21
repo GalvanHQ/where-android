@@ -119,6 +119,7 @@ fun ChatScreen(
     onNavigateToUserProfile: (String) -> Unit = {},
     onNavigateToGroupInfo: (String) -> Unit = {},
     onNavigateToGroupMap: (String) -> Unit = {},
+    onNavigateToGlobalMap: () -> Unit = {},
     onNavigateToConversationInfo: (String) -> Unit = {},
     onNavigateToChat: (String) -> Unit = {},
     viewModel: ChatViewModel = hiltViewModel()
@@ -556,7 +557,12 @@ fun ChatScreen(
                     val onLocationTap = remember {
                         {
                             val gId = uiState.conversation?.groupId
-                            if (gId != null) onNavigateToGroupMap(gId)
+                            if (gId != null) {
+                                onNavigateToGroupMap(gId)
+                            } else {
+                                // DM — open the global map where this friend's pin lives.
+                                onNavigateToGlobalMap()
+                            }
                         }
                     }
                     val isGroupConversation = uiState.conversation?.groupId != null
@@ -928,14 +934,16 @@ fun ChatScreen(
             if (groupId != null) {
                 onNavigateToGroupMap(groupId)
             } else {
-                onNavigateBack()
+                // Direct chat — there's no group-scoped map, so open the
+                // global map (Map bottom tab) where this friend's pin lives.
+                onNavigateToGlobalMap()
             }
         },
         onDismiss = { viewModel.dismissLiveMeetupSheet() }
     )
 
     // ── Location Share Bottom Sheet ───────────────────────────────────────────
-    if (uiState.locationBottomSheetState != com.ovi.where.presentation.chat.LocationBottomSheetState.HIDDEN) {
+    if (uiState.locationBottomSheetState != LocationBottomSheetState.HIDDEN) {
         var showInfiniteConfirm by remember { mutableStateOf(false) }
 
         androidx.compose.material3.ModalBottomSheet(

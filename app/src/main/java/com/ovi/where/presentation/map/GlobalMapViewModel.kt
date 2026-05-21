@@ -151,16 +151,25 @@ class GlobalMapViewModel @Inject constructor(
         observeRepoSharingState()
     }
 
-    /** Loads the last-known camera position from DataStore for instant map render. */
+    /**
+     * Loads the last-known user location from DataStore so the map camera can
+     * open near the user immediately — even if location services are currently
+     * off. Always flips [GlobalMapUiState.cameraRestored] once the read finishes
+     * (regardless of whether a saved coord exists), unblocking GoogleMap composition.
+     */
     private fun restoreLastCameraPosition() {
         viewModelScope.launch {
-            val saved = userPreferences.getLastCameraPosition()
-            if (saved != null) {
-                _uiState.value = _uiState.value.copy(
+            val saved = userPreferences.getLastKnownLocation()
+            _uiState.value = if (saved != null) {
+                _uiState.value.copy(
                     initialCameraLat = saved.first,
                     initialCameraLng = saved.second,
-                    initialCameraZoom = saved.third
+                    initialCameraZoom = 14f,
+                    cameraRestored = true
                 )
+            } else {
+                // First-ever launch — leave (0,0) zoom 2 default.
+                _uiState.value.copy(cameraRestored = true)
             }
         }
     }
@@ -754,18 +763,9 @@ class GlobalMapViewModel @Inject constructor(
                     hasMyLocation = true,
                     requestCameraMove = true
                 )
-            }
-        }
-    }
-
-    /**
-     * Called when the app goes to background (onStop). Saves the current camera
-     * position once so the next cold start renders instantly. No repeated writes.
-     */
-    fun saveCameraPosition(lat: Double, lng: Double, zoom: Float) {
-        viewModelScope.launch {
-            if (lat != 0.0 && lng != 0.0) {
-                userPreferences.saveLastCameraPosition(lat, lng, zoom)
+                // Persist for next cold start so the map opens here even
+                // if location services are off then.
+                userPreferences.saveLastKnownLocation(loc.latitude, loc.longitude)
             }
         }
     }
@@ -898,6 +898,12 @@ data class GlobalMapUiState(
     val error: String? = null,
     /** Whether the initial auto-zoom to fit all friends has already fired. */
     val hasAutoZoomed: Boolean = false,
+    /**
+     * True once [restoreLastCameraPosition] has finished reading DataStore.
+     * The map waits for this before composing GoogleMap so the saved camera
+     * position is the very first frame (no jump from (0,0) when location is off).
+     */
+    val cameraRestored: Boolean = false,
     /** Monotonic counter to break StateFlow structural equality on timeAgo refresh. */
     val timeAgoTick: Long = 0L
 )

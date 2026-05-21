@@ -187,7 +187,7 @@ fun GlobalMapScreen(
     }
 
     val cameraPositionState = rememberCameraPositionState {
-        // Start at last-known position for instant map render (cached tiles load immediately).
+        // Seeded from the user's last-known GPS coords (persisted in DataStore).
         // Falls back to (0,0) zoom 2 on first-ever launch.
         position = CameraPosition.fromLatLngZoom(
             LatLng(uiState.initialCameraLat, uiState.initialCameraLng),
@@ -195,18 +195,20 @@ fun GlobalMapScreen(
         )
     }
 
-    // Save camera position once when the screen goes to background (ON_STOP).
-    // Single write per session — no repeated DataStore writes during use.
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
-                val pos = cameraPositionState.position
-                viewModel.saveCameraPosition(pos.target.latitude, pos.target.longitude, pos.zoom)
-            }
+    // The ViewModel reads last-known coords from DataStore asynchronously, so the
+    // remember lambda above usually runs with defaults still in place. Once the
+    // read finishes, snap the camera to the restored position. We also gate
+    // GoogleMap composition on `cameraRestored` below, so the map's first frame
+    // is always the correct one — even when location services are off.
+    LaunchedEffect(uiState.cameraRestored) {
+        if (uiState.cameraRestored &&
+            (uiState.initialCameraLat != 0.0 || uiState.initialCameraLng != 0.0)
+        ) {
+            cameraPositionState.position = CameraPosition.fromLatLngZoom(
+                LatLng(uiState.initialCameraLat, uiState.initialCameraLng),
+                uiState.initialCameraZoom
+            )
         }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // ── Permission launcher ───────────────────────────────────────────────────
@@ -526,6 +528,12 @@ fun GlobalMapScreen(
         // so they sit above the sheet peek and bottom nav.
         Box(modifier = Modifier.fillMaxSize()) {
             // ── Map (full screen — behind sheet, nav bar, and FABs) ───────────
+            // Wait for the saved camera position to load from DataStore before
+            // composing the map. This is a few-ms delay (invisible to the user)
+            // and guarantees the very first frame is the correct location.
+            // Without this gate, GoogleMap composes at (0,0) zoom 2 and stays
+            // there if location is off (no live fix to override it).
+            if (uiState.cameraRestored) {
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
@@ -656,6 +664,7 @@ fun GlobalMapScreen(
                         )
                     }
                 }
+            }
             }
 
 

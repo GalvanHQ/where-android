@@ -32,10 +32,10 @@ class UserPreferences @Inject constructor(
         val LAST_SHARE_TARGET_ID = stringPreferencesKey("last_share_target_id")
         val LAST_SHARE_TARGET_NAME = stringPreferencesKey("last_share_target_name")
         val LAST_SHARE_DURATION = longPreferencesKey("last_share_duration")
-        // Last-known camera position (instant map load)
-        val LAST_CAMERA_LAT = stringPreferencesKey("last_camera_lat")
-        val LAST_CAMERA_LNG = stringPreferencesKey("last_camera_lng")
-        val LAST_CAMERA_ZOOM = stringPreferencesKey("last_camera_zoom")
+        // Last-known user GPS coords — used to seed the map camera on cold start
+        // so the map opens near the user even when location services are off.
+        val LAST_KNOWN_LAT = stringPreferencesKey("last_known_lat")
+        val LAST_KNOWN_LNG = stringPreferencesKey("last_known_lng")
     }
 
     val userId: Flow<String?> = dataStore.data.map { preferences ->
@@ -151,24 +151,22 @@ class UserPreferences @Inject constructor(
         }
     }
 
-    // ── Last-known camera position (instant map load) ─────────────────────────
+    // ── Last-known user location (seeds map camera on cold start) ────────────
 
-    /** Returns (lat, lng, zoom) or null if never saved. */
-    suspend fun getLastCameraPosition(): Triple<Double, Double, Float>? {
+    /** Returns (lat, lng) of the most recent successful GPS fix, or null if never saved. */
+    suspend fun getLastKnownLocation(): Pair<Double, Double>? {
         val prefs = dataStore.data.map { p ->
-            val lat = p[Keys.LAST_CAMERA_LAT]?.toDoubleOrNull()
-            val lng = p[Keys.LAST_CAMERA_LNG]?.toDoubleOrNull()
-            val zoom = p[Keys.LAST_CAMERA_ZOOM]?.toFloatOrNull()
-            if (lat != null && lng != null && zoom != null) Triple(lat, lng, zoom) else null
+            val lat = p[Keys.LAST_KNOWN_LAT]?.toDoubleOrNull()
+            val lng = p[Keys.LAST_KNOWN_LNG]?.toDoubleOrNull()
+            if (lat != null && lng != null) lat to lng else null
         }
         return prefs.first()
     }
 
-    suspend fun saveLastCameraPosition(lat: Double, lng: Double, zoom: Float) {
+    suspend fun saveLastKnownLocation(lat: Double, lng: Double) {
         dataStore.edit { prefs ->
-            prefs[Keys.LAST_CAMERA_LAT] = lat.toString()
-            prefs[Keys.LAST_CAMERA_LNG] = lng.toString()
-            prefs[Keys.LAST_CAMERA_ZOOM] = zoom.toString()
+            prefs[Keys.LAST_KNOWN_LAT] = lat.toString()
+            prefs[Keys.LAST_KNOWN_LNG] = lng.toString()
         }
     }
 

@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEmotions
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonAdd
@@ -136,7 +135,6 @@ fun GroupInfoScreen(
         onNavigateToMembers = onNavigateToMembers,
         onNavigateToNicknames = onNavigateToNicknames,
         onNavigateToSearch = onNavigateToSearch,
-        onNavigateToGroupMap = onNavigateToGroupMap,
         onRetry = { viewModel.retry() },
         onToggleMute = { viewModel.toggleMute() },
         onLeaveGroup = { viewModel.leaveGroup { onNavigateBack() } },
@@ -165,7 +163,6 @@ internal fun GroupInfoScreenContent(
     onNavigateToMembers: () -> Unit = {},
     onNavigateToNicknames: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
-    onNavigateToGroupMap: () -> Unit = {},
     onRetry: () -> Unit,
     onToggleMute: () -> Unit,
     onLeaveGroup: () -> Unit,
@@ -253,12 +250,10 @@ internal fun GroupInfoScreenContent(
 
                 // ── Action Button Row ────────────────────────────────────────
                 ActionButtonRow(
-                    isAdmin = uiState.isCurrentUserAdmin,
                     isMuted = uiState.isMuted,
                     onAddMembersTap = onNavigateToAddMembers,
                     onMuteTap = { showMuteDialog = true },
-                    onSearchTap = onNavigateToSearch,
-                    onMapTap = onNavigateToGroupMap
+                    onSearchTap = onNavigateToSearch
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -617,12 +612,10 @@ private fun GroupInfoHeader(
 
 @Composable
 private fun ActionButtonRow(
-    isAdmin: Boolean,
     isMuted: Boolean,
     onAddMembersTap: () -> Unit,
     onMuteTap: () -> Unit,
-    onSearchTap: () -> Unit,
-    onMapTap: () -> Unit = {}
+    onSearchTap: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -630,19 +623,12 @@ private fun ActionButtonRow(
             .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        if (isAdmin) {
-            GroupInfoActionButton(
-                icon = Icons.Filled.PersonAdd,
-                label = "Add",
-                modifier = Modifier.weight(1f),
-                onClick = onAddMembersTap
-            )
-        }
+        // Any group member can invite others — admin gating removed.
         GroupInfoActionButton(
-            icon = Icons.Filled.Map,
-            label = "Map",
+            icon = Icons.Filled.PersonAdd,
+            label = "Add",
             modifier = Modifier.weight(1f),
-            onClick = onMapTap
+            onClick = onAddMembersTap
         )
         GroupInfoActionButton(
             icon = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,

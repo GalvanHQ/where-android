@@ -51,7 +51,6 @@ import com.ovi.where.presentation.model.GroupMemberUiModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GroupMembersScreen(
-    groupId: String,
     onNavigateBack: () -> Unit,
     onNavigateToAddMembers: () -> Unit,
     onNavigateToUserProfile: (String) -> Unit = {},
@@ -68,14 +67,14 @@ fun GroupMembersScreen(
                 title = "Members (${uiState.memberCount})",
                 onNavigateBack = onNavigateBack,
                 actions = {
-                    if (uiState.isCurrentUserAdmin) {
-                        IconButton(onClick = onNavigateToAddMembers) {
-                            Icon(
-                                Icons.Default.PersonAdd,
-                                contentDescription = "Add members",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
+                    // Any group member can invite others — admin gating removed
+                    // to match the action button in [GroupInfoScreen].
+                    IconButton(onClick = onNavigateToAddMembers) {
+                        Icon(
+                            Icons.Default.PersonAdd,
+                            contentDescription = "Add members",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             )

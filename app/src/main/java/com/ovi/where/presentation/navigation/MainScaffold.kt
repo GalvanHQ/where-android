@@ -126,8 +126,7 @@ fun MainScaffold(
                 // GlobalMapScreen handles its own sheet/FAB layout.
                 GlobalMapScreen(
                     onNavigateToChat = onNavigateToChat,
-                    onNavigateToUserProfile = onNavigateToUserProfile,
-                    onNavigateToGroupMap = onNavigateToGroupMap
+                    onNavigateToUserProfile = onNavigateToUserProfile
                 )
             }
             composable(BottomTab.Chats.route) {

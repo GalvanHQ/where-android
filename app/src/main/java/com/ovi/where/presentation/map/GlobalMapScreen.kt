@@ -9,11 +9,18 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -150,7 +157,6 @@ val MapNavBarHeight = 80.dp
 fun GlobalMapScreen(
     onNavigateToChat: (String) -> Unit = {},
     onNavigateToUserProfile: (String) -> Unit = {},
-    onNavigateToGroupMap: (String) -> Unit = {},
     viewModel: GlobalMapViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -349,7 +355,21 @@ fun GlobalMapScreen(
                 }
             }
 
-            when (sheetView) {
+            AnimatedContent(
+                targetState = sheetView,
+                transitionSpec = {
+                    val forward = targetState.ordinal > initialState.ordinal
+                    (slideInHorizontally(
+                        initialOffsetX = { fullWidth -> if (forward) fullWidth else -fullWidth },
+                        animationSpec = tween(300)
+                    ) togetherWith slideOutHorizontally(
+                        targetOffsetX = { fullWidth -> if (forward) -fullWidth else fullWidth },
+                        animationSpec = tween(300)
+                    )).using(SizeTransform(clip = true))
+                },
+                label = "sheetViewAnim"
+            ) { currentView ->
+                when (currentView) {
                 MapSheetView.FriendDetail -> {
                     val friend = uiState.selectedFriend
                     if (friend != null) {
@@ -463,6 +483,7 @@ fun GlobalMapScreen(
                         }
                     )
                 }
+                }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -486,10 +507,34 @@ fun GlobalMapScreen(
                     zoomControlsEnabled = false
                 )
             ) {
+                // ── Compute display positions (fan-out overlapping markers) ────
+                // When markers (me + friends) sit at the same spot, spread them out
+                // in a small circle around their centroid so all avatars are visible.
+                val validFriends = uiState.friendLocations.filter {
+                    it.latitude != 0.0 && it.longitude != 0.0
+                }
+                val displayPositions = remember(
+                    uiState.hasMyLocation,
+                    uiState.myLatitude,
+                    uiState.myLongitude,
+                    validFriends
+                ) {
+                    val all = mutableListOf<Pair<String, LatLng>>()
+                    if (uiState.hasMyLocation && uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
+                        all.add(MY_MARKER_KEY to LatLng(uiState.myLatitude, uiState.myLongitude))
+                    }
+                    validFriends.forEach {
+                        all.add(it.userId to LatLng(it.latitude, it.longitude))
+                    }
+                    fanOutOverlappingMarkers(all)
+                }
+
                 // ── My location marker (inside GoogleMap → sticks to LatLng) ──
                 if (uiState.hasMyLocation && uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
-                    val myMarkerState = remember(uiState.myLatitude, uiState.myLongitude) {
-                        MarkerState(position = LatLng(uiState.myLatitude, uiState.myLongitude))
+                    val myDisplayPos = displayPositions[MY_MARKER_KEY]
+                        ?: LatLng(uiState.myLatitude, uiState.myLongitude)
+                    val myMarkerState = remember(myDisplayPos.latitude, myDisplayPos.longitude) {
+                        MarkerState(position = myDisplayPos)
                     }
 
                     // Pre-load my profile bitmap for marker
@@ -531,13 +576,12 @@ fun GlobalMapScreen(
                 }
 
                 // ── Friend avatar markers (inside GoogleMap → sticks to LatLng) ──
-                val validFriends = uiState.friendLocations.filter {
-                    it.latitude != 0.0 && it.longitude != 0.0
-                }
                 validFriends.forEach { friend ->
+                    val friendDisplayPos = displayPositions[friend.userId]
+                        ?: LatLng(friend.latitude, friend.longitude)
                     val friendMarkerState =
-                        remember(friend.userId, friend.latitude, friend.longitude) {
-                            MarkerState(position = LatLng(friend.latitude, friend.longitude))
+                        remember(friend.userId, friendDisplayPos.latitude, friendDisplayPos.longitude) {
+                            MarkerState(position = friendDisplayPos)
                         }
 
                     // Pre-load friend avatar bitmap for marker
@@ -1100,27 +1144,42 @@ private fun HomeSheetContent(
 
         Spacer(Modifier.height(8.dp))
 
-        when (homeTab) {
-            MapHomeTab.Friends -> FriendsTabContent(
-                friends = friends,
-                myLatitude = myLatitude,
-                myLongitude = myLongitude,
-                hasMyLocation = hasMyLocation,
-                activeFilter = activeFilter,
-                bottomReservedSpace = bottomReservedSpace,
-                onFriendClick = onFriendClick,
-                onShowOnMap = onShowOnMap
-            )
-            MapHomeTab.MyShares -> MySharesTabContent(
-                sharingTargetIds = sharingTargetIds,
-                sharingTargetExpiries = sharingTargetExpiries,
-                groups = groups,
-                directTargets = directTargets,
-                bottomReservedSpace = bottomReservedSpace,
-                onAddShare = onAddShare,
-                onStopOne = onStopOne,
-                onStopAll = onStopAll
-            )
+        AnimatedContent(
+            targetState = homeTab,
+            transitionSpec = {
+                val forward = targetState.ordinal > initialState.ordinal
+                (slideInHorizontally(
+                    initialOffsetX = { fullWidth -> if (forward) fullWidth else -fullWidth },
+                    animationSpec = tween(250)
+                ) togetherWith slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> if (forward) -fullWidth else fullWidth },
+                    animationSpec = tween(250)
+                )).using(SizeTransform(clip = true))
+            },
+            label = "homeTabAnim"
+        ) { currentTab ->
+            when (currentTab) {
+                MapHomeTab.Friends -> FriendsTabContent(
+                    friends = friends,
+                    myLatitude = myLatitude,
+                    myLongitude = myLongitude,
+                    hasMyLocation = hasMyLocation,
+                    activeFilter = activeFilter,
+                    bottomReservedSpace = bottomReservedSpace,
+                    onFriendClick = onFriendClick,
+                    onShowOnMap = onShowOnMap
+                )
+                MapHomeTab.MyShares -> MySharesTabContent(
+                    sharingTargetIds = sharingTargetIds,
+                    sharingTargetExpiries = sharingTargetExpiries,
+                    groups = groups,
+                    directTargets = directTargets,
+                    bottomReservedSpace = bottomReservedSpace,
+                    onAddShare = onAddShare,
+                    onStopOne = onStopOne,
+                    onStopAll = onStopAll
+                )
+            }
         }
     }
 }
@@ -1194,53 +1253,63 @@ private fun FriendsTabContent(
     onFriendClick: (FriendLocationUiModel) -> Unit,
     onShowOnMap: (FriendLocationUiModel) -> Unit
 ) {
-    if (friends.isEmpty()) {
-        TabEmptyState(
-            icon = Icons.Default.LocationOff,
-            title = "No friends sharing",
-            subtitle = if (activeFilter != null)
-                "No one in ${activeFilter.name} is sharing live location."
-            else "When friends share their location, they'll appear here.",
-            bottomReservedSpace = bottomReservedSpace
-        )
-        return
-    }
-
-    // Horizontal avatar row at top, then full vertical list of cards
-    Spacer(Modifier.height(4.dp))
-    androidx.compose.foundation.lazy.LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        items(items = friends, key = { "avatar-${it.userId}" }) { friend ->
-            FriendAvatarPeek(friend = friend, onClick = { onFriendClick(friend) })
-        }
-    }
-
-    Spacer(Modifier.height(12.dp))
-    androidx.compose.material3.HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 20.dp),
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-    )
-
-    LazyColumn(
-        contentPadding = PaddingValues(
-            start = 12.dp,
-            end = 12.dp,
-            top = 12.dp,
-            bottom = bottomReservedSpace + 16.dp
-        ),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(items = friends, key = { "card-${it.userId}" }) { friend ->
-            FriendCard(
-                friend = friend,
-                myLatitude = myLatitude,
-                myLongitude = myLongitude,
-                hasMyLocation = hasMyLocation,
-                onClick = { onFriendClick(friend) },
-                onShowOnMap = { onShowOnMap(friend) }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (friends.isEmpty()) {
+            TabEmptyState(
+                icon = Icons.Default.LocationOff,
+                title = "No friends sharing",
+                subtitle = if (activeFilter != null)
+                    "No one in ${activeFilter.name} is sharing live location."
+                else "When friends share their location, they'll appear here.",
+                bottomReservedSpace = bottomReservedSpace
             )
+            return@Column
+        }
+
+        // ── Section header ────────────────────────────────────────────────────────
+        Text(
+            text = "${friends.size} ${if (friends.size == 1) "friend is" else "friends are"} sharing their location with you",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+        )
+
+        Spacer(Modifier.height(4.dp))
+        androidx.compose.foundation.lazy.LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(items = friends, key = { "avatar-${it.userId}" }) { friend ->
+                FriendAvatarPeek(friend = friend, onClick = { onFriendClick(friend) })
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        androidx.compose.material3.HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        )
+
+        LazyColumn(
+            contentPadding = PaddingValues(
+                start = 12.dp,
+                end = 12.dp,
+                top = 12.dp,
+                bottom = bottomReservedSpace + 16.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(items = friends, key = { "card-${it.userId}" }) { friend ->
+                FriendCard(
+                    friend = friend,
+                    myLatitude = myLatitude,
+                    myLongitude = myLongitude,
+                    hasMyLocation = hasMyLocation,
+                    onClick = { onFriendClick(friend) },
+                    onShowOnMap = { onShowOnMap(friend) }
+                )
+            }
         }
     }
 }
@@ -1261,117 +1330,128 @@ private fun MySharesTabContent(
         allTargets[id] ?: GroupFilter(id = id, name = id, isDirect = id.startsWith("direct:"))
     }
 
-    if (active.isEmpty()) {
-        // Empty state with primary CTA to start sharing
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.LocationOn,
-                    null,
-                    modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-            Text(
-                "You're not sharing yet",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Pick friends or groups to share your live location with.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-            Spacer(Modifier.height(20.dp))
-            Button(
-                onClick = onAddShare,
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (active.isEmpty()) {
+            // Empty state with primary CTA to start sharing
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp),
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.LocationOn,
+                        null,
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "You're not sharing yet",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Pick friends or groups to share your live location with.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(20.dp))
+                Button(
+                    onClick = onAddShare,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Share location", fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.height(bottomReservedSpace))
+            }
+            return@Column
+        }
+
+        // ── Section header ────────────────────────────────────────────────────────
+        Text(
+            text = "You're sharing your live location with ${active.size} ${if (active.size == 1) "recipient" else "recipients"}",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+        )
+        Spacer(Modifier.height(4.dp))
+
+        LazyColumn(
+            contentPadding = PaddingValues(
+                start = 12.dp,
+                end = 12.dp,
+                top = 4.dp,
+                bottom = 12.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.heightIn(max = 380.dp)
+        ) {
+            items(active, key = { "active-${it.id}" }) { target ->
+                ActiveShareRow(
+                    target = target,
+                    expiry = sharingTargetExpiries[target.id],
+                    onStop = { onStopOne(target.id) }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Footer actions
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = onAddShare,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
                 shape = RoundedCornerShape(14.dp)
             ) {
-                Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(18.dp))
+                Icon(imageVector = ImageVector.vectorResource(id = R.drawable.location_arrow), null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Share location", fontWeight = FontWeight.Bold)
+                Text("Share more", style = MaterialTheme.typography.labelLarge)
             }
-            Spacer(Modifier.height(bottomReservedSpace))
+            Button(
+                onClick = onStopAll,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+            ) {
+                Icon(Icons.Rounded.Stop, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Stop all", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            }
         }
-        return
+        Spacer(Modifier.height(bottomReservedSpace))
     }
-
-    // Active list with per-target stop buttons + footer actions
-    LazyColumn(
-        contentPadding = PaddingValues(
-            start = 12.dp,
-            end = 12.dp,
-            top = 4.dp,
-            bottom = 12.dp
-        ),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier.heightIn(max = 380.dp)
-    ) {
-        items(active, key = { "active-${it.id}" }) { target ->
-            ActiveShareRow(
-                target = target,
-                expiry = sharingTargetExpiries[target.id],
-                onStop = { onStopOne(target.id) }
-            )
-        }
-    }
-
-    Spacer(Modifier.height(8.dp))
-
-    // Footer actions
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        OutlinedButton(
-            onClick = onAddShare,
-            modifier = Modifier
-                .weight(1f)
-                .height(48.dp),
-            shape = RoundedCornerShape(14.dp)
-        ) {
-            Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("Add more", style = MaterialTheme.typography.labelLarge)
-        }
-        Button(
-            onClick = onStopAll,
-            modifier = Modifier
-                .weight(1f)
-                .height(48.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.onErrorContainer
-            )
-        ) {
-            Icon(Icons.Rounded.Stop, null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("Stop all", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-        }
-    }
-    Spacer(Modifier.height(bottomReservedSpace))
 }
 
 @Composable
@@ -2843,6 +2923,78 @@ private fun MapStyleCard(
         }
     }
 }
+
+// ── Marker Fan-Out (prevents overlapping pins) ──────────────────────────────
+
+/** Key used for the user's own marker in the display-positions map. */
+private const val MY_MARKER_KEY = "__my_location__"
+
+/**
+ * When multiple markers sit within [CLUSTER_RADIUS_METERS] of each other,
+ * fans them out in a circle around their centroid so all avatars are visible.
+ * Markers that are far enough apart keep their original positions.
+ *
+ * @param markers list of (id → LatLng) pairs for all markers on the map.
+ * @return map of id → adjusted LatLng.
+ */
+private fun fanOutOverlappingMarkers(
+    markers: List<Pair<String, LatLng>>
+): Map<String, LatLng> {
+    if (markers.size <= 1) return markers.toMap()
+
+    val result = mutableMapOf<String, LatLng>()
+    val assigned = mutableSetOf<String>()
+
+    // Group markers into clusters: any marker within CLUSTER_RADIUS_METERS of another
+    // in the same cluster gets fanned out.
+    for (i in markers.indices) {
+        if (markers[i].first in assigned) continue
+
+        val cluster = mutableListOf(markers[i])
+        assigned.add(markers[i].first)
+
+        for (j in i + 1 until markers.size) {
+            if (markers[j].first in assigned) continue
+            val dist = FloatArray(1)
+            android.location.Location.distanceBetween(
+                markers[i].second.latitude, markers[i].second.longitude,
+                markers[j].second.latitude, markers[j].second.longitude,
+                dist
+            )
+            if (dist[0] < CLUSTER_RADIUS_METERS) {
+                cluster.add(markers[j])
+                assigned.add(markers[j].first)
+            }
+        }
+
+        if (cluster.size == 1) {
+            // No overlap — keep original position
+            result[cluster[0].first] = cluster[0].second
+        } else {
+            // Fan out around centroid
+            val centroidLat = cluster.sumOf { it.second.latitude } / cluster.size
+            val centroidLng = cluster.sumOf { it.second.longitude } / cluster.size
+            val angleStep = 360.0 / cluster.size
+            cluster.forEachIndexed { index, (id, _) ->
+                val angleDeg = angleStep * index
+                val angleRad = Math.toRadians(angleDeg)
+                // Offset by FAN_OUT_RADIUS_METERS in the given direction
+                // 1 degree latitude ≈ 111,320 meters
+                val latOffset = (FAN_OUT_RADIUS_METERS * kotlin.math.cos(angleRad)) / 111_320.0
+                val lngOffset = (FAN_OUT_RADIUS_METERS * kotlin.math.sin(angleRad)) /
+                    (111_320.0 * kotlin.math.cos(Math.toRadians(centroidLat)))
+                result[id] = LatLng(centroidLat + latOffset, centroidLng + lngOffset)
+            }
+        }
+    }
+    return result
+}
+
+/** Two markers within this distance (meters) are considered overlapping. */
+private const val CLUSTER_RADIUS_METERS = 15f
+
+/** How far (meters) to spread markers from the centroid when they overlap. */
+private const val FAN_OUT_RADIUS_METERS = 3.0
 
 // ── Premium Map Pin Marker ───────────────────────────────────────────────────
 

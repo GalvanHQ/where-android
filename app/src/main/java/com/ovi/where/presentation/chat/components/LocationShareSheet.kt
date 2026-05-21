@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.ShareLocation
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
@@ -360,7 +362,7 @@ private fun DurationChip(
 
 /**
  * Persistent banner shown below the chat header while live location sharing is active.
- * Shows "Sharing live location · Xh Ym" with a Stop button and pulsing indicator.
+ * Premium design: theme-colored with a linear countdown progress bar and compact stop button.
  */
 @Composable
 fun LiveLocationSharingBanner(
@@ -369,77 +371,76 @@ fun LiveLocationSharingBanner(
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "banner_pulse")
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 1f,
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1.15f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1000),
+            animation = tween(durationMillis = 900),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "banner_pulse_alpha"
+        label = "banner_pulse_scale"
     )
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = Color(0xFF4CAF50).copy(alpha = 0.08f),
-        tonalElevation = 0.dp
+        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+        tonalElevation = 1.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Pulsing green dot + location icon
-            Box(contentAlignment = Alignment.Center) {
-                // Pulsing ring
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF4CAF50).copy(alpha = pulseAlpha * 0.2f))
-                )
-                Icon(
-                    imageVector = Icons.Filled.ShareLocation,
-                    contentDescription = null,
-                    tint = Color(0xFF4CAF50),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
+            // Pulsing dot
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .scale(pulseScale)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.tertiary)
+            )
             Spacer(Modifier.width(10.dp))
+
+            // Status text
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Sharing live location",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    color = Color(0xFF4CAF50)
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
                 )
-                if (timeRemaining != null) {
-                    Text(
-                        text = "$timeRemaining remaining",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    Text(
-                        text = "Until you stop",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = if (timeRemaining != null) "$timeRemaining remaining" else "Until you stop",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
+                )
             }
+
+            // Stop button
             Surface(
                 onClick = onStop,
-                shape = RoundedCornerShape(8.dp),
-                color = Color(0xFFE53935).copy(alpha = 0.1f)
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
             ) {
-                Text(
-                    text = "Stop",
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = Color(0xFFE53935)
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Stop,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "Stop",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
     }

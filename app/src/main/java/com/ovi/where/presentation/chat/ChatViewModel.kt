@@ -1455,43 +1455,55 @@ class ChatViewModel @Inject constructor(
      * Requirements: 1.3, 1.11
      */
     private fun startLiveLocationSharing() {
-        val groupId = _uiState.value.conversation?.groupId ?: return
+        val conversation = _uiState.value.conversation ?: return
+        val targetId = conversation.groupId ?: "direct:${conversation.otherUserId}"
         val durationMinutes = _uiState.value.selectedDurationMinutes
 
         viewModelScope.launch {
-            // Dismiss bottom sheet within 300ms (Requirement 1.3)
+            // Dismiss bottom sheet immediately (responsive UX)
             _uiState.value = _uiState.value.copy(
                 locationBottomSheetState = LocationBottomSheetState.HIDDEN
             )
 
-            val result = startLocationSharingUseCase(groupId, durationMinutes)
+            // If already sharing with other targets, ADD this target to the session
+            // (preserving existing targets' expiries). Otherwise start fresh.
+            val alreadySharing = locationRepository.isSharingLocation()
+            val result = if (alreadySharing && targetId !in locationRepository.getSharingTargetIds()) {
+                locationRepository.addSharingTarget(targetId, durationMinutes)
+            } else {
+                startLocationSharingUseCase(targetId, durationMinutes)
+            }
 
             when (result) {
                 is Resource.Error -> {
-                    // Requirement 1.11: Show error, do not start service
                     _uiState.value = _uiState.value.copy(
                         liveLocationError = result.message ?: "Could not start location sharing"
                     )
                 }
                 is Resource.Success -> {
-                    // Start LocationTrackingService (Requirement 1.3)
+                    // Start/ensure the foreground service is running.
+                    // If it's already running (other targets active), this is a no-op
+                    // because the service uses START_STICKY and deduplicates.
                     val context = getApplication<Application>()
-                    val intent = LocationTrackingService.createStartIntent(
-                        context, durationMinutes
+                    context.startForegroundService(
+                        LocationTrackingService.createStartIntent(context, durationMinutes)
                     )
-                    context.startForegroundService(intent)
 
-                    // Insert live location message into conversation (Requirement 1.3)
-                    insertLiveLocationMessage(groupId, durationMinutes)
+                    // Insert live location message into conversation
+                    insertLiveLocationMessage(targetId, durationMinutes)
 
-                    // Start the persistent banner with countdown (Requirement 1.4)
-                    val expiresAt = clock() + durationMinutes * 60_000L
+                    // Show the persistent banner with THIS target's countdown
+                    val expiresAt = if (durationMinutes > 0) {
+                        clock() + durationMinutes * 60_000L
+                    } else null // continuous
                     _uiState.value = _uiState.value.copy(
                         isLiveLocationSharingActive = true,
                         liveLocationExpiresAt = expiresAt,
-                        liveLocationTimeRemaining = formatTimeRemaining(durationMinutes)
+                        liveLocationTimeRemaining = if (durationMinutes > 0) formatTimeRemaining(durationMinutes) else null
                     )
-                    startLocationSharingTimer(expiresAt)
+                    if (expiresAt != null) {
+                        startLocationSharingTimer(expiresAt)
+                    }
                 }
                 is Resource.Loading -> { /* no-op */ }
             }
@@ -1529,19 +1541,23 @@ class ChatViewModel @Inject constructor(
 
     /**
      * Called when the user taps "Stop" on the live location banner.
-     * Invokes StopLocationSharingUseCase and removes the banner within 300ms.
+     * Removes ONLY this conversation's target from the active session.
+     * The foreground service keeps running if other targets remain — it's the
+     * GlobalMapViewModel's ticker that stops the service when all targets expire.
      *
-     * Requirement 1.5: Invoke StopLocationSharingUseCase, remove banner within 300ms.
+     * This is the correct multi-target-aware approach: each screen only manages
+     * its own target, never kills the shared service.
      */
     fun stopLiveLocationSharing() {
-        val groupId = _uiState.value.conversation?.groupId ?: return
+        val conversation = _uiState.value.conversation ?: return
+        val targetId = conversation.groupId ?: "direct:${conversation.otherUserId}"
 
         viewModelScope.launch {
             // Remove this conversation's target from the active session.
             // If it's the last one, the repo stops the session entirely.
-            val result = stopLocationSharingUseCase(groupId)
+            val result = stopLocationSharingUseCase(targetId)
 
-            // Remove banner within 300ms regardless of result (Requirement 1.5)
+            // Remove banner immediately (responsive UX)
             _uiState.value = _uiState.value.copy(
                 isLiveLocationSharingActive = false,
                 liveLocationExpiresAt = null,
@@ -1550,10 +1566,13 @@ class ChatViewModel @Inject constructor(
             locationSharingTimerJob?.cancel()
             locationSharingTimerJob = null
 
-            // Stop the LocationTrackingService
-            val context = getApplication<Application>()
-            val intent = LocationTrackingService.createStopIntent(context)
-            context.startService(intent)
+            // Only stop the service if NO other targets remain.
+            // Check the repo's live state — if empty, the session is fully over.
+            val remainingTargets = locationRepository.getSharingTargetIds()
+            if (remainingTargets.isEmpty()) {
+                val context = getApplication<Application>()
+                context.startService(LocationTrackingService.createStopIntent(context))
+            }
 
             if (result is Resource.Error) {
                 _uiState.value = _uiState.value.copy(
@@ -1588,28 +1607,25 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Starts a timer that updates the timeRemaining every 60 seconds.
-     * Automatically stops when the session expires.
-     *
-     * Requirement 1.4: Update timeRemaining every 60 seconds.
-     * Requirement 1.9: Stop when session expires.
+     * Countdown timer for THIS conversation's sharing target.
+     * When the per-target expiry hits, removes the banner but does NOT stop the service
+     * (other targets may still be active — the map screen's ticker handles service lifecycle).
      */
     private fun startLocationSharingTimer(expiresAt: Long) {
         locationSharingTimerJob?.cancel()
+        if (expiresAt == Long.MAX_VALUE) return // Continuous — no countdown needed
+
         locationSharingTimerJob = viewModelScope.launch {
             while (true) {
                 val remainingMs = expiresAt - clock()
                 if (remainingMs <= 0) {
-                    // Session expired (Requirement 1.9)
+                    // This conversation's target expired — remove banner.
+                    // The repo's pruneExpired() + map ticker handle the actual cleanup.
                     _uiState.value = _uiState.value.copy(
                         isLiveLocationSharingActive = false,
                         liveLocationExpiresAt = null,
                         liveLocationTimeRemaining = null
                     )
-                    // Stop the service
-                    val context = getApplication<Application>()
-                    val intent = LocationTrackingService.createStopIntent(context)
-                    context.startService(intent)
                     break
                 }
                 val remainingMinutes = (remainingMs / 60_000L) + 1 // Round up
@@ -1655,6 +1671,7 @@ class ChatViewModel @Inject constructor(
         }
 
         // Check if user is currently sharing with this conversation's target.
+        // Uses per-target expiry (not global max) so the timer is accurate for THIS conversation.
         // This makes the banner appear even if sharing was started from the map screen.
         viewModelScope.launch {
             val conversation = _uiState.value.conversation ?: return@launch
@@ -1662,11 +1679,14 @@ class ChatViewModel @Inject constructor(
             val activeTargets = locationRepository.checkSharingStatus()
             val isSharingHere = targetId in activeTargets
             if (isSharingHere) {
-                val expiresAt = locationRepository.getSharingExpiryTime()
+                // Use the per-target expiry for THIS conversation, not the global max.
+                val targetExpiries = locationRepository.getTargetExpiries()
+                val thisExpiry = targetExpiries[targetId]
+                val expiresAt = if (thisExpiry == Long.MAX_VALUE) null else thisExpiry
                 _uiState.value = _uiState.value.copy(
                     isLiveLocationSharingActive = true,
                     liveLocationExpiresAt = expiresAt,
-                    liveLocationTimeRemaining = if (expiresAt != null && expiresAt != Long.MAX_VALUE) {
+                    liveLocationTimeRemaining = if (expiresAt != null) {
                         val remaining = (expiresAt - System.currentTimeMillis()) / 60_000L
                         if (remaining >= 60) "${remaining / 60}h ${remaining % 60}m"
                         else "${remaining}m"
@@ -1694,13 +1714,14 @@ class ChatViewModel @Inject constructor(
 
     /**
      * Computes the number of active location sharers in this conversation.
-     * Filters by groupId match and isSharingActive flag.
-     *
-     * Requirement 4.1, 4.3: Count active sharers for header display.
+     * Matches against both legacy targetId and the new targetIds list.
      */
     private fun computeActiveSharingCount(locations: List<SharedLocation>): Int {
-        val groupId = _uiState.value.conversation?.groupId ?: return 0
-        return locations.count { it.isSharingActive && it.groupId == groupId }
+        val conversation = _uiState.value.conversation ?: return 0
+        val targetId = conversation.groupId ?: "direct:${conversation.otherUserId}"
+        return locations.count { loc ->
+            loc.isSharingActive && (loc.groupId == targetId || targetId in loc.targetIds)
+        }
     }
 
     /**

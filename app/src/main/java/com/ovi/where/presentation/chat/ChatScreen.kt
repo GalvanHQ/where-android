@@ -4,6 +4,11 @@ import android.Manifest
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,16 +29,20 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,6 +58,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -450,7 +463,16 @@ fun ChatScreen(
             }
 
             // ── Mini Map Overlay ──────────────────────────────────────────────
-            // Slides down from top showing all active location sharers in this conversation.
+            // Auto-show when someone starts sharing in this conversation (once per session).
+            // After the user closes it, it stays closed until they manually re-open.
+            var hasAutoShownMiniMap by remember { mutableStateOf(false) }
+            LaunchedEffect(uiState.isOtherUserSharingLocation) {
+                if (uiState.isOtherUserSharingLocation && !uiState.showMiniMap && !hasAutoShownMiniMap) {
+                    hasAutoShownMiniMap = true
+                    viewModel.toggleMiniMap()
+                }
+            }
+
             MiniMapOverlay(
                 visible = uiState.showMiniMap,
                 locations = uiState.cachedLocations,
@@ -890,91 +912,161 @@ fun ChatScreen(
     }
 
     // ── Location Share Bottom Sheet ───────────────────────────────────────────
-    // Simplified: no target picker needed (target = this conversation).
-    // Just shows duration picker and starts sharing immediately.
     if (uiState.locationBottomSheetState != com.ovi.where.presentation.chat.LocationBottomSheetState.HIDDEN) {
         var showInfiniteConfirm by remember { mutableStateOf(false) }
 
         androidx.compose.material3.ModalBottomSheet(
             onDismissRequest = { viewModel.dismissLocationBottomSheet() },
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            containerColor = MaterialTheme.colorScheme.surface
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 2.dp
         ) {
-            // Duration picker content
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                shape = androidx.compose.foundation.shape.CircleShape
+                // ── Recipient context ─────────────────────────────────────────
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Animated location icon with pulse ring
+                    Box(contentAlignment = Alignment.Center) {
+                        val infiniteTransition = rememberInfiniteTransition(label = "loc_pulse")
+                        val ringScale by infiniteTransition.animateFloat(
+                            initialValue = 0.8f,
+                            targetValue = 1.3f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1200),
+                                repeatMode = RepeatMode.Reverse
                             ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Filled.LocationOn,
-                            contentDescription = null,
-                            modifier = Modifier.size(22.dp),
-                            tint = MaterialTheme.colorScheme.primary
+                            label = "ring_scale"
                         )
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .scale(ringScale)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.LocationOn,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
-                    Spacer(Modifier.width(12.dp))
-                    Column {
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "Share Live Location",
+                            "Share live location",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             "with ${uiState.conversation?.title ?: "this conversation"}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                // ── Info card ─────────────────────────────────────────────────
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Filled.Info,
+                            null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            "Your real-time location will be visible to everyone in this conversation for the selected duration.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                 }
 
                 Spacer(Modifier.height(20.dp))
 
+                // ── Duration selector ─────────────────────────────────────────
                 Text(
-                    "DURATION",
+                    "HOW LONG?",
                     style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     letterSpacing = 1.sp
                 )
                 Spacer(Modifier.height(10.dp))
 
-                // Duration chips
-                val durations = listOf(15L to "15 min", 60L to "1 hour", 240L to "4 hours", 0L to "Until I stop")
+                val durations = listOf(
+                    15L to "15 min",
+                    60L to "1 hour",
+                    240L to "4 hours",
+                    0L to "∞"
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     durations.forEach { (minutes, label) ->
-                        androidx.compose.material3.FilterChip(
-                            selected = uiState.selectedDurationMinutes == minutes,
+                        val selected = uiState.selectedDurationMinutes == minutes
+                        Surface(
                             onClick = {
                                 if (minutes == 0L) {
-                                    // "Until I stop" — confirm before selecting (no time limit)
                                     showInfiniteConfirm = true
                                 } else {
                                     viewModel.onDurationSelected(minutes)
                                 }
                             },
-                            label = { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp)
-                        )
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = if (selected) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurface
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
+                        }
                     }
                 }
 
                 Spacer(Modifier.height(24.dp))
 
-                // Start button
+                // ── Start button ──────────────────────────────────────────────
                 Button(
                     onClick = {
                         val hasPermission = context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
@@ -983,19 +1075,30 @@ fun ChatScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp),
-                    shape = RoundedCornerShape(14.dp)
+                        .height(54.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp
+                    )
                 ) {
                     Icon(Icons.Filled.LocationOn, null, Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Start Sharing", style = MaterialTheme.typography.labelLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "Start sharing",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(20.dp))
             }
         }
 
-        // ── Confirm "Until I stop" — explain the trade-offs before letting users pick it ──
+        // ── Confirm "Until I stop" ────────────────────────────────────────────
         if (showInfiniteConfirm) {
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { showInfiniteConfirm = false },
@@ -1011,7 +1114,7 @@ fun ChatScreen(
                     Text(
                         "Share until you stop?",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        fontWeight = FontWeight.Bold
                     )
                 },
                 text = {
@@ -1034,7 +1137,7 @@ fun ChatScreen(
                             showInfiniteConfirm = false
                         }
                     ) {
-                        Text("Use no time limit", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text("Use no time limit", fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {

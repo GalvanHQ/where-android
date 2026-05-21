@@ -57,10 +57,11 @@ import androidx.compose.ui.unit.sp
 /**
  * Premium chat input bar.
  *
- * Layout (collapsed):  [+] │ Message...  [🎤] │ [➤/👍]
+ * Layout (collapsed):  [+] [📍] │ Message...  [🎤] │ [➤/👍]
  * Layout (expanded):   [✕] [📷] [🖼️] [📍] │ Message...  [🎤] │ [➤/👍]
  *
- * - Plus expands inline to show Camera + Gallery + Location icons (no dropdown/popup)
+ * - Plus expands inline to show Camera + Gallery icons (no dropdown/popup)
+ * - Location button is always visible next to + for fast access
  * - Mic inside the pill for voice recording
  * - Right: Send (when typing) or Emoji shortcut (when set)
  */
@@ -82,6 +83,7 @@ fun ChatInputBar(
     onEmojiShortcutSend: () -> Unit = {},
     themeColor: Color? = null,
     mentionRanges: List<IntRange> = emptyList(),
+    isSharingLocation: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val hasText = text.isNotBlank()
@@ -108,7 +110,7 @@ fun ChatInputBar(
                 .padding(horizontal = 6.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // ── Left: Plus or expanded Camera+Gallery ────────────────
+            // ── Left: Plus or expanded Camera+Gallery, then Location pill ────────────────
             AnimatedContent(
                 targetState = expanded,
                 transitionSpec = {
@@ -149,27 +151,31 @@ fun ChatInputBar(
                         ) {
                             Icon(Icons.Filled.Image, "Gallery", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Spacer(Modifier.width(4.dp))
-                        IconButton(
-                            onClick = { expanded = false; onLocationTap() },
-                            modifier = Modifier.size(38.dp),
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                            )
-                        ) {
-                            Icon(Icons.Filled.LocationOn, "Location", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
                     }
                 } else {
-                    IconButton(
-                        onClick = { expanded = true },
-                        modifier = Modifier.size(42.dp),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    ) {
-                        Icon(Icons.Filled.Add, "Attach", Modifier.size(22.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { expanded = true },
+                            modifier = Modifier.size(42.dp),
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        ) {
+                            Icon(Icons.Filled.Add, "Attach", Modifier.size(22.dp))
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        // Standalone location button — opens live meetup sheet
+                        IconButton(
+                            onClick = onLocationTap,
+                            modifier = Modifier.size(42.dp).semantics { contentDescription = "Live location" },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = if (isSharingLocation) accent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = if (isSharingLocation) accent else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        ) {
+                            Icon(Icons.Filled.LocationOn, null, Modifier.size(22.dp))
+                        }
                     }
                 }
             }

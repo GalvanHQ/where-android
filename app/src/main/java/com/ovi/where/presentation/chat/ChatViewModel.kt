@@ -160,6 +160,7 @@ class ChatViewModel @Inject constructor(
             observeCachedLocations()
             observeOfflineState()
             observePresenceForOnlineCount()
+            observeRepoSharingState()
         }
     }
 
@@ -180,6 +181,7 @@ class ChatViewModel @Inject constructor(
         observeCachedLocations()
         observeOfflineState()
         observePresenceForOnlineCount()
+        observeRepoSharingState()
     }
 
     // ─── Message Observation and Initial Load (Task 6.1) ──────────────────────
@@ -1364,6 +1366,9 @@ class ChatViewModel @Inject constructor(
     /** Job for the countdown timer that updates timeRemaining every 60 seconds. */
     private var locationSharingTimerJob: Job? = null
 
+    /** Job that streams the user's current GPS location while sharing here. */
+    private var myLocationStreamJob: Job? = null
+
     /**
      * Called when the user taps the location button in the input bar.
      * Shows the location bottom sheet with options based on conversation type.
@@ -1378,6 +1383,53 @@ class ChatViewModel @Inject constructor(
             locationBottomSheetState = LocationBottomSheetState.OPTIONS,
             showLiveLocationOption = hasGroupId
         )
+    }
+
+    /**
+     * Opens the live meetup bottom sheet with the embedded map and duration picker.
+     * Used by the location button next to the + in the input bar, and by the
+     * sharing-avatars row in the chat header.
+     */
+    fun openLiveMeetupSheet() {
+        _uiState.value = _uiState.value.copy(
+            showLiveMeetupSheet = true,
+            // Reset duration to default so the picker opens with 1h selected.
+            selectedDurationMinutes = if (_uiState.value.isLiveLocationSharingActive)
+                _uiState.value.selectedDurationMinutes
+            else DEFAULT_LIVE_LOCATION_DURATION_MINUTES
+        )
+        // Start streaming the user's pin so they see themselves on the map
+        // alongside friends, even if they aren't sharing yet. Mirrors the
+        // global map's auto-locate-on-launch behavior.
+        if (myLocationStreamJob?.isActive != true) startMyLocationStream()
+    }
+
+    /** Dismisses the live meetup bottom sheet. */
+    fun dismissLiveMeetupSheet() {
+        _uiState.value = _uiState.value.copy(showLiveMeetupSheet = false)
+        // Stop the my-pin stream when the sheet closes — but ONLY if we
+        // aren't actively sharing (sharing keeps the stream running so the
+        // chat header avatars row reflects our live position).
+        if (!_uiState.value.isLiveLocationSharingActive) {
+            stopMyLocationStream()
+        }
+    }
+
+    /**
+     * Starts live location sharing from the live meetup sheet using the currently
+     * selected duration. Requests permission if needed; otherwise begins sharing
+     * and closes the sheet on success.
+     */
+    fun startSharingFromMeetupSheet(hasLocationPermission: Boolean) {
+        if (!hasLocationPermission) {
+            _uiState.value = _uiState.value.copy(liveLocationPermissionNeeded = true)
+            return
+        }
+        startLiveLocationSharing()
+        // Sheet will be dismissed by startLiveLocationSharing once the use case
+        // succeeds (it sets locationBottomSheetState = HIDDEN). Also hide our
+        // dedicated meetup sheet so the user lands back on the chat.
+        _uiState.value = _uiState.value.copy(showLiveMeetupSheet = false)
     }
 
     /**
@@ -1492,18 +1544,11 @@ class ChatViewModel @Inject constructor(
                     // Insert live location message into conversation
                     insertLiveLocationMessage(targetId, durationMinutes)
 
-                    // Show the persistent banner with THIS target's countdown
-                    val expiresAt = if (durationMinutes > 0) {
-                        clock() + durationMinutes * 60_000L
-                    } else null // continuous
-                    _uiState.value = _uiState.value.copy(
-                        isLiveLocationSharingActive = true,
-                        liveLocationExpiresAt = expiresAt,
-                        liveLocationTimeRemaining = if (durationMinutes > 0) formatTimeRemaining(durationMinutes) else null
-                    )
-                    if (expiresAt != null) {
-                        startLocationSharingTimer(expiresAt)
-                    }
+                    // The repo's activeSharingState flow drives the banner /
+                    // header pill / meetup sheet — no per-screen state set
+                    // here. Just nudge the my-pin stream so the user appears
+                    // on the chat map immediately.
+                    startMyLocationStream()
                 }
                 is Resource.Loading -> { /* no-op */ }
             }
@@ -1557,12 +1602,9 @@ class ChatViewModel @Inject constructor(
             // If it's the last one, the repo stops the session entirely.
             val result = stopLocationSharingUseCase(targetId)
 
-            // Remove banner immediately (responsive UX)
-            _uiState.value = _uiState.value.copy(
-                isLiveLocationSharingActive = false,
-                liveLocationExpiresAt = null,
-                liveLocationTimeRemaining = null
-            )
+            // The repo's activeSharingState flow will drop this target and the
+            // observer in observeRepoSharingState() updates the banner. No
+            // manual state set here — keeps chat & map locked to the same source.
             locationSharingTimerJob?.cancel()
             locationSharingTimerJob = null
 
@@ -1579,6 +1621,68 @@ class ChatViewModel @Inject constructor(
                     liveLocationError = result.message ?: "Could not stop location sharing"
                 )
             }
+            stopMyLocationStream()
+        }
+    }
+
+    /**
+     * Streams the current user's GPS location while sharing in this conversation,
+     * so the live meetup sheet can render the user's own pin alongside the friends'.
+     * Uses the existing FusedLocationClient via [LocationManager] so no extra
+     * battery cost — the foreground service is already running for sharing.
+     */
+    @Suppress("MissingPermission")
+    private fun startMyLocationStream() {
+        myLocationStreamJob?.cancel()
+        myLocationStreamJob = viewModelScope.launch {
+            try {
+                val uid = currentUserId ?: return@launch
+                val name = firebaseAuth.currentUser?.displayName ?: ""
+                val photo = firebaseAuth.currentUser?.photoUrl?.toString()
+                // Seed with last known location so the pin appears immediately.
+                runCatching { locationManager.getCurrentLocation() }.getOrNull()?.let { loc ->
+                    _uiState.value = _uiState.value.copy(
+                        myLiveLocation = SharedLocation(
+                            id = uid,
+                            userId = uid,
+                            latitude = loc.latitude,
+                            longitude = loc.longitude,
+                            accuracy = loc.accuracy,
+                            timestamp = System.currentTimeMillis(),
+                            isSharingActive = true,
+                            displayName = name,
+                            photoUrl = photo
+                        )
+                    )
+                }
+                // Stream subsequent updates.
+                locationManager.getLocationUpdates().collect { loc ->
+                    _uiState.value = _uiState.value.copy(
+                        myLiveLocation = SharedLocation(
+                            id = uid,
+                            userId = uid,
+                            latitude = loc.latitude,
+                            longitude = loc.longitude,
+                            accuracy = loc.accuracy,
+                            timestamp = System.currentTimeMillis(),
+                            isSharingActive = true,
+                            displayName = name,
+                            photoUrl = photo
+                        )
+                    )
+                }
+            } catch (_: Exception) {
+                // Permission revoked or transient error — silently drop the pin.
+                _uiState.value = _uiState.value.copy(myLiveLocation = null)
+            }
+        }
+    }
+
+    private fun stopMyLocationStream() {
+        myLocationStreamJob?.cancel()
+        myLocationStreamJob = null
+        if (_uiState.value.myLiveLocation != null) {
+            _uiState.value = _uiState.value.copy(myLiveLocation = null)
         }
     }
 
@@ -1589,14 +1693,6 @@ class ChatViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             locationBottomSheetState = LocationBottomSheetState.HIDDEN
         )
-    }
-
-    /**
-     * Toggles the mini-map overlay visibility on the chat screen.
-     * Shows active location sharers in this conversation on a compact map.
-     */
-    fun toggleMiniMap() {
-        _uiState.value = _uiState.value.copy(showMiniMap = !_uiState.value.showMiniMap)
     }
 
     /**
@@ -1612,29 +1708,10 @@ class ChatViewModel @Inject constructor(
      * (other targets may still be active — the map screen's ticker handles service lifecycle).
      */
     private fun startLocationSharingTimer(expiresAt: Long) {
-        locationSharingTimerJob?.cancel()
-        if (expiresAt == Long.MAX_VALUE) return // Continuous — no countdown needed
-
-        locationSharingTimerJob = viewModelScope.launch {
-            while (true) {
-                val remainingMs = expiresAt - clock()
-                if (remainingMs <= 0) {
-                    // This conversation's target expired — remove banner.
-                    // The repo's pruneExpired() + map ticker handle the actual cleanup.
-                    _uiState.value = _uiState.value.copy(
-                        isLiveLocationSharingActive = false,
-                        liveLocationExpiresAt = null,
-                        liveLocationTimeRemaining = null
-                    )
-                    break
-                }
-                val remainingMinutes = (remainingMs / 60_000L) + 1 // Round up
-                _uiState.value = _uiState.value.copy(
-                    liveLocationTimeRemaining = formatTimeRemaining(remainingMinutes)
-                )
-                delay(LOCATION_TIMER_UPDATE_INTERVAL_MS)
-            }
-        }
+        // No-op: replaced by observeRepoSharingState() which derives the
+        // remaining-time label from the unified repo flow. Kept as a private
+        // method so existing call sites stay valid; the function is now empty
+        // to avoid double timers / drift between chat and map.
     }
 
     fun markRead() {
@@ -1656,6 +1733,51 @@ class ChatViewModel @Inject constructor(
      * Requirement 7.3: Display cached locations within 100ms, subscribe to Socket.IO,
      * fall back to Firestore after 10s.
      */
+    /**
+     * Observes the repository's unified [activeSharingState] and derives this
+     * conversation's banner state from it. Eliminates the per-screen timer so
+     * the chat header pill and the map screen FAB countdown always match.
+     */
+    private fun observeRepoSharingState() {
+        viewModelScope.launch {
+            locationRepository.activeSharingState.collect { state ->
+                val conversation = _uiState.value.conversation
+                val targetId = conversation?.groupId
+                    ?: conversation?.otherUserId?.let { "direct:$it" }
+
+                // No active session at all → cheap exit, skip targetId lookup.
+                if (!state.isSharing || targetId == null) {
+                    _uiState.value = _uiState.value.copy(
+                        isLiveLocationSharingActive = false,
+                        liveLocationExpiresAt = null,
+                        liveLocationTimeRemaining = null
+                    )
+                    stopMyLocationStream()
+                    return@collect
+                }
+
+                val expiry = state.targetExpiries[targetId]
+                val isSharingHere = expiry != null
+                val timeRemaining = expiry?.let {
+                    com.ovi.where.presentation.common.SharingTimeFormatter
+                        .formatRemaining(it, state.nowMs)
+                }
+
+                _uiState.value = _uiState.value.copy(
+                    isLiveLocationSharingActive = isSharingHere,
+                    liveLocationExpiresAt = expiry?.takeIf { it != Long.MAX_VALUE },
+                    liveLocationTimeRemaining = timeRemaining
+                )
+
+                if (isSharingHere) {
+                    if (myLocationStreamJob?.isActive != true) startMyLocationStream()
+                } else {
+                    stopMyLocationStream()
+                }
+            }
+        }
+    }
+
     private fun observeCachedLocations() {
         // Immediately serve cached locations from Room (within 100ms)
         viewModelScope.launch {
@@ -1670,30 +1792,12 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // Check if user is currently sharing with this conversation's target.
-        // Uses per-target expiry (not global max) so the timer is accurate for THIS conversation.
-        // This makes the banner appear even if sharing was started from the map screen.
+        // The repo's activeSharingState (observed by observeRepoSharingState)
+        // is the single source of truth for sharing status. We still kick a
+        // checkSharingStatus() to populate the in-memory session from Firestore
+        // on cold start so the flow has accurate data immediately.
         viewModelScope.launch {
-            val conversation = _uiState.value.conversation ?: return@launch
-            val targetId = conversation.groupId ?: "direct:${conversation.otherUserId}"
-            val activeTargets = locationRepository.checkSharingStatus()
-            val isSharingHere = targetId in activeTargets
-            if (isSharingHere) {
-                // Use the per-target expiry for THIS conversation, not the global max.
-                val targetExpiries = locationRepository.getTargetExpiries()
-                val thisExpiry = targetExpiries[targetId]
-                val expiresAt = if (thisExpiry == Long.MAX_VALUE) null else thisExpiry
-                _uiState.value = _uiState.value.copy(
-                    isLiveLocationSharingActive = true,
-                    liveLocationExpiresAt = expiresAt,
-                    liveLocationTimeRemaining = if (expiresAt != null) {
-                        val remaining = (expiresAt - System.currentTimeMillis()) / 60_000L
-                        if (remaining >= 60) "${remaining / 60}h ${remaining % 60}m"
-                        else "${remaining}m"
-                    } else null
-                )
-                startLocationSharingTimer(expiresAt ?: Long.MAX_VALUE)
-            }
+            locationRepository.checkSharingStatus()
         }
 
         // Subscribe to real-time updates with Socket.IO primary / Firestore fallback (10s timeout)
@@ -3165,6 +3269,8 @@ data class ChatUiState(
     // ─── Aggressive Local Caching State (Task 2.4) ────────────────────────────
     /** Cached locations from Room, served within 100ms of screen open (Requirement 7.2). */
     val cachedLocations: List<SharedLocation> = emptyList(),
+    /** Live coordinates of the current user (from FusedLocationClient) while sharing in this chat. */
+    val myLiveLocation: SharedLocation? = null,
     /** Whether the device is currently offline (Requirement 7.5). */
     val isOffline: Boolean = false,
     /** Whether to show the "Queued for sync" banner for offline write actions (Requirement 7.6). */
@@ -3255,9 +3361,9 @@ data class ChatUiState(
     // ─── Image Size Error State ───────────────────────────────────────────────
     /** Whether to show the image size limit error inline (Requirement 6.7). */
     val showImageSizeError: Boolean = false,
-    // ─── Mini Map Overlay State ───────────────────────────────────────────────
-    /** Whether the mini-map overlay is visible on top of the chat. */
-    val showMiniMap: Boolean = false
+    // ─── Live Meetup Sheet (chat-location-header-redesign) ────────────────────
+    /** Whether the live meetup bottom sheet (map + duration picker) is visible. */
+    val showLiveMeetupSheet: Boolean = false
 )
 
 /**

@@ -13,6 +13,7 @@ import com.ovi.where.data.local.entity.toDomain
 import com.ovi.where.data.local.entity.toEntity
 import com.ovi.where.data.remote.chat.ChatSocketIoClient
 import com.ovi.where.data.remote.chat.ServerFrame
+import com.ovi.where.domain.model.ActiveSharingState
 import com.ovi.where.domain.model.MeetupDestination
 import com.ovi.where.domain.model.SharedLocation
 import com.ovi.where.domain.repository.LocationRepository
@@ -24,6 +25,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -72,6 +74,54 @@ class LocationRepositoryImpl @Inject constructor(
     }
     @Volatile
     private var currentSession: ActiveSharingSession? = null
+
+    /** Atomic update + publish so every mutation reaches both screens. */
+    private fun setCurrentSession(session: ActiveSharingSession?) {
+        currentSession = session
+        publishSharingState()
+    }
+
+    // ── Unified active-sharing StateFlow (chat + map share this) ────────────
+    private val _activeSharingState = MutableStateFlow(ActiveSharingState())
+    override val activeSharingState: StateFlow<ActiveSharingState> = _activeSharingState
+
+    /** Ticker that re-emits [activeSharingState] every 15s while sharing is active. */
+    private var sharingTickerJob: Job? = null
+
+    private fun publishSharingState() {
+        val expiries = currentSession?.targetExpiries.orEmpty()
+        _activeSharingState.value = ActiveSharingState(
+            targetExpiries = expiries,
+            nowMs = System.currentTimeMillis()
+        )
+        if (expiries.isEmpty()) {
+            sharingTickerJob?.cancel()
+            sharingTickerJob = null
+        } else if (sharingTickerJob?.isActive != true) {
+            sharingTickerJob = repositoryScope.launch {
+                while (true) {
+                    delay(15_000L)
+                    val active = currentSession?.let { pruneExpired(it.targetExpiries) }.orEmpty()
+                    if (active.isEmpty()) {
+                        currentSession = null
+                        _activeSharingState.value = ActiveSharingState(
+                            targetExpiries = emptyMap(),
+                            nowMs = System.currentTimeMillis()
+                        )
+                        break
+                    } else {
+                        if (active.size != currentSession?.targetExpiries?.size) {
+                            currentSession = currentSession?.copy(targetExpiries = active)
+                        }
+                        _activeSharingState.value = ActiveSharingState(
+                            targetExpiries = active,
+                            nowMs = System.currentTimeMillis()
+                        )
+                    }
+                }
+            }
+        }
+    }
 
     // ── Speed-dependent write throttle state ──────────────────────────────────
     @Volatile
@@ -240,9 +290,11 @@ class LocationRepositoryImpl @Inject constructor(
             val targetExpiries = sanitized.associateWith { expiry }
 
             val visibleTo = computeVisibleTo(uid, sanitized)
-            currentSession = ActiveSharingSession(
-                targetExpiries = targetExpiries,
-                visibleTo = visibleTo
+            setCurrentSession(
+                ActiveSharingSession(
+                    targetExpiries = targetExpiries,
+                    visibleTo = visibleTo
+                )
             )
 
             val targetType = computeTargetType(sanitized)
@@ -285,7 +337,7 @@ class LocationRepositoryImpl @Inject constructor(
     override suspend fun stopLocationSharing(): Resource<Unit> {
         return try {
             val uid = currentUid ?: return Resource.Error("Not authenticated")
-            currentSession = null
+            setCurrentSession(null)
 
             firestore.collection(AppConstants.FIRESTORE_COLLECTION_ACTIVE_LOCATIONS)
                 .document(uid)
@@ -320,7 +372,7 @@ class LocationRepositoryImpl @Inject constructor(
             val newExpiries = pruneExpired(session.targetExpiries) + (targetId to newExpiry)
             val newTargets = newExpiries.keys.toList()
             val visibleTo = computeVisibleTo(uid, newTargets)
-            currentSession = session.copy(targetExpiries = newExpiries, visibleTo = visibleTo)
+            setCurrentSession(session.copy(targetExpiries = newExpiries, visibleTo = visibleTo))
 
             firestore.collection(AppConstants.FIRESTORE_COLLECTION_ACTIVE_LOCATIONS)
                 .document(uid)
@@ -356,7 +408,7 @@ class LocationRepositoryImpl @Inject constructor(
             val uid = currentUid ?: return Resource.Error("Not authenticated")
             val newTargets = newExpiries.keys.toList()
             val visibleTo = computeVisibleTo(uid, newTargets)
-            currentSession = session.copy(targetExpiries = newExpiries, visibleTo = visibleTo)
+            setCurrentSession(session.copy(targetExpiries = newExpiries, visibleTo = visibleTo))
 
             firestore.collection(AppConstants.FIRESTORE_COLLECTION_ACTIVE_LOCATIONS)
                 .document(uid)
@@ -899,12 +951,12 @@ class LocationRepositoryImpl @Inject constructor(
         // Prune any expired targets; if nothing is left, the session is over.
         val active = pruneExpired(session.targetExpiries)
         if (active.isEmpty()) {
-            currentSession = null
+            setCurrentSession(null)
             return false
         }
         if (active.size != session.targetExpiries.size) {
             // Reflect pruning in memory state
-            currentSession = session.copy(targetExpiries = active)
+            setCurrentSession(session.copy(targetExpiries = active))
         }
         return true
     }
@@ -931,11 +983,11 @@ class LocationRepositoryImpl @Inject constructor(
                 val active = pruneExpired(cached.targetExpiries)
                 if (active.isNotEmpty()) {
                     if (active.size != cached.targetExpiries.size) {
-                        currentSession = cached.copy(targetExpiries = active)
+                        setCurrentSession(cached.copy(targetExpiries = active))
                     }
                     return active.keys.toList()
                 } else {
-                    currentSession = null
+                    setCurrentSession(null)
                 }
             }
 
@@ -972,9 +1024,11 @@ class LocationRepositoryImpl @Inject constructor(
                 val activeExpiries = pruneExpired(targetExpiries)
 
                 if (isActive && activeExpiries.isNotEmpty()) {
-                    currentSession = ActiveSharingSession(
-                        targetExpiries = activeExpiries,
-                        visibleTo = visibleTo
+                    setCurrentSession(
+                        ActiveSharingSession(
+                            targetExpiries = activeExpiries,
+                            visibleTo = visibleTo
+                        )
                     )
                     return activeExpiries.keys.toList()
                 }

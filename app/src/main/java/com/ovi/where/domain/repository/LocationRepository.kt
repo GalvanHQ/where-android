@@ -1,11 +1,23 @@
 package com.ovi.where.domain.repository
 
 import com.ovi.where.core.common.Resource
+import com.ovi.where.domain.model.ActiveSharingState
 import com.ovi.where.domain.model.MeetupDestination
 import com.ovi.where.domain.model.SharedLocation
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 interface LocationRepository {
+    /**
+     * Single source of truth for the currently-active sharing session.
+     * Both the chat screen and the map screen read from this flow so they
+     * always show the same target list and the same remaining time.
+     *
+     * The flow re-emits on a fixed cadence (~15s) while a session is active
+     * so countdown UIs can rebind without each screen running its own ticker.
+     */
+    val activeSharingState: StateFlow<ActiveSharingState>
+
     /**
      * Starts a location sharing session for one or more targets (groups + direct friends).
      * If a session already exists, this REPLACES the target set entirely. Each target

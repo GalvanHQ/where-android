@@ -148,6 +148,7 @@ class GlobalMapViewModel @Inject constructor(
         startTimeAgoTicker()
         autoLocateOnLaunch()
         restoreSharingState()
+        observeRepoSharingState()
     }
 
     /** Loads the last-known camera position from DataStore for instant map render. */
@@ -277,19 +278,34 @@ class GlobalMapViewModel @Inject constructor(
     }
 
     /**
+     * Mirrors `LocationRepository.activeSharingState` into the UI state so the
+     * map's sharing pill, FAB countdown, and "My shares" tab always match the
+     * single repo flow. Using `ActiveSharingState`'s helper properties means
+     * we never recompute `targetIds` or `overallExpiry` ad-hoc here — the
+     * domain model owns that derivation.
+     */
+    private fun observeRepoSharingState() {
+        viewModelScope.launch {
+            locationRepository.activeSharingState.collect { state ->
+                _uiState.value = _uiState.value.copy(
+                    isSharing = state.isSharing,
+                    sharingTargetIds = state.targetIds,
+                    sharingTargetExpiries = state.targetExpiries,
+                    sharingExpiresAt = state.overallExpiry,
+                    sharingCountdown = formatCountdown(state.overallExpiry)
+                )
+            }
+        }
+    }
+
+    /**
      * Formats the remaining time until expiry as a countdown string.
-     * Returns "Xh Ym" when ≥ 60 minutes remain, "Xm" when < 60 minutes.
-     * Returns null for continuous sessions (no expiry).
+     * Delegates to [SharingTimeFormatter] so the map FAB pill and the chat
+     * header pill always render the same value for the same expiry.
      */
     private fun formatCountdown(expiresAt: Long?): String? {
-        if (expiresAt == null || expiresAt == Long.MAX_VALUE) return null
-        val remainingMs = expiresAt - System.currentTimeMillis()
-        if (remainingMs <= 0) return null
-        val minutes = remainingMs / MILLIS_PER_MINUTE
-        return when {
-            minutes >= 60 -> "${minutes / 60}h ${minutes % 60}m"
-            else -> "${minutes}m"
-        }
+        return com.ovi.where.presentation.common.SharingTimeFormatter
+            .formatRemaining(expiresAt)
     }
 
     private fun checkGpsEnabled() {

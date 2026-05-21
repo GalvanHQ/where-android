@@ -81,8 +81,7 @@ import com.ovi.where.presentation.chat.components.ChatEmptyState
 import com.ovi.where.presentation.chat.components.ChatInputBar
 import com.ovi.where.presentation.chat.components.DateSeparator
 import com.ovi.where.presentation.chat.components.ImageSizeLimitError
-import com.ovi.where.presentation.chat.components.LiveLocationSharingBanner
-import com.ovi.where.presentation.chat.components.MiniMapOverlay
+import com.ovi.where.presentation.chat.components.LiveMeetupSheet
 import com.ovi.where.presentation.chat.components.MentionSuggestionPopup
 import com.ovi.where.presentation.chat.components.MessageAnimationConstants
 import com.ovi.where.presentation.chat.components.MessageSearchBar
@@ -129,6 +128,30 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
+    // Pins of others sharing in THIS conversation, derived from the unified repo
+    // stream filtered by this chat's targetId. Drives the header avatars row.
+    val headerSharingAvatars = remember(
+        uiState.cachedLocations,
+        uiState.conversation?.groupId,
+        uiState.conversation?.otherUserId
+    ) {
+        val conv = uiState.conversation
+        val targetId = conv?.groupId ?: conv?.otherUserId?.let { "direct:$it" }
+        if (targetId == null) emptyList()
+        else uiState.cachedLocations.filter { loc ->
+            loc.isSharingActive && (loc.groupId == targetId || targetId in loc.targetIds)
+        }
+    }
+
+    // Pins shown on the meetup sheet's mini map. Same as the header list, plus
+    // the user's own live pin so they always see themselves on the map (mirrors
+    // GlobalMapScreen's auto-locate-on-launch). The user's pin is intentionally
+    // NOT in the header list — that row is "who's actively sharing".
+    val meetupMapLocations = remember(headerSharingAvatars, uiState.myLiveLocation) {
+        val mine = uiState.myLiveLocation
+        if (mine != null) listOf(mine) + headerSharingAvatars else headerSharingAvatars
+    }
 
     // Theme color — single source of truth derived from conversation state.
     // Stable: only changes when the actual hex string value changes.
@@ -404,9 +427,10 @@ fun ChatScreen(
                 onNavigateBack = onNavigateBack,
                 onNavigateToGroupInfo = onNavigateToGroupInfo,
                 onNavigateToConversationInfo = onNavigateToConversationInfo,
-                onMapTap = { viewModel.toggleMiniMap() },
                 onlineMemberCount = uiState.onlineMemberCount,
-                isOtherUserFriend = uiState.isOtherUserFriend
+                isOtherUserFriend = uiState.isOtherUserFriend,
+                sharingLocations = headerSharingAvatars,
+                onSharingAvatarsTap = { viewModel.openLiveMeetupSheet() }
             )
         }
     ) { paddingValues ->
@@ -453,41 +477,6 @@ fun ChatScreen(
             }
 
 
-            // ── Live Location Sharing Banner ──────────────────────────────────
-            // Persistent banner shown while the user is actively sharing their live location.
-            if (uiState.isLiveLocationSharingActive) {
-                LiveLocationSharingBanner(
-                    timeRemaining = uiState.liveLocationTimeRemaining,
-                    onStop = viewModel::stopLiveLocationSharing
-                )
-            }
-
-            // ── Mini Map Overlay ──────────────────────────────────────────────
-            // Auto-show when someone starts sharing in this conversation (once per session).
-            // After the user closes it, it stays closed until they manually re-open.
-            var hasAutoShownMiniMap by remember { mutableStateOf(false) }
-            LaunchedEffect(uiState.isOtherUserSharingLocation) {
-                if (uiState.isOtherUserSharingLocation && !uiState.showMiniMap && !hasAutoShownMiniMap) {
-                    hasAutoShownMiniMap = true
-                    viewModel.toggleMiniMap()
-                }
-            }
-
-            MiniMapOverlay(
-                visible = uiState.showMiniMap,
-                locations = uiState.cachedLocations,
-                onClose = { viewModel.toggleMiniMap() },
-                onExpandToFullMap = {
-                    viewModel.toggleMiniMap()
-                    val groupId = uiState.conversation?.groupId
-                    if (groupId != null) {
-                        onNavigateToGroupMap(groupId)
-                    } else {
-                        // DM conversation — navigate back to main (Map tab)
-                        onNavigateBack()
-                    }
-                }
-            )
 
             // ── Message Search Bar (Task 8.1, Requirements 13.1-13.7) ─────────
             if (uiState.isSearchActive) {
@@ -877,10 +866,11 @@ fun ChatScreen(
                     galleryLauncher.launch("image/*")
                 },
                 onLocationTap = {
-                    // Start location sharing with this conversation's group/friend
-                    // Uses the same flow as the map screen but pre-selects the target
-                    viewModel.onLocationShareButtonTap()
+                    // Opens the live meetup bottom sheet showing the embedded map
+                    // of active sharers and a duration picker / share button.
+                    viewModel.openLiveMeetupSheet()
                 },
+                isSharingLocation = uiState.isLiveLocationSharingActive,
                 // Voice recording state & callbacks
                 isVoiceRecording = uiState.isVoiceRecording,
                 voiceRecordingDurationMs = uiState.voiceRecordingDurationMs,
@@ -910,6 +900,39 @@ fun ChatScreen(
             )
         }
     }
+
+    // ── Live Meetup Bottom Sheet ──────────────────────────────────────────────
+    // The new sheet — opened from the location button next to + or from the
+    // sharing-avatars row in the chat header. Shows an embedded map of active
+    // sharers with a duration picker and a share/stop button.
+    LiveMeetupSheet(
+        visible = uiState.showLiveMeetupSheet,
+        conversationTitle = uiState.conversation?.title,
+        locations = meetupMapLocations,
+        isSharing = uiState.isLiveLocationSharingActive,
+        sharingTimeRemaining = uiState.liveLocationTimeRemaining,
+        selectedDurationMinutes = uiState.selectedDurationMinutes,
+        onDurationSelected = viewModel::onDurationSelected,
+        onStartSharing = {
+            val hasPermission = context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            viewModel.startSharingFromMeetupSheet(hasPermission)
+        },
+        onStopSharing = {
+            viewModel.stopLiveLocationSharing()
+            viewModel.dismissLiveMeetupSheet()
+        },
+        onOpenFullMap = {
+            viewModel.dismissLiveMeetupSheet()
+            val groupId = uiState.conversation?.groupId
+            if (groupId != null) {
+                onNavigateToGroupMap(groupId)
+            } else {
+                onNavigateBack()
+            }
+        },
+        onDismiss = { viewModel.dismissLiveMeetupSheet() }
+    )
 
     // ── Location Share Bottom Sheet ───────────────────────────────────────────
     if (uiState.locationBottomSheetState != com.ovi.where.presentation.chat.LocationBottomSheetState.HIDDEN) {

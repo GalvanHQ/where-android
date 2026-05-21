@@ -70,7 +70,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -110,6 +109,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -140,9 +140,9 @@ import com.google.maps.android.compose.rememberCameraPositionState
 import com.ovi.where.R
 import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.presentation.map.components.fanOutOverlappingMarkers
 import com.ovi.where.core.utils.LocationUtils
 import com.ovi.where.core.utils.showToast
+import com.ovi.where.presentation.map.components.fanOutOverlappingMarkers
 import kotlinx.coroutines.launch
 
 /**
@@ -1002,10 +1002,34 @@ fun GlobalMapScreen(
                     .navigationBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                val context = LocalContext.current
+                val density = LocalDensity.current
+
+                val myAvatarPixelSize = remember(density) {
+                    with(density) { Dimens.avatarSizeXLarge.roundToPx() }
+                }
+
+                val myAvatarRequest = remember(uiState.myPhotoUrl, myAvatarPixelSize) {
+                    if (uiState.myPhotoUrl.isNullOrBlank()) {
+                        null
+                    } else {
+                        ImageRequest.Builder(context)
+                            .data(uiState.myPhotoUrl)
+                            .crossfade(true)
+                            .size(myAvatarPixelSize)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .networkCachePolicy(CachePolicy.ENABLED)
+                            .memoryCacheKey(uiState.myPhotoUrl)
+                            .diskCacheKey(uiState.myPhotoUrl)
+                            .build()
+                    }
+                }
+
                 // Avatar
-                if (!uiState.myPhotoUrl.isNullOrEmpty()) {
+                if (myAvatarRequest != null) {
                     AsyncImage(
-                        model = uiState.myPhotoUrl,
+                        model = myAvatarRequest,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
@@ -1565,7 +1589,31 @@ private fun FriendDetailSheetContent(
     onNavigateToUserProfile: () -> Unit,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+
     val color = AvatarColors[friend.userId.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
+
+    val avatarPixelSize = remember(density) {
+        with(density) { Dimens.avatarSizeXLarge.roundToPx() }
+    }
+
+    val avatarRequest = remember(friend.photoUrl, avatarPixelSize) {
+        if (friend.photoUrl.isNullOrBlank()) {
+            null
+        } else {
+            ImageRequest.Builder(context)
+                .data(friend.photoUrl)
+                .crossfade(true)
+                .size(avatarPixelSize)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .networkCachePolicy(CachePolicy.ENABLED)
+                .memoryCacheKey(friend.photoUrl)
+                .diskCacheKey(friend.photoUrl)
+                .build()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -1584,9 +1632,9 @@ private fun FriendDetailSheetContent(
         Spacer(Modifier.height(8.dp))
 
         // Avatar
-        if (!friend.photoUrl.isNullOrEmpty()) {
+        if (avatarRequest != null) {
             AsyncImage(
-                model = friend.photoUrl,
+                model = avatarRequest,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -1603,7 +1651,11 @@ private fun FriendDetailSheetContent(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = friend.displayName.take(1).uppercase(),
+                    text = friend.displayName
+                        .trim()
+                        .take(1)
+                        .uppercase()
+                        .ifEmpty { "?" },
                     style = MaterialTheme.typography.displaySmall,
                     color = MaterialTheme.colorScheme.surface
                 )
@@ -1685,6 +1737,31 @@ private fun FriendDetailSheetContent(
 @Composable
 private fun FilterPillAvatar(filter: GroupFilter?) {
     val size = 36.dp
+
+    val context = LocalContext.current
+    val density = LocalDensity.current
+
+    val avatarPixelSize = remember(density) {
+        with(density) { size.roundToPx() }
+    }
+
+    val avatarRequest = remember(filter?.photoUrl, avatarPixelSize) {
+        if (filter?.photoUrl.isNullOrBlank()) {
+            null
+        } else {
+            ImageRequest.Builder(context)
+                .data(filter.photoUrl)
+                .crossfade(true)
+                .size(avatarPixelSize)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .networkCachePolicy(CachePolicy.ENABLED)
+                .memoryCacheKey(filter.photoUrl)
+                .diskCacheKey(filter.photoUrl)
+                .build()
+        }
+    }
+
     when {
         filter == null -> {
             Box(
@@ -1696,15 +1773,16 @@ private fun FilterPillAvatar(filter: GroupFilter?) {
             ) {
                 Icon(
                     Icons.Default.Groups,
-                    null,
+                    contentDescription = null,
                     modifier = Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
         }
-        !filter.photoUrl.isNullOrEmpty() -> {
+
+        avatarRequest != null -> {
             AsyncImage(
-                model = filter.photoUrl,
+                model = avatarRequest,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -1713,8 +1791,10 @@ private fun FilterPillAvatar(filter: GroupFilter?) {
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             )
         }
+
         else -> {
             val color = AvatarColors[filter.id.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
+
             Box(
                 modifier = Modifier
                     .size(size)
@@ -1724,7 +1804,11 @@ private fun FilterPillAvatar(filter: GroupFilter?) {
             ) {
                 if (filter.isDirect) {
                     Text(
-                        text = filter.name.take(1).uppercase(),
+                        text = filter.name
+                            .trim()
+                            .take(1)
+                            .uppercase()
+                            .ifEmpty { "?" },
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.surface
@@ -1732,7 +1816,7 @@ private fun FilterPillAvatar(filter: GroupFilter?) {
                 } else {
                     Icon(
                         Icons.Default.Groups,
-                        null,
+                        contentDescription = null,
                         modifier = Modifier.size(18.dp),
                         tint = MaterialTheme.colorScheme.surface
                     )
@@ -1748,7 +1832,32 @@ private fun FriendAvatarPeek(
     friend: FriendLocationUiModel,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+
     val color = AvatarColors[friend.userId.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
+
+    val avatarPixelSize = remember(density) {
+        with(density) { 52.dp.roundToPx() }
+    }
+
+    val avatarRequest = remember(friend.photoUrl, avatarPixelSize) {
+        if (friend.photoUrl.isNullOrBlank()) {
+            null
+        } else {
+            ImageRequest.Builder(context)
+                .data(friend.photoUrl)
+                .crossfade(true)
+                .size(avatarPixelSize)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .networkCachePolicy(CachePolicy.ENABLED)
+                .memoryCacheKey(friend.photoUrl)
+                .diskCacheKey(friend.photoUrl)
+                .build()
+        }
+    }
+
     Column(
         modifier = Modifier
             .clickable(onClick = onClick)
@@ -1757,9 +1866,9 @@ private fun FriendAvatarPeek(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(contentAlignment = Alignment.BottomEnd) {
-            if (!friend.photoUrl.isNullOrEmpty()) {
+            if (avatarRequest != null) {
                 AsyncImage(
-                    model = friend.photoUrl,
+                    model = avatarRequest,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
@@ -1776,13 +1885,18 @@ private fun FriendAvatarPeek(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = friend.displayName.take(1).uppercase(),
+                        text = friend.displayName
+                            .trim()
+                            .take(1)
+                            .uppercase()
+                            .ifEmpty { "?" },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.surface
                     )
                 }
             }
+
             if (friend.isActive) {
                 Box(
                     modifier = Modifier
@@ -1795,9 +1909,14 @@ private fun FriendAvatarPeek(
                 )
             }
         }
+
         Spacer(Modifier.height(6.dp))
+
         Text(
-            text = friend.displayName.substringBefore(" "),
+            text = friend.displayName
+                .trim()
+                .substringBefore(" ")
+                .ifEmpty { "Unknown" },
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
@@ -1819,7 +1938,30 @@ private fun FriendCard(
     onShowOnMap: () -> Unit
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
+
     val color = AvatarColors[friend.userId.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
+
+    val avatarPixelSize = remember(density) {
+        with(density) { 48.dp.roundToPx() }
+    }
+
+    val avatarRequest = remember(friend.photoUrl, avatarPixelSize) {
+        if (friend.photoUrl.isNullOrBlank()) {
+            null
+        } else {
+            ImageRequest.Builder(context)
+                .data(friend.photoUrl)
+                .crossfade(true)
+                .size(avatarPixelSize)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .networkCachePolicy(CachePolicy.ENABLED)
+                .memoryCacheKey(friend.photoUrl)
+                .diskCacheKey(friend.photoUrl)
+                .build()
+        }
+    }
 
     Surface(
         onClick = onClick,
@@ -1831,11 +1973,10 @@ private fun FriendCard(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar with active dot
             Box(contentAlignment = Alignment.BottomEnd) {
-                if (!friend.photoUrl.isNullOrEmpty()) {
+                if (avatarRequest != null) {
                     AsyncImage(
-                        model = friend.photoUrl,
+                        model = avatarRequest,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
@@ -1852,13 +1993,18 @@ private fun FriendCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = friend.displayName.take(1).uppercase(),
+                            text = friend.displayName
+                                .trim()
+                                .take(1)
+                                .uppercase()
+                                .ifEmpty { "?" },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.surface
                         )
                     }
                 }
+
                 if (friend.isActive) {
                     Box(
                         modifier = Modifier
@@ -1871,9 +2017,9 @@ private fun FriendCard(
                     )
                 }
             }
+
             Spacer(Modifier.width(12.dp))
 
-            // Name + meta row
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = friend.displayName,
@@ -1883,13 +2029,18 @@ private fun FriendCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+
                 Spacer(Modifier.height(2.dp))
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (hasMyLocation && friend.latitude != 0.0 && friend.longitude != 0.0) {
                         val distance = LocationUtils.calculateDistance(
-                            myLatitude, myLongitude,
-                            friend.latitude, friend.longitude
+                            myLatitude,
+                            myLongitude,
+                            friend.latitude,
+                            friend.longitude
                         )
+
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
@@ -1902,8 +2053,10 @@ private fun FriendCard(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
                         }
+
                         friend.etaText?.let { eta ->
                             Spacer(Modifier.width(6.dp))
+
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
                                 color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
@@ -1917,8 +2070,10 @@ private fun FriendCard(
                                 )
                             }
                         }
+
                         Spacer(Modifier.width(6.dp))
                     }
+
                     Text(
                         text = friend.timeAgo.ifEmpty { "Just now" },
                         style = MaterialTheme.typography.labelSmall,
@@ -1928,8 +2083,8 @@ private fun FriendCard(
                 }
             }
 
-            // Map navigation button — center & zoom on this friend
             Spacer(Modifier.width(8.dp))
+
             Surface(
                 onClick = onShowOnMap,
                 shape = CircleShape,
@@ -1964,224 +2119,6 @@ private fun SharingPulseDot() {
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.tertiary)
     )
-}
-
-@Composable
-private fun FriendAvatarChip(
-    friend: FriendLocationUiModel,
-    myLatitude: Double = 0.0,
-    myLongitude: Double = 0.0,
-    hasMyLocation: Boolean = false,
-    onClick: () -> Unit
-) {
-    val context = LocalContext.current
-    val color = AvatarColors[friend.userId.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
-    Column(
-        modifier = Modifier.clickable(onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(contentAlignment = Alignment.BottomEnd) {
-            if (!friend.photoUrl.isNullOrEmpty()) {
-                AsyncImage(
-                    model = friend.photoUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(Dimens.avatarSizeMedium)
-                        .clip(CircleShape)
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(Dimens.avatarSizeMedium)
-                        .clip(CircleShape)
-                        .background(color),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = friend.displayName.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.surface
-                    )
-                }
-            }
-            if (friend.isActive) {
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.tertiary)
-                )
-            }
-        }
-        Spacer(Modifier.height(Dimens.spaceXSmall))
-        Text(
-            text = friend.displayName.substringBefore(" "),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            text = friend.timeAgo,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1
-        )
-        // Distance label
-        if (hasMyLocation && friend.latitude != 0.0 && friend.longitude != 0.0) {
-            val distance = LocationUtils.calculateDistance(
-                myLatitude, myLongitude,
-                friend.latitude, friend.longitude
-            )
-            Text(
-                text = LocationUtils.formatDistance(context, distance),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1
-            )
-            // ETA display
-            friend.etaText?.let { eta ->
-                Text(
-                    text = "~$eta",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.tertiary,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FriendDetailSheet(
-    friend: FriendLocationUiModel,
-    onMessage: () -> Unit,
-    onNavigateToUserProfile: (String) -> Unit,
-    onNavigateToGroupMap: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val color = AvatarColors[friend.userId.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(Dimens.spaceXLarge)
-            .navigationBarsPadding(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Avatar
-        if (!friend.photoUrl.isNullOrEmpty()) {
-            AsyncImage(
-                model = friend.photoUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(Dimens.avatarSizeXLarge)
-                    .clip(CircleShape)
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(Dimens.avatarSizeXLarge)
-                    .clip(CircleShape)
-                    .background(color),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = friend.displayName.take(1).uppercase(),
-                    style = MaterialTheme.typography.displaySmall,
-                    color = MaterialTheme.colorScheme.surface
-                )
-            }
-        }
-
-        Spacer(Modifier.height(Dimens.spaceLarge))
-
-        Text(text = friend.displayName, style = MaterialTheme.typography.headlineSmall)
-        if (friend.username.isNotEmpty()) {
-            Text(
-                text = "@${friend.username}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        Spacer(Modifier.height(Dimens.spaceMedium))
-
-        // Location status
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (friend.isActive) {
-                SharingPulseDot()
-                Spacer(Modifier.width(Dimens.spaceSmall))
-                Text(
-                    text = "Sharing in ${friend.groupName}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.tertiary
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Rounded.History, null,
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.width(Dimens.spaceSmall))
-                Text(
-                    text = if (friend.timeAgo.isNotEmpty()) "Last seen ${friend.timeAgo}" else "Location not available",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        Spacer(Modifier.height(Dimens.spaceXLarge))
-
-        // Actions
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
-        ) {
-            // Message button
-            Button(
-                onClick = onMessage,
-                modifier = Modifier.weight(1f),
-                shape = MaterialTheme.shapes.medium
-            ) {
-                Icon(
-                    Icons.Default.ChatBubbleOutline,
-                    null,
-                    modifier = Modifier.size(Dimens.iconSizeMedium)
-                )
-                Spacer(Modifier.width(Dimens.spaceSmall))
-                Text("Message")
-            }
-
-            // View profile
-            OutlinedButton(
-                onClick = { onNavigateToUserProfile(friend.userId); onDismiss() },
-                modifier = Modifier.weight(1f),
-                shape = MaterialTheme.shapes.medium
-            ) {
-                Icon(Icons.Default.Person, null, modifier = Modifier.size(Dimens.iconSizeMedium))
-                Spacer(Modifier.width(Dimens.spaceSmall))
-                Text("Profile")
-            }
-        }
-
-        // View on group map
-        FilledTonalButton(
-            onClick = { onNavigateToGroupMap(friend.groupId); onDismiss() },
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium
-        ) {
-            Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(Dimens.iconSizeMedium))
-            Spacer(Modifier.width(Dimens.spaceSmall))
-            Text("Open ${friend.groupName} Map")
-        }
-
-        Spacer(Modifier.height(Dimens.spaceLarge))
-    }
 }
 
 @Composable
@@ -3009,6 +2946,9 @@ private fun Life360PinMarker(
         borderColor
     }
     val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    val avatarImageBitmap = remember(avatarBitmap) {
+        avatarBitmap?.asImageBitmap()
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
@@ -3032,16 +2972,20 @@ private fun Life360PinMarker(
                 .clip(CircleShape)
                 .background(surfaceVariant)
         ) {
-            if (avatarBitmap != null) {
+            if (avatarImageBitmap != null) {
                 Image(
-                    painter = BitmapPainter(avatarBitmap.asImageBitmap()),
+                    painter = BitmapPainter(avatarImageBitmap),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
                 Text(
-                    text = fallbackLabel,
+                    text = fallbackLabel
+                        .trim()
+                        .take(1)
+                        .uppercase()
+                        .ifEmpty { "?" },
                     color = MaterialTheme.colorScheme.onPrimary,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.ExtraBold

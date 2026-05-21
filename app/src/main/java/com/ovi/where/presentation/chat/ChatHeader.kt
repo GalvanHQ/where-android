@@ -40,12 +40,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.ovi.where.domain.model.SharedLocation
 import com.ovi.where.presentation.chat.components.ConversationAvatar
 import com.ovi.where.presentation.model.ConversationUiModel
@@ -304,6 +310,13 @@ private fun SharingAvatarsRow(
     sharers: List<SharedLocation>,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+
+    val avatarPixelSize = remember(density) {
+        with(density) { 24.dp.roundToPx() }
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "sharers_pulse")
     val pulse by infiniteTransition.animateFloat(
         initialValue = 1f,
@@ -323,18 +336,37 @@ private fun SharingAvatarsRow(
             .clip(CircleShape)
             .clickable(onClick = onClick)
             .padding(horizontal = 4.dp, vertical = 2.dp)
-            .semantics { contentDescription = "${sharers.size} sharing live location" },
+            .semantics {
+                contentDescription = "${sharers.size} sharing live location"
+            },
         verticalAlignment = Alignment.CenterVertically
     ) {
         visible.forEachIndexed { index, loc ->
             val color = SharerColors[index % SharerColors.size]
+
+            val avatarRequest = remember(loc.photoUrl, avatarPixelSize) {
+                if (loc.photoUrl.isNullOrBlank()) {
+                    null
+                } else {
+                    ImageRequest.Builder(context)
+                        .data(loc.photoUrl)
+                        .crossfade(true)
+                        .size(avatarPixelSize)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .networkCachePolicy(CachePolicy.ENABLED)
+                        .memoryCacheKey(loc.photoUrl)
+                        .diskCacheKey(loc.photoUrl)
+                        .build()
+                }
+            }
+
             Box(
                 modifier = Modifier
                     .let { if (index > 0) it.offset(x = (-8).dp) else it }
                     .size(28.dp),
                 contentAlignment = Alignment.Center
             ) {
-                // Pulsing halo behind the avatar
                 Box(
                     modifier = Modifier
                         .size(28.dp)
@@ -342,6 +374,7 @@ private fun SharingAvatarsRow(
                         .clip(CircleShape)
                         .background(color.copy(alpha = 0.25f))
                 )
+
                 Box(
                     modifier = Modifier
                         .size(24.dp)
@@ -350,18 +383,22 @@ private fun SharingAvatarsRow(
                         .border(1.5.dp, MaterialTheme.colorScheme.surface, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (!loc.photoUrl.isNullOrEmpty()) {
-                        coil.compose.AsyncImage(
-                            model = loc.photoUrl,
+                    if (avatarRequest != null) {
+                        AsyncImage(
+                            model = avatarRequest,
                             contentDescription = null,
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier
                                 .size(24.dp)
                                 .clip(CircleShape)
                         )
                     } else {
                         Text(
-                            text = loc.displayName.firstOrNull()?.uppercase() ?: "?",
+                            text = loc.displayName
+                                .trim()
+                                .take(1)
+                                .uppercase()
+                                .ifEmpty { "?" },
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 10.sp
@@ -372,6 +409,7 @@ private fun SharingAvatarsRow(
                 }
             }
         }
+
         if (overflow > 0) {
             Box(
                 modifier = Modifier

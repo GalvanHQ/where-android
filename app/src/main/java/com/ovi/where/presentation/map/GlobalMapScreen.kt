@@ -16,8 +16,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -61,6 +59,7 @@ import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
@@ -187,7 +186,12 @@ fun GlobalMapScreen(
     }
 
     val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(LatLng(0.0, 0.0), 2.0f)
+        // Start at last-known position for instant map render (cached tiles load immediately).
+        // Falls back to (0,0) zoom 2 on first-ever launch.
+        position = CameraPosition.fromLatLngZoom(
+            LatLng(uiState.initialCameraLat, uiState.initialCameraLng),
+            uiState.initialCameraZoom
+        )
     }
 
     // ── Permission launcher ───────────────────────────────────────────────────
@@ -231,10 +235,10 @@ fun GlobalMapScreen(
     val hapticFeedback = LocalHapticFeedback.current
 
     // ── Auto-zoom to fit all friends on first load ────────────────────────────
-    var hasAutoZoomed by remember { mutableStateOf(false) }
-    LaunchedEffect(uiState.friendLocations) {
-        if (!hasAutoZoomed && uiState.friendLocations.isNotEmpty()) {
-            hasAutoZoomed = true
+    // Uses ViewModel state so it persists across tab switches (like Life360/Google Maps).
+    LaunchedEffect(uiState.friendLocations, uiState.hasAutoZoomed) {
+        if (!uiState.hasAutoZoomed && uiState.friendLocations.isNotEmpty()) {
+            viewModel.onAutoZoomConsumed()
             val validFriends = uiState.friendLocations.filter {
                 it.latitude != 0.0 && it.longitude != 0.0
             }
@@ -289,6 +293,19 @@ fun GlobalMapScreen(
     var mapType by remember { mutableStateOf(MapType.NORMAL) }
     var showMapTypeSheet by remember { mutableStateOf(false) }
     var showMyProfileSheet by remember { mutableStateOf(false) }
+
+    // ── Night mode map style (auto-detect based on time of day) ───────────────
+    val isNightTime = remember {
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        hour < 6 || hour >= 19 // Night = 7pm to 6am
+    }
+    val nightMapStyle = remember(isNightTime) {
+        if (isNightTime) {
+            com.google.android.gms.maps.model.MapStyleOptions.loadRawResourceStyle(
+                context, R.raw.map_style_night
+            )
+        } else null
+    }
 
     // Single persistent bottom sheet that switches views.
     // Replaces multiple modal bottom sheets for cleaner UX.
@@ -500,7 +517,8 @@ fun GlobalMapScreen(
                 contentPadding = innerPadding,
                 properties = MapProperties(
                     mapType = mapType,
-                    isMyLocationEnabled = false // we draw our own marker
+                    isMyLocationEnabled = false,
+                    mapStyleOptions = if (mapType == MapType.NORMAL) nightMapStyle else null
                 ),
                 uiSettings = MapUiSettings(
                     myLocationButtonEnabled = false,
@@ -1376,7 +1394,7 @@ private fun MySharesTabContent(
                         .height(50.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(18.dp))
+                    Icon(imageVector = ImageVector.vectorResource(id = R.drawable.location_arrow), null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Share location", fontWeight = FontWeight.Bold)
                 }
@@ -1580,7 +1598,7 @@ private fun FriendDetailSheetContent(
                 )
             } else {
                 Icon(
-                    Icons.Default.LocationOff, null,
+                    imageVector = Icons.Rounded.History, null,
                     modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -2066,7 +2084,7 @@ private fun FriendDetailSheet(
                 )
             } else {
                 Icon(
-                    Icons.Default.LocationOff, null,
+                    imageVector = Icons.Rounded.History, null,
                     modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )

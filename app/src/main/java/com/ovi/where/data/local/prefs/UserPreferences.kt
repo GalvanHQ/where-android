@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,6 +32,10 @@ class UserPreferences @Inject constructor(
         val LAST_SHARE_TARGET_ID = stringPreferencesKey("last_share_target_id")
         val LAST_SHARE_TARGET_NAME = stringPreferencesKey("last_share_target_name")
         val LAST_SHARE_DURATION = longPreferencesKey("last_share_duration")
+        // Last-known camera position (instant map load)
+        val LAST_CAMERA_LAT = stringPreferencesKey("last_camera_lat")
+        val LAST_CAMERA_LNG = stringPreferencesKey("last_camera_lng")
+        val LAST_CAMERA_ZOOM = stringPreferencesKey("last_camera_zoom")
     }
 
     val userId: Flow<String?> = dataStore.data.map { preferences ->
@@ -143,6 +148,27 @@ class UserPreferences @Inject constructor(
             prefs[Keys.LAST_SHARE_TARGET_ID] = targetId
             prefs[Keys.LAST_SHARE_TARGET_NAME] = targetName
             prefs[Keys.LAST_SHARE_DURATION] = durationMinutes
+        }
+    }
+
+    // ── Last-known camera position (instant map load) ─────────────────────────
+
+    /** Returns (lat, lng, zoom) or null if never saved. */
+    suspend fun getLastCameraPosition(): Triple<Double, Double, Float>? {
+        val prefs = dataStore.data.map { p ->
+            val lat = p[Keys.LAST_CAMERA_LAT]?.toDoubleOrNull()
+            val lng = p[Keys.LAST_CAMERA_LNG]?.toDoubleOrNull()
+            val zoom = p[Keys.LAST_CAMERA_ZOOM]?.toFloatOrNull()
+            if (lat != null && lng != null && zoom != null) Triple(lat, lng, zoom) else null
+        }
+        return prefs.first()
+    }
+
+    suspend fun saveLastCameraPosition(lat: Double, lng: Double, zoom: Float) {
+        dataStore.edit { prefs ->
+            prefs[Keys.LAST_CAMERA_LAT] = lat.toString()
+            prefs[Keys.LAST_CAMERA_LNG] = lng.toString()
+            prefs[Keys.LAST_CAMERA_ZOOM] = zoom.toString()
         }
     }
 

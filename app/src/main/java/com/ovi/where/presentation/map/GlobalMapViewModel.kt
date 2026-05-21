@@ -137,6 +137,7 @@ class GlobalMapViewModel @Inject constructor(
     }
 
     init {
+        restoreLastCameraPosition()
         loadGroupsAndStartObserving()
         observeFriends()
         observeConsolidatedLocations()
@@ -147,6 +148,20 @@ class GlobalMapViewModel @Inject constructor(
         startTimeAgoTicker()
         autoLocateOnLaunch()
         restoreSharingState()
+    }
+
+    /** Loads the last-known camera position from DataStore for instant map render. */
+    private fun restoreLastCameraPosition() {
+        viewModelScope.launch {
+            val saved = userPreferences.getLastCameraPosition()
+            if (saved != null) {
+                _uiState.value = _uiState.value.copy(
+                    initialCameraLat = saved.first,
+                    initialCameraLng = saved.second,
+                    initialCameraZoom = saved.third
+                )
+            }
+        }
     }
 
     /** Auto-locate user on first launch (like Google Maps). */
@@ -723,12 +738,18 @@ class GlobalMapViewModel @Inject constructor(
                     hasMyLocation = true,
                     requestCameraMove = true
                 )
+                // Persist for instant map load on next app open
+                userPreferences.saveLastCameraPosition(loc.latitude, loc.longitude, 15f)
             }
         }
     }
 
     fun onCameraMoveConsumed() {
         _uiState.value = _uiState.value.copy(requestCameraMove = false)
+    }
+
+    fun onAutoZoomConsumed() {
+        _uiState.value = _uiState.value.copy(hasAutoZoomed = true)
     }
 
     fun openOrCreateDm(userId: String) {
@@ -821,6 +842,10 @@ data class GlobalMapUiState(
     val myLongitude: Double = 0.0,
     val hasMyLocation: Boolean = false,
     val requestCameraMove: Boolean = false,
+    /** Last-known camera position for instant map load (persisted across sessions). */
+    val initialCameraLat: Double = 0.0,
+    val initialCameraLng: Double = 0.0,
+    val initialCameraZoom: Float = 2f,
     // Groups
     val groups: List<GroupFilter> = emptyList(),
     val directTargets: List<GroupFilter> = emptyList(),
@@ -845,6 +870,8 @@ data class GlobalMapUiState(
     val isLocationEnabled: Boolean = true,
     val isLoading: Boolean = true,
     val error: String? = null,
+    /** Whether the initial auto-zoom to fit all friends has already fired. */
+    val hasAutoZoomed: Boolean = false,
     /** Monotonic counter to break StateFlow structural equality on timeAgo refresh. */
     val timeAgoTick: Long = 0L
 )

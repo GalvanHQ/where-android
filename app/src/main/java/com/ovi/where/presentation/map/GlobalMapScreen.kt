@@ -311,17 +311,14 @@ fun GlobalMapScreen(
     var showMapTypeSheet by remember { mutableStateOf(false) }
     var showMyProfileSheet by remember { mutableStateOf(false) }
 
-    // ── Night mode map style (auto-detect based on time of day) ───────────────
+    // ── Night mode (auto-detect based on time of day) ─────────────────────────
+    // Uses ComposeMapColorScheme.DARK — Google's official Maps dark mode,
+    // applied before the first frame so there's no light-tile flash. We
+    // intentionally don't layer a custom mapStyleOptions JSON on top so the
+    // styling stays identical to Google Maps' production dark theme.
     val isNightTime = remember {
         val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
         hour < 6 || hour >= 19 // Night = 7pm to 6am
-    }
-    val nightMapStyle = remember(isNightTime) {
-        if (isNightTime) {
-            com.google.android.gms.maps.model.MapStyleOptions.loadRawResourceStyle(
-                context, R.raw.map_style_night
-            )
-        } else null
     }
 
     // Single persistent bottom sheet that switches views.
@@ -526,7 +523,16 @@ fun GlobalMapScreen(
         // innerPadding.bottom = sheetPeekHeight (sheet peek + nav bar height).
         // Map fills the full Box behind everything; FABs and overlays use innerPadding
         // so they sit above the sheet peek and bottom nav.
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                // Backdrop tuned to match Google Maps' official dark/light tile
+                // colors. Painted under the GoogleMap so the brief mount-to-
+                // first-tile window blends into the theme instead of flashing.
+                .background(
+                    if (isNightTime) Color(0xFF202C3B) else Color(0xFFE8EDF1)
+                )
+        ) {
             // ── Map (full screen — behind sheet, nav bar, and FABs) ───────────
             // Wait for the saved camera position to load from DataStore before
             // composing the map. This is a few-ms delay (invisible to the user)
@@ -538,10 +544,18 @@ fun GlobalMapScreen(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
                 contentPadding = innerPadding,
+                // mapColorScheme is the SDK's native dark mode and is applied
+                // *before* the first frame, eliminating the light-tile flash
+                // we used to see while the JSON style was being applied. We
+                // keep mapStyleOptions for fine-tuning POI visibility etc.
+                mapColorScheme = if (isNightTime) {
+                    com.google.maps.android.compose.ComposeMapColorScheme.DARK
+                } else {
+                    com.google.maps.android.compose.ComposeMapColorScheme.LIGHT
+                },
                 properties = MapProperties(
                     mapType = mapType,
-                    isMyLocationEnabled = false,
-                    mapStyleOptions = if (mapType == MapType.NORMAL) nightMapStyle else null
+                    isMyLocationEnabled = false
                 ),
                 uiSettings = MapUiSettings(
                     myLocationButtonEnabled = false,

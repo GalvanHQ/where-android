@@ -371,23 +371,27 @@ private fun MapPreview(
         locations.filter { it.latitude != 0.0 && it.longitude != 0.0 }
     }
 
-    // ── Night mode map style ──────────────────────────────────────────────
-    // Mirrors GlobalMapScreen: auto-applies the bundled night JSON between
-    // 7pm and 6am so the chat preview matches the full map's look.
+    // ── Night mode (matches GlobalMapScreen — auto-detect 7pm to 6am) ──────
+    // Uses ComposeMapColorScheme.DARK, the SDK's official Google Maps dark
+    // theme. No custom JSON layering so the chat preview matches the global
+    // map and the production Google Maps app exactly.
     val context = LocalContext.current
-    val nightMapStyle = remember {
+    val isNightTime = remember {
         val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-        val isNight = hour < 6 || hour >= 19
-        if (isNight) {
-            com.google.android.gms.maps.model.MapStyleOptions
-                .loadRawResourceStyle(context, com.ovi.where.R.raw.map_style_night)
-        } else null
+        hour < 6 || hour >= 19
     }
 
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        // At night, paint the surface dark so any sub-frame between
+        // GoogleMap mount and the first tile paint blends with Google Maps'
+        // official dark theme instead of flashing the light surface.
+        color = if (isNightTime) {
+            androidx.compose.ui.graphics.Color(0xFF202C3B)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        },
         tonalElevation = 1.dp
     ) {
         if (validLocations.isEmpty()) {
@@ -499,13 +503,16 @@ private fun MapPreview(
                     .fillMaxSize()
                     .clip(RoundedCornerShape(16.dp)),
                 cameraPositionState = cameraPositionState,
+                // Native dark mode applies before the first frame, killing the
+                // light-tile flash that the JSON style alone couldn't prevent.
+                mapColorScheme = if (isNightTime) {
+                    com.google.maps.android.compose.ComposeMapColorScheme.DARK
+                } else {
+                    com.google.maps.android.compose.ComposeMapColorScheme.LIGHT
+                },
                 properties = MapProperties(
                     isMyLocationEnabled = false,
-                    mapType = MapType.NORMAL,
-                    // Auto-apply the night map style from 7pm-6am, exactly like
-                    // the global map screen, so the chat preview blends with
-                    // the rest of the app instead of glaring white at night.
-                    mapStyleOptions = nightMapStyle
+                    mapType = MapType.NORMAL
                 ),
                 uiSettings = MapUiSettings(
                     zoomControlsEnabled = false,

@@ -738,8 +738,18 @@ class GlobalMapViewModel @Inject constructor(
                     hasMyLocation = true,
                     requestCameraMove = true
                 )
-                // Persist for instant map load on next app open
-                userPreferences.saveLastCameraPosition(loc.latitude, loc.longitude, 15f)
+            }
+        }
+    }
+
+    /**
+     * Called when the app goes to background (onStop). Saves the current camera
+     * position once so the next cold start renders instantly. No repeated writes.
+     */
+    fun saveCameraPosition(lat: Double, lng: Double, zoom: Float) {
+        viewModelScope.launch {
+            if (lat != 0.0 && lng != 0.0) {
+                userPreferences.saveLastCameraPosition(lat, lng, zoom)
             }
         }
     }

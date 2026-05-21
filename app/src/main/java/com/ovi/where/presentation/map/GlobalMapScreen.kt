@@ -194,6 +194,20 @@ fun GlobalMapScreen(
         )
     }
 
+    // Save camera position once when the screen goes to background (ON_STOP).
+    // Single write per session — no repeated DataStore writes during use.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                val pos = cameraPositionState.position
+                viewModel.saveCameraPosition(pos.target.latitude, pos.target.longitude, pos.zoom)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     // ── Permission launcher ───────────────────────────────────────────────────
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()

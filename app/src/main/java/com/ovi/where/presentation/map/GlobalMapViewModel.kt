@@ -777,9 +777,21 @@ class GlobalMapViewModel @Inject constructor(
                 hasMyLocation = true,
                 requestCameraMove = moveCamera || _uiState.value.requestCameraMove
             )
-            // Persist for next cold start so the map opens here even
-            // if location services are off then.
-            userPreferences.saveLastKnownLocation(loc.latitude, loc.longitude)
+            // Throttle the DataStore write: only persist when the new fix is
+            // meaningfully different from the saved one. Stops every tab return
+            // (which recreates this ViewModel) from spamming a write with the
+            // same coords. Threshold ~50m balances accuracy with write count.
+            val saved = userPreferences.getLastKnownLocation()
+            val shouldWrite = saved == null || run {
+                val results = FloatArray(1)
+                android.location.Location.distanceBetween(
+                    saved.first, saved.second, loc.latitude, loc.longitude, results
+                )
+                results[0] >= 50f
+            }
+            if (shouldWrite) {
+                userPreferences.saveLastKnownLocation(loc.latitude, loc.longitude)
+            }
         }
     }
 

@@ -22,12 +22,19 @@ import com.ovi.where.core.constants.AppConstants.USER_FETCH_DEBOUNCE_MS
 import com.ovi.where.data.local.prefs.UserPreferences
 import com.ovi.where.data.location.LocationManager
 import com.ovi.where.domain.model.SharedLocation
+import com.ovi.where.domain.model.MeetupDestination
+import com.ovi.where.domain.model.SystemEventType
 import com.ovi.where.domain.model.User
+import com.ovi.where.domain.repository.ConversationRepository
 import com.ovi.where.domain.repository.LocationRepository
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
 import com.ovi.where.domain.usecase.friend.ObserveFriendsUseCase
 import com.ovi.where.domain.usecase.group.GetUserGroupsUseCase
+import com.ovi.where.domain.usecase.location.ClearMeetupDestinationUseCase
+import com.ovi.where.domain.usecase.location.DetectArrivalUseCase
 import com.ovi.where.domain.usecase.location.ObserveActiveLocationsUseCase
+import com.ovi.where.domain.usecase.location.ObserveMeetupDestinationUseCase
+import com.ovi.where.domain.usecase.location.SetMeetupDestinationUseCase
 import com.ovi.where.domain.usecase.location.StartLocationSharingUseCase
 import com.ovi.where.domain.usecase.location.StopLocationSharingUseCase
 import com.ovi.where.domain.usecase.user.GetUsersUseCase
@@ -71,12 +78,26 @@ data class FriendLocationUiModel(
     val lastUpdatedTimestamp: Long = 0L
 )
 
+/**
+ * Maximum number of member avatars previewed per group in stacked-avatar
+ * surfaces (the meetup-destination picker, etc.). Three balances visual
+ * density with read cost.
+ */
+private const val MAX_PREVIEW_AVATARS = 3
+
 /** Simple group representation for the filter pill / sheet. */
 data class GroupFilter(
     val id: String,
     val name: String,
     val isDirect: Boolean = false,
-    val photoUrl: String? = null
+    val photoUrl: String? = null,
+    /**
+     * Photo URLs of the first few group members (in arbitrary order). Used
+     * by stacked-avatar previews — e.g. the meetup-destination group picker.
+     * Empty for direct targets and for groups whose user profiles haven't
+     * been fetched yet. Items may be null when a member has no photo set.
+     */
+    val memberPhotos: List<String?> = emptyList()
 )
 
 @HiltViewModel
@@ -93,7 +114,13 @@ class GlobalMapViewModel @Inject constructor(
     private val getOrCreateDirectConversationUseCase: GetOrCreateDirectConversationUseCase,
     private val observeFriendsUseCase: ObserveFriendsUseCase,
     private val userPreferences: UserPreferences,
-    private val observeCurrentUserUseCase: ObserveCurrentUserUseCase
+    private val observeCurrentUserUseCase: ObserveCurrentUserUseCase,
+    private val setMeetupDestinationUseCase: SetMeetupDestinationUseCase,
+    private val clearMeetupDestinationUseCase: ClearMeetupDestinationUseCase,
+    private val observeMeetupDestinationUseCase: ObserveMeetupDestinationUseCase,
+    private val detectArrivalUseCase: DetectArrivalUseCase,
+    private val conversationRepository: ConversationRepository,
+    private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(GlobalMapUiState())
@@ -121,6 +148,9 @@ class GlobalMapViewModel @Inject constructor(
 
     // Sharing countdown ticker
     private var countdownJob: Job? = null
+
+    // Meetup destination listener (per active group filter)
+    private var meetupDestinationJob: Job? = null
 
     // Cache raw SharedLocation list for re-processing without re-subscribing
     @Volatile
@@ -372,10 +402,17 @@ class GlobalMapViewModel @Inject constructor(
                             GroupFilter(
                                 id = it.id,
                                 name = it.name,
-                                photoUrl = it.avatarUrl
+                                photoUrl = it.avatarUrl,
+                                // Seed empty — photos arrive asynchronously via
+                                // resolveGroupMemberPhotos() below.
+                                memberPhotos = emptyList()
                             )
                         }
                     )
+                    // Hydrate member photos in the background so the meetup
+                    // group picker (and any other stacked-avatar surface)
+                    // shows real faces.
+                    resolveGroupMemberPhotos(groups)
                     // Check sharing sessions in background
                     checkAllSharingSessions()
                 }
@@ -387,6 +424,42 @@ class GlobalMapViewModel @Inject constructor(
                 }
                 else -> {}
             }
+        }
+    }
+
+    /**
+     * Fetches profile photos for up to `MAX_PREVIEW_AVATARS` members of each
+     * group and updates [GlobalMapUiState.groups] in place. Reuses the
+     * shared [userCache] so groups that share members don't trigger
+     * duplicate fetches, and uses [getUsersUseCase] for the missing ids.
+     */
+    private fun resolveGroupMemberPhotos(groups: List<com.ovi.where.domain.model.Group>) {
+        if (groups.isEmpty()) return
+        viewModelScope.launch {
+            val maxPreview = MAX_PREVIEW_AVATARS
+            // Pick the first N member ids per group, then dedupe globally so
+            // we hit Firestore once per unique uid.
+            val previewIds: Map<String, List<String>> = groups.associate { g ->
+                g.id to g.memberIds.take(maxPreview)
+            }
+            val unknownIds = previewIds.values.flatten().distinct()
+                .filter { it.isNotBlank() && it !in userCache }
+            if (unknownIds.isNotEmpty()) {
+                when (val result = getUsersUseCase(unknownIds)) {
+                    is Resource.Success ->
+                        result.data?.forEach { userCache[it.id] = it }
+                    else -> {} // Best-effort — fall back to color dots.
+                }
+            }
+            // Re-map state with photos pulled from the now-warm cache.
+            val updated = _uiState.value.groups.map { gf ->
+                val ids = previewIds[gf.id].orEmpty()
+                if (ids.isEmpty()) gf
+                else gf.copy(
+                    memberPhotos = ids.map { uid -> userCache[uid]?.photoUrl }
+                )
+            }
+            _uiState.value = _uiState.value.copy(groups = updated)
         }
     }
 
@@ -513,6 +586,13 @@ class GlobalMapViewModel @Inject constructor(
             friendLocations = friendLocations,
             isLoading = false
         )
+        // Destination metrics depend on the local user's speed (sourced from
+        // their own SharedLocation row). Recompute on every batch so the ETA
+        // refreshes as the user moves.
+        recomputeDestinationMetrics()
+        if (_uiState.value.hasMyLocation) {
+            checkSelfArrival(_uiState.value.myLatitude, _uiState.value.myLongitude)
+        }
     }
 
     /** Debounced user fetch — collect IDs for 200ms then batch fetch. */
@@ -609,6 +689,404 @@ class GlobalMapViewModel @Inject constructor(
         // Re-process cached data without re-subscribing to Firestore
         if (lastRawLocations.isNotEmpty()) {
             processLocationUpdates(lastRawLocations)
+        }
+        // Switch the destination listener to the newly-selected group.
+        observeMeetupDestinationFor(filter)
+    }
+
+    // ── Meetup destination ──────────────────────────────────────────────────
+
+    /**
+     * Single Firestore listener per active group filter. Direct conversations
+     * and the "all groups" view (filter == null) clear the destination state
+     * and cancel the listener so we don't pay for a stray snapshot listener
+     * outside of a group context.
+     */
+    private fun observeMeetupDestinationFor(filter: GroupFilter?) {
+        meetupDestinationJob?.cancel()
+        if (filter == null || filter.isDirect || filter.id.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                meetupDestination = null,
+                meetupDestinationDistanceText = null,
+                meetupDestinationEtaText = null,
+                arrivedDestinationKey = null
+            )
+            return
+        }
+        val groupId = filter.id
+        meetupDestinationJob = viewModelScope.launch {
+            observeMeetupDestinationUseCase(groupId).collect { destination ->
+                val previous = _uiState.value.meetupDestination
+                val newKey = destination?.let { destinationKey(groupId, it) }
+                val previousKey = previous?.let { destinationKey(groupId, it) }
+                _uiState.value = _uiState.value.copy(
+                    meetupDestination = destination,
+                    arrivedDestinationKey = if (newKey != previousKey) null else _uiState.value.arrivedDestinationKey
+                )
+                recomputeDestinationMetrics()
+                // Re-check arrival immediately when a new destination lands —
+                // the user may already be inside the radius.
+                if (_uiState.value.hasMyLocation) {
+                    checkSelfArrival(_uiState.value.myLatitude, _uiState.value.myLongitude)
+                }
+            }
+        }
+    }
+
+    /** Stable per-session id used to deduplicate `MEETUP_ARRIVED` writes. */
+    private fun destinationKey(groupId: String, destination: MeetupDestination): String =
+        "${groupId}_${destination.setAt}"
+
+    /**
+     * Re-renders the distance + ETA labels on the destination card. Cheap —
+     * just reformats existing values, no Firestore reads.
+     */
+    private fun recomputeDestinationMetrics() {
+        val state = _uiState.value
+        val destination = state.meetupDestination
+        if (destination == null || !destination.hasValidLocation || !state.hasMyLocation) {
+            _uiState.value = state.copy(
+                meetupDestinationDistanceText = null,
+                meetupDestinationEtaText = null
+            )
+            return
+        }
+        val results = FloatArray(1)
+        android.location.Location.distanceBetween(
+            state.myLatitude, state.myLongitude,
+            destination.latitude, destination.longitude,
+            results
+        )
+        val distance = results[0]
+        // Find the local user's current speed from cached locations (if they're
+        // sharing). Falls back to 0 → ETA helper assumes ~50 km/h.
+        val mySpeed = lastRawLocations.firstOrNull { it.userId == currentUserId }?.speed ?: 0f
+        _uiState.value = state.copy(
+            meetupDestinationDistanceText = formatDistance(distance),
+            meetupDestinationEtaText = computeEta(distance, mySpeed)
+        )
+    }
+
+    /**
+     * Called by [GlobalMapScreen] when the user long-presses the map.
+     * Captures the lat/lng, kicks off a best-effort reverse-geocode, then
+     * shows the "Set meetup point" sheet.
+     */
+    fun onMapLongClick(latitude: Double, longitude: Double) {
+        viewModelScope.launch {
+            // If there are no groups, we can't pick a destination — bail out.
+            if (_uiState.value.groups.isEmpty()) {
+                _uiEvent.send(
+                    UiEvent.ShowSnackbar(
+                        UiText.DynamicString("Join or create a group to set a meetup point")
+                    )
+                )
+                return@launch
+            }
+            _uiState.value = _uiState.value.copy(
+                pendingDestinationPick = PendingDestinationPick(
+                    latitude = latitude,
+                    longitude = longitude,
+                    address = null,
+                    isResolvingAddress = true
+                ),
+                showSetDestinationSheet = true
+            )
+            val resolved = geocodeAddress(latitude, longitude)
+            // Only update if the user hasn't already cancelled / re-picked.
+            val currentPick = _uiState.value.pendingDestinationPick
+            if (currentPick != null &&
+                currentPick.latitude == latitude &&
+                currentPick.longitude == longitude
+            ) {
+                _uiState.value = _uiState.value.copy(
+                    pendingDestinationPick = currentPick.copy(
+                        address = resolved,
+                        isResolvingAddress = false
+                    )
+                )
+            }
+        }
+    }
+
+    fun dismissSetDestinationSheet() {
+        _uiState.value = _uiState.value.copy(
+            showSetDestinationSheet = false,
+            pendingDestinationPick = null
+        )
+    }
+
+    /**
+     * Enters discoverable placement mode. The map screen renders a centered
+     * crosshair + bottom action bar instead of the regular FABs. The user
+     * pans/zooms to the spot and confirms via the action bar.
+     *
+     * No-op (with a snackbar) when the user has no groups, since the
+     * destination is group-scoped and there's nothing to pin it to.
+     */
+    fun enterMeetupPlacement() {
+        if (_uiState.value.groups.isEmpty()) {
+            viewModelScope.launch {
+                _uiEvent.send(
+                    UiEvent.ShowSnackbar(
+                        UiText.DynamicString("Join or create a group to set a meetup point")
+                    )
+                )
+            }
+            return
+        }
+        _uiState.value = _uiState.value.copy(
+            isMeetupPlacementMode = true,
+            placementAddress = null,
+            isResolvingPlacementAddress = false,
+            // Make sure no stale modal is still open.
+            showSetDestinationSheet = false,
+            pendingDestinationPick = null
+        )
+    }
+
+    /** Cancels placement mode without setting a destination. */
+    fun cancelMeetupPlacement() {
+        _uiState.value = _uiState.value.copy(
+            isMeetupPlacementMode = false,
+            placementAddress = null,
+            isResolvingPlacementAddress = false
+        )
+    }
+
+    /**
+     * Called by the screen each time the camera idles while in placement
+     * mode. Reverse-geocodes the centered coordinates so the action bar can
+     * show the resolved address without spamming the geocoder while the
+     * user pans.
+     */
+    fun onPlacementCameraIdle(latitude: Double, longitude: Double) {
+        if (!_uiState.value.isMeetupPlacementMode) return
+        _uiState.value = _uiState.value.copy(isResolvingPlacementAddress = true)
+        viewModelScope.launch {
+            val resolved = geocodeAddress(latitude, longitude)
+            // Only apply the result if the user is still in placement mode —
+            // they may have cancelled while geocoding was in flight.
+            if (_uiState.value.isMeetupPlacementMode) {
+                _uiState.value = _uiState.value.copy(
+                    placementAddress = resolved,
+                    isResolvingPlacementAddress = false
+                )
+            }
+        }
+    }
+
+    /**
+     * Confirms the placement mode pick. Mirrors the long-press flow — sets
+     * the pending pick, then either auto-confirms when there's exactly one
+     * eligible group (or the active filter resolves to one) or opens the
+     * redesigned sheet for group selection.
+     */
+    fun confirmMeetupPlacement(latitude: Double, longitude: Double) {
+        val state = _uiState.value
+        if (!state.isMeetupPlacementMode) return
+        val groups = state.groups
+        if (groups.isEmpty()) {
+            cancelMeetupPlacement()
+            return
+        }
+
+        val pendingPick = PendingDestinationPick(
+            latitude = latitude,
+            longitude = longitude,
+            address = state.placementAddress,
+            isResolvingAddress = state.isResolvingPlacementAddress
+        )
+        _uiState.value = state.copy(
+            isMeetupPlacementMode = false,
+            placementAddress = null,
+            isResolvingPlacementAddress = false,
+            pendingDestinationPick = pendingPick,
+            showSetDestinationSheet = true
+        )
+
+        // Kick off a fresh geocode if we don't have an address yet — the
+        // sheet will pick it up via the existing pendingDestinationPick flow.
+        if (pendingPick.address.isNullOrBlank()) {
+            viewModelScope.launch {
+                val resolved = geocodeAddress(latitude, longitude)
+                val current = _uiState.value.pendingDestinationPick
+                if (current != null &&
+                    current.latitude == latitude &&
+                    current.longitude == longitude
+                ) {
+                    _uiState.value = _uiState.value.copy(
+                        pendingDestinationPick = current.copy(
+                            address = resolved,
+                            isResolvingAddress = false
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Confirms the picked destination for [groupId]. Authors a
+     * `MEETUP_DESTINATION_SET` system message into the group's chat once the
+     * Firestore write succeeds.
+     */
+    fun confirmDestinationPick(groupId: String, name: String) {
+        val pick = _uiState.value.pendingDestinationPick ?: return
+        val trimmed = name.trim().ifBlank { pick.address?.substringBefore(',')?.trim().orEmpty() }
+            .ifBlank { "Meetup point" }
+        viewModelScope.launch {
+            when (
+                setMeetupDestinationUseCase(
+                    groupId = groupId,
+                    latitude = pick.latitude,
+                    longitude = pick.longitude,
+                    name = trimmed,
+                    address = pick.address.orEmpty()
+                )
+            ) {
+                is Resource.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        showSetDestinationSheet = false,
+                        pendingDestinationPick = null
+                    )
+                    writeMeetupSystemMessage(
+                        groupId = groupId,
+                        eventType = SystemEventType.MEETUP_DESTINATION_SET,
+                        payload = mapOf(
+                            "name" to trimmed,
+                            "address" to pick.address.orEmpty()
+                        ),
+                        fallbackText = run {
+                            val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
+                            "$actor set the meetup point at \"$trimmed\""
+                        }
+                    )
+                    _uiEvent.send(
+                        UiEvent.ShowSnackbar(
+                            UiText.DynamicString("Meetup point set")
+                        )
+                    )
+                }
+                is Resource.Error -> {
+                    _uiEvent.send(
+                        UiEvent.ShowSnackbar(
+                            UiText.DynamicString("Couldn't set meetup point. Try again.")
+                        )
+                    )
+                }
+                else -> {}
+            }
+        }
+    }
+
+    /** Clears the active destination for the currently-filtered group. */
+    fun clearMeetupDestination() {
+        val filter = _uiState.value.activeGroupFilter ?: return
+        if (filter.isDirect || filter.id.isBlank()) return
+        val previous = _uiState.value.meetupDestination
+        viewModelScope.launch {
+            when (clearMeetupDestinationUseCase(filter.id)) {
+                is Resource.Success -> {
+                    writeMeetupSystemMessage(
+                        groupId = filter.id,
+                        eventType = SystemEventType.MEETUP_DESTINATION_CLEARED,
+                        payload = mapOf("name" to (previous?.name ?: "")),
+                        fallbackText = run {
+                            val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
+                            "$actor cleared the meetup point"
+                        }
+                    )
+                    _uiEvent.send(
+                        UiEvent.ShowSnackbar(
+                            UiText.DynamicString("Meetup point cleared")
+                        )
+                    )
+                }
+                is Resource.Error -> {
+                    _uiEvent.send(
+                        UiEvent.ShowSnackbar(
+                            UiText.DynamicString("Couldn't clear meetup point")
+                        )
+                    )
+                }
+                else -> {}
+            }
+        }
+    }
+
+    /**
+     * One-shot arrival check. If the local user has just entered the arrival
+     * radius for the current destination and we haven't authored
+     * `MEETUP_ARRIVED` for this destination key yet, write the system message
+     * and remember the key.
+     */
+    private fun checkSelfArrival(myLat: Double, myLng: Double) {
+        val state = _uiState.value
+        val destination = state.meetupDestination ?: return
+        val filter = state.activeGroupFilter ?: return
+        if (filter.isDirect || filter.id.isBlank()) return
+        if (!destination.hasValidLocation || !destination.isActive) return
+        val key = destinationKey(filter.id, destination)
+        if (state.arrivedDestinationKey == key) return // already announced
+        if (!detectArrivalUseCase.hasArrived(myLat, myLng, destination)) return
+
+        _uiState.value = state.copy(arrivedDestinationKey = key)
+        viewModelScope.launch {
+            writeMeetupSystemMessage(
+                groupId = filter.id,
+                eventType = SystemEventType.MEETUP_ARRIVED,
+                payload = mapOf("name" to destination.name),
+                fallbackText = run {
+                    val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
+                    "$actor arrived at the meetup point"
+                }
+            )
+        }
+    }
+
+    /**
+     * Resolves the conversation for [groupId] and writes a system message via
+     * [SystemMessageWriter]. Failures are swallowed — the destination state
+     * change matters more than the cosmetic timeline entry.
+     */
+    private suspend fun writeMeetupSystemMessage(
+        groupId: String,
+        eventType: SystemEventType,
+        payload: Map<String, String>,
+        fallbackText: String
+    ) {
+        val conversationId = try {
+            conversationRepository.getConversationIdByGroupId(groupId)
+        } catch (e: Exception) {
+            Timber.w(e, "writeMeetupSystemMessage: failed to resolve conversationId for $groupId")
+            return
+        } ?: return
+        systemMessageWriter.writeSystemMessage(
+            conversationId = conversationId,
+            eventType = eventType,
+            payload = payload,
+            fallbackText = fallbackText
+        )
+    }
+
+    /**
+     * Reverse-geocode helper. Best-effort: returns null on failure or empty
+     * results. Stays off the main thread; uses [android.location.Geocoder]'s
+     * synchronous overload (Android 13+ has an async API but the sync one is
+     * fine on `Dispatchers.IO`).
+     */
+    private suspend fun geocodeAddress(latitude: Double, longitude: Double): String? {
+        return try {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val geocoder = android.location.Geocoder(getApplication(), java.util.Locale.getDefault())
+                @Suppress("DEPRECATION")
+                val results = geocoder.getFromLocation(latitude, longitude, 1)
+                results?.firstOrNull()?.getAddressLine(0)
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "geocodeAddress failed")
+            null
         }
     }
 
@@ -777,6 +1255,9 @@ class GlobalMapViewModel @Inject constructor(
                 hasMyLocation = true,
                 requestCameraMove = moveCamera || _uiState.value.requestCameraMove
             )
+            // Refresh distance/ETA + arrival detection now that we have a fix.
+            recomputeDestinationMetrics()
+            checkSelfArrival(loc.latitude, loc.longitude)
             // Throttle the DataStore write: only persist when the new fix is
             // meaningfully different from the saved one. Stops every tab return
             // (which recreates this ViewModel) from spamming a write with the
@@ -797,6 +1278,28 @@ class GlobalMapViewModel @Inject constructor(
 
     fun onCameraMoveConsumed() {
         _uiState.value = _uiState.value.copy(requestCameraMove = false)
+    }
+
+    /** Asks the screen to animate the camera onto the active meetup destination. */
+    fun requestDestinationFocus() {
+        if (_uiState.value.meetupDestination?.hasValidLocation == true) {
+            _uiState.value = _uiState.value.copy(requestDestinationFocus = true)
+        }
+    }
+
+    fun onDestinationFocusConsumed() {
+        _uiState.value = _uiState.value.copy(requestDestinationFocus = false)
+    }
+
+    /** Opens the place-card sheet for the active destination. No-op when none. */
+    fun openMeetupPlaceCard() {
+        if (_uiState.value.meetupDestination?.hasValidLocation == true) {
+            _uiState.value = _uiState.value.copy(showMeetupPlaceCard = true)
+        }
+    }
+
+    fun dismissMeetupPlaceCard() {
+        _uiState.value = _uiState.value.copy(showMeetupPlaceCard = false)
     }
 
     fun onAutoZoomConsumed() {
@@ -882,6 +1385,7 @@ class GlobalMapViewModel @Inject constructor(
         friendsJob?.cancel()
         timeAgoRefreshJob?.cancel()
         countdownJob?.cancel()
+        meetupDestinationJob?.cancel()
         unregisterLocationProviderReceiver()
     }
 }
@@ -930,5 +1434,53 @@ data class GlobalMapUiState(
      */
     val cameraRestored: Boolean = false,
     /** Monotonic counter to break StateFlow structural equality on timeAgo refresh. */
-    val timeAgoTick: Long = 0L
+    val timeAgoTick: Long = 0L,
+    // ── Meetup destination ──────────────────────────────────────────────────
+    /** Active destination for the currently-filtered group, if any. */
+    val meetupDestination: MeetupDestination? = null,
+    /** Pre-formatted distance from local user to destination ("0.4km away" / "120m away"). */
+    val meetupDestinationDistanceText: String? = null,
+    /** Pre-formatted ETA from local user to destination ("5 min" / "1h 12m"). */
+    val meetupDestinationEtaText: String? = null,
+    /** Long-press pick that hasn't been confirmed yet. Drives the bottom sheet. */
+    val pendingDestinationPick: PendingDestinationPick? = null,
+    /** Whether the "Set meetup point" sheet is visible. */
+    val showSetDestinationSheet: Boolean = false,
+    /**
+     * Discoverable placement mode: when true the map shows a centered
+     * crosshair and a bottom action bar instead of the regular FABs. Triggered
+     * by the dedicated Meetup FAB; long-press picks a spot directly without
+     * entering placement mode (preserves the power-user shortcut).
+     */
+    val isMeetupPlacementMode: Boolean = false,
+    /** Resolved address for the spot the camera is currently centered on while in placement mode. */
+    val placementAddress: String? = null,
+    /** True while the geocoder is resolving [placementAddress]. */
+    val isResolvingPlacementAddress: Boolean = false,
+    /**
+     * One-shot flag — set by [GlobalMapViewModel.requestDestinationFocus] so the
+     * screen animates the camera onto the active destination pin. Cleared via
+     * [onDestinationFocusConsumed] once the screen has handled it.
+     */
+    val requestDestinationFocus: Boolean = false,
+    /** Whether the place-card sheet for the active destination is visible. */
+    val showMeetupPlaceCard: Boolean = false,
+    /**
+     * Stable key (`"${groupId}_${destination.setAt}"`) of the destination the
+     * local user has already authored a `MEETUP_ARRIVED` system message for.
+     * Reset whenever the destination changes so a re-set destination triggers
+     * a new arrival announcement.
+     */
+    val arrivedDestinationKey: String? = null
+)
+
+/**
+ * A long-press pick on the global map that hasn't been confirmed yet.
+ * Address may be null while the geocoder is still resolving (or if it failed).
+ */
+data class PendingDestinationPick(
+    val latitude: Double,
+    val longitude: Double,
+    val address: String? = null,
+    val isResolvingAddress: Boolean = false
 )

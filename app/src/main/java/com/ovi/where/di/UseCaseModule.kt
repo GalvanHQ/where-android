@@ -54,7 +54,11 @@ import com.ovi.where.domain.usecase.group.LeaveGroupUseCase
 import com.ovi.where.domain.usecase.group.ObserveGroupMembersUseCase
 import com.ovi.where.domain.usecase.group.PromoteMemberUseCase
 import com.ovi.where.domain.usecase.group.UpdateGroupUseCase
+import com.ovi.where.domain.usecase.location.ClearMeetupDestinationUseCase
+import com.ovi.where.domain.usecase.location.DetectArrivalUseCase
 import com.ovi.where.domain.usecase.location.ObserveGroupLocationsUseCase
+import com.ovi.where.domain.usecase.location.ObserveMeetupDestinationUseCase
+import com.ovi.where.domain.usecase.location.SetMeetupDestinationUseCase
 import com.ovi.where.domain.usecase.location.StartLocationSharingUseCase
 import com.ovi.where.domain.usecase.location.StopLocationSharingUseCase
 import com.ovi.where.domain.usecase.user.GetUsersUseCase
@@ -98,6 +102,10 @@ object UseCaseModule {
     @Provides fun provideStartLocationSharingUseCase(r: LocationRepository) = StartLocationSharingUseCase(r)
     @Provides fun provideStopLocationSharingUseCase(r: LocationRepository) = StopLocationSharingUseCase(r)
     @Provides fun provideObserveGroupLocationsUseCase(r: LocationRepository) = ObserveGroupLocationsUseCase(r)
+    @Provides fun provideSetMeetupDestinationUseCase(r: LocationRepository) = SetMeetupDestinationUseCase(r)
+    @Provides fun provideClearMeetupDestinationUseCase(r: LocationRepository) = ClearMeetupDestinationUseCase(r)
+    @Provides fun provideObserveMeetupDestinationUseCase(r: LocationRepository) = ObserveMeetupDestinationUseCase(r)
+    @Provides fun provideDetectArrivalUseCase() = DetectArrivalUseCase()
 
     // ── User ─────────────────────────────────────────────────────────────────
     @Provides fun provideGetUsersUseCase(r: UserRepository) = GetUsersUseCase(r)

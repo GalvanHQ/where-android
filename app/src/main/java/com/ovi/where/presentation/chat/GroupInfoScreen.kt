@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEmotions
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonAdd
@@ -135,6 +136,8 @@ fun GroupInfoScreen(
         onNavigateToMembers = onNavigateToMembers,
         onNavigateToNicknames = onNavigateToNicknames,
         onNavigateToSearch = onNavigateToSearch,
+        onNavigateToGroupMap = onNavigateToGroupMap,
+        onClearMeetupDestination = { viewModel.clearMeetupDestination() },
         onRetry = { viewModel.retry() },
         onToggleMute = { viewModel.toggleMute() },
         onLeaveGroup = { viewModel.leaveGroup { onNavigateBack() } },
@@ -163,6 +166,8 @@ internal fun GroupInfoScreenContent(
     onNavigateToMembers: () -> Unit = {},
     onNavigateToNicknames: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
+    onNavigateToGroupMap: () -> Unit = {},
+    onClearMeetupDestination: () -> Unit = {},
     onRetry: () -> Unit,
     onToggleMute: () -> Unit,
     onLeaveGroup: () -> Unit,
@@ -276,6 +281,15 @@ internal fun GroupInfoScreenContent(
                     onThemeColor = { showThemeColorDialog = true },
                     onEmojiShortcut = { showEmojiPicker = true },
                     onNicknames = onNavigateToNicknames
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // ── Meetup section ───────────────────────────────────────────
+                MeetupSection(
+                    destination = uiState.meetupDestination,
+                    onNavigateToGroupMap = onNavigateToGroupMap,
+                    onClearMeetupDestination = onClearMeetupDestination
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -1128,5 +1142,175 @@ private fun SectionListItem(
                 )
             }
         }
+    }
+}
+
+
+// ── Meetup section ───────────────────────────────────────────────────────────
+
+/**
+ * Group Info section that surfaces the active meetup destination.
+ *
+ * Layout matches the rest of the Group Info screen — section header in the
+ * `labelLarge` + `SemiBold` style, then a single tappable row with leading
+ * flag icon. Tap behaviour:
+ *
+ * - No destination set → opens the Group Map (where the user can long-press
+ *   to set one). Keeps the picker logic in a single place.
+ * - Destination set → opens an action sheet: "Show on map" / "Clear".
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun MeetupSection(
+    destination: com.ovi.where.domain.model.MeetupDestination?,
+    onNavigateToGroupMap: () -> Unit,
+    onClearMeetupDestination: () -> Unit
+) {
+    var showActions by remember { mutableStateOf(false) }
+    var showClearConfirm by remember { mutableStateOf(false) }
+    val active = destination != null && destination.isActive && destination.hasValidLocation
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Meetup",
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = FontWeight.SemiBold
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    if (active) showActions = true
+                    else onNavigateToGroupMap()
+                }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            androidx.compose.material3.Icon(
+                imageVector = Icons.Filled.Flag,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                tint = if (active) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Meetup point",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = when {
+                        !active -> "None set — open the map to choose one"
+                        destination!!.address.isNotBlank() -> destination.address
+                        else -> destination.name.ifBlank { "Active" }
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+
+    if (showActions && destination != null) {
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = { showActions = false },
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                Text(
+                    text = destination.name.ifBlank { "Meetup point" },
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
+                if (destination.address.isNotBlank()) {
+                    Text(
+                        text = destination.address,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                MeetupActionRow(
+                    icon = Icons.Filled.Flag,
+                    label = "Show on map",
+                    onClick = {
+                        showActions = false
+                        onNavigateToGroupMap()
+                    }
+                )
+                MeetupActionRow(
+                    icon = Icons.Filled.Delete,
+                    label = "Clear meetup point",
+                    tint = MaterialTheme.colorScheme.error,
+                    onClick = {
+                        showActions = false
+                        showClearConfirm = true
+                    }
+                )
+            }
+        }
+    }
+
+    if (showClearConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirm = false },
+            title = { Text("Clear meetup point?") },
+            text = { Text("Everyone in this group will stop seeing it on the map.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showClearConfirm = false
+                    onClearMeetupDestination()
+                }) {
+                    Text(
+                        "Clear",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun MeetupActionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    tint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        androidx.compose.material3.Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = tint
+        )
     }
 }

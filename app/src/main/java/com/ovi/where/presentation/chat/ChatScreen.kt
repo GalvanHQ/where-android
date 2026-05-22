@@ -931,6 +931,7 @@ fun ChatScreen(
         visible = uiState.showLiveMeetupSheet,
         conversationTitle = uiState.conversation?.title,
         locations = meetupMapLocations,
+        meetupDestination = uiState.meetupDestination,
         isSharing = uiState.isLiveLocationSharingActive,
         sharingTimeRemaining = uiState.liveLocationTimeRemaining,
         selectedDurationMinutes = uiState.selectedDurationMinutes,

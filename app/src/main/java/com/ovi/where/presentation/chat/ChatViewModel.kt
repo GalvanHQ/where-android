@@ -108,7 +108,8 @@ class ChatViewModel @Inject constructor(
     private val onlineStatusDao: OnlineStatusDao,
     private val userRepository: UserRepository,
     private val getOrCreateDirectConversationUseCase: com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase,
-    private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter
+    private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter,
+    private val observeMeetupDestinationUseCase: com.ovi.where.domain.usecase.location.ObserveMeetupDestinationUseCase
 ) : AndroidViewModel(application) {
 
     /**
@@ -384,6 +385,19 @@ class ChatViewModel @Inject constructor(
     /** Whether presence subscription for DM has been started (to avoid duplicate subscriptions). */
     private var dmPresenceSubscribed = false
 
+    /**
+     * Subscribes to the active meetup destination for a group conversation.
+     * Result drives the in-chat live meetup sheet's "Meet at" pill and the
+     * destination pin on the embedded map preview.
+     */
+    private fun observeMeetupDestination(groupId: String) {
+        viewModelScope.launch {
+            observeMeetupDestinationUseCase(groupId).collect { destination ->
+                _uiState.value = _uiState.value.copy(meetupDestination = destination)
+            }
+        }
+    }
+
     private fun loadConversation(conversationId: String) {
         viewModelScope.launch {
             val uid = currentUserId ?: ""
@@ -438,6 +452,10 @@ class ChatViewModel @Inject constructor(
                         observeAdminStatus(uiModel.groupId)
                         // Observe group members for @mention suggestions (Requirement 14.1)
                         observeGroupMembersForMentions(uiModel.groupId)
+                        // Observe the active meetup destination so the live meetup
+                        // sheet and (later) header surfaces stay in sync with the
+                        // global map.
+                        observeMeetupDestination(uiModel.groupId)
                     }
                 }
             }
@@ -3352,7 +3370,9 @@ data class ChatUiState(
     val showImageSizeError: Boolean = false,
     // ─── Live Meetup Sheet (chat-location-header-redesign) ────────────────────
     /** Whether the live meetup bottom sheet (map + duration picker) is visible. */
-    val showLiveMeetupSheet: Boolean = false
+    val showLiveMeetupSheet: Boolean = false,
+    /** Active meetup destination for this group (null for direct chats / no destination set). */
+    val meetupDestination: com.ovi.where.domain.model.MeetupDestination? = null
 )
 
 /**

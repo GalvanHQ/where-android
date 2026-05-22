@@ -81,7 +81,15 @@ service cloud.firestore {
     match /groups/{groupId} {
       allow create: if isAuthenticated();
       allow read: if isAuthenticated();
-      allow update: if isAuthenticated();
+      // Updates are allowed for any authenticated user EXCEPT updates that
+      // touch `meetupDestination`, which require the actor to be a current
+      // group member. This blocks outsiders from polluting a group's pinned
+      // meetup point while keeping every other field's existing semantics.
+      allow update: if isAuthenticated()
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['meetupDestination'])
+          || (request.auth.uid in resource.data.memberIds)
+        );
       allow delete: if isAuthenticated() && request.auth.uid == resource.data.createdBy;
 
       match /members/{memberId} {

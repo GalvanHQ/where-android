@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
@@ -91,6 +92,7 @@ fun LiveMeetupSheet(
     visible: Boolean,
     conversationTitle: String?,
     locations: List<SharedLocation>,
+    meetupDestination: com.ovi.where.domain.model.MeetupDestination? = null,
     isSharing: Boolean,
     sharingTimeRemaining: String?,
     selectedDurationMinutes: Long,
@@ -169,12 +171,44 @@ fun LiveMeetupSheet(
             // ── Map preview (220dp, rounded) ─────────────────────────────
             MapPreview(
                 locations = locations,
+                meetupDestination = meetupDestination,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(220.dp)
             )
 
             Spacer(Modifier.height(16.dp))
+
+            // ── Meet at pill ─────────────────────────────────────────────
+            if (meetupDestination != null && meetupDestination.isActive && meetupDestination.hasValidLocation) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Flag,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Meet at: ${meetupDestination.name.ifBlank { "Meetup point" }}",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
 
             // ── Duration picker (only shown when not currently sharing) ──
             if (!isSharing) {
@@ -365,10 +399,16 @@ fun LiveMeetupSheet(
 @Composable
 private fun MapPreview(
     locations: List<SharedLocation>,
+    meetupDestination: com.ovi.where.domain.model.MeetupDestination? = null,
     modifier: Modifier = Modifier
 ) {
     val validLocations = remember(locations) {
         locations.filter { it.latitude != 0.0 && it.longitude != 0.0 }
+    }
+    val destinationLatLng = remember(meetupDestination) {
+        meetupDestination
+            ?.takeIf { it.isActive && it.hasValidLocation }
+            ?.let { LatLng(it.latitude, it.longitude) }
     }
 
     // ── Night mode (matches GlobalMapScreen — auto-detect 7pm to 6am) ──────
@@ -394,7 +434,7 @@ private fun MapPreview(
         },
         tonalElevation = 1.dp
     ) {
-        if (validLocations.isEmpty()) {
+        if (validLocations.isEmpty() && destinationLatLng == null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -436,54 +476,63 @@ private fun MapPreview(
             // framing the meetup. Then we still nudge it tightly via
             // newLatLngBounds in a LaunchedEffect (uses the actual viewport size
             // so the framing is exact).
-            val initialPosition = remember(validLocations) {
-                if (validLocations.size == 1) {
-                    val only = validLocations.first()
-                    CameraPosition.fromLatLngZoom(LatLng(only.latitude, only.longitude), 15f)
-                } else {
-                    val centroidLat = validLocations.sumOf { it.latitude } / validLocations.size
-                    val centroidLng = validLocations.sumOf { it.longitude } / validLocations.size
-                    // Pick a zoom that roughly fits the diagonal span. Refined
-                    // by the bounds animation below once the map knows its size.
-                    val maxLat = validLocations.maxOf { it.latitude }
-                    val minLat = validLocations.minOf { it.latitude }
-                    val maxLng = validLocations.maxOf { it.longitude }
-                    val minLng = validLocations.minOf { it.longitude }
-                    val span = maxOf(maxLat - minLat, maxLng - minLng)
-                    val zoom = when {
-                        span > 5.0 -> 5f
-                        span > 1.0 -> 8f
-                        span > 0.5 -> 9f
-                        span > 0.1 -> 11f
-                        span > 0.05 -> 12f
-                        span > 0.01 -> 13f
-                        else -> 14f
+            val initialPosition = remember(validLocations, destinationLatLng) {
+                // Build a list of every point we want to fit on the preview —
+                // active sharers plus (if set) the meetup destination.
+                val allPoints = buildList {
+                    validLocations.forEach { add(LatLng(it.latitude, it.longitude)) }
+                    if (destinationLatLng != null) add(destinationLatLng)
+                }
+                when {
+                    allPoints.isEmpty() ->
+                        CameraPosition.fromLatLngZoom(LatLng(0.0, 0.0), 2f)
+                    allPoints.size == 1 ->
+                        CameraPosition.fromLatLngZoom(allPoints.first(), 15f)
+                    else -> {
+                        val centroidLat = allPoints.sumOf { it.latitude } / allPoints.size
+                        val centroidLng = allPoints.sumOf { it.longitude } / allPoints.size
+                        // Pick a zoom that roughly fits the diagonal span. Refined
+                        // by the bounds animation below once the map knows its size.
+                        val maxLat = allPoints.maxOf { it.latitude }
+                        val minLat = allPoints.minOf { it.latitude }
+                        val maxLng = allPoints.maxOf { it.longitude }
+                        val minLng = allPoints.minOf { it.longitude }
+                        val span = maxOf(maxLat - minLat, maxLng - minLng)
+                        val zoom = when {
+                            span > 5.0 -> 5f
+                            span > 1.0 -> 8f
+                            span > 0.5 -> 9f
+                            span > 0.1 -> 11f
+                            span > 0.05 -> 12f
+                            span > 0.01 -> 13f
+                            else -> 14f
+                        }
+                        CameraPosition.fromLatLngZoom(LatLng(centroidLat, centroidLng), zoom)
                     }
-                    CameraPosition.fromLatLngZoom(LatLng(centroidLat, centroidLng), zoom)
                 }
             }
             val cameraPositionState = rememberCameraPositionState { position = initialPosition }
 
-            // Frame all sharers exactly when the sheet opens. No animation —
-            // animations cause the visible "zoom in" the user complained about.
-            // Re-runs only when the sharer SET changes (a sharer joins or leaves),
-            // not on every GPS coordinate update.
-            val sharerKey = remember(validLocations) {
-                validLocations.map { it.userId }.sorted().joinToString(",")
+            // Frame all sharers + destination exactly when the sheet opens.
+            // No animation — animations cause the visible "zoom in" the user
+            // complained about. Re-runs when the sharer SET changes or when
+            // the destination identity changes.
+            val frameKey = remember(validLocations, destinationLatLng) {
+                val sharerKey = validLocations.map { it.userId }.sorted().joinToString(",")
+                val destKey = destinationLatLng?.let { "${it.latitude},${it.longitude}" } ?: ""
+                "$sharerKey|$destKey"
             }
-            LaunchedEffect(sharerKey) {
-                if (validLocations.isEmpty()) return@LaunchedEffect
-                val update = if (validLocations.size == 1) {
-                    CameraUpdateFactory.newLatLngZoom(
-                        LatLng(
-                            validLocations.first().latitude,
-                            validLocations.first().longitude
-                        ),
-                        15f
-                    )
+            LaunchedEffect(frameKey) {
+                val allPoints = buildList {
+                    validLocations.forEach { add(LatLng(it.latitude, it.longitude)) }
+                    if (destinationLatLng != null) add(destinationLatLng)
+                }
+                if (allPoints.isEmpty()) return@LaunchedEffect
+                val update = if (allPoints.size == 1) {
+                    CameraUpdateFactory.newLatLngZoom(allPoints.first(), 15f)
                 } else {
                     val bounds = LatLngBounds.builder().apply {
-                        validLocations.forEach { include(LatLng(it.latitude, it.longitude)) }
+                        allPoints.forEach { include(it) }
                     }.build()
                     CameraUpdateFactory.newLatLngBounds(bounds, 96)
                 }
@@ -570,6 +619,20 @@ private fun MapPreview(
                             fallbackLabel = loc.displayName.firstOrNull()?.uppercase() ?: "?",
                             accentColor = avatarColorForUser(loc.userId)
                         )
+                    }
+                }
+
+                // ── Meetup destination marker on the embedded preview ──────
+                if (destinationLatLng != null && meetupDestination != null) {
+                    val destinationMarkerState = remember(destinationLatLng) {
+                        MarkerState(position = destinationLatLng)
+                    }
+                    MarkerComposable(
+                        state = destinationMarkerState,
+                        title = meetupDestination.name.ifBlank { "Meetup point" },
+                        zIndex = 4f
+                    ) {
+                        com.ovi.where.presentation.map.components.DestinationPinMarker()
                     }
                 }
             }

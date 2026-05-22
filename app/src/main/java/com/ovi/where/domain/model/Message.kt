@@ -88,7 +88,10 @@ enum class SystemEventType {
     EMOJI_SHORTCUT_CHANGED,
     LIVE_LOCATION_STARTED,
     LOCATION_SHARED,
-    USER_BLOCKED;
+    USER_BLOCKED,
+    MEETUP_DESTINATION_SET,
+    MEETUP_DESTINATION_CLEARED,
+    MEETUP_ARRIVED;
 
     companion object {
         /** Safe parse from a string; returns null on unknown values (forward-compat). */

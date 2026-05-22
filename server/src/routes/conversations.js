@@ -445,7 +445,11 @@ router.post('/:conversationId/system-message', async (req, res) => {
             'EMOJI_SHORTCUT_CHANGED',
             'LIVE_LOCATION_STARTED',
             'LOCATION_SHARED',
-            'USER_BLOCKED'
+            'USER_BLOCKED',
+            // Meetup destination events — see .kiro/specs/meetup-destination/
+            'MEETUP_DESTINATION_SET',
+            'MEETUP_DESTINATION_CLEARED',
+            'MEETUP_ARRIVED'
         ]);
         if (!ACCEPTED_EVENT_TYPES.has(systemEventType)) {
             return res.status(400).json({ error: `Unknown systemEventType: ${systemEventType}` });

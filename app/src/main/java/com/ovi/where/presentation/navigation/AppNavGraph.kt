@@ -332,6 +332,21 @@ fun AppNavGraph(
                         navController.navigate(Screen.UserProfile.createRoute(userId)) {
                             launchSingleTop = true
                         }
+                    },
+                    onNavigateToCreateGroup = {
+                        navController.navigate(Screen.CreateGroup.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToJoinGroup = {
+                        navController.navigate(Screen.JoinGroup.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToAddFriends = {
+                        navController.navigate(Screen.Search.createRoute("people")) {
+                            launchSingleTop = true
+                        }
                     }
                 )
             }

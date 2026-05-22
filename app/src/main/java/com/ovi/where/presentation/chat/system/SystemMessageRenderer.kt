@@ -122,6 +122,20 @@ object SystemMessageRenderer {
                 // (filter happens upstream in MessageRepositoryImpl).
                 "$actor blocked you"
             }
+
+            SystemEventType.MEETUP_DESTINATION_SET -> {
+                val name = payload["name"].orEmpty().ifBlank { "the meetup point" }
+                if (name == "the meetup point") "$actor set the meetup point"
+                else "$actor set the meetup point at \"$name\""
+            }
+
+            SystemEventType.MEETUP_DESTINATION_CLEARED ->
+                "$actor cleared the meetup point"
+
+            SystemEventType.MEETUP_ARRIVED -> {
+                if (isSelfActor) "You arrived at the meetup point"
+                else "$actor arrived at the meetup point"
+            }
         }
     }
 }

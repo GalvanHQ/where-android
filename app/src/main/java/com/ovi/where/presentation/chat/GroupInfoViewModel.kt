@@ -42,7 +42,10 @@ class GroupInfoViewModel @Inject constructor(
     private val conversationRepository: com.ovi.where.domain.repository.ConversationRepository,
     private val firebaseAuth: FirebaseAuth,
     private val friendshipRepository: com.ovi.where.domain.repository.FriendshipRepository,
-    private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter
+    private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter,
+    private val observeMeetupDestinationUseCase: com.ovi.where.domain.usecase.location.ObserveMeetupDestinationUseCase,
+    private val setMeetupDestinationUseCase: com.ovi.where.domain.usecase.location.SetMeetupDestinationUseCase,
+    private val clearMeetupDestinationUseCase: com.ovi.where.domain.usecase.location.ClearMeetupDestinationUseCase
 ) : ViewModel() {
 
     private val groupId: String = savedStateHandle["groupId"] ?: ""
@@ -71,6 +74,81 @@ class GroupInfoViewModel @Inject constructor(
     init {
         if (groupId.isNotBlank()) {
             loadGroupInfo()
+            observeMeetupDestination()
+        }
+    }
+
+    /**
+     * Observes the active meetup destination for this group. Cleans up
+     * automatically when the ViewModel is cleared.
+     */
+    private fun observeMeetupDestination() {
+        viewModelScope.launch {
+            observeMeetupDestinationUseCase(groupId).collect { destination ->
+                _uiState.update { it.copy(meetupDestination = destination) }
+            }
+        }
+    }
+
+    /**
+     * Sets the meetup destination for this group from the Group Info picker.
+     * Authors a `MEETUP_DESTINATION_SET` system message into the group's chat
+     * once the Firestore write succeeds.
+     */
+    fun setMeetupDestination(latitude: Double, longitude: Double, name: String, address: String = "") {
+        viewModelScope.launch {
+            val trimmed = name.trim().ifBlank { "Meetup point" }
+            when (
+                setMeetupDestinationUseCase(
+                    groupId = groupId,
+                    latitude = latitude,
+                    longitude = longitude,
+                    name = trimmed,
+                    address = address
+                )
+            ) {
+                is Resource.Success -> {
+                    val convId = ensureConversationId()
+                    if (convId != null) {
+                        val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
+                        systemMessageWriter.writeSystemMessage(
+                            conversationId = convId,
+                            eventType = com.ovi.where.domain.model.SystemEventType.MEETUP_DESTINATION_SET,
+                            payload = mapOf("name" to trimmed, "address" to address),
+                            fallbackText = "$actor set the meetup point at \"$trimmed\""
+                        )
+                    }
+                }
+                is Resource.Error -> {
+                    _uiState.update { it.copy(error = "Couldn't set meetup point. Try again.") }
+                }
+                is Resource.Loading -> {}
+            }
+        }
+    }
+
+    /** Clears the active meetup destination for this group. */
+    fun clearMeetupDestination() {
+        viewModelScope.launch {
+            val previous = _uiState.value.meetupDestination
+            when (clearMeetupDestinationUseCase(groupId)) {
+                is Resource.Success -> {
+                    val convId = ensureConversationId()
+                    if (convId != null) {
+                        val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
+                        systemMessageWriter.writeSystemMessage(
+                            conversationId = convId,
+                            eventType = com.ovi.where.domain.model.SystemEventType.MEETUP_DESTINATION_CLEARED,
+                            payload = mapOf("name" to (previous?.name ?: "")),
+                            fallbackText = "$actor cleared the meetup point"
+                        )
+                    }
+                }
+                is Resource.Error -> {
+                    _uiState.update { it.copy(error = "Couldn't clear meetup point") }
+                }
+                is Resource.Loading -> {}
+            }
         }
     }
 

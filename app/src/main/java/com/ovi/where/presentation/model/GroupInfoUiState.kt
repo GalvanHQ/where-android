@@ -18,5 +18,7 @@ data class GroupInfoUiState(
     val emojiShortcut: String? = null,
     val isMuted: Boolean = false,
     val isLoading: Boolean = true,
-    val error: String? = null
+    val error: String? = null,
+    /** Currently active meetup destination for this group (null when none set). */
+    val meetupDestination: com.ovi.where.domain.model.MeetupDestination? = null
 )

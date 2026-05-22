@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -57,7 +58,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.LocationOn
@@ -142,6 +142,9 @@ import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.LocationUtils
 import com.ovi.where.core.utils.showToast
+import com.ovi.where.presentation.map.components.DestinationPinMarker
+import com.ovi.where.presentation.map.components.MeetupPlacementActionBar
+import com.ovi.where.presentation.map.components.SetMeetupDestinationSheet
 import com.ovi.where.presentation.map.components.fanOutOverlappingMarkers
 import kotlinx.coroutines.launch
 
@@ -157,6 +160,9 @@ val MapNavBarHeight = 80.dp
 fun GlobalMapScreen(
     onNavigateToChat: (String) -> Unit = {},
     onNavigateToUserProfile: (String) -> Unit = {},
+    onNavigateToCreateGroup: () -> Unit = {},
+    onNavigateToJoinGroup: () -> Unit = {},
+    onNavigateToAddFriends: () -> Unit = {},
     viewModel: GlobalMapViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -310,6 +316,7 @@ fun GlobalMapScreen(
     var mapType by remember { mutableStateOf(MapType.NORMAL) }
     var showMapTypeSheet by remember { mutableStateOf(false) }
     var showMyProfileSheet by remember { mutableStateOf(false) }
+    var showMeetupClearConfirm by remember { mutableStateOf(false) }
 
     // ── Night mode (auto-detect based on time of day) ─────────────────────────
     // Uses ComposeMapColorScheme.DARK — Google's official Maps dark mode,
@@ -337,9 +344,16 @@ fun GlobalMapScreen(
     // keeps content from being hidden behind the nav bar.
     val systemBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val totalNavBarHeight = MapNavBarHeight + systemBottomInset
-    // Peek shows: drag handle + hero header (~64dp) + avatars row (~80dp) when friends exist
+    // Peek shows: drag handle + hero header (~64dp) + avatars row (~80dp) when friends exist.
+    // In placement mode we collapse the sheet to just its drag handle (~32dp) so the map
+    // gets max vertical area for the user to find their meetup spot.
     val contentPeek = 250.dp
-    val sheetPeekHeight = contentPeek + totalNavBarHeight
+    val placementPeek = 32.dp
+    val sheetPeekHeight = if (uiState.isMeetupPlacementMode) {
+        placementPeek + totalNavBarHeight
+    } else {
+        contentPeek + totalNavBarHeight
+    }
 
     val bottomSheetScaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberStandardBottomSheetState(
@@ -354,11 +368,19 @@ fun GlobalMapScreen(
         }
     }
 
+    // Collapse the sheet to peek the moment placement mode starts so the map
+    // gets max vertical space to pick a spot from.
+    LaunchedEffect(uiState.isMeetupPlacementMode) {
+        if (uiState.isMeetupPlacementMode) {
+            bottomSheetScaffoldState.bottomSheetState.partialExpand()
+        }
+    }
+
     BottomSheetScaffold(
         scaffoldState = bottomSheetScaffoldState,
         sheetPeekHeight = sheetPeekHeight,
         sheetShape = RoundedCornerShape(topStart = 38.dp, topEnd = 38.dp),
-        sheetContainerColor = MaterialTheme.colorScheme.surfaceDim,
+        sheetContainerColor = MaterialTheme.colorScheme.surface,
         sheetShadowElevation = 12.dp,
         sheetTonalElevation = 1.dp,
         sheetDragHandle = {
@@ -435,6 +457,18 @@ fun GlobalMapScreen(
                         excludeTargetIds = uiState.sharingTargetIds,
                         bottomReservedSpace = totalNavBarHeight,
                         onCancel = { sheetView = MapSheetView.Home },
+                        onCreateGroup = {
+                            sheetView = MapSheetView.Home
+                            onNavigateToCreateGroup()
+                        },
+                        onJoinGroup = {
+                            sheetView = MapSheetView.Home
+                            onNavigateToJoinGroup()
+                        },
+                        onAddFriends = {
+                            sheetView = MapSheetView.Home
+                            onNavigateToAddFriends()
+                        },
                         onStart = { targetIds, durationMinutes ->
                             if (uiState.isSharing) {
                                 targetIds.forEach { id ->
@@ -544,6 +578,10 @@ fun GlobalMapScreen(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
                 contentPadding = innerPadding,
+                onMapLongClick = { latLng ->
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                    viewModel.onMapLongClick(latLng.latitude, latLng.longitude)
+                },
                 // mapColorScheme is the SDK's native dark mode and is applied
                 // *before* the first frame, eliminating the light-tile flash
                 // we used to see while the JSON style was being applied. We
@@ -678,59 +716,101 @@ fun GlobalMapScreen(
                         )
                     }
                 }
+
+                // ── Meetup destination marker ─────────────────────────────────
+                val destination = uiState.meetupDestination
+                if (destination != null && destination.hasValidLocation && destination.isActive) {
+                    val destinationLatLng = remember(destination.latitude, destination.longitude) {
+                        LatLng(destination.latitude, destination.longitude)
+                    }
+                    val destinationMarkerState = remember(destinationLatLng) {
+                        MarkerState(position = destinationLatLng)
+                    }
+                    MarkerComposable(
+                        state = destinationMarkerState,
+                        title = destination.name.ifEmpty { "Meetup point" },
+                        snippet = destination.address.takeIf { it.isNotBlank() },
+                        zIndex = 4f,
+                        onClick = {
+                            viewModel.openMeetupPlaceCard()
+                            true
+                        }
+                    ) {
+                        DestinationPinMarker()
+                    }
+                }
             }
             }
 
 
-            // ── Group filter pill (top center) ───────────────────────────────
-            // Premium floating pill with active-filter avatar, like Google Maps search bar
-            Surface(
+            // ── Top-of-map chip strip ─────────────────────────────────────────
+            // Sits at the top center like Google Maps' chip strip. Both chips
+            // share the same chip language: 40dp height, 50% radius, single-
+            // line label, leading icon/avatar. Group filter on the left,
+            // meetup chip on the right.
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
                     .padding(top = 12.dp)
-                    .clickable { viewModel.showGroupPicker(true) },
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 6.dp,
-                tonalElevation = 1.dp
+                    .padding(horizontal = Dimens.spaceMedium),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.padding(
-                        start = 8.dp,
-                        end = 16.dp,
-                        top = 8.dp,
-                        bottom = 8.dp
-                    ),
-                    verticalAlignment = Alignment.CenterVertically
+                // Group filter chip — same chip language as the meetup chip.
+                Surface(
+                    modifier = Modifier
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(50))
+                        .clickable { viewModel.showGroupPicker(true) },
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 2.dp,
+                    tonalElevation = 2.dp,
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
                 ) {
-                    FilterPillAvatar(filter = uiState.activeGroupFilter)
-                    Spacer(Modifier.width(10.dp))
-                    Column {
+                    Row(
+                        modifier = Modifier.padding(start = 6.dp, end = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Compact 28dp avatar — matches the meetup chip's
+                        // active-state inset bubble for visual rhythm.
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            FilterPillAvatar(filter = uiState.activeGroupFilter)
+                        }
+                        Spacer(Modifier.width(8.dp))
                         Text(
                             text = uiState.activeGroupFilter?.name ?: "All Friends",
-                            style = MaterialTheme.typography.titleSmall,
+                            style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Text(
-                            text = if (uiState.friendLocations.isEmpty()) "No one sharing"
-                            else "${uiState.friendLocations.size} ${if (uiState.friendLocations.size == 1) "person" else "people"} sharing",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.ArrowDropDown,
+                            null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Spacer(Modifier.width(8.dp))
-                    Icon(
-                        Icons.Default.ArrowDropDown,
-                        null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
+
+                com.ovi.where.presentation.map.components.MeetupChip(
+                    destination = uiState.meetupDestination,
+                    distanceText = uiState.meetupDestinationDistanceText,
+                    onIdleClick = { viewModel.enterMeetupPlacement() },
+                    onActiveClick = { viewModel.openMeetupPlaceCard() }
+                )
             }
 
             // ── Stacked status banners (location off + sharing) ──────────────────
@@ -836,6 +916,9 @@ fun GlobalMapScreen(
             // FABs use innerPadding to sit above the sheet peek (which already
             // includes the bottom nav bar height). When the user pulls the sheet
             // up, it slides over the FABs — exactly like Google Maps.
+            // Hidden while placement mode is active to keep the placement
+            // crosshair + action bar the only visible chrome.
+            if (!uiState.isMeetupPlacementMode) {
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -948,6 +1031,124 @@ fun GlobalMapScreen(
                             modifier = Modifier.size(Dimens.iconSizeLarge)
                         )
                     }
+                }
+            }
+            } // end if (!uiState.isMeetupPlacementMode) — FAB column
+
+            // ── Meetup placement overlay ─────────────────────────────────────
+            // When the user enters placement mode we render:
+            //   • An animated crosshair anchored to the visible map center
+            //     (accounting for the chip strip on top and the action bar /
+            //     sheet peek on the bottom).
+            //   • A top hint pill.
+            //   • A compact bottom action bar.
+            // The home sheet is collapsed to a tiny peek so the user has
+            // maximum map real estate to pan / zoom.
+            if (uiState.isMeetupPlacementMode) {
+                // Visible-area aware crosshair centering. Top reserved space
+                // accounts for the status bar + chip strip (~70dp). Bottom
+                // reserved space is the sheet peek + nav bar + action bar
+                // height. We shift the crosshair up by half the difference
+                // so it lands in the middle of what the user can actually
+                // see, not the absolute screen center.
+                val statusBarTop = WindowInsets.statusBars
+                    .asPaddingValues().calculateTopPadding()
+                val chipStripHeight = 70.dp
+                val actionBarHeight = 90.dp
+                val topReserved = statusBarTop + chipStripHeight
+                val bottomReserved = sheetPeekHeight + actionBarHeight
+                val crosshairYOffset = (topReserved - bottomReserved) / 2
+
+                com.ovi.where.presentation.map.components.PlacementCrosshair(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .offset(y = crosshairYOffset)
+                )
+
+                // Top hint pill — slides in from above.
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = true,
+                    enter = androidx.compose.animation.slideInVertically(
+                        initialOffsetY = { -it },
+                        animationSpec = androidx.compose.animation.core.tween(350)
+                    ) + androidx.compose.animation.fadeIn(),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(top = 72.dp)
+                        .padding(horizontal = Dimens.spaceLarge)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.inverseSurface,
+                        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                        tonalElevation = 4.dp,
+                        shadowElevation = 8.dp
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.LocationOn,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.inverseOnSurface,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "Move map to pick a spot",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+
+                // Compact bottom action bar — sits just above the collapsed
+                // sheet peek so the map dominates the screen.
+                MeetupPlacementActionBar(
+                    address = uiState.placementAddress,
+                    isResolving = uiState.isResolvingPlacementAddress,
+                    onCancel = { viewModel.cancelMeetupPlacement() },
+                    onConfirm = {
+                        val center = cameraPositionState.position.target
+                        viewModel.confirmMeetupPlacement(center.latitude, center.longitude)
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(bottom = sheetPeekHeight + 8.dp)
+                        .padding(horizontal = 12.dp)
+                )
+
+                // Reverse-geocode the centered point each time the camera idles.
+                LaunchedEffect(cameraPositionState.isMoving) {
+                    if (!cameraPositionState.isMoving) {
+                        val target = cameraPositionState.position.target
+                        viewModel.onPlacementCameraIdle(target.latitude, target.longitude)
+                    }
+                }
+
+                // System back exits placement mode.
+                androidx.activity.compose.BackHandler(enabled = true) {
+                    viewModel.cancelMeetupPlacement()
+                }
+            }
+
+            // ── Frame the camera onto the active destination on demand ─────
+            // Triggered by the FAB action sheet's "Show on map" item.
+            LaunchedEffect(uiState.requestDestinationFocus) {
+                val destination = uiState.meetupDestination
+                if (uiState.requestDestinationFocus && destination != null && destination.hasValidLocation) {
+                    cameraPositionState.animate(
+                        CameraUpdateFactory.newLatLngZoom(
+                            LatLng(destination.latitude, destination.longitude), 16f
+                        ),
+                        durationMs = 700
+                    )
+                    viewModel.onDestinationFocusConsumed()
                 }
             }
         }
@@ -1136,6 +1337,78 @@ fun GlobalMapScreen(
                 Spacer(Modifier.height(Dimens.spaceLarge))
             }
         }
+    }
+
+    // ── Place-card sheet for the active meetup destination ──────────────────
+    // Opened by tapping the active top-of-map MeetupChip OR the destination
+    // marker on the map (Google-Maps-style "tap a place" pattern).
+    val activeMeetup = uiState.meetupDestination
+    if (uiState.showMeetupPlaceCard && activeMeetup != null && activeMeetup.hasValidLocation) {
+        com.ovi.where.presentation.map.components.MeetupPlaceCardSheet(
+            destination = activeMeetup,
+            distanceText = uiState.meetupDestinationDistanceText,
+            etaText = uiState.meetupDestinationEtaText,
+            onShowOnMap = {
+                viewModel.dismissMeetupPlaceCard()
+                viewModel.requestDestinationFocus()
+            },
+            onClear = {
+                viewModel.dismissMeetupPlaceCard()
+                showMeetupClearConfirm = true
+            },
+            onDismiss = { viewModel.dismissMeetupPlaceCard() }
+        )
+    }
+
+    // ── Clear meetup destination confirm dialog ──────────────────────────────
+    if (showMeetupClearConfirm) {
+        AlertDialog(
+            onDismissRequest = { showMeetupClearConfirm = false },
+            title = { Text("Clear meetup point?") },
+            text = {
+                Text(
+                    "Everyone in ${uiState.activeGroupFilter?.name ?: "the group"} " +
+                        "will stop seeing it on the map."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showMeetupClearConfirm = false
+                    viewModel.clearMeetupDestination()
+                }) {
+                    Text(
+                        "Clear",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMeetupClearConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // ── Set meetup destination sheet (long-press on map) ──────────────────────
+    if (uiState.showSetDestinationSheet && uiState.pendingDestinationPick != null) {
+        SetMeetupDestinationSheet(
+            pick = uiState.pendingDestinationPick!!,
+            groups = uiState.groups,
+            preferredGroupId = uiState.activeGroupFilter?.takeIf { !it.isDirect }?.id,
+            onConfirm = { groupId, name ->
+                viewModel.confirmDestinationPick(groupId, name)
+            },
+            onCreateGroup = {
+                viewModel.dismissSetDestinationSheet()
+                onNavigateToCreateGroup()
+            },
+            onJoinGroup = {
+                viewModel.dismissSetDestinationSheet()
+                onNavigateToJoinGroup()
+            },
+            onDismiss = { viewModel.dismissSetDestinationSheet() }
+        )
     }
 }
 
@@ -1768,14 +2041,14 @@ private fun FilterPillAvatar(filter: GroupFilter?) {
                 modifier = Modifier
                     .size(size)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.Groups,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -2328,6 +2601,9 @@ private fun ShareTargetSheet(
     initialDuration: Long = 60L,
     bottomReservedSpace: androidx.compose.ui.unit.Dp = 0.dp,
     onCancel: () -> Unit = {},
+    onCreateGroup: () -> Unit = {},
+    onJoinGroup: () -> Unit = {},
+    onAddFriends: () -> Unit = {},
     onStart: (List<String>, Long) -> Unit
 ) {
     val visibleGroups = remember(groups, excludeTargetIds) {
@@ -2388,7 +2664,11 @@ private fun ShareTargetSheet(
         Spacer(Modifier.height(16.dp))
 
         if (targets.isEmpty()) {
-            ShareEmptyState()
+            ShareEmptyState(
+                onCreateGroup = onCreateGroup,
+                onJoinGroup = onJoinGroup,
+                onAddFriends = onAddFriends
+            )
             Spacer(Modifier.height(bottomReservedSpace))
             return@Column
         }
@@ -2535,7 +2815,7 @@ private fun ShareTargetSheet(
             )
         ) {
             Icon(
-                Icons.Default.NearMe,
+                imageVector = ImageVector.vectorResource(id = R.drawable.location_arrow ),
                 contentDescription = null,
                 modifier = Modifier.size(20.dp)
             )
@@ -2554,41 +2834,109 @@ private fun ShareTargetSheet(
 }
 
 @Composable
-private fun ShareEmptyState() {
+private fun ShareEmptyState(
+    onCreateGroup: () -> Unit = {},
+    onJoinGroup: () -> Unit = {},
+    onAddFriends: () -> Unit = {}
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 32.dp),
+            .padding(horizontal = 4.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
                 .size(64.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 Icons.Default.Groups,
                 contentDescription = null,
-                modifier = Modifier.size(32.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                modifier = Modifier.size(30.dp),
+                tint = MaterialTheme.colorScheme.primary
             )
         }
         Spacer(Modifier.height(12.dp))
         Text(
             "No one to share with yet",
             style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            "Add friends or join a group first",
+            "Add friends or create / join a group to start sharing your live location.",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 16.dp)
         )
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(20.dp))
+
+        // Primary action — most likely path is adding friends (DM share).
+        Button(
+            onClick = onAddFriends,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
+        ) {
+            Icon(Icons.Default.Person, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "Add friends",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Secondary actions — group paths.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick = onJoinGroup,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                )
+            ) {
+                Text(
+                    "Join group",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Button(
+                onClick = onCreateGroup,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                )
+            ) {
+                Text(
+                    "Create group",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
     }
 }
 

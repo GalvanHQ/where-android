@@ -164,6 +164,7 @@ fun GlobalMapScreen(
     onNavigateToCreateGroup: () -> Unit = {},
     onNavigateToJoinGroup: () -> Unit = {},
     onNavigateToAddFriends: () -> Unit = {},
+    onNavigateToMeetupNavigation: (String) -> Unit = {},
     viewModel: GlobalMapViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -1350,32 +1351,6 @@ fun GlobalMapScreen(
     // marker on the map (Google-Maps-style "tap a place" pattern).
     val activeMeetup = uiState.meetupDestination
     if (uiState.showMeetupPlaceCard && activeMeetup != null && activeMeetup.hasValidLocation) {
-        // Google Maps handoff for "Get directions". Uses the geo: scheme
-        // with a `q=` label so the dropped pin shows the meetup name.
-        val openDirections: () -> Unit = {
-            val name = activeMeetup.name.ifBlank { "Meetup point" }
-            val uri = android.net.Uri.parse(
-                "geo:${activeMeetup.latitude},${activeMeetup.longitude}" +
-                    "?q=${activeMeetup.latitude},${activeMeetup.longitude}" +
-                    "(${java.net.URLEncoder.encode(name, "UTF-8")})"
-            )
-            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
-                // Prefer Google Maps when installed; falls back to the chooser.
-                setPackage("com.google.android.apps.maps")
-                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            try {
-                context.startActivity(intent)
-            } catch (_: android.content.ActivityNotFoundException) {
-                // Google Maps not installed — try any available maps app.
-                context.startActivity(
-                    android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
-                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                )
-            }
-        }
-
         MeetupPlaceCardSheet(
             destination = activeMeetup,
             groupName = uiState.meetupDestinationGroupId
@@ -1390,8 +1365,16 @@ fun GlobalMapScreen(
                 viewModel.requestDestinationFocus()
             },
             onGetDirections = {
+                // In-app turn-by-turn-style navigation: opens our own
+                // GoogleMap with the route polyline drawn from the user's
+                // current location to the meetup point. We only navigate
+                // if we still have a group reference for the active
+                // destination — without it, the navigation screen has
+                // nothing to observe.
                 viewModel.dismissMeetupPlaceCard()
-                openDirections()
+                uiState.meetupDestinationGroupId?.let { groupId ->
+                    onNavigateToMeetupNavigation(groupId)
+                }
             },
             onCantMakeIt = {
                 viewModel.dismissMeetupPlaceCard()

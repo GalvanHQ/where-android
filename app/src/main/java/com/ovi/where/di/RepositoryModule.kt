@@ -2,6 +2,7 @@ package com.ovi.where.di
 
 import com.ovi.where.data.repository.AuthRepositoryImpl
 import com.ovi.where.data.repository.ConversationRepositoryImpl
+import com.ovi.where.data.repository.DirectionsRepositoryImpl
 import com.ovi.where.data.repository.FriendshipRepositoryImpl
 import com.ovi.where.data.repository.GroupRepositoryImpl
 import com.ovi.where.data.repository.InteractionRepositoryImpl
@@ -10,6 +11,7 @@ import com.ovi.where.data.repository.MessageRepositoryImpl
 import com.ovi.where.data.repository.UserRepositoryImpl
 import com.ovi.where.domain.repository.AuthRepository
 import com.ovi.where.domain.repository.ConversationRepository
+import com.ovi.where.domain.repository.DirectionsRepository
 import com.ovi.where.domain.repository.FriendshipRepository
 import com.ovi.where.domain.repository.GroupRepository
 import com.ovi.where.domain.repository.InteractionRepository
@@ -34,4 +36,5 @@ abstract class RepositoryModule {
     @Binds @Singleton abstract fun bindConversationRepository(impl: ConversationRepositoryImpl): ConversationRepository
     @Binds @Singleton abstract fun bindMessageRepository(impl: MessageRepositoryImpl): MessageRepository
     @Binds @Singleton abstract fun bindInteractionRepository(impl: InteractionRepositoryImpl): InteractionRepository
+    @Binds @Singleton abstract fun bindDirectionsRepository(impl: DirectionsRepositoryImpl): DirectionsRepository
 }

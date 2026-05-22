@@ -2,6 +2,7 @@ package com.ovi.where.di
 
 import com.ovi.where.domain.repository.AuthRepository
 import com.ovi.where.domain.repository.ConversationRepository
+import com.ovi.where.domain.repository.DirectionsRepository
 import com.ovi.where.domain.repository.FriendshipRepository
 import com.ovi.where.domain.repository.GroupRepository
 import com.ovi.where.domain.repository.LocationRepository
@@ -56,6 +57,7 @@ import com.ovi.where.domain.usecase.group.PromoteMemberUseCase
 import com.ovi.where.domain.usecase.group.UpdateGroupUseCase
 import com.ovi.where.domain.usecase.location.ClearMeetupDestinationUseCase
 import com.ovi.where.domain.usecase.location.DetectArrivalUseCase
+import com.ovi.where.domain.usecase.location.GetMeetupRouteUseCase
 import com.ovi.where.domain.usecase.location.ObserveGroupLocationsUseCase
 import com.ovi.where.domain.usecase.location.ObserveMeetupDestinationUseCase
 import com.ovi.where.domain.usecase.location.SetMeetupDestinationUseCase
@@ -108,6 +110,7 @@ object UseCaseModule {
     @Provides fun provideDetectArrivalUseCase() = DetectArrivalUseCase()
     @Provides fun provideUpdateMeetupParticipantStatusUseCase(r: LocationRepository) =
         com.ovi.where.domain.usecase.location.UpdateMeetupParticipantStatusUseCase(r)
+    @Provides fun provideGetMeetupRouteUseCase(r: DirectionsRepository) = GetMeetupRouteUseCase(r)
 
     // ── User ─────────────────────────────────────────────────────────────────
     @Provides fun provideGetUsersUseCase(r: UserRepository) = GetUsersUseCase(r)

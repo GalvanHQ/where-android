@@ -147,6 +147,14 @@ sealed class Screen(val route: String) {
     }
 
     @Serializable
+    data class MeetupNavigation(val groupId: String) : Screen("meetup_navigation/${groupId}") {
+        companion object {
+            const val ROUTE = "meetup_navigation/{groupId}"
+            fun createRoute(groupId: String) = "meetup_navigation/$groupId"
+        }
+    }
+
+    @Serializable
     data object CreateGroup : Screen("create_group")
 
     @Serializable

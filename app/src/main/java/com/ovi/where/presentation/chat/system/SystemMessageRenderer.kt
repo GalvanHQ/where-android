@@ -112,6 +112,11 @@ object SystemMessageRenderer {
                 else "$actor started sharing their live location"
             }
 
+            SystemEventType.LOCATION_SHARED -> {
+                if (isSelfActor) "You shared your location"
+                else "$actor shared their location"
+            }
+
             SystemEventType.USER_BLOCKED -> {
                 // Renderer reaches this branch only on the blocked user's side
                 // (filter happens upstream in MessageRepositoryImpl).

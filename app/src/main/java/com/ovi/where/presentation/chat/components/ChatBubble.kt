@@ -263,52 +263,17 @@ fun ChatBubble(
                         }
                     }
 
-                    // LOCATION
-                    message.isLocation -> {
-                        Surface(
-                            shape = bubbleShape,
-                            color = backgroundColor,
-                            modifier = bubbleModifier
-                                .widthIn(max = maxBubbleWidth)
-                                .clip(bubbleShape)
-                                .clickable { onLocationTap() }
-                                .pointerInput(message.id) {
-                                    detectTapGestures(onLongPress = { onLongPress() })
-                                }
-                        ) {
-                            LocationMessageBubble(
-                                latitude = message.latitude ?: 0.0,
-                                longitude = message.longitude ?: 0.0
-                            )
-                        }
-                    }
-
-                    // LIVE LOCATION (real-time sharing session)
-                    message.isLiveLocation -> {
-                        Box(
-                            modifier = bubbleModifier
-                                .widthIn(max = maxBubbleWidth)
-                                .pointerInput(message.id) {
-                                    detectTapGestures(onLongPress = { onLongPress() })
-                                }
-                        ) {
-                            LiveLocationBubble(
-                                sharedLocation = com.ovi.where.domain.model.SharedLocation(
-                                    id = message.locationSharingSessionId ?: message.id,
-                                    userId = message.senderId,
-                                    latitude = message.latitude ?: 0.0,
-                                    longitude = message.longitude ?: 0.0,
-                                    timestamp = System.currentTimeMillis(),
-                                    isSharingActive = true,
-                                    sharingStartedAt = 0L
-                                ),
-                                isSessionActive = true,
-                                senderDisplayName = message.senderName,
-                                isGroupConversation = true,
-                                onTapNavigateToMap = { onLocationTap() }
-                            )
-                        }
-                    }
+                    // Note: LOCATION and LIVE_LOCATION are no longer rendered
+                    // as bubbles. This is a location-first app, so a map
+                    // bubble inside chat duplicates information that's already
+                    // surfaced via:
+                    //   1. A SYSTEM info line ("X shared their location" /
+                    //      "X started sharing their live location") authored
+                    //      when the action happens.
+                    //   2. The persistent meetup sheet, header pill, FAB
+                    //      countdown, and the global friends map.
+                    // Historical LOCATION / LIVE_LOCATION rows are coerced
+                    // into the system-message branch by the toUiModel mapper.
 
                     // TEXT (default)
                     else -> {

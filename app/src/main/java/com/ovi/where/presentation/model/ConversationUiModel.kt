@@ -167,12 +167,13 @@ private fun formatLastMessagePreview(type: MessageType, text: String): String {
     return when (type) {
         MessageType.IMAGE -> "📷 Photo"
         MessageType.VOICE -> "🎤 Voice message"
-        MessageType.LOCATION -> "📍 Location"
-        MessageType.LIVE_LOCATION -> "📍 Location"
+        // Both location types now render as system info lines in the timeline,
+        // so reuse the actual fallback text written into lastMessageText
+        // instead of a generic icon. Falls back to a friendly default if blank.
+        MessageType.LOCATION -> text.ifEmpty { "📍 Location" }
+        MessageType.LIVE_LOCATION -> text.ifEmpty { "📍 Live location" }
         MessageType.VIDEO -> "🎥 Video"
         MessageType.DOCUMENT -> "📄 Document"
-        // System events: Cloud Functions write the localised English line
-        // into `lastMessageText` directly, so reuse it as-is. No "You: " prefix.
         MessageType.SYSTEM -> text.ifEmpty { "Group activity" }
         else -> text.ifEmpty { "No messages yet" }
     }

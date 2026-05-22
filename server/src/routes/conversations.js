@@ -438,6 +438,7 @@ router.post('/:conversationId/system-message', async (req, res) => {
             'THEME_COLOR_CHANGED',
             'EMOJI_SHORTCUT_CHANGED',
             'LIVE_LOCATION_STARTED',
+            'LOCATION_SHARED',
             'USER_BLOCKED'
         ]);
         if (!ACCEPTED_EVENT_TYPES.has(systemEventType)) {

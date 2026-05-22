@@ -156,8 +156,17 @@ fun Message.toUiModel(
 ): MessageUiModel {
     val direction = if (senderId == currentUserId) BubbleDirection.SENT else BubbleDirection.RECEIVED
     val isSystem = type == MessageType.SYSTEM
-    val isLocation = type == MessageType.LOCATION
-    val isLiveLocation = type == MessageType.LIVE_LOCATION
+    // Pre-existing LIVE_LOCATION and LOCATION messages are coerced to render
+    // as the dedicated SYSTEM info line. Live sharing is its own feature
+    // (meetup sheet, header pill, FAB) and one-shot pin drops on a
+    // location-first app land more naturally as audit-trail lines than as
+    // map bubbles inside chat. The send features themselves are unchanged —
+    // only the rendering moves to the system-message style.
+    val isLegacyLiveLocation = type == MessageType.LIVE_LOCATION
+    val isLegacyLocationPin = type == MessageType.LOCATION
+    val treatedAsSystem = isSystem || isLegacyLiveLocation || isLegacyLocationPin
+    val isLocation = false // never render the old map bubble; coerced above
+    val isLiveLocation = false // never render the old bubble; coerced above
     val isImage = type == MessageType.IMAGE
     val isVoice = type == MessageType.VOICE
     val locationLabel = if (isLocation && latitude != null && longitude != null) {
@@ -168,16 +177,26 @@ fun Message.toUiModel(
     val resolvedSenderName = nicknames[senderId]?.takeIf { it.isNotBlank() } ?: senderName
 
     // Pre-render the system event text once so the composable stays declarative.
-    val systemRendered: String = if (isSystem) {
+    val systemRendered: String = if (treatedAsSystem) {
+        val coercedEventType = systemEventType ?: when {
+            isLegacyLiveLocation -> com.ovi.where.domain.model.SystemEventType.LIVE_LOCATION_STARTED
+            isLegacyLocationPin -> com.ovi.where.domain.model.SystemEventType.LOCATION_SHARED
+            else -> null
+        }
+        val coercedFallback = when {
+            isLegacyLiveLocation -> "$resolvedSenderName started sharing their live location"
+            isLegacyLocationPin -> "$resolvedSenderName shared their location"
+            else -> text
+        }
         com.ovi.where.presentation.chat.system.SystemMessageRenderer.render(
-            eventType = systemEventType,
+            eventType = coercedEventType,
             payload = systemEventPayload,
             actorName = resolvedSenderName,
             targetName = targetUserId?.let { nicknames[it]?.takeIf(String::isNotBlank) ?: nameResolver(it) },
             currentUserId = currentUserId,
             actorId = senderId,
             targetId = targetUserId,
-            fallback = text
+            fallback = coercedFallback
         )
     } else ""
 
@@ -244,8 +263,9 @@ fun Message.toUiModel(
         linkPreviewDomain = linkPreviewDomain,
         // Mentions: pass through for rendering in primary color + bold (Requirement 14.4)
         mentionedUserIds = mentionedUserIds.toImmutableList(),
-        // System messages — populated only when type == SYSTEM
-        isSystem = isSystem,
+        // System messages — populated for SYSTEM type and (back-compat) for
+        // historical LIVE_LOCATION rows so they render with the new style.
+        isSystem = treatedAsSystem,
         systemText = systemRendered
     )
 }

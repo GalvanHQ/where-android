@@ -1254,6 +1254,10 @@ class ChatViewModel @Inject constructor(
     fun sendLocation(latitude: Double, longitude: Double) {
         val convId = _uiState.value.conversationId ?: return
         viewModelScope.launch { sendLocationMessageUseCase(convId, latitude, longitude) }
+        // The existing `LOCATION` message persists with lat/lng as before;
+        // ChatBubble no longer renders a map for it, and toUiModel coerces it
+        // into the SYSTEM info-line render path so the timeline shows
+        // "X shared their location" instead of a fat map preview.
     }
 
     /**
@@ -1542,12 +1546,13 @@ class ChatViewModel @Inject constructor(
                         LocationTrackingService.createStartIntent(context, durationMinutes)
                     )
 
-                    // Insert live location message into conversation
-                    insertLiveLocationMessage(targetId, durationMinutes)
-
-                    // Emit a SYSTEM info line so the timeline shows "X started
-                    // sharing live location". The detailed live-location bubble
-                    // covers the actual UI; this is the audit trail.
+                    // Live-sharing UX is now driven by:
+                    //   1. The SYSTEM info line below ("Ovi started sharing
+                    //      their live location") — the audit-trail entry.
+                    //   2. The persistent meetup sheet + header pill + map FAB
+                    //      countdown — all reactive to activeSharingState.
+                    // The legacy `insertLiveLocationMessage` chat-bubble copy
+                    // was redundant and got removed.
                     val convId = _uiState.value.conversationId
                     if (convId != null) {
                         val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
@@ -1559,44 +1564,13 @@ class ChatViewModel @Inject constructor(
                         )
                     }
 
-                    // The repo's activeSharingState flow drives the banner /
-                    // header pill / meetup sheet — no per-screen state set
-                    // here. Just nudge the my-pin stream so the user appears
-                    // on the chat map immediately.
+                    // Nudge the my-pin stream so the user appears on the chat
+                    // map immediately.
                     startMyLocationStream()
                 }
                 is Resource.Loading -> { /* no-op */ }
             }
         }
-    }
-
-    /**
-     * Inserts a LIVE_LOCATION message into the conversation.
-     */
-    private suspend fun insertLiveLocationMessage(groupId: String, durationMinutes: Long) {
-        val convId = _uiState.value.conversationId ?: return
-        val currentUser = firebaseAuth.currentUser
-        val sessionId = UUID.randomUUID().toString()
-
-        val message = Message(
-            id = sessionId,
-            conversationId = convId,
-            senderId = currentUser?.uid ?: "",
-            senderName = currentUser?.displayName ?: "",
-            senderPhotoUrl = currentUser?.photoUrl?.toString(),
-            text = "📍 Live location",
-            type = MessageType.LIVE_LOCATION,
-            timestamp = System.currentTimeMillis(),
-            status = MessageStatus.SENT,
-            locationSharingSessionId = sessionId,
-            locationSharingDurationMinutes = durationMinutes
-        )
-
-        messageRepositoryImpl.sendMessage(
-            conversationId = convId,
-            text = "📍 Live location",
-            replyToId = null
-        )
     }
 
     /**

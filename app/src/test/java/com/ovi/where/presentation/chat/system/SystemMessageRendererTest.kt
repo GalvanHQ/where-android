@@ -209,6 +209,20 @@ class SystemMessageRendererTest {
         )
     }
 
+    @Test fun `LOCATION_SHARED self`() {
+        assertEquals(
+            "You shared your location",
+            render(SystemEventType.LOCATION_SHARED, actorId = me)
+        )
+    }
+
+    @Test fun `LOCATION_SHARED other`() {
+        assertEquals(
+            "Sara shared their location",
+            render(SystemEventType.LOCATION_SHARED, actorId = them)
+        )
+    }
+
     // ─── USER_BLOCKED ─────────────────────────────────────────────────────────
     @Test fun `USER_BLOCKED renders to current user only`() {
         val s = render(SystemEventType.USER_BLOCKED, actorId = them, targetId = me)

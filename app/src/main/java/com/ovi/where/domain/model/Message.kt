@@ -87,6 +87,7 @@ enum class SystemEventType {
     THEME_COLOR_CHANGED,
     EMOJI_SHORTCUT_CHANGED,
     LIVE_LOCATION_STARTED,
+    LOCATION_SHARED,
     USER_BLOCKED;
 
     companion object {

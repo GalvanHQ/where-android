@@ -372,6 +372,165 @@ router.patch('/:conversationId/read', async (req, res) => {
 });
 
 /**
+ * POST /api/conversations/:conversationId/system-message
+ *
+ * Authors a system event line (group renamed, member added, theme changed, etc.)
+ * into the conversation's chat timeline. The Android client calls this whenever
+ * it mutates state worth surfacing as a Messenger-style "info line".
+ *
+ * Why this lives server-side rather than as a direct Firestore client write:
+ *   1. The `messages` collection is locked down (Admin SDK only) so we don't
+ *      have to allow any client-side writes that would need rule-level
+ *      validation of payload shape, sender identity, and embed integrity.
+ *   2. We already have a vetted message-persistence path (`persistMessage`
+ *      pattern in socket.js) — this route mirrors that transactional shape so
+ *      `recentMessages`, `lastMessage*`, and the archive stay consistent.
+ *   3. Idempotency: the deterministic `messageId` from the client + a
+ *      `set` overwrite means retries during transient errors collapse to a
+ *      single document.
+ *   4. Notifications stay suppressed by construction — this route does not
+ *      call sendFCM(). System events are informational only.
+ *
+ * Body:
+ *   {
+ *     messageId:     string  (deterministic id from the client)
+ *     systemEventType: string  (e.g. "GROUP_RENAMED")
+ *     systemEventPayload: object | null  (event-specific data)
+ *     targetUserId:  string | null
+ *     fallbackText:  string  (English line for legacy clients & lastMessageText)
+ *     timestamp:     number  (epoch ms)
+ *   }
+ *
+ * See `.kiro/specs/group-system-messages/`.
+ */
+router.post('/:conversationId/system-message', async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const uid = req.user.uid;
+        const {
+            messageId,
+            systemEventType,
+            systemEventPayload,
+            targetUserId,
+            fallbackText,
+            timestamp
+        } = req.body;
+
+        if (!messageId || !systemEventType || !fallbackText || !timestamp) {
+            return res.status(400).json({
+                error: 'messageId, systemEventType, fallbackText and timestamp are required'
+            });
+        }
+
+        // Whitelist of accepted event types — keeps the route honest about what
+        // it's allowed to author. New event variants must be added here too.
+        const ACCEPTED_EVENT_TYPES = new Set([
+            'GROUP_RENAMED',
+            'GROUP_DESCRIPTION_CHANGED',
+            'GROUP_PHOTO_CHANGED',
+            'MEMBER_ADDED',
+            'MEMBER_REMOVED',
+            'MEMBER_LEFT',
+            'MEMBER_JOINED',
+            'MEMBER_PROMOTED',
+            'MEMBER_DEMOTED',
+            'NICKNAME_CHANGED',
+            'THEME_COLOR_CHANGED',
+            'EMOJI_SHORTCUT_CHANGED',
+            'LIVE_LOCATION_STARTED',
+            'USER_BLOCKED'
+        ]);
+        if (!ACCEPTED_EVENT_TYPES.has(systemEventType)) {
+            return res.status(400).json({ error: `Unknown systemEventType: ${systemEventType}` });
+        }
+
+        const convRef = db.collection('conversations').doc(conversationId);
+        const convDoc = await convRef.get();
+        if (!convDoc.exists) {
+            return res.status(404).json({ error: 'Conversation not found' });
+        }
+        const convData = convDoc.data();
+        if (!convData.participantIds.includes(uid)) {
+            return res.status(403).json({ error: 'Not a participant' });
+        }
+
+        // Resolve actor name once. Falls back to "Someone" so the line is
+        // never empty even if the user doc is missing.
+        let actorName = req.user.name || '';
+        if (!actorName) {
+            try {
+                const userDoc = await db.collection('users').doc(uid).get();
+                actorName = (userDoc.exists && userDoc.data().displayName) || 'Someone';
+            } catch (_) {
+                actorName = 'Someone';
+            }
+        }
+        const actorPhotoUrl = (req.user.picture) || null;
+
+        const msgDto = {
+            id: messageId,
+            senderId: uid,
+            senderName: actorName,
+            senderPhotoUrl: actorPhotoUrl,
+            text: fallbackText,
+            messageType: 'SYSTEM',
+            timestamp: timestamp,
+            readBy: [],
+            reactions: {},
+            systemEventType: systemEventType,
+            systemEventPayload: systemEventPayload || null,
+            targetUserId: targetUserId || null
+        };
+
+        // Archive copy carries conversationId; embedded copy doesn't (saves space).
+        const archiveDto = { ...msgDto, conversationId };
+        const embeddedDto = { ...msgDto };
+
+        const msgRef = db.collection('messages').doc(messageId);
+
+        // Idempotency: deterministic id + .set() makes retries within the
+        // same second collapse to a single document. Two distinct calls land
+        // in different timestamp buckets, so they don't clash.
+        await msgRef.set(archiveDto);
+
+        // Update conversation preview fields atomically with the recentMessages
+        // append. Mirrors the `persistMessage` shape in socket.js so embedded
+        // pagination keeps working. unreadCounts intentionally NOT incremented.
+        await db.runTransaction(async (transaction) => {
+            const fresh = await transaction.get(convRef);
+            if (!fresh.exists) return;
+
+            const data = fresh.data();
+            const existing = data.recentMessages || [];
+
+            // Skip the embed if we've already added this exact message id.
+            // Catches a retry where the message was previously archived but
+            // the conversation update didn't land.
+            const alreadyEmbedded = existing.some(m => m.id === messageId);
+            const recentMessages = alreadyEmbedded
+                ? existing
+                : [...existing, embeddedDto].slice(-50); // MAX_RECENT_MESSAGES
+
+            transaction.update(convRef, {
+                lastMessageText: fallbackText,
+                lastMessageType: 'SYSTEM',
+                lastMessageSenderId: uid,
+                lastMessageTimestamp: timestamp,
+                recentMessages,
+                oldestRecentTimestamp: recentMessages.length > 0
+                    ? recentMessages[0].timestamp
+                    : timestamp
+            });
+        });
+
+        res.json({ success: true, id: messageId });
+    } catch (error) {
+        console.error('Error writing system message:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
  * POST /api/conversations/migrate-recent
  * One-time migration: backfills recentMessages for all conversations
  * belonging to the authenticated user. Run once after deploying the

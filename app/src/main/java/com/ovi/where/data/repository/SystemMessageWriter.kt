@@ -1,8 +1,8 @@
 package com.ovi.where.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
+import com.ovi.where.data.remote.chat.ChatApiClient
+import com.ovi.where.data.remote.chat.SystemMessageRequest
 import com.ovi.where.domain.model.SystemEventType
 import kotlinx.coroutines.tasks.await
 import timber.log.Timber
@@ -11,38 +11,40 @@ import javax.inject.Singleton
 
 /**
  * Writes a [SystemEventType] message into the chat timeline. Used by repos
- * that mutate state worth surfacing as a Messenger-style "info line" — group
- * renames, member changes, theme tweaks, etc.
+ * and view models that mutate state worth surfacing as a Messenger-style
+ * "info line" — group renames, member changes, theme tweaks, etc.
+ *
+ * Authoring goes through `POST /api/conversations/:id/system-message` rather
+ * than directly to Firestore. Two reasons:
+ *
+ *   1. The `messages` collection is Admin-SDK-only by Firestore rules. Keeping
+ *      it that way means we don't have to encode payload validation, sender
+ *      identity, and `recentMessages` integrity in declarative rules — the
+ *      server route validates everything in one well-tested code path.
+ *   2. The server handles the same transactional `recentMessages` /
+ *      `lastMessage*` update pattern the WS message handler uses, so embedded
+ *      pagination, chat list previews, and the archive stay consistent.
  *
  * Idempotency: the message id is derived deterministically from
  * `(eventType, conversationId, timestamp_bucket, actorId, targetId?)` so a
- * retried write on the same logical event collapses into a single document
- * (Firestore `set` on the same id = overwrite, not duplicate).
+ * retried request on the same logical event collapses to a single document
+ * (server uses `set` on the same id).
  *
- * Notification suppression: writes go directly to Firestore, bypassing the
- * Node WebSocket server's FCM push pipeline. System events therefore never
- * generate phone notifications (Requirement 8.1) — this is by construction.
+ * Notification suppression: the server route does not call `sendFCM()`, so
+ * system events never produce push notifications by construction
+ * (Requirement 8.1).
  *
  * See `.kiro/specs/group-system-messages/`.
  */
 @Singleton
 class SystemMessageWriter @Inject constructor(
-    private val firestore: FirebaseFirestore,
     private val firebaseAuth: FirebaseAuth
 ) {
 
     /**
-     * Writes the system message and updates the conversation's `lastMessage*`
-     * preview fields. Failures log and swallow — the underlying state change
-     * (which the caller has already committed) is more important than the
-     * cosmetic timeline entry. Caller MUST have permission to read the
-     * conversation; the Firestore rules already require this.
-     *
-     * @param conversationId target chat conversation id
-     * @param eventType the typed event variant
-     * @param targetUserId optional — the user the action was performed on
-     * @param payload event-specific extras (e.g. "newName", "oldEmoji")
-     * @param fallbackText English line written into `Message.text` for legacy clients
+     * Authors the system message via the server endpoint. Failures log and
+     * swallow — the underlying state change (which the caller already
+     * committed) matters more than the cosmetic timeline entry.
      */
     suspend fun writeSystemMessage(
         conversationId: String,
@@ -55,56 +57,35 @@ class SystemMessageWriter @Inject constructor(
             Timber.tag(TAG).w("Skipping $eventType in $conversationId — no current user")
             return
         }
-        val actorId = actor.uid
-        val actorName = actor.displayName ?: ""
+        val token = try {
+            actor.getIdToken(false).await()?.token
+        } catch (e: Exception) {
+            Timber.tag(TAG).w(e, "Failed to fetch ID token for $eventType")
+            return
+        }
+        if (token.isNullOrBlank()) {
+            Timber.tag(TAG).w("Empty ID token; skipping $eventType")
+            return
+        }
 
         val timestamp = System.currentTimeMillis()
         val messageId = buildDeterministicId(
-            eventType, conversationId, timestamp, actorId, targetUserId
-        )
-
-        val payloadDoc = if (payload.isEmpty()) null else payload
-        val docData = mapOf(
-            "id" to messageId,
-            "conversationId" to conversationId,
-            "senderId" to actorId,
-            "senderName" to actorName,
-            "senderPhotoUrl" to actor.photoUrl?.toString(),
-            "text" to fallbackText,
-            "messageType" to "SYSTEM",
-            "timestamp" to timestamp,
-            "readBy" to emptyList<String>(),
-            "reactions" to emptyMap<String, List<String>>(),
-            "systemEventType" to eventType.name,
-            "systemEventPayload" to payloadDoc,
-            "targetUserId" to targetUserId
+            eventType, conversationId, timestamp, actor.uid, targetUserId
         )
 
         try {
-            val convRef = firestore
-                .collection("conversations")
-                .document(conversationId)
-            val msgRef = firestore.collection("messages").document(messageId)
-
-            // Atomic batch: write the message archive + update the conversation
-            // preview fields. unreadCounts intentionally NOT incremented —
-            // system events are informational and shouldn't bump the badge.
-            val batch = firestore.batch()
-            batch.set(msgRef, docData)
-            batch.update(
-                convRef,
-                mapOf(
-                    "lastMessageText" to fallbackText,
-                    "lastMessageType" to "SYSTEM",
-                    "lastMessageSenderId" to actorId,
-                    "lastMessageTimestamp" to timestamp,
-                    "recentMessages" to FieldValue.arrayUnion(
-                        // Strip conversationId from embedded copy (matches Node persistMessage)
-                        docData - "conversationId"
-                    )
+            ChatApiClient.apiService.postSystemMessage(
+                token = "Bearer $token",
+                conversationId = conversationId,
+                request = SystemMessageRequest(
+                    messageId = messageId,
+                    systemEventType = eventType.name,
+                    systemEventPayload = payload.takeIf { it.isNotEmpty() },
+                    targetUserId = targetUserId,
+                    fallbackText = fallbackText,
+                    timestamp = timestamp
                 )
             )
-            batch.commit().await()
         } catch (e: Exception) {
             Timber.tag(TAG).w(
                 e,

@@ -66,6 +66,26 @@ data class CreateGroupConversationRequest(
     val memberIds: List<String>
 )
 
+/**
+ * Body for `POST /api/conversations/{id}/system-message`. Mirrors the fields
+ * the server route validates. See `.kiro/specs/group-system-messages/`.
+ */
+@Serializable
+data class SystemMessageRequest(
+    val messageId: String,
+    val systemEventType: String,
+    val systemEventPayload: Map<String, String>? = null,
+    val targetUserId: String? = null,
+    val fallbackText: String,
+    val timestamp: Long
+)
+
+@Serializable
+data class SystemMessageResponse(
+    val success: Boolean = false,
+    val id: String = ""
+)
+
 // ─── WebSocket incoming frames (from server) ──────────────────────────────
 
 // ─── Link Preview DTO ─────────────────────────────────────────────────────

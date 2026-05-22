@@ -95,4 +95,19 @@ interface ChatApiService {
     suspend fun fetchLinkPreview(
         @Query("url") url: String
     ): LinkPreviewDto
+
+    /**
+     * Authors a system event message (group renamed, member added, theme
+     * changed, etc.) into the chat timeline. Server-side validation keeps
+     * the `messages` collection rule-locked while letting the client trigger
+     * informational lines after committing the underlying state change.
+     *
+     * See `.kiro/specs/group-system-messages/`.
+     */
+    @POST("/api/conversations/{conversationId}/system-message")
+    suspend fun postSystemMessage(
+        @Header("Authorization") token: String,
+        @Path("conversationId") conversationId: String,
+        @Body request: SystemMessageRequest
+    ): SystemMessageResponse
 }

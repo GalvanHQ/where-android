@@ -656,7 +656,12 @@ fun GlobalMapScreen(
                     }
 
                     MarkerComposable(
-                        keys = arrayOf(myAvatarBitmap ?: Unit),
+                        keys = arrayOf(
+                            myAvatarBitmap ?: Unit,
+                            uiState.selfMeetupNote,
+                            uiState.selfMeetupStatus,
+                            uiState.meetupDestination != null
+                        ),
                         state = myMarkerState,
                         title = "My Location",
                         zIndex = 10f,
@@ -667,7 +672,10 @@ fun GlobalMapScreen(
                         }
                     ) {
                         MyLocationMarkerContent(
-                            avatarBitmap = myAvatarBitmap
+                            avatarBitmap = myAvatarBitmap,
+                            note = uiState.selfMeetupNote,
+                            meetupStatus = uiState.selfMeetupStatus
+                                .takeIf { uiState.meetupDestination != null }
                         )
                     }
                 }
@@ -703,7 +711,11 @@ fun GlobalMapScreen(
                     }
 
                     MarkerComposable(
-                        keys = arrayOf(friendAvatarBitmap ?: Unit),
+                        keys = arrayOf(
+                            friendAvatarBitmap ?: Unit,
+                            friend.meetupNote,
+                            friend.meetupStatus?.name ?: ""
+                        ),
                         state = friendMarkerState,
                         title = friend.displayName,
                         snippet = friend.timeAgo,
@@ -3442,13 +3454,35 @@ private fun Life360PinMarker(
 
 @Composable
 private fun MyLocationMarkerContent(
-    avatarBitmap: Bitmap?
+    avatarBitmap: Bitmap?,
+    note: String = "",
+    meetupStatus: com.ovi.where.domain.model.MeetupParticipantStatus? = null
 ) {
-    Life360PinMarker(
-        avatarBitmap = avatarBitmap,
-        fallbackLabel = "ME",
-        accentColor = MaterialTheme.colorScheme.primary
-    )
+    val statusLabel = when {
+        note.isNotBlank() -> FriendStatusLabel(text = note, tint = FriendStatusTint.Note)
+        meetupStatus == com.ovi.where.domain.model.MeetupParticipantStatus.ARRIVED ->
+            FriendStatusLabel(text = "Arrived", tint = FriendStatusTint.Success)
+        meetupStatus == com.ovi.where.domain.model.MeetupParticipantStatus.CANT_MAKE_IT ->
+            FriendStatusLabel(text = "Can't make it", tint = FriendStatusTint.Error)
+        else -> null
+    }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.widthIn(max = 220.dp)
+    ) {
+        if (statusLabel != null) {
+            FriendStatusBubble(
+                text = statusLabel.text,
+                tint = statusLabel.tint
+            )
+            Spacer(Modifier.height(2.dp))
+        }
+        Life360PinMarker(
+            avatarBitmap = avatarBitmap,
+            fallbackLabel = "ME",
+            accentColor = MaterialTheme.colorScheme.primary
+        )
+    }
 }
 
 @Composable
@@ -3508,6 +3542,15 @@ private data class FriendStatusLabel(
 
 private enum class FriendStatusTint { Note, Success, Error }
 
+/**
+ * Chat-bubble-shaped status caption shown above a friend's pin —
+ * rounded body + a small triangular tail that points at the avatar
+ * below. Reads like a WhatsApp / Messenger speech bubble so the user's
+ * note feels like *their words*, not a plain badge.
+ *
+ * Tail is a 6dp-tall isoceles triangle drawn with [drawBehind] so we
+ * stay on a single composition layer (no nested Surfaces / clips).
+ */
 @Composable
 private fun FriendStatusBubble(text: String, tint: FriendStatusTint) {
     val (bg, fg) = when (tint) {
@@ -3518,22 +3561,46 @@ private fun FriendStatusBubble(text: String, tint: FriendStatusTint) {
         FriendStatusTint.Error ->
             MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
     }
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = bg,
-        tonalElevation = 1.dp,
-        shadowElevation = 2.dp,
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.widthIn(max = 200.dp)
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall,
-            color = fg,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        // ── Bubble body ───────────────────────────────────────────────
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = bg,
+            tonalElevation = 2.dp,
+            shadowElevation = 3.dp
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
+                color = fg,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+            )
+        }
+
+        // ── Tail pointing down at the avatar ──────────────────────────
+        // Slight overlap pulls the triangle into the body so the join
+        // reads as a single bubble rather than two stacked shapes.
+        Box(
+            modifier = Modifier
+                .offset(y = (-1).dp)
+                .size(width = 12.dp, height = 6.dp)
+                .drawBehind {
+                    val path = Path().apply {
+                        moveTo(0f, 0f)
+                        lineTo(size.width, 0f)
+                        lineTo(size.width / 2f, size.height)
+                        close()
+                    }
+                    drawPath(path, color = bg)
+                }
         )
     }
 }

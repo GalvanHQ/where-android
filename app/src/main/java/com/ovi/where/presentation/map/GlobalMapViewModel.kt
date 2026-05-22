@@ -187,6 +187,18 @@ class GlobalMapViewModel @Inject constructor(
     @Volatile
     private var lastRawLocations: List<SharedLocation> = emptyList()
 
+    /**
+     * Last known position per userId across snapshots. We keep entries here
+     * even after a user's share goes inactive — so meetup participants who
+     * arrived or opted out still render on the map at their last known
+     * spot with a status bubble, instead of vanishing the moment their
+     * `activeLocations` doc flips to `isSharingActive=false`.
+     *
+     * Only meetup participants survive past inactive; non-participants
+     * follow the existing "stop sharing → drop pin" behaviour.
+     */
+    private val lastKnownLocationByUser = mutableMapOf<String, SharedLocation>()
+
     val currentUserId: String? get() = firebaseAuth.currentUser?.uid
 
     private val locationProviderReceiver = object : BroadcastReceiver() {
@@ -542,20 +554,73 @@ class GlobalMapViewModel @Inject constructor(
     private fun processLocationUpdates(locations: List<SharedLocation>) {
         val uid = currentUserId ?: return
         val activeFilter = _uiState.value.activeGroupFilter
+        val activeMeetups = _uiState.value.meetupDestinationsByGroup
+
+        // Build the set of "still relevant" user ids — every meetup
+        // participant for groups that still have an active meetup.
+        // These users keep their pin on the map even after their share
+        // flips inactive, so the group can see they arrived / opted out.
+        val meetupParticipantIds: Set<String> = activeMeetups.values
+            .flatMap { it.participants.keys }
+            .toSet()
+
+        // Refresh the last-known cache from the live snapshot. We update
+        // unconditionally on isSharingActive == true — that's the freshest
+        // signal — and only purge entries that no longer belong to any
+        // meetup AND are inactive.
+        locations.forEach { loc ->
+            if (loc.isSharingActive) {
+                lastKnownLocationByUser[loc.userId] = loc
+            }
+        }
+        // Drop cached entries for users we no longer care about.
+        lastKnownLocationByUser.keys
+            .filter { cachedUid ->
+                cachedUid !in meetupParticipantIds &&
+                    locations.none { it.userId == cachedUid && it.isSharingActive }
+            }
+            .toList()
+            .forEach { lastKnownLocationByUser.remove(it) }
+
+        // Merge live + cached: anything currently active wins, plus any
+        // meetup participant we have a last-known position for that's
+        // missing from the live list (their share stopped — we still want
+        // their pin on the map).
+        val liveUserIds = locations.filter { it.isSharingActive }.map { it.userId }.toSet()
+        val merged = locations.toMutableList()
+        meetupParticipantIds
+            .filter { it !in liveUserIds && it != uid }
+            .forEach { participantUid ->
+                lastKnownLocationByUser[participantUid]?.let { cached ->
+                    // Mark it !isSharingActive so the UI can render it
+                    // appropriately (stale dot etc.) — the source of
+                    // truth for "is the user still pinging" is the
+                    // current snapshot, not the cache.
+                    merged.add(cached.copy(isSharingActive = false))
+                }
+            }
 
         // Client-side filter: match if filter id is in targetIds (or legacy targetId)
         val filtered = if (activeFilter != null) {
-            locations.filter { activeFilter.id in it.targetIds || it.targetId == activeFilter.id }
+            merged.filter { activeFilter.id in it.targetIds || it.targetId == activeFilter.id }
         } else {
-            locations
+            merged
         }
 
-        // Deduplicate by userId — keep latest timestamp per user
+        // Deduplicate by userId — keep latest timestamp per user.
+        // We allow inactive locations through here because meetup
+        // participants might be inactive but still need their pin shown.
         val deduped = filtered
-            .filter { it.userId != uid && it.isSharingActive }
+            .filter { it.userId != uid }
             .groupBy { it.userId }
             .mapValues { (_, entries) -> entries.maxByOrNull { it.timestamp }!! }
-            .values.toList()
+            .values
+            .filter { loc ->
+                // Keep if currently sharing OR if the user is in any
+                // active meetup we care about.
+                loc.isSharingActive || loc.userId in meetupParticipantIds
+            }
+            .toList()
 
         // Build UI models with distance-from-me
         // Use denormalized displayName/photoUrl from location documents first,
@@ -575,7 +640,6 @@ class GlobalMapViewModel @Inject constructor(
             debouncedFetchUsers(unknownIds)
         }
 
-        val activeMeetups = _uiState.value.meetupDestinationsByGroup
         val friendLocations = deduped.map { loc ->
             // Fallback chain: denormalized field → in-memory cache → userId
             val displayName = loc.displayName.ifEmpty {
@@ -878,36 +942,24 @@ class GlobalMapViewModel @Inject constructor(
                     autoStartShareForMeetup(groupId)
                 com.ovi.where.domain.model.MeetupParticipantStatus.ARRIVED,
                 com.ovi.where.domain.model.MeetupParticipantStatus.CANT_MAKE_IT ->
-                    // Self has reached a terminal state on this destination
-                    // (possibly written by another device of theirs / arrival
-                    // detector). Any share targeting this group exists only
-                    // because of the meetup, so drop it unconditionally.
-                    stopAnyShareToGroup(groupId)
+                    // Self has reached a terminal state on this destination.
+                    // Stop the meetup-owned share for that group so we don't
+                    // ping our GPS to a meetup we've ended for ourselves.
+                    // Manual shares the user added themselves are NOT touched
+                    // — they have their own lifecycle.
+                    stopMeetupAutoShareForGroup(groupId)
             }
         }
 
-        // Stop *all* shares for groups whose destinations are no longer
-        // active. The destination ending is the lifecycle owner of the
-        // meetup-driven share — clear/auto-clear means "the reason for
-        // sharing is gone". Strong-stop here so every device kills its
-        // share, not just the one whose meetup write started it.
-        val noLongerActive = _uiState.value.sharingTargetIds
+        // Stop *meetup-owned* shares for groups whose destinations are no
+        // longer active. Clear / auto-clear means "the meetup-driven
+        // sharing reason is gone" — so we drop the auto-share. Manual
+        // shares are unaffected: those existed before the meetup and the
+        // user's intent to share with them is independent of the meetup
+        // ending.
+        val noLongerActive = _uiState.value.meetupOwnedShareGroupIds
             .filter { it !in activeByGroup.keys }
-            .filter { it in _uiState.value.meetupOwnedShareGroupIds || it in (_uiState.value.previousMeetupGroupIds) }
-        noLongerActive.forEach { stopAnyShareToGroup(it) }
-
-        // Track the set of groups that currently have an active meetup
-        // for *this user*. We use the difference between snapshots to
-        // know which groups just transitioned out of having a meetup —
-        // those are the ones we hard-stop the share for.
-        val currentMeetupGroupIds = activeByGroup.keys
-            .filter { gid -> activeByGroup[gid]?.participants?.containsKey(uid) == true }
-            .toSet()
-        val justEnded = _uiState.value.previousMeetupGroupIds - currentMeetupGroupIds
-        justEnded.forEach { stopAnyShareToGroup(it) }
-        if (currentMeetupGroupIds != _uiState.value.previousMeetupGroupIds) {
-            _uiState.value = _uiState.value.copy(previousMeetupGroupIds = currentMeetupGroupIds)
-        }
+        noLongerActive.forEach { stopMeetupAutoShareForGroup(it) }
     }
 
     /**
@@ -1128,13 +1180,25 @@ class GlobalMapViewModel @Inject constructor(
      */
     fun enterMeetupPlacement() {
         if (_uiState.value.groups.isEmpty()) {
-            viewModelScope.launch {
-                _uiEvent.send(
-                    UiEvent.ShowSnackbar(
-                        UiText.DynamicString("Join or create a group to set a meetup point")
-                    )
-                )
-            }
+            // No groups yet — drop straight into the SetMeetupDestinationSheet
+            // so the user lands on its Create / Join empty-state CTAs. We
+            // need a non-null pendingDestinationPick to render the sheet,
+            // so seed it with the user's current location (the lat/lng
+            // doesn't matter because the empty state replaces the
+            // "share with" picker and the confirm CTA is disabled).
+            val state = _uiState.value
+            _uiState.value = state.copy(
+                showSetDestinationSheet = true,
+                pendingDestinationPick = PendingDestinationPick(
+                    latitude = state.myLatitude,
+                    longitude = state.myLongitude,
+                    address = null,
+                    isResolvingAddress = false
+                ),
+                isMeetupPlacementMode = false,
+                placementAddress = null,
+                isResolvingPlacementAddress = false
+            )
             return
         }
         _uiState.value = _uiState.value.copy(
@@ -1340,10 +1404,10 @@ class GlobalMapViewModel @Inject constructor(
         viewModelScope.launch {
             when (clearMeetupDestinationUseCase(groupId)) {
                 is Resource.Success -> {
-                    // Meetup is over — kill our share to this group too.
-                    // The reconcile pass on every other device will do the
-                    // same when their snapshot lands.
-                    stopAnyShareToGroup(groupId)
+                    // Meetup is over — kill the meetup-owned share to this
+                    // group too. Manual shares the user started themselves
+                    // (independently of the meetup) keep running.
+                    stopMeetupAutoShareForGroup(groupId)
 
                     writeMeetupSystemMessage(
                         groupId = groupId,
@@ -1447,8 +1511,9 @@ class GlobalMapViewModel @Inject constructor(
             )
             // Local stop is fast — server snapshot will reconcile in next
             // tick anyway, but this avoids a UX lag where the share pill
-            // lingers for the round-trip.
-            stopAnyShareToGroup(groupId)
+            // lingers for the round-trip. Only the meetup-owned share is
+            // dropped; manual shares remain.
+            stopMeetupAutoShareForGroup(groupId)
             _uiEvent.send(
                 UiEvent.ShowSnackbar(
                     UiText.DynamicString("You let the group know you can't make it")
@@ -1873,31 +1938,6 @@ class GlobalMapViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Hard-stops any active share targeting [groupId] regardless of who
-     * started it.
-     *
-     * Used when the meetup itself ends the share's reason for existing —
-     * the user opted out (`CANT_MAKE_IT`), arrived at the destination, or
-     * the destination was cleared / auto-cleared. The user's intent to
-     * share with this group is over, so we drop the target whether we
-     * (the meetup) or the user originally added it.
-     *
-     * Manual shares to *other* groups are untouched — only the target
-     * matching [groupId] is removed.
-     */
-    private fun stopAnyShareToGroup(groupId: String) {
-        val state = _uiState.value
-        if (groupId in state.meetupOwnedShareGroupIds) {
-            _uiState.value = state.copy(
-                meetupOwnedShareGroupIds = state.meetupOwnedShareGroupIds - groupId
-            )
-        }
-        if (groupId in _uiState.value.sharingTargetIds) {
-            removeSharingTarget(groupId)
-        }
-    }
-
     fun onAutoZoomConsumed() {
         _uiState.value = _uiState.value.copy(hasAutoZoomed = true)
     }
@@ -2120,15 +2160,6 @@ data class GlobalMapUiState(
      */
     val meetupOwnedShareGroupIds: Set<String> = emptySet(),
 
-    /**
-     * Snapshot of group ids that had an active meetup *for this user* on
-     * the previous reconcile pass. Used to detect "the meetup just ended"
-     * (group disappeared from the active map) and unconditionally stop
-     * the share to that group on the user's device — even if the share
-     * was originally started by the user manually rather than by the
-     * meetup itself.
-     */
-    val previousMeetupGroupIds: Set<String> = emptySet(),
     /**
      * Per-group active meetup destinations. Multi-group state so the chip
      * and pin remain visible regardless of which filter the user has on.

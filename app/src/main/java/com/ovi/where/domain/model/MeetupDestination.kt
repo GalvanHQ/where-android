@@ -53,7 +53,19 @@ data class MeetupDestination(
 data class MeetupParticipant(
     val status: MeetupParticipantStatus = MeetupParticipantStatus.ON_THE_WAY,
     /** Epoch millis of the last status update. */
-    val updatedAt: Long = 0L
+    val updatedAt: Long = 0L,
+    /**
+     * Optional free-form note this participant wants the rest of the
+     * group to see (e.g. "Stuck in traffic", "Running 10 min late",
+     * "Picking up coffee — order me one too").
+     *
+     * Rendered as a caption bubble above the participant's pin on the
+     * map and inline in the place-card participants list. Capped to a
+     * short length client-side; Firestore stores it verbatim.
+     *
+     * Empty string = no note.
+     */
+    val note: String = ""
 )
 
 /**

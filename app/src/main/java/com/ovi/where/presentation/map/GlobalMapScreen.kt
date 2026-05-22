@@ -319,6 +319,7 @@ fun GlobalMapScreen(
     var showMapTypeSheet by remember { mutableStateOf(false) }
     var showMyProfileSheet by remember { mutableStateOf(false) }
     var showMeetupClearConfirm by remember { mutableStateOf(false) }
+    var showMeetupStatusEditor by remember { mutableStateOf(false) }
 
     // ── Night mode (auto-detect based on time of day) ─────────────────────────
     // Uses ComposeMapColorScheme.DARK — Google's official Maps dark mode,
@@ -1360,6 +1361,7 @@ fun GlobalMapScreen(
             participants = uiState.meetupParticipants,
             isCreator = uiState.isMeetupCreator,
             selfStatus = uiState.selfMeetupStatus,
+            selfNote = uiState.selfMeetupNote,
             onShowOnMap = {
                 viewModel.dismissMeetupPlaceCard()
                 viewModel.requestDestinationFocus()
@@ -1386,7 +1388,27 @@ fun GlobalMapScreen(
                 viewModel.dismissMeetupPlaceCard()
                 showMeetupClearConfirm = true
             },
+            onEditStatus = {
+                viewModel.dismissMeetupPlaceCard()
+                showMeetupStatusEditor = true
+            },
             onDismiss = { viewModel.dismissMeetupPlaceCard() }
+        )
+    }
+
+    // ── Status editor (custom-status entry sheet) ────────────────────────────
+    if (showMeetupStatusEditor) {
+        com.ovi.where.presentation.map.components.MeetupStatusEditorSheet(
+            initialNote = uiState.selfMeetupNote,
+            onSave = { newNote ->
+                showMeetupStatusEditor = false
+                viewModel.setMeetupNote(newNote)
+            },
+            onClear = {
+                showMeetupStatusEditor = false
+                viewModel.setMeetupNote("")
+            },
+            onDismiss = { showMeetupStatusEditor = false }
         )
     }
 
@@ -3434,9 +3456,84 @@ private fun FriendMapMarkerContent(
     friend: FriendLocationUiModel,
     avatarBitmap: Bitmap?
 ) {
-    Life360PinMarker(
-        avatarBitmap = avatarBitmap,
-        fallbackLabel = friend.displayName.take(1).uppercase(),
-        accentColor = avatarColorFor(friend.userId)
-    )
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.widthIn(max = 220.dp)
+    ) {
+        // Status bubble — caption-style chip showing the user's free-form
+        // meetup note, or the canonical "Arrived" / "Can't make it" label
+        // when they're in a terminal status. We keep this above the pin so
+        // the avatar stays the focal point.
+        val statusLabel = friend.statusBubbleLabel()
+        if (statusLabel != null) {
+            FriendStatusBubble(
+                text = statusLabel.text,
+                tint = statusLabel.tint
+            )
+            Spacer(Modifier.height(2.dp))
+        }
+        Life360PinMarker(
+            avatarBitmap = avatarBitmap,
+            fallbackLabel = friend.displayName.take(1).uppercase(),
+            accentColor = avatarColorFor(friend.userId)
+        )
+    }
+}
+
+/**
+ * Pre-computed bubble label for a friend's pin. Returns null when the
+ * friend has nothing worth showing (no note + on the way / no meetup).
+ */
+private fun FriendLocationUiModel.statusBubbleLabel(): FriendStatusLabel? {
+    // Note takes precedence — it's the user's own words.
+    if (meetupNote.isNotBlank()) {
+        return FriendStatusLabel(
+            text = meetupNote,
+            tint = FriendStatusTint.Note
+        )
+    }
+    return when (meetupStatus) {
+        com.ovi.where.domain.model.MeetupParticipantStatus.ARRIVED ->
+            FriendStatusLabel(text = "Arrived", tint = FriendStatusTint.Success)
+        com.ovi.where.domain.model.MeetupParticipantStatus.CANT_MAKE_IT ->
+            FriendStatusLabel(text = "Can't make it", tint = FriendStatusTint.Error)
+        else -> null
+    }
+}
+
+private data class FriendStatusLabel(
+    val text: String,
+    val tint: FriendStatusTint
+)
+
+private enum class FriendStatusTint { Note, Success, Error }
+
+@Composable
+private fun FriendStatusBubble(text: String, tint: FriendStatusTint) {
+    val (bg, fg) = when (tint) {
+        FriendStatusTint.Note ->
+            MaterialTheme.colorScheme.surface to MaterialTheme.colorScheme.onSurface
+        FriendStatusTint.Success ->
+            MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
+        FriendStatusTint.Error ->
+            MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
+    }
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = bg,
+        tonalElevation = 1.dp,
+        shadowElevation = 2.dp,
+        modifier = Modifier.widthIn(max = 200.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = fg,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        )
+    }
 }

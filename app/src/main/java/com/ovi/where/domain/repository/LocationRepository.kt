@@ -137,4 +137,13 @@ interface LocationRepository {
 
     /** Observes the meetup destination for a group (real-time updates). */
     fun observeMeetupDestination(groupId: String): Flow<MeetupDestination?>
+
+    /**
+     * Updates only the calling user's note ("custom status") on the
+     * destination's participants map. Empty string clears the note.
+     */
+    suspend fun updateMeetupParticipantNote(
+        groupId: String,
+        note: String
+    ): Resource<Unit>
 }

@@ -77,7 +77,20 @@ data class FriendLocationUiModel(
     /** Formatted ETA string (e.g., "5 min", "1h 12m"). Null if distance < 50m or no user location. */
     val etaText: String? = null,
     /** Raw epoch millis for timeAgo recalculation on ticker */
-    val lastUpdatedTimestamp: Long = 0L
+    val lastUpdatedTimestamp: Long = 0L,
+    /**
+     * The user's current free-form meetup note ("custom status"), if any.
+     * Empty when the user has no active meetup or hasn't set a note.
+     * Rendered as a caption bubble above their pin.
+     */
+    val meetupNote: String = "",
+    /**
+     * The user's current meetup participation status, if any active meetup
+     * has them in its participants map. Drives the pin's status badge
+     * (e.g. "Arrived" / "Can't make it"). Null when not part of any active
+     * meetup.
+     */
+    val meetupStatus: com.ovi.where.domain.model.MeetupParticipantStatus? = null
 )
 
 /**
@@ -132,6 +145,7 @@ class GlobalMapViewModel @Inject constructor(
     private val observeMeetupDestinationUseCase: ObserveMeetupDestinationUseCase,
     private val detectArrivalUseCase: DetectArrivalUseCase,
     private val updateMeetupParticipantStatusUseCase: com.ovi.where.domain.usecase.location.UpdateMeetupParticipantStatusUseCase,
+    private val updateMeetupParticipantNoteUseCase: com.ovi.where.domain.usecase.location.UpdateMeetupParticipantNoteUseCase,
     private val conversationRepository: ConversationRepository,
     private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter
 ) : AndroidViewModel(application) {
@@ -561,6 +575,7 @@ class GlobalMapViewModel @Inject constructor(
             debouncedFetchUsers(unknownIds)
         }
 
+        val activeMeetups = _uiState.value.meetupDestinationsByGroup
         val friendLocations = deduped.map { loc ->
             // Fallback chain: denormalized field → in-memory cache → userId
             val displayName = loc.displayName.ifEmpty {
@@ -583,6 +598,16 @@ class GlobalMapViewModel @Inject constructor(
             val isStale = loc.timestamp > 0L &&
                 (System.currentTimeMillis() - loc.timestamp) > 5 * 60_000L
 
+            // Find this user's most recent meetup participation (if any).
+            // Prefer the meetup whose group matches the location's target,
+            // falling back to any meetup the user is in.
+            val matchingMeetup = activeMeetups[loc.targetId]
+                ?.takeIf { it.participants.containsKey(loc.userId) }
+                ?: activeMeetups.values
+                    .filter { it.participants.containsKey(loc.userId) }
+                    .maxByOrNull { it.setAt }
+            val participantEntry = matchingMeetup?.participants?.get(loc.userId)
+
             FriendLocationUiModel(
                 userId = loc.userId,
                 displayName = displayName,
@@ -599,7 +624,9 @@ class GlobalMapViewModel @Inject constructor(
                 groupName = groupName,
                 distanceMeters = distance,
                 etaText = computeEta(distance, loc.speed),
-                lastUpdatedTimestamp = loc.timestamp
+                lastUpdatedTimestamp = loc.timestamp,
+                meetupNote = participantEntry?.note.orEmpty(),
+                meetupStatus = participantEntry?.status
             )
         }
 
@@ -820,6 +847,13 @@ class GlobalMapViewModel @Inject constructor(
         // status. Only the creator's device fires the clear so we don't
         // race writes from N members.
         maybeAutoClearMeetups(activeByGroup)
+
+        // Notes / statuses for friend pins flow through FriendLocationUiModel
+        // which is built from the cached locations list. Trigger a rebuild
+        // so the new notes propagate without waiting for the next GPS tick.
+        if (lastRawLocations.isNotEmpty()) {
+            processLocationUpdates(lastRawLocations)
+        }
     }
 
     /**
@@ -844,15 +878,36 @@ class GlobalMapViewModel @Inject constructor(
                     autoStartShareForMeetup(groupId)
                 com.ovi.where.domain.model.MeetupParticipantStatus.ARRIVED,
                 com.ovi.where.domain.model.MeetupParticipantStatus.CANT_MAKE_IT ->
-                    stopMeetupAutoShareForGroup(groupId)
+                    // Self has reached a terminal state on this destination
+                    // (possibly written by another device of theirs / arrival
+                    // detector). Any share targeting this group exists only
+                    // because of the meetup, so drop it unconditionally.
+                    stopAnyShareToGroup(groupId)
             }
         }
 
-        // Stop owned shares for groups whose destinations are no longer
-        // active (cleared while we were offline, etc).
-        val ownedNoLongerActive = _uiState.value.meetupOwnedShareGroupIds
+        // Stop *all* shares for groups whose destinations are no longer
+        // active. The destination ending is the lifecycle owner of the
+        // meetup-driven share — clear/auto-clear means "the reason for
+        // sharing is gone". Strong-stop here so every device kills its
+        // share, not just the one whose meetup write started it.
+        val noLongerActive = _uiState.value.sharingTargetIds
             .filter { it !in activeByGroup.keys }
-        ownedNoLongerActive.forEach { stopMeetupAutoShareForGroup(it) }
+            .filter { it in _uiState.value.meetupOwnedShareGroupIds || it in (_uiState.value.previousMeetupGroupIds) }
+        noLongerActive.forEach { stopAnyShareToGroup(it) }
+
+        // Track the set of groups that currently have an active meetup
+        // for *this user*. We use the difference between snapshots to
+        // know which groups just transitioned out of having a meetup —
+        // those are the ones we hard-stop the share for.
+        val currentMeetupGroupIds = activeByGroup.keys
+            .filter { gid -> activeByGroup[gid]?.participants?.containsKey(uid) == true }
+            .toSet()
+        val justEnded = _uiState.value.previousMeetupGroupIds - currentMeetupGroupIds
+        justEnded.forEach { stopAnyShareToGroup(it) }
+        if (currentMeetupGroupIds != _uiState.value.previousMeetupGroupIds) {
+            _uiState.value = _uiState.value.copy(previousMeetupGroupIds = currentMeetupGroupIds)
+        }
     }
 
     /**
@@ -902,7 +957,8 @@ class GlobalMapViewModel @Inject constructor(
                 meetupDestinationEtaText = null,
                 meetupParticipants = emptyList(),
                 isMeetupCreator = false,
-                selfMeetupStatus = com.ovi.where.domain.model.MeetupParticipantStatus.ON_THE_WAY
+                selfMeetupStatus = com.ovi.where.domain.model.MeetupParticipantStatus.ON_THE_WAY,
+                selfMeetupNote = ""
             )
             return
         }
@@ -925,8 +981,10 @@ class GlobalMapViewModel @Inject constructor(
         val uid = currentUserId
         val groupId = state.meetupDestinationGroupId
         val isCreator = uid != null && destination.setBy == uid
-        val selfStatus = uid?.let { destination.participants[it]?.status }
+        val selfEntry = uid?.let { destination.participants[it] }
+        val selfStatus = selfEntry?.status
             ?: com.ovi.where.domain.model.MeetupParticipantStatus.ON_THE_WAY
+        val selfNote = selfEntry?.note.orEmpty()
 
         // Build participant rows. Sort: arrived → on the way → can't make it,
         // then by name. Self always pinned to the top.
@@ -970,7 +1028,8 @@ class GlobalMapViewModel @Inject constructor(
                     isYou = participantUid == uid,
                     isCreator = participantUid == destination.setBy,
                     isInactive = isInactive,
-                    distanceLabel = perUserDistanceLabel
+                    distanceLabel = perUserDistanceLabel,
+                    note = entry.note
                 )
             }
             .sortedWith(
@@ -993,7 +1052,8 @@ class GlobalMapViewModel @Inject constructor(
             meetupDestinationEtaText = etaText,
             meetupParticipants = participantRows,
             isMeetupCreator = isCreator,
-            selfMeetupStatus = selfStatus
+            selfMeetupStatus = selfStatus,
+            selfMeetupNote = selfNote
         )
     }
 
@@ -1280,9 +1340,10 @@ class GlobalMapViewModel @Inject constructor(
         viewModelScope.launch {
             when (clearMeetupDestinationUseCase(groupId)) {
                 is Resource.Success -> {
-                    // Meetup is over — kill the meetup-owned share too. Manual
-                    // shares the user started themselves are not touched.
-                    stopMeetupAutoShareForGroup(groupId)
+                    // Meetup is over — kill our share to this group too.
+                    // The reconcile pass on every other device will do the
+                    // same when their snapshot lands.
+                    stopAnyShareToGroup(groupId)
 
                     writeMeetupSystemMessage(
                         groupId = groupId,
@@ -1387,12 +1448,53 @@ class GlobalMapViewModel @Inject constructor(
             // Local stop is fast — server snapshot will reconcile in next
             // tick anyway, but this avoids a UX lag where the share pill
             // lingers for the round-trip.
-            stopMeetupAutoShareForGroup(groupId)
+            stopAnyShareToGroup(groupId)
             _uiEvent.send(
                 UiEvent.ShowSnackbar(
                     UiText.DynamicString("You let the group know you can't make it")
                 )
             )
+        }
+    }
+
+    /**
+     * Updates the calling user's free-form note ("custom status") on the
+     * canonical active meetup destination. Empty string clears the note.
+     *
+     * Targets the canonical (most-recently-set) meetup; if the user is in
+     * multiple concurrent meetups across different groups, the canonical
+     * one is the one rendered on the place card so updating it there is
+     * the natural intent.
+     */
+    fun setMeetupNote(note: String) {
+        val state = _uiState.value
+        val groupId = state.meetupDestinationGroupId ?: return
+        viewModelScope.launch {
+            when (updateMeetupParticipantNoteUseCase(groupId, note)) {
+                is Resource.Success -> {
+                    if (note.isBlank()) {
+                        _uiEvent.send(
+                            UiEvent.ShowSnackbar(
+                                UiText.DynamicString("Status cleared")
+                            )
+                        )
+                    } else {
+                        _uiEvent.send(
+                            UiEvent.ShowSnackbar(
+                                UiText.DynamicString("Status updated")
+                            )
+                        )
+                    }
+                }
+                is Resource.Error -> {
+                    _uiEvent.send(
+                        UiEvent.ShowSnackbar(
+                            UiText.DynamicString("Couldn't update status")
+                        )
+                    )
+                }
+                else -> {}
+            }
         }
     }
 
@@ -1771,6 +1873,31 @@ class GlobalMapViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Hard-stops any active share targeting [groupId] regardless of who
+     * started it.
+     *
+     * Used when the meetup itself ends the share's reason for existing —
+     * the user opted out (`CANT_MAKE_IT`), arrived at the destination, or
+     * the destination was cleared / auto-cleared. The user's intent to
+     * share with this group is over, so we drop the target whether we
+     * (the meetup) or the user originally added it.
+     *
+     * Manual shares to *other* groups are untouched — only the target
+     * matching [groupId] is removed.
+     */
+    private fun stopAnyShareToGroup(groupId: String) {
+        val state = _uiState.value
+        if (groupId in state.meetupOwnedShareGroupIds) {
+            _uiState.value = state.copy(
+                meetupOwnedShareGroupIds = state.meetupOwnedShareGroupIds - groupId
+            )
+        }
+        if (groupId in _uiState.value.sharingTargetIds) {
+            removeSharingTarget(groupId)
+        }
+    }
+
     fun onAutoZoomConsumed() {
         _uiState.value = _uiState.value.copy(hasAutoZoomed = true)
     }
@@ -1805,19 +1932,48 @@ class GlobalMapViewModel @Inject constructor(
      * Computes a human-readable ETA string based on distance and speed.
      *
      * Strategy:
-     * - If the friend is moving (speed > 1 m/s), use their actual speed
-     * - Otherwise, assume average driving speed (~50 km/h = 13.9 m/s)
-     * - Returns null if distance < 50m (already arrived) or distance is null
+     * - Returns null if distance < 50m (already arrived) or distance is null.
+     * - If the user is moving (speed > 1 m/s), use their actual speed —
+     *   it's the most accurate signal for "are they driving / walking /
+     *   stationary". Speeds are direct GPS readings so they already
+     *   incorporate road-following.
+     * - Otherwise we have to estimate. Crow-flies haversine
+     *   underestimates real road distance by roughly 30% in cities
+     *   (Google's own routing data shows 1.25–1.4× depending on grid
+     *   density), and average urban driving speed is closer to ~30 km/h
+     *   than the textbook 50 km/h. The combined factor — a 1.3 detour
+     *   multiplier divided by an 8.3 m/s typical urban speed —
+     *   collapses to a single ~10.8 s/m coefficient.
+     *
+     * The navigation screen has access to the Directions API and uses
+     * the API's exact duration when it has a route in hand; this fallback
+     * is for the place-card / list rows where we don't fetch a route
+     * just to render an estimate.
      */
     private fun computeEta(distanceMeters: Float?, friendSpeed: Float): String? {
         if (distanceMeters == null || distanceMeters < 50f) return null
-        val speedMps = if (friendSpeed > 1f) friendSpeed.toDouble() else 13.9
-        val etaSeconds = (distanceMeters / speedMps).toLong()
+        val etaSeconds = if (friendSpeed > 1f) {
+            // Live speed already reflects road-following, so use the raw
+            // straight-line distance against it.
+            (distanceMeters / friendSpeed.toDouble()).toLong()
+        } else {
+            // Stationary/idle — assume road detour + typical urban speed.
+            // 1.3 × distance ÷ (30 km/h ≈ 8.33 m/s) = ~0.156 s/m.
+            val roadDistance = distanceMeters * ROAD_DETOUR_FACTOR
+            (roadDistance / TYPICAL_URBAN_DRIVING_MPS).toLong()
+        }
         return when {
             etaSeconds < 60 -> "< 1 min"
             etaSeconds < 3600 -> "${etaSeconds / 60} min"
             else -> "${etaSeconds / 3600}h ${(etaSeconds % 3600) / 60}m"
         }
+    }
+
+    private companion object EtaConstants {
+        /** Empirical road-vs-crow-flies multiplier for urban areas. */
+        const val ROAD_DETOUR_FACTOR = 1.3f
+        /** Average city driving speed in m/s (≈ 30 km/h). */
+        const val TYPICAL_URBAN_DRIVING_MPS = 8.33
     }
 
     private fun startLocationService(durationMinutes: Long) {
@@ -1963,6 +2119,16 @@ data class GlobalMapUiState(
      * concurrent meetups across different groups; ownership is per-group.
      */
     val meetupOwnedShareGroupIds: Set<String> = emptySet(),
+
+    /**
+     * Snapshot of group ids that had an active meetup *for this user* on
+     * the previous reconcile pass. Used to detect "the meetup just ended"
+     * (group disappeared from the active map) and unconditionally stop
+     * the share to that group on the user's device — even if the share
+     * was originally started by the user manually rather than by the
+     * meetup itself.
+     */
+    val previousMeetupGroupIds: Set<String> = emptySet(),
     /**
      * Per-group active meetup destinations. Multi-group state so the chip
      * and pin remain visible regardless of which filter the user has on.
@@ -1994,6 +2160,8 @@ data class GlobalMapUiState(
     /** Local user's status on the canonical meetup, defaulting to ON_THE_WAY. */
     val selfMeetupStatus: com.ovi.where.domain.model.MeetupParticipantStatus =
         com.ovi.where.domain.model.MeetupParticipantStatus.ON_THE_WAY,
+    /** Local user's free-form note on the canonical meetup, empty when none. */
+    val selfMeetupNote: String = "",
     /**
      * Stable key (`"${groupId}_${destination.setAt}"`) of the destination the
      * local user has already authored a `MEETUP_ARRIVED` system message for.

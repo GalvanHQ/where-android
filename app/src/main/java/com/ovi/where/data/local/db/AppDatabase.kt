@@ -9,6 +9,7 @@ import com.ovi.where.data.local.dao.ConversationDao
 import com.ovi.where.data.local.dao.InteractionDao
 import com.ovi.where.data.local.dao.LinkPreviewCacheDao
 import com.ovi.where.data.local.dao.LocationDao
+import com.ovi.where.data.local.dao.MeetupDestinationDao
 import com.ovi.where.data.local.dao.MessageDao
 import com.ovi.where.data.local.dao.OfflineOperationDao
 import com.ovi.where.data.local.dao.OnlineStatusDao
@@ -17,6 +18,7 @@ import com.ovi.where.data.local.entity.CacheMetadataEntity
 import com.ovi.where.data.local.entity.ConversationEntity
 import com.ovi.where.data.local.entity.InteractionEntity
 import com.ovi.where.data.local.entity.LinkPreviewCacheEntity
+import com.ovi.where.data.local.entity.MeetupDestinationEntity
 import com.ovi.where.data.local.entity.MessageEntity
 import com.ovi.where.data.local.entity.OfflineOperationEntity
 import com.ovi.where.data.local.entity.OnlineStatusEntity
@@ -33,9 +35,10 @@ import com.ovi.where.data.local.entity.VoiceMessageCacheEntity
         InteractionEntity::class,
         VoiceMessageCacheEntity::class,
         LinkPreviewCacheEntity::class,
-        OnlineStatusEntity::class
+        OnlineStatusEntity::class,
+        MeetupDestinationEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -48,6 +51,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun voiceMessageCacheDao(): VoiceMessageCacheDao
     abstract fun linkPreviewCacheDao(): LinkPreviewCacheDao
     abstract fun onlineStatusDao(): OnlineStatusDao
+    abstract fun meetupDestinationDao(): MeetupDestinationDao
 
     companion object {
         val MIGRATION_5_6 = object : Migration(5, 6) {
@@ -198,6 +202,35 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `messages` ADD COLUMN `systemEventType` TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE `messages` ADD COLUMN `systemEventPayload` TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE `messages` ADD COLUMN `targetUserId` TEXT DEFAULT NULL")
+            }
+        }
+
+        /**
+         * Adds the `meetup_destination` table — Room becomes the SSOT for the
+         * meetup feature. The repository keeps it in sync with the Firestore
+         * snapshot; the UI flows directly off this table.
+         *
+         * Participants are serialized to a single JSON column to keep the
+         * schema simple — they're always read together with the destination.
+         */
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `meetup_destination` (
+                        `groupId` TEXT NOT NULL,
+                        `latitude` REAL NOT NULL,
+                        `longitude` REAL NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `address` TEXT NOT NULL,
+                        `setBy` TEXT NOT NULL,
+                        `setAt` INTEGER NOT NULL,
+                        `isActive` INTEGER NOT NULL,
+                        `participantsJson` TEXT NOT NULL,
+                        PRIMARY KEY(`groupId`)
+                    )
+                    """.trimIndent()
+                )
             }
         }
     }

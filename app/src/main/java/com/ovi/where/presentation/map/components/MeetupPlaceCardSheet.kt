@@ -23,8 +23,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DirectionsCar
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.NearMe
 import androidx.compose.material.icons.rounded.Person
@@ -85,7 +87,9 @@ data class MeetupParticipantUiModel(
     /** True when this user has no recent location heartbeat (>5min stale). */
     val isInactive: Boolean,
     /** Pre-formatted distance label for ON_THE_WAY users. Null for terminal/inactive. */
-    val distanceLabel: String?
+    val distanceLabel: String?,
+    /** Free-form note ("custom status") set by this participant. Empty when none. */
+    val note: String = ""
 )
 
 /**
@@ -107,10 +111,12 @@ fun MeetupPlaceCardSheet(
     participants: List<MeetupParticipantUiModel>,
     isCreator: Boolean,
     selfStatus: MeetupParticipantStatus,
+    selfNote: String,
     onShowOnMap: () -> Unit,
     onGetDirections: () -> Unit,
     onCantMakeIt: () -> Unit,
     onClear: () -> Unit,
+    onEditStatus: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -220,6 +226,15 @@ fun MeetupPlaceCardSheet(
                         )
                     }
                 }
+            }
+
+            // ── Your-status composer (only while you can still update it) ─
+            if (selfStatus == MeetupParticipantStatus.ON_THE_WAY) {
+                Spacer(Modifier.height(Dimens.spaceLarge))
+                YourStatusCard(
+                    note = selfNote,
+                    onClick = onEditStatus
+                )
             }
 
             // ── Participants section ─────────────────────────────────────
@@ -442,6 +457,19 @@ private fun ParticipantRow(participant: MeetupParticipantUiModel) {
 
 @Composable
 private fun ParticipantStatusLine(participant: MeetupParticipantUiModel) {
+    // If the participant has a custom note set, prefer that — it's their
+    // own words. Otherwise fall back to the status-derived label.
+    if (participant.note.isNotBlank()) {
+        Text(
+            text = "“${participant.note}”",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Medium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        return
+    }
     val (label, color) = when {
         participant.isInactive && participant.status == MeetupParticipantStatus.ON_THE_WAY ->
             "Inactive — last seen recently" to MaterialTheme.colorScheme.onSurfaceVariant
@@ -598,6 +626,76 @@ private fun MetricCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
+        }
+    }
+}
+
+/**
+ * Compact "your status" card that lives between the metric strip and the
+ * participants list when the user is still on the way. Shows their
+ * current note (or a "Set custom status" prompt when empty) and opens
+ * the editor sheet on tap.
+ *
+ * Idle: 56dp tall, surfaceContainerHigh background, primary leading
+ * icon, chevron trailing — matches the "tap to edit" affordance used
+ * elsewhere in the app.
+ */
+@Composable
+private fun YourStatusCard(
+    note: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Dimens.spaceLarge)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "YOUR STATUS",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    text = if (note.isBlank()) "Tap to set a custom status" else note,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (note.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.onSurface,
+                    fontWeight = if (note.isBlank()) FontWeight.Normal else FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Icon(
+                imageVector = Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

@@ -110,6 +110,8 @@ object UseCaseModule {
     @Provides fun provideDetectArrivalUseCase() = DetectArrivalUseCase()
     @Provides fun provideUpdateMeetupParticipantStatusUseCase(r: LocationRepository) =
         com.ovi.where.domain.usecase.location.UpdateMeetupParticipantStatusUseCase(r)
+    @Provides fun provideUpdateMeetupParticipantNoteUseCase(r: LocationRepository) =
+        com.ovi.where.domain.usecase.location.UpdateMeetupParticipantNoteUseCase(r)
     @Provides fun provideGetMeetupRouteUseCase(r: DirectionsRepository) = GetMeetupRouteUseCase(r)
 
     // ── User ─────────────────────────────────────────────────────────────────

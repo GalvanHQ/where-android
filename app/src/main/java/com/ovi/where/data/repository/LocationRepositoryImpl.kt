@@ -8,6 +8,7 @@ import com.ovi.where.core.common.Resource
 import com.ovi.where.core.constants.AppConstants
 import com.ovi.where.core.constants.AppConstants.MILLIS_PER_MINUTE
 import com.ovi.where.data.local.dao.LocationDao
+import com.ovi.where.data.local.dao.MeetupDestinationDao
 import com.ovi.where.data.local.entity.SharedLocationEntity
 import com.ovi.where.data.local.entity.toDomain
 import com.ovi.where.data.local.entity.toEntity
@@ -41,7 +42,8 @@ class LocationRepositoryImpl @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
     private val lazyChatSocketIoClient: Lazy<ChatSocketIoClient>,
-    private val locationDao: LocationDao
+    private val locationDao: LocationDao,
+    private val meetupDestinationDao: MeetupDestinationDao
 ) : LocationRepository {
 
     /**
@@ -1177,46 +1179,105 @@ class LocationRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun observeMeetupDestination(groupId: String): Flow<MeetupDestination?> = callbackFlow {
-        val listener = firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
-            .document(groupId)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Timber.e(error, "Meetup destination listener error")
-                    trySend(null).isSuccess
-                    return@addSnapshotListener
-                }
-                val destMap = snapshot?.get("meetupDestination") as? Map<*, *>
-                if (destMap != null && destMap["isActive"] == true) {
-                    val rawParticipants = destMap["participants"] as? Map<*, *>
-                    val participants = rawParticipants
-                        ?.mapNotNull { (k, v) ->
-                            val uid = k as? String ?: return@mapNotNull null
-                            val entry = v as? Map<*, *> ?: return@mapNotNull null
-                            uid to com.ovi.where.domain.model.MeetupParticipant(
-                                status = com.ovi.where.domain.model.MeetupParticipantStatus
-                                    .fromString(entry["status"] as? String),
-                                updatedAt = (entry["updatedAt"] as? Number)?.toLong() ?: 0L
-                            )
-                        }
-                        ?.toMap()
-                        .orEmpty()
-
-                    val destination = MeetupDestination(
-                        latitude = (destMap["latitude"] as? Number)?.toDouble() ?: 0.0,
-                        longitude = (destMap["longitude"] as? Number)?.toDouble() ?: 0.0,
-                        name = destMap["name"] as? String ?: "",
-                        address = destMap["address"] as? String ?: "",
-                        setBy = destMap["setBy"] as? String ?: "",
-                        setAt = (destMap["setAt"] as? Number)?.toLong() ?: 0L,
-                        isActive = true,
-                        participants = participants
+    /**
+     * Updates only the calling user's free-form note ("custom status") on
+     * the destination's participants map. Empty string clears the note.
+     * Same dotted-path strategy as [updateMeetupParticipantStatus] so we
+     * never touch other participants' entries.
+     */
+    override suspend fun updateMeetupParticipantNote(
+        groupId: String,
+        note: String
+    ): Resource<Unit> {
+        return try {
+            val uid = currentUid ?: return Resource.Error("Not authenticated")
+            val now = System.currentTimeMillis()
+            firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
+                .document(groupId)
+                .update(
+                    mapOf(
+                        "meetupDestination.participants.$uid.note" to note,
+                        "meetupDestination.participants.$uid.updatedAt" to now
                     )
-                    trySend(destination).isSuccess
-                } else {
-                    trySend(null).isSuccess
+                )
+                .await()
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to update meetup participant note")
+            Resource.Error(e.message ?: "Failed to update status")
+        }
+    }
+
+    /**
+     * Per-group meetup-destination listener registry. Keeps one Firestore
+     * snapshot listener per group active for the lifetime of the process,
+     * mirroring snapshots into Room (SSOT). Multiple UI consumers can
+     * subscribe to the same group through Room without spawning new
+     * listeners.
+     */
+    private val meetupListeners = mutableMapOf<String, ListenerRegistration>()
+    private val meetupListenerLock = Any()
+
+    override fun observeMeetupDestination(groupId: String): Flow<MeetupDestination?> {
+        ensureMeetupListener(groupId)
+        return meetupDestinationDao.observeByGroup(groupId).map { entity ->
+            entity?.takeIf { it.isActive }?.toDomain()
+        }
+    }
+
+    /**
+     * Starts (or reuses) the Firestore listener for [groupId] that mirrors
+     * the meetup destination into Room. Idempotent — calling it multiple
+     * times just keeps the same listener around.
+     */
+    private fun ensureMeetupListener(groupId: String) {
+        synchronized(meetupListenerLock) {
+            if (meetupListeners.containsKey(groupId)) return
+            val reg = firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
+                .document(groupId)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        Timber.e(error, "Meetup destination listener error for $groupId")
+                        return@addSnapshotListener
+                    }
+                    val destMap = snapshot?.get("meetupDestination") as? Map<*, *>
+                    if (destMap != null && destMap["isActive"] == true) {
+                        val rawParticipants = destMap["participants"] as? Map<*, *>
+                        val participants = rawParticipants
+                            ?.mapNotNull { (k, v) ->
+                                val uid = k as? String ?: return@mapNotNull null
+                                val entry = v as? Map<*, *> ?: return@mapNotNull null
+                                uid to com.ovi.where.domain.model.MeetupParticipant(
+                                    status = com.ovi.where.domain.model.MeetupParticipantStatus
+                                        .fromString(entry["status"] as? String),
+                                    updatedAt = (entry["updatedAt"] as? Number)?.toLong() ?: 0L,
+                                    note = (entry["note"] as? String).orEmpty()
+                                )
+                            }
+                            ?.toMap()
+                            .orEmpty()
+
+                        val destination = MeetupDestination(
+                            latitude = (destMap["latitude"] as? Number)?.toDouble() ?: 0.0,
+                            longitude = (destMap["longitude"] as? Number)?.toDouble() ?: 0.0,
+                            name = destMap["name"] as? String ?: "",
+                            address = destMap["address"] as? String ?: "",
+                            setBy = destMap["setBy"] as? String ?: "",
+                            setAt = (destMap["setAt"] as? Number)?.toLong() ?: 0L,
+                            isActive = true,
+                            participants = participants
+                        )
+                        repositoryScope.launch {
+                            meetupDestinationDao.upsert(destination.toEntity(groupId))
+                        }
+                    } else {
+                        // Inactive / missing — drop the row so observers see null.
+                        repositoryScope.launch {
+                            meetupDestinationDao.deleteByGroup(groupId)
+                        }
+                    }
                 }
-            }
-        awaitClose { listener.remove() }
+            meetupListeners[groupId] = reg
+        }
     }
 }

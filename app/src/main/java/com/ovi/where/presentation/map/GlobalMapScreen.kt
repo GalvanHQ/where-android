@@ -61,6 +61,9 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.NearMe
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetScaffold
@@ -164,7 +167,6 @@ fun GlobalMapScreen(
     onNavigateToCreateGroup: () -> Unit = {},
     onNavigateToJoinGroup: () -> Unit = {},
     onNavigateToAddFriends: () -> Unit = {},
-    onNavigateToMeetupNavigation: (String) -> Unit = {},
     viewModel: GlobalMapViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -755,6 +757,20 @@ fun GlobalMapScreen(
                         DestinationPinMarker()
                     }
                 }
+
+                // ── In-app navigation polyline ────────────────────────────────
+                // Drawn over the existing GoogleMap when the user taps
+                // "Directions" on the meetup place card. Lives next to
+                // the destination marker so they share z-stacking.
+                uiState.navigationRoute?.points?.takeIf { it.size >= 2 }?.let { points ->
+                    com.google.maps.android.compose.Polyline(
+                        points = points,
+                        color = MaterialTheme.colorScheme.primary,
+                        width = 14f,
+                        geodesic = false,
+                        zIndex = 1f
+                    )
+                }
             }
             }
 
@@ -764,7 +780,11 @@ fun GlobalMapScreen(
             // share the same chip language: 40dp height, 50% radius, single-
             // line label, leading icon/avatar. Group filter on the left,
             // meetup chip on the right.
-            Row(
+            //
+            // Hidden while in-app navigation is active — that mode owns
+            // the top of the map with its own status surface.
+            if (!uiState.isMeetupNavigating) {
+                Row(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
@@ -826,6 +846,28 @@ fun GlobalMapScreen(
                     distanceText = uiState.meetupDestinationDistanceText,
                     onIdleClick = { viewModel.enterMeetupPlacement() },
                     onActiveClick = { viewModel.openMeetupPlaceCard() }
+                )
+                }
+            }
+
+            // ── Navigation status card (in-app navigation overlay) ───────────
+            // Replaces the chip strip while navigating. Shows distance + ETA
+            // along with Recenter / Stop controls, sits at top-center so the
+            // user's eye doesn't have to relocate from the chip strip's spot.
+            if (uiState.isMeetupNavigating) {
+                NavigationStatusCard(
+                    destinationName = uiState.meetupDestination?.name?.takeIf { it.isNotBlank() }
+                        ?: "Meetup point",
+                    distanceLabel = uiState.navigationDistanceLabel,
+                    etaLabel = uiState.navigationEtaLabel,
+                    isLoading = uiState.navigationLoading,
+                    errorMessage = uiState.navigationError,
+                    onRecenter = { viewModel.refreshMeetupRoute() },
+                    onStop = { viewModel.stopMeetupNavigation() },
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(horizontal = Dimens.spaceMedium, vertical = 12.dp)
                 )
             }
 
@@ -1171,6 +1213,26 @@ fun GlobalMapScreen(
                     viewModel.onDestinationFocusConsumed()
                 }
             }
+
+            // ── Navigation camera fitting ────────────────────────────────
+            // Fits the camera around (origin + destination) on every
+            // recenter request — tied to a long timestamp so it fires
+            // exactly once per request even if the route refetches in
+            // between.
+            LaunchedEffect(uiState.navigationRecenterRequest) {
+                if (uiState.navigationRecenterRequest == 0L) return@LaunchedEffect
+                if (!uiState.isMeetupNavigating) return@LaunchedEffect
+                val destination = uiState.meetupDestination ?: return@LaunchedEffect
+                if (!destination.hasValidLocation || !uiState.hasMyLocation) return@LaunchedEffect
+                val bounds = LatLngBounds.builder()
+                    .include(LatLng(uiState.myLatitude, uiState.myLongitude))
+                    .include(LatLng(destination.latitude, destination.longitude))
+                    .build()
+                cameraPositionState.animate(
+                    CameraUpdateFactory.newLatLngBounds(bounds, 180),
+                    durationMs = 700
+                )
+            }
         }
     }
 
@@ -1379,15 +1441,13 @@ fun GlobalMapScreen(
                 viewModel.requestDestinationFocus()
             },
             onGetDirections = {
-                // In-app turn-by-turn-style navigation: opens our own
-                // GoogleMap with the route polyline drawn from the user's
-                // current location to the meetup point. We only navigate
-                // if we still have a group reference for the active
-                // destination — without it, the navigation screen has
-                // nothing to observe.
+                // In-app navigation overlay: draws a route polyline + status
+                // bar over THIS Global Map (no separate destination, no
+                // back-stack push). The user stays in their familiar map
+                // context with all the friend pins still visible.
                 viewModel.dismissMeetupPlaceCard()
                 uiState.meetupDestinationGroupId?.let { groupId ->
-                    onNavigateToMeetupNavigation(groupId)
+                    viewModel.startMeetupNavigation(groupId)
                 }
             },
             onCantMakeIt = {
@@ -3602,5 +3662,194 @@ private fun FriendStatusBubble(text: String, tint: FriendStatusTint) {
                     drawPath(path, color = bg)
                 }
         )
+    }
+}
+
+/**
+ * Top-of-map status card for the in-app meetup navigation overlay.
+ *
+ * Replaces the chip strip while [GlobalMapUiState.isMeetupNavigating] is
+ * true. Shows the destination name, live distance + ETA, a primary
+ * "Recenter" affordance (also doubles as retry on error), and a Stop
+ * button to exit navigation.
+ */
+@Composable
+private fun NavigationStatusCard(
+    destinationName: String,
+    distanceLabel: String?,
+    etaLabel: String?,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onRecenter: () -> Unit,
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 4.dp,
+        shadowElevation = 4.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(
+                start = 12.dp,
+                end = 8.dp,
+                top = 10.dp,
+                bottom = 12.dp
+            )
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.NearMe,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "NAVIGATING TO",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = destinationName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .padding(end = 4.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else if (errorMessage != null) {
+                    androidx.compose.material3.IconButton(onClick = onRecenter) {
+                        Icon(
+                            Icons.Rounded.Refresh,
+                            contentDescription = "Retry",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                } else {
+                    androidx.compose.material3.IconButton(onClick = onRecenter) {
+                        Icon(
+                            Icons.Rounded.Refresh,
+                            contentDescription = "Recenter",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                androidx.compose.material3.IconButton(onClick = onStop) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Stop navigation",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
+            // ── Metric strip: distance + ETA ─────────────────────────────
+            if (distanceLabel != null || etaLabel != null || errorMessage != null) {
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (distanceLabel != null) {
+                        NavMetricChip(
+                            icon = Icons.Rounded.NearMe,
+                            label = "Distance",
+                            value = distanceLabel,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    if (etaLabel != null) {
+                        NavMetricChip(
+                            icon = Icons.Rounded.Schedule,
+                            label = "ETA",
+                            value = etaLabel,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+                if (errorMessage != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = errorMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NavMetricChip(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 }

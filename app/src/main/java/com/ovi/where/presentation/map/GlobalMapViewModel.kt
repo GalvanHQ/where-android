@@ -146,6 +146,7 @@ class GlobalMapViewModel @Inject constructor(
     private val detectArrivalUseCase: DetectArrivalUseCase,
     private val updateMeetupParticipantStatusUseCase: com.ovi.where.domain.usecase.location.UpdateMeetupParticipantStatusUseCase,
     private val updateMeetupParticipantNoteUseCase: com.ovi.where.domain.usecase.location.UpdateMeetupParticipantNoteUseCase,
+    private val getMeetupRouteUseCase: com.ovi.where.domain.usecase.location.GetMeetupRouteUseCase,
     private val conversationRepository: ConversationRepository,
     private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter
 ) : AndroidViewModel(application) {
@@ -1563,6 +1564,223 @@ class GlobalMapViewModel @Inject constructor(
         }
     }
 
+    // ── In-app meetup navigation overlay ─────────────────────────────────────
+
+    /** Job watching the user's location while navigation is active. */
+    private var navigationLocationJob: Job? = null
+    /** Job that runs an in-flight Directions API fetch. */
+    private var navigationRouteJob: Job? = null
+    /** Last destination we successfully fetched a route to. */
+    private var lastRoutedDestination: com.google.android.gms.maps.model.LatLng? = null
+
+    /**
+     * Enters in-app navigation mode for [groupId]'s active meetup.
+     *
+     * Renders a polyline + status bar over the Global Map. We re-use the
+     * same map already on screen, so no separate destination is pushed
+     * onto the back stack — the user stays in their familiar map context.
+     */
+    fun startMeetupNavigation(groupId: String) {
+        val state = _uiState.value
+        val destination = state.meetupDestinationsByGroup[groupId] ?: run {
+            viewModelScope.launch {
+                _uiEvent.send(
+                    UiEvent.ShowSnackbar(
+                        UiText.DynamicString("This meetup is no longer active.")
+                    )
+                )
+            }
+            return
+        }
+        if (!destination.hasValidLocation) return
+
+        _uiState.value = state.copy(
+            isMeetupNavigating = true,
+            navigationGroupId = groupId,
+            navigationRoute = null,
+            navigationDistanceLabel = null,
+            navigationEtaLabel = null,
+            navigationLoading = true,
+            navigationError = null,
+            navigationRecenterRequest = System.currentTimeMillis()
+        )
+
+        // Trigger an immediate route fetch with the freshest GPS fix we
+        // have. The location stream observer below keeps things in sync
+        // as the user moves.
+        viewModelScope.launch {
+            val origin = state.takeIf { it.hasMyLocation }
+                ?.let { com.google.android.gms.maps.model.LatLng(it.myLatitude, it.myLongitude) }
+                ?: locationManager.getCurrentLocation()
+                    ?.let { com.google.android.gms.maps.model.LatLng(it.latitude, it.longitude) }
+
+            if (origin != null) {
+                fetchRouteForNavigation(origin, destination)
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    navigationLoading = false,
+                    navigationError = "Waiting for your location…"
+                )
+            }
+        }
+
+        // Lightweight location observer that:
+        //  • refreshes the route when the user drifts >250m off the polyline
+        //    (avoids burning Directions quota on every GPS tick), and
+        //  • keeps the live distance label fresh between route refreshes.
+        navigationLocationJob?.cancel()
+        navigationLocationJob = viewModelScope.launch {
+            locationManager.getLocationUpdates().collect { loc ->
+                val current = _uiState.value
+                if (!current.isMeetupNavigating) return@collect
+                val activeDestination = current.navigationGroupId?.let {
+                    current.meetupDestinationsByGroup[it]
+                } ?: return@collect
+
+                val origin = com.google.android.gms.maps.model.LatLng(loc.latitude, loc.longitude)
+                val destLatLng = com.google.android.gms.maps.model.LatLng(
+                    activeDestination.latitude, activeDestination.longitude
+                )
+
+                // Update live distance label every tick.
+                val results = FloatArray(1)
+                android.location.Location.distanceBetween(
+                    origin.latitude, origin.longitude,
+                    destLatLng.latitude, destLatLng.longitude,
+                    results
+                )
+                _uiState.value = _uiState.value.copy(
+                    navigationDistanceLabel = formatDistance(results[0])
+                )
+
+                // Refresh the route when:
+                //  • the destination moved >50m, or
+                //  • the user is >250m from the cached polyline.
+                val cached = lastRoutedDestination
+                val destinationMoved = cached != null &&
+                    distanceBetween(cached, destLatLng) > 50f
+                val driftedOff = current.navigationRoute?.points?.let { pts ->
+                    nearestPolylineDistance(origin, pts) > NAV_OFF_ROUTE_THRESHOLD_M
+                } ?: true
+                if (destinationMoved || driftedOff) {
+                    fetchRouteForNavigation(origin, activeDestination)
+                }
+            }
+        }
+    }
+
+    /** User-initiated retry / recenter from the status bar. */
+    fun refreshMeetupRoute() {
+        val state = _uiState.value
+        val groupId = state.navigationGroupId ?: return
+        val destination = state.meetupDestinationsByGroup[groupId] ?: return
+        val origin = state.takeIf { it.hasMyLocation }
+            ?.let { com.google.android.gms.maps.model.LatLng(it.myLatitude, it.myLongitude) }
+            ?: return
+        _uiState.value = state.copy(
+            navigationRecenterRequest = System.currentTimeMillis(),
+            navigationError = null
+        )
+        viewModelScope.launch { fetchRouteForNavigation(origin, destination) }
+    }
+
+    /** Tears down navigation overlay state. */
+    fun stopMeetupNavigation() {
+        navigationLocationJob?.cancel()
+        navigationLocationJob = null
+        navigationRouteJob?.cancel()
+        navigationRouteJob = null
+        lastRoutedDestination = null
+        _uiState.value = _uiState.value.copy(
+            isMeetupNavigating = false,
+            navigationGroupId = null,
+            navigationRoute = null,
+            navigationDistanceLabel = null,
+            navigationEtaLabel = null,
+            navigationLoading = false,
+            navigationError = null
+        )
+    }
+
+    /**
+     * Fetches a Directions API route from [origin] to the meetup point
+     * and writes it into UI state. Cancels any in-flight fetch first.
+     */
+    private suspend fun fetchRouteForNavigation(
+        origin: com.google.android.gms.maps.model.LatLng,
+        destination: com.ovi.where.domain.model.MeetupDestination
+    ) {
+        navigationRouteJob?.cancel()
+        navigationRouteJob = viewModelScope.launch {
+            val destLatLng = com.google.android.gms.maps.model.LatLng(
+                destination.latitude, destination.longitude
+            )
+            _uiState.value = _uiState.value.copy(
+                navigationLoading = _uiState.value.navigationRoute == null
+            )
+            when (val result = getMeetupRouteUseCase(origin, destLatLng)) {
+                is Resource.Success -> {
+                    val route = result.data
+                    lastRoutedDestination = destLatLng
+                    _uiState.value = _uiState.value.copy(
+                        navigationLoading = false,
+                        navigationRoute = route,
+                        navigationDistanceLabel = route?.let {
+                            formatDistance(it.distanceMeters.toFloat())
+                        } ?: _uiState.value.navigationDistanceLabel,
+                        navigationEtaLabel = route?.let { formatRouteEta(it.durationSeconds) },
+                        navigationError = null
+                    )
+                }
+                is Resource.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        navigationLoading = false,
+                        navigationError = result.message
+                    )
+                }
+                is Resource.Loading -> Unit
+            }
+        }
+    }
+
+    /** Like [computeEta] but for a precise Directions API duration. */
+    private fun formatRouteEta(seconds: Long): String? {
+        if (seconds <= 0) return null
+        return when {
+            seconds < 60 -> "< 1 min"
+            seconds < 3600 -> "${seconds / 60} min"
+            else -> "${seconds / 3600}h ${(seconds % 3600) / 60}m"
+        }
+    }
+
+    private fun distanceBetween(
+        a: com.google.android.gms.maps.model.LatLng,
+        b: com.google.android.gms.maps.model.LatLng
+    ): Float {
+        val out = FloatArray(1)
+        android.location.Location.distanceBetween(
+            a.latitude, a.longitude, b.latitude, b.longitude, out
+        )
+        return out[0]
+    }
+
+    private fun nearestPolylineDistance(
+        origin: com.google.android.gms.maps.model.LatLng,
+        points: List<com.google.android.gms.maps.model.LatLng>
+    ): Float {
+        if (points.isEmpty()) return Float.MAX_VALUE
+        // Sample every 5th point — cheap "are we anywhere near the line?".
+        val stride = (points.size / 50).coerceAtLeast(1)
+        var minDist = Float.MAX_VALUE
+        var i = 0
+        while (i < points.size) {
+            val d = distanceBetween(origin, points[i])
+            if (d < minDist) minDist = d
+            i += stride
+        }
+        return minDist
+    }
+
     /**
      * Resolves the conversation for [groupId] and writes a system message via
      * [SystemMessageWriter]. Failures are swallowed — the destination state
@@ -2014,6 +2232,12 @@ class GlobalMapViewModel @Inject constructor(
         const val ROAD_DETOUR_FACTOR = 1.3f
         /** Average city driving speed in m/s (≈ 30 km/h). */
         const val TYPICAL_URBAN_DRIVING_MPS = 8.33
+        /**
+         * How far the user can drift from the cached navigation polyline
+         * before we re-fetch a route. Tighter values waste Directions
+         * quota; looser values let the line fall behind the user.
+         */
+        const val NAV_OFF_ROUTE_THRESHOLD_M = 250f
     }
 
     private fun startLocationService(durationMinutes: Long) {
@@ -2159,6 +2383,28 @@ data class GlobalMapUiState(
      * concurrent meetups across different groups; ownership is per-group.
      */
     val meetupOwnedShareGroupIds: Set<String> = emptySet(),
+
+    // ── In-app meetup navigation overlay ─────────────────────────────────────
+    /**
+     * True while the user is in "navigate to meetup" mode — the Global
+     * Map renders a route polyline + a top status bar with distance/ETA
+     * + a Stop / Recenter control instead of the chip strip.
+     */
+    val isMeetupNavigating: Boolean = false,
+    /** Group id whose meetup destination we're navigating to. */
+    val navigationGroupId: String? = null,
+    /** Decoded route polyline + distance + duration from the Directions API. */
+    val navigationRoute: com.ovi.where.domain.model.Route? = null,
+    /** Pre-formatted distance label (e.g. "1.2km"). */
+    val navigationDistanceLabel: String? = null,
+    /** Pre-formatted ETA label (e.g. "8 min"). */
+    val navigationEtaLabel: String? = null,
+    /** True while the initial route fetch is still in flight. */
+    val navigationLoading: Boolean = false,
+    /** Last error from the Directions API; null on success / not yet attempted. */
+    val navigationError: String? = null,
+    /** One-shot trigger to recenter the camera on the route bounds. */
+    val navigationRecenterRequest: Long = 0L,
 
     /**
      * Per-group active meetup destinations. Multi-group state so the chip

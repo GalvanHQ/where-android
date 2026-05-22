@@ -347,11 +347,6 @@ fun AppNavGraph(
                         navController.navigate(Screen.Search.createRoute("people")) {
                             launchSingleTop = true
                         }
-                    },
-                    onNavigateToMeetupNavigation = { groupId ->
-                        navController.navigate(Screen.MeetupNavigation.createRoute(groupId)) {
-                            launchSingleTop = true
-                        }
                     }
                 )
             }
@@ -774,16 +769,6 @@ fun AppNavGraph(
                 LaunchedEffect(Unit) {
                     navController.navigateToTab(Screen.MapTab.route)
                 }
-            }
-
-            // ── In-app meetup navigation (turn-by-turn-style polyline view) ───
-            composable(
-                route     = Screen.MeetupNavigation.ROUTE,
-                arguments = listOf(navArgument("groupId") { type = NavType.StringType })
-            ) {
-                com.ovi.where.presentation.map.navigation.MeetupNavigationScreen(
-                    onNavigateBack = { navController.popBackStack() }
-                )
             }
 
             composable(Screen.CreateGroup.route) {

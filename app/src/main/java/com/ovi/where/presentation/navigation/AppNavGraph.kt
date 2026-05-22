@@ -633,7 +633,6 @@ fun AppNavGraph(
             ) { back ->
                 val groupId = back.arguments?.getString("groupId") ?: return@composable
                 com.ovi.where.presentation.group.AddGroupMembersScreen(
-                    groupId = groupId,
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

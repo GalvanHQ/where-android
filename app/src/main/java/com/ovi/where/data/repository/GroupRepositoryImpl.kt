@@ -52,7 +52,7 @@ class GroupRepositoryImpl @Inject constructor(
             val groupId = UUID.randomUUID().toString()
             val inviteCode = UUID.randomUUID().toString().take(8).uppercase()
             val now = System.currentTimeMillis()
-            
+
             val group = Group(
                 id = groupId,
                 name = name,
@@ -63,13 +63,13 @@ class GroupRepositoryImpl @Inject constructor(
                 inviteCode = inviteCode,
                 avatarUrl = avatarUrl
             )
-            
+
             val batch = firestore.batch()
-            
+
             val groupRef = firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
                 .document(groupId)
             batch.set(groupRef, group)
-            
+
             val member = GroupMember(
                 id = uid,
                 userId = uid,
@@ -80,9 +80,9 @@ class GroupRepositoryImpl @Inject constructor(
             val memberRef = groupRef.collection(AppConstants.FIRESTORE_COLLECTION_MEMBERS)
                 .document(uid)
             batch.set(memberRef, member)
-            
+
             batch.update(groupRef, "memberIds", FieldValue.arrayUnion(uid))
-            
+
             batch.commit().await()
             Resource.Success(group)
         } catch (e: Exception) {

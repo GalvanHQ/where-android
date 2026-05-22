@@ -1,8 +1,6 @@
 package com.ovi.where.presentation.group
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -70,7 +68,6 @@ import com.ovi.where.presentation.common.WhereTopAppBar
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddGroupMembersScreen(
-    groupId: String,
     onNavigateBack: () -> Unit,
     viewModel: GroupInfoViewModel = hiltViewModel()
 ) {

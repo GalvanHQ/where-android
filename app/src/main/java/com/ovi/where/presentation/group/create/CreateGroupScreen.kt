@@ -9,15 +9,21 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +33,7 @@ import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -58,6 +65,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -163,7 +171,19 @@ fun CreateGroupScreen(
 }
 
 // ── Group Creation Form ─────────────────────────────────────────────────────────
-
+//
+// Layout split across three regions so the "Create" CTA never falls below
+// the fold no matter how many friends are listed:
+//
+//   ┌──────────────────────────────────────┐
+//   │ Header (avatar + name + description) │ ← scrolls vertically with selection chips
+//   │ Selected-members chip row            │
+//   │ Search field                         │
+//   ├──────────────────────────────────────┤
+//   │ Friend list (LazyColumn, weight 1f)  │ ← independent scroll, doesn't push CTA
+//   ├──────────────────────────────────────┤
+//   │ Create button (sticky bottom)        │
+//   └──────────────────────────────────────┘
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CreateGroupForm(
@@ -183,111 +203,138 @@ private fun CreateGroupForm(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .imePadding()
     ) {
-        // ── Header: Avatar + Name inline (WhatsApp-style) ────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceXLarge),
-            verticalAlignment = Alignment.CenterVertically
+        // ── Header (scrolls vertically as a single block) ────────────────
+        Column(
+            modifier = Modifier.verticalScroll(rememberScrollState())
         ) {
-            // Avatar
-            Box(
+            // Avatar + Name inline (WhatsApp-style)
+            Row(
                 modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-                    .clickable { showAvatarSheet = true },
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = Dimens.spaceLarge,
+                        vertical = Dimens.spaceXLarge
+                    ),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (uiState.avatarUri != null) {
-                    AsyncImage(
-                        model = uiState.avatarUri,
-                        contentDescription = "Group avatar",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(64.dp).clip(CircleShape)
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .clickable { showAvatarSheet = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (uiState.avatarUri != null) {
+                        AsyncImage(
+                            model = uiState.avatarUri,
+                            contentDescription = "Group avatar",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.AddAPhoto,
+                            contentDescription = "Add group photo",
+                            modifier = Modifier.size(28.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                Spacer(Modifier.width(Dimens.spaceLarge))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    OutlinedTextField(
+                        value = uiState.name,
+                        onValueChange = onNameChange,
+                        label = { Text(stringResource(R.string.label_group_name)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !uiState.isLoading,
+                        isError = uiState.nameError != null,
+                        singleLine = true,
+                        shape = RoundedCornerShape(Dimens.cornerSmall),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        )
                     )
-                } else {
-                    Icon(
-                        Icons.Default.AddAPhoto,
-                        contentDescription = "Add group photo",
-                        modifier = Modifier.size(28.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                    uiState.nameError?.let { error ->
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 4.dp, start = 4.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(Modifier.width(Dimens.spaceLarge))
-
-            // Name field inline
-            Column(modifier = Modifier.weight(1f)) {
-                OutlinedTextField(
-                    value = uiState.name,
-                    onValueChange = onNameChange,
-                    label = { Text(stringResource(R.string.label_group_name)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !uiState.isLoading,
-                    isError = uiState.nameError != null,
-                    singleLine = true,
-                    shape = RoundedCornerShape(Dimens.cornerSmall),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-                    )
+            // Description
+            OutlinedTextField(
+                value = uiState.description,
+                onValueChange = onDescriptionChange,
+                label = { Text(stringResource(R.string.label_description_optional)) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Dimens.spaceLarge),
+                enabled = !uiState.isLoading,
+                singleLine = false,
+                maxLines = 3,
+                minLines = 2,
+                shape = RoundedCornerShape(Dimens.cornerSmall),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
                 )
-                uiState.nameError?.let { error ->
-                    Text(
-                        text = error,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 4.dp, start = 4.dp)
-                    )
-                }
-            }
+            )
+
+            Spacer(Modifier.height(Dimens.spaceXLarge))
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                modifier = Modifier.padding(horizontal = Dimens.spaceLarge)
+            )
+
+            Spacer(Modifier.height(Dimens.spaceLarge))
         }
 
-        // ── Description ──────────────────────────────────────────────────
-        OutlinedTextField(
-            value = uiState.description,
-            onValueChange = onDescriptionChange,
-            label = { Text(stringResource(R.string.label_description_optional)) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Dimens.spaceLarge),
-            enabled = !uiState.isLoading,
-            singleLine = false,
-            maxLines = 3,
-            minLines = 2,
-            shape = RoundedCornerShape(Dimens.cornerSmall),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-            )
-        )
-
-        Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
-
-        HorizontalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-            modifier = Modifier.padding(horizontal = Dimens.spaceLarge)
-        )
-
-        Spacer(modifier = Modifier.height(Dimens.spaceLarge))
-
-        // ── Members Section ──────────────────────────────────────────────
+        // ── Members section header (sticky-ish — sits above the list) ─────
+        val selectedCount = uiState.selectedMembers.size
         Text(
-            text = if (uiState.selectedMembers.isNotEmpty())
-                "Add Members · ${uiState.selectedMembers.size} selected"
-            else "Add Members",
+            text = if (selectedCount > 0) "Members · $selectedCount selected" else "Add members",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(horizontal = Dimens.spaceLarge)
         )
 
-        Spacer(modifier = Modifier.height(Dimens.spaceMedium))
+        // Selected-members chip row — Telegram/WhatsApp pattern. Tap a chip
+        // to remove. Hidden when nothing is selected to avoid empty chrome.
+        if (uiState.selectedMembers.isNotEmpty()) {
+            Spacer(Modifier.height(Dimens.spaceSmall))
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = Dimens.spaceLarge),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(
+                    items = uiState.selectedMembers,
+                    key = { it.id }
+                ) { member ->
+                    SelectedMemberChip(
+                        user = member,
+                        onRemove = { onMemberRemoved(member) }
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(Dimens.spaceMedium))
 
         // Search field
         OutlinedTextField(
@@ -324,42 +371,55 @@ private fun CreateGroupForm(
             )
         }
 
-        Spacer(modifier = Modifier.height(Dimens.spaceMedium))
+        Spacer(Modifier.height(Dimens.spaceMedium))
 
-        // Results / friend list
-        if (uiState.isSearching) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = Dimens.spaceLarge),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(Dimens.iconSizeMedium),
-                    strokeWidth = Dimens.strokeWidthThin
-                )
-            }
-        } else if (uiState.searchResults.isNotEmpty()) {
-            val selectedIds = uiState.selectedMembers.map { it.id }.toSet()
-            Column(modifier = Modifier.fillMaxWidth()) {
-                uiState.searchResults.forEach { user ->
-                    val isSelected = user.id in selectedIds
-                    ContactSelectableRow(
-                        user = user,
-                        isSelected = isSelected,
-                        onClick = {
-                            if (isSelected) onMemberRemoved(user) else onMemberSelected(user)
+        // ── Friend list (independently scrollable, fills remaining space) ─
+        val selectedIds = uiState.selectedMembers.map { it.id }.toSet()
+        Box(modifier = Modifier.weight(1f)) {
+            when {
+                uiState.isSearching -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(vertical = Dimens.spaceLarge),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(Dimens.iconSizeMedium),
+                            strokeWidth = Dimens.strokeWidthThin
+                        )
+                    }
+                }
+
+                uiState.searchResults.isEmpty() && uiState.memberSearchQuery.isNotBlank() -> {
+                    EmptyRow(text = "No friends found")
+                }
+
+                uiState.searchResults.isEmpty() -> {
+                    EmptyRow(text = "Add friends from the People tab to invite them.")
+                }
+
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = Dimens.spaceLarge)
+                    ) {
+                        items(
+                            items = uiState.searchResults,
+                            key = { it.id }
+                        ) { user ->
+                            ContactSelectableRow(
+                                user = user,
+                                isSelected = user.id in selectedIds,
+                                onClick = {
+                                    if (user.id in selectedIds) onMemberRemoved(user)
+                                    else onMemberSelected(user)
+                                }
+                            )
                         }
-                    )
+                    }
                 }
             }
-        } else if (uiState.memberSearchQuery.isNotBlank()) {
-            Text(
-                text = "No friends found",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceLarge)
-            )
         }
 
         // General error
@@ -369,23 +429,32 @@ private fun CreateGroupForm(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(
-                    start = Dimens.spaceLarge,
-                    top = Dimens.spaceMedium
+                    horizontal = Dimens.spaceLarge,
+                    vertical = Dimens.spaceSmall
                 )
             )
         }
 
-        Spacer(modifier = Modifier.weight(1f))
-
-        // ── Create Button (pinned to bottom) ─────────────────────────────
-        PrimaryButton(
-            text = stringResource(R.string.action_create_group),
-            onClick = onCreateGroup,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceLarge),
-            isLoading = uiState.isLoading
-        )
+        // ── Sticky CTA at the bottom ─────────────────────────────────────
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp,
+            tonalElevation = 0.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            PrimaryButton(
+                text = stringResource(R.string.action_create_group),
+                onClick = onCreateGroup,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(
+                        horizontal = Dimens.spaceLarge,
+                        vertical = Dimens.spaceMedium
+                    ),
+                isLoading = uiState.isLoading
+            )
+        }
     }
 
     // ── Avatar Picker Bottom Sheet ───────────────────────────────────────
@@ -434,6 +503,95 @@ private fun CreateGroupForm(
     }
 }
 
+// ── Selected-member chip ────────────────────────────────────────────────────
+//
+// Compact pill: 32dp avatar + first name + ✕. Tapping the chip deselects.
+// Sized so 5–6 chips fit on a typical phone width before scrolling kicks
+// in. First-name-only keeps long display names from blowing up the row.
+@Composable
+private fun SelectedMemberChip(
+    user: User,
+    onRemove: () -> Unit
+) {
+    val firstName = remember(user.displayName) {
+        user.displayName.trim().substringBefore(' ').ifEmpty { user.displayName }
+    }
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        modifier = Modifier
+            .height(40.dp)
+            .clip(RoundedCornerShape(50))
+            .clickable(onClick = onRemove)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 4.dp, end = 10.dp)
+        ) {
+            // Avatar
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                if (user.photoUrl != null) {
+                    AsyncImage(
+                        model = user.photoUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                    )
+                } else {
+                    Text(
+                        text = user.displayName.take(1).uppercase(),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = firstName,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 100.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Remove ${user.displayName}",
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyRow(text: String) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = Dimens.spaceXLarge)
+        )
+    }
+}
+
 // ── Contact Selectable Row ──────────────────────────────────────────────────────
 
 @Composable
@@ -448,7 +606,7 @@ private fun ContactSelectableRow(
             .clickable(onClick = onClick)
             .background(
                 if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
-                else androidx.compose.ui.graphics.Color.Transparent
+                else Color.Transparent
             )
             .padding(horizontal = Dimens.spaceLarge, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -467,7 +625,9 @@ private fun ContactSelectableRow(
                         model = user.photoUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(44.dp).clip(CircleShape)
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
                     )
                 } else {
                     Text(
@@ -499,14 +659,24 @@ private fun ContactSelectableRow(
 
         Spacer(Modifier.width(12.dp))
 
-        Text(
-            text = user.displayName,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = user.displayName,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (user.username.isNotBlank()) {
+                Text(
+                    text = "@${user.username}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }
 

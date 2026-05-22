@@ -13,6 +13,7 @@ import com.ovi.where.core.constants.AppConstants.MIN_SEARCH_QUERY_LENGTH
 import com.ovi.where.core.constants.AppConstants.SEARCH_DEBOUNCE_MS
 import com.ovi.where.core.utils.ImageUploadUtil
 import com.ovi.where.domain.model.User
+import com.ovi.where.domain.repository.GroupRepository
 import com.ovi.where.domain.usecase.chat.CreateGroupConversationUseCase
 import com.ovi.where.domain.usecase.friend.ObserveFriendsUseCase
 import com.ovi.where.domain.usecase.group.CreateGroupUseCase
@@ -50,6 +51,7 @@ class CreateGroupViewModel @Inject constructor(
     private val createGroupUseCase: CreateGroupUseCase,
     private val createGroupConversationUseCase: CreateGroupConversationUseCase,
     private val observeFriendsUseCase: ObserveFriendsUseCase,
+    private val groupRepository: GroupRepository,
     private val firebaseAuth: FirebaseAuth
 ) : AndroidViewModel(application) {
 
@@ -285,7 +287,30 @@ class CreateGroupViewModel @Inject constructor(
                 is Resource.Success -> {
                     val group = result.data
                     if (group != null) {
-                        // Step 3: Create the group conversation with selected members
+                        // Step 3: Add the picked friends to the group, one
+                        // by one. Mirrors the AddGroupMembersScreen flow
+                        // (groupRepository.addMember handles the
+                        // subcollection write + memberIds arrayUnion +
+                        // memberCount increment for each user). We swallow
+                        // individual failures to keep the rest of the
+                        // creation flow moving — partial-add is rare and
+                        // the user can re-invite from the group info
+                        // screen if needed.
+                        val invitees = state.selectedMembers
+                            .map { it.id }
+                            .filter { it.isNotBlank() && it != currentUserId }
+                            .distinct()
+                        invitees.forEach { inviteeUid ->
+                            runCatching { groupRepository.addMember(group.id, inviteeUid) }
+                                .onFailure {
+                                    timber.log.Timber.w(
+                                        it,
+                                        "Failed to add member $inviteeUid to group ${group.id}"
+                                    )
+                                }
+                        }
+
+                        // Step 4: Create the group conversation with selected members
                         val memberIds = state.selectedMembers.map { it.id } + currentUserId
                         val conversationResult = createGroupConversationUseCase(
                             groupId = group.id,
@@ -298,7 +323,7 @@ class CreateGroupViewModel @Inject constructor(
                             else -> null
                         }
 
-                        // Step 4: Write conversationId back to the group document
+                        // Step 5: Write conversationId back to the group document
                         if (conversationId != null) {
                             try {
                                 com.google.firebase.firestore.FirebaseFirestore.getInstance()

@@ -23,6 +23,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,7 +63,6 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.LocationOn
-import androidx.compose.material.icons.rounded.NearMe
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SocialDistance
@@ -147,6 +148,7 @@ import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.LocationUtils
 import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.map.components.DestinationPinMarker
+import com.ovi.where.presentation.map.components.MeetupChip
 import com.ovi.where.presentation.map.components.MeetupPlaceCardSheet
 import com.ovi.where.presentation.map.components.MeetupPlacementActionBar
 import com.ovi.where.presentation.map.components.SetMeetupDestinationSheet
@@ -790,7 +792,13 @@ fun GlobalMapScreen(
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
                     .padding(top = 12.dp)
-                    .padding(horizontal = Dimens.spaceMedium),
+                    .padding(horizontal = Dimens.spaceMedium)
+                    // Safety net: if the active meetup chip's label, the
+                    // group-filter name, and the notification chip can't
+                    // all fit on the smallest screen, let the strip
+                    // scroll horizontally rather than clipping the
+                    // notification chip off the right edge.
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -830,7 +838,8 @@ fun GlobalMapScreen(
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 110.dp)
                         )
                         Spacer(Modifier.width(4.dp))
                         Icon(
@@ -842,11 +851,21 @@ fun GlobalMapScreen(
                     }
                 }
 
-                com.ovi.where.presentation.map.components.MeetupChip(
+                MeetupChip(
                     destination = uiState.meetupDestination,
                     distanceText = uiState.meetupDestinationDistanceText,
                     onIdleClick = { viewModel.enterMeetupPlacement() },
                     onActiveClick = { viewModel.openMeetupPlaceCard() }
+                )
+
+                // Icon-only notifications chip — UI stub. The real
+                // notifications system gets wired up in a follow-up.
+                com.ovi.where.presentation.notification.components.NotificationChip(
+                    onClick = {
+                        // TODO: route to the Notifications screen once it
+                        // exists. For now, no-op so the chip is visible
+                        // but doesn't dead-end the user.
+                    }
                 )
                 }
             }
@@ -1156,7 +1175,7 @@ fun GlobalMapScreen(
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                text = "Move map to pick a spot",
+                                text = "Move and zoom map to pick a spot",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1

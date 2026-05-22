@@ -35,7 +35,7 @@ import com.ovi.where.data.local.entity.VoiceMessageCacheEntity
         LinkPreviewCacheEntity::class,
         OnlineStatusEntity::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -183,6 +183,21 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `shared_location` ADD COLUMN `targetType` TEXT NOT NULL DEFAULT ''")
                 db.execSQL("ALTER TABLE `shared_location` ADD COLUMN `targetId` TEXT NOT NULL DEFAULT ''")
                 db.execSQL("ALTER TABLE `shared_location` ADD COLUMN `visibleTo` TEXT DEFAULT NULL")
+            }
+        }
+
+        /**
+         * Adds three nullable columns to `messages` for system events
+         * (Messenger-style "info messages"). Additive, defaults to NULL,
+         * so older code paths read existing rows unchanged.
+         *
+         * See spec: `.kiro/specs/group-system-messages/`.
+         */
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `messages` ADD COLUMN `systemEventType` TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE `messages` ADD COLUMN `systemEventPayload` TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE `messages` ADD COLUMN `targetUserId` TEXT DEFAULT NULL")
             }
         }
     }

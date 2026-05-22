@@ -41,7 +41,8 @@ class GroupInfoViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
     private val conversationRepository: com.ovi.where.domain.repository.ConversationRepository,
     private val firebaseAuth: FirebaseAuth,
-    private val friendshipRepository: com.ovi.where.domain.repository.FriendshipRepository
+    private val friendshipRepository: com.ovi.where.domain.repository.FriendshipRepository,
+    private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter
 ) : ViewModel() {
 
     private val groupId: String = savedStateHandle["groupId"] ?: ""
@@ -54,6 +55,18 @@ class GroupInfoViewModel @Inject constructor(
 
     /** Cached conversationId for loading shared media */
     private var conversationId: String? = null
+
+    /** Resolves and caches the conversationId for this group; returns null if unavailable. */
+    private suspend fun ensureConversationId(): String? {
+        if (conversationId == null) {
+            conversationId = conversationRepository.getConversationIdByGroupId(groupId)
+        }
+        return conversationId
+    }
+
+    /** Display name lookup for a target user from the cached members list. */
+    private fun resolveTargetName(userId: String): String =
+        _uiState.value.members.firstOrNull { it.userId == userId }?.displayName ?: "Someone"
 
     init {
         if (groupId.isNotBlank()) {
@@ -81,6 +94,7 @@ class GroupInfoViewModel @Inject constructor(
                         _uiState.update {
                             it.copy(
                                 groupName = group.name,
+                                groupDescription = group.description,
                                 groupPhotoUrl = group.avatarUrl,
                                 memberCount = group.memberCount,
                                 isLoading = false,
@@ -289,10 +303,61 @@ class GroupInfoViewModel @Inject constructor(
         viewModelScope.launch {
             when (groupRepository.updateMemberRole(groupId, userId, MemberRole.ADMIN)) {
                 is Resource.Success -> {
-                    // Optimistic update already applied
+                    val convId = ensureConversationId()
+                    if (convId != null) {
+                        val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
+                        val target = resolveTargetName(userId)
+                        systemMessageWriter.writeSystemMessage(
+                            conversationId = convId,
+                            eventType = com.ovi.where.domain.model.SystemEventType.MEMBER_PROMOTED,
+                            targetUserId = userId,
+                            fallbackText = "$actor made $target an admin"
+                        )
+                    }
                 }
                 is Resource.Error -> {
                     // Revert optimistic update
+                    _uiState.update { it.copy(members = previousMembers) }
+                }
+                is Resource.Loading -> {}
+            }
+        }
+    }
+
+    /**
+     * Demotes an admin back to a regular member (optimistic update). Mirrors
+     * [makeAdmin] but flips the role the other direction. Emits a
+     * MEMBER_DEMOTED system message into the group's chat.
+     */
+    fun demoteAdmin(userId: String) {
+        val previousMembers = _uiState.value.members
+
+        _uiState.update { state ->
+            state.copy(
+                members = state.members.map { member ->
+                    if (member.userId == userId) {
+                        member.copy(isAdmin = false, roleText = "Member")
+                    } else member
+                }
+            )
+        }
+
+        viewModelScope.launch {
+            when (groupRepository.updateMemberRole(groupId, userId, MemberRole.MEMBER)) {
+                is Resource.Success -> {
+                    val convId = ensureConversationId()
+                    if (convId != null) {
+                        val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
+                        val target = resolveTargetName(userId)
+                        systemMessageWriter.writeSystemMessage(
+                            conversationId = convId,
+                            eventType = com.ovi.where.domain.model.SystemEventType.MEMBER_DEMOTED,
+                            targetUserId = userId,
+                            fallbackText = "$actor removed $target as admin"
+                        )
+                    }
+                }
+                is Resource.Error -> {
                     _uiState.update { it.copy(members = previousMembers) }
                 }
                 is Resource.Loading -> {}
@@ -318,9 +383,21 @@ class GroupInfoViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            // Capture target name BEFORE optimistic state was mutated, since
+            // the member may have already been removed from the cached list.
+            val targetName = previousMembers.firstOrNull { it.userId == userId }?.displayName ?: "Someone"
             when (groupRepository.removeMember(groupId, userId)) {
                 is Resource.Success -> {
-                    // Optimistic update already applied
+                    val convId = ensureConversationId()
+                    if (convId != null) {
+                        val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
+                        systemMessageWriter.writeSystemMessage(
+                            conversationId = convId,
+                            eventType = com.ovi.where.domain.model.SystemEventType.MEMBER_REMOVED,
+                            targetUserId = userId,
+                            fallbackText = "$actor removed $targetName"
+                        )
+                    }
                 }
                 is Resource.Error -> {
                     // Revert optimistic update
@@ -362,8 +439,23 @@ class GroupInfoViewModel @Inject constructor(
      */
     fun leaveGroup(onSuccess: () -> Unit) {
         viewModelScope.launch {
+            // Resolve conversationId BEFORE leaving so the doc read is still
+            // permitted. We need to write the system message before our own
+            // removal closes the door on writes.
+            val convId = ensureConversationId()
+            val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
+            val actorId = firebaseAuth.currentUser?.uid
+
             when (groupRepository.leaveGroup(groupId)) {
                 is Resource.Success -> {
+                    if (convId != null && actorId != null) {
+                        systemMessageWriter.writeSystemMessage(
+                            conversationId = convId,
+                            eventType = com.ovi.where.domain.model.SystemEventType.MEMBER_LEFT,
+                            targetUserId = actorId,
+                            fallbackText = "$actor left the group"
+                        )
+                    }
                     onSuccess()
                 }
                 is Resource.Error -> {
@@ -393,21 +485,65 @@ class GroupInfoViewModel @Inject constructor(
     }
 
     /**
-     * Updates the group name. Optimistic update + Firestore persist.
+     * Updates the group's name and description together. Optimistic update +
+     * Firestore persist with rollback on error. Either field can stay the
+     * same — pass the existing value to avoid blanking it out.
      */
-    fun updateGroupName(newName: String) {
+    fun updateGroupDetails(newName: String, newDescription: String) {
         if (newName.isBlank() || newName.length < 3) return
         val previousName = _uiState.value.groupName
-        _uiState.update { it.copy(groupName = newName) }
+        val previousDescription = _uiState.value.groupDescription
+        if (newName == previousName && newDescription == previousDescription) return
+
+        _uiState.update { it.copy(groupName = newName, groupDescription = newDescription) }
 
         viewModelScope.launch {
-            when (groupRepository.updateGroup(groupId, newName, "")) {
+            when (groupRepository.updateGroup(groupId, newName, newDescription)) {
                 is Resource.Error -> {
-                    _uiState.update { it.copy(groupName = previousName) }
+                    _uiState.update {
+                        it.copy(groupName = previousName, groupDescription = previousDescription)
+                    }
                 }
-                else -> {}
+                else -> {
+                    // Emit one system message per changed field. Cloud Functions
+                    // would normally do this server-side; here we author from
+                    // the client because the project uses Cloud Run + WS, not
+                    // Firestore-triggered Functions. Idempotent ids in
+                    // SystemMessageWriter make duplicate-emit harmless.
+                    val convId = ensureConversationId()
+                    if (convId != null) {
+                        val actorName = firebaseAuth.currentUser?.displayName ?: "Someone"
+                        if (newName != previousName) {
+                            systemMessageWriter.writeSystemMessage(
+                                conversationId = convId,
+                                eventType = com.ovi.where.domain.model.SystemEventType.GROUP_RENAMED,
+                                payload = mapOf(
+                                    "oldName" to previousName,
+                                    "newName" to newName
+                                ),
+                                fallbackText = "$actorName renamed the group to \"$newName\""
+                            )
+                        }
+                        if (newDescription != previousDescription) {
+                            systemMessageWriter.writeSystemMessage(
+                                conversationId = convId,
+                                eventType = com.ovi.where.domain.model.SystemEventType.GROUP_DESCRIPTION_CHANGED,
+                                payload = mapOf(
+                                    "oldDescription" to previousDescription,
+                                    "newDescription" to newDescription
+                                ),
+                                fallbackText = "$actorName updated the group description"
+                            )
+                        }
+                    }
+                }
             }
         }
+    }
+
+    /** Backwards-compatible name-only update. Delegates to [updateGroupDetails]. */
+    fun updateGroupName(newName: String) {
+        updateGroupDetails(newName, _uiState.value.groupDescription)
     }
 
     /**
@@ -416,8 +552,24 @@ class GroupInfoViewModel @Inject constructor(
     fun addMembers(userIds: List<String>, onSuccess: () -> Unit) {
         viewModelScope.launch {
             var allSuccess = true
+            val convId = ensureConversationId()
+            val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
             for (userId in userIds) {
                 when (groupRepository.addMember(groupId, userId)) {
+                    is Resource.Success -> {
+                        if (convId != null) {
+                            // Resolve target name from the User repo since the
+                            // member isn't in the cached list yet.
+                            val targetName = (userRepository.getUser(userId) as? Resource.Success)
+                                ?.data?.displayName ?: "Someone"
+                            systemMessageWriter.writeSystemMessage(
+                                conversationId = convId,
+                                eventType = com.ovi.where.domain.model.SystemEventType.MEMBER_ADDED,
+                                targetUserId = userId,
+                                fallbackText = "$actor added $targetName"
+                            )
+                        }
+                    }
                     is Resource.Error -> { allSuccess = false }
                     else -> {}
                 }
@@ -469,6 +621,17 @@ class GroupInfoViewModel @Inject constructor(
                     conversationRepository.updateConversationPhotoUrl(convId, photoUrl)
                     timber.log.Timber.d("GroupInfoVM: also updated by conversationId=$convId")
                 }
+
+                // 4. Emit a system message line for the timeline.
+                conversationId?.let { convId ->
+                    val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
+                    systemMessageWriter.writeSystemMessage(
+                        conversationId = convId,
+                        eventType = com.ovi.where.domain.model.SystemEventType.GROUP_PHOTO_CHANGED,
+                        payload = mapOf("newPhotoUrl" to photoUrl),
+                        fallbackText = "$actor changed the group photo"
+                    )
+                }
             } catch (e: Exception) {
                 timber.log.Timber.e(e, "GroupInfoVM: updateGroupPhoto failed")
                 _uiState.update { it.copy(groupPhotoUrl = null) }
@@ -492,15 +655,34 @@ class GroupInfoViewModel @Inject constructor(
                 return@launch
             }
 
+            val previous = _uiState.value.nicknames[userId].orEmpty()
+            val newNick = nickname.trim()
+            if (previous == newNick) return@launch
+
             val currentNicknames = _uiState.value.nicknames.toMutableMap()
-            if (nickname.isBlank()) {
+            if (newNick.isBlank()) {
                 currentNicknames.remove(userId)
             } else {
-                currentNicknames[userId] = nickname
+                currentNicknames[userId] = newNick
             }
             _uiState.update { it.copy(nicknames = currentNicknames) }
             val result = conversationRepository.updateNicknames(convId, currentNicknames)
             timber.log.Timber.d("GroupInfoVM: updateNicknames result=$result")
+
+            val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
+            val target = resolveTargetName(userId)
+            val text = if (newNick.isBlank()) "$actor cleared $target's nickname"
+                else "$actor set $target's nickname to \"$newNick\""
+            systemMessageWriter.writeSystemMessage(
+                conversationId = convId,
+                eventType = com.ovi.where.domain.model.SystemEventType.NICKNAME_CHANGED,
+                targetUserId = userId,
+                payload = mapOf(
+                    "oldNickname" to previous,
+                    "newNickname" to newNick
+                ),
+                fallbackText = text
+            )
         }
     }
 
@@ -508,6 +690,8 @@ class GroupInfoViewModel @Inject constructor(
      * Updates the theme color for the group's conversation.
      */
     fun updateThemeColor(colorHex: String?) {
+        val previous = _uiState.value.themeColor
+        if (previous == colorHex) return
         _uiState.update { it.copy(themeColor = colorHex) }
         viewModelScope.launch {
             // Ensure conversationId is resolved
@@ -516,6 +700,16 @@ class GroupInfoViewModel @Inject constructor(
             }
             val convId = conversationId ?: return@launch
             conversationRepository.updateThemeColor(convId, colorHex)
+            val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
+            systemMessageWriter.writeSystemMessage(
+                conversationId = convId,
+                eventType = com.ovi.where.domain.model.SystemEventType.THEME_COLOR_CHANGED,
+                payload = buildMap {
+                    if (previous != null) put("oldColor", previous)
+                    if (colorHex != null) put("newColor", colorHex)
+                },
+                fallbackText = "$actor changed the chat color"
+            )
         }
     }
 
@@ -523,6 +717,8 @@ class GroupInfoViewModel @Inject constructor(
      * Updates the emoji shortcut for the group's conversation.
      */
     fun updateEmojiShortcut(emoji: String?) {
+        val previous = _uiState.value.emojiShortcut
+        if (previous == emoji) return
         _uiState.update { it.copy(emojiShortcut = emoji) }
         viewModelScope.launch {
             if (conversationId == null) {
@@ -530,6 +726,18 @@ class GroupInfoViewModel @Inject constructor(
             }
             val convId = conversationId ?: return@launch
             conversationRepository.updateEmojiShortcut(convId, emoji)
+            val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
+            val text = if (emoji.isNullOrBlank()) "$actor changed the emoji shortcut"
+                else "$actor set the emoji shortcut to $emoji"
+            systemMessageWriter.writeSystemMessage(
+                conversationId = convId,
+                eventType = com.ovi.where.domain.model.SystemEventType.EMOJI_SHORTCUT_CHANGED,
+                payload = buildMap {
+                    if (previous != null) put("oldEmoji", previous)
+                    if (emoji != null) put("newEmoji", emoji)
+                },
+                fallbackText = text
+            )
         }
     }
 

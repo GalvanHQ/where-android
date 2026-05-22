@@ -33,6 +33,8 @@ data class MessageUiModel(
     val text: String,
     /** HH:mm formatted time shown under the bubble. */
     val formattedTime: String,
+    /** Raw epoch milliseconds for callers that need to format on demand (e.g. system messages). */
+    val timestampMs: Long = 0L,
     /** yyyy-MM-dd key used to group messages under date separators. */
     val dateKey: String,
     val direction: BubbleDirection,
@@ -123,7 +125,12 @@ data class MessageUiModel(
      * Whether this is the absolute last sent message in the conversation — the only
      * message that shows the status circle (pending/sent/delivered) when not yet read.
      */
-    val showStatusIndicator: Boolean = false
+    val showStatusIndicator: Boolean = false,
+    // ─── System Messages (group-system-messages spec) ─────────────────────────
+    /** True when this row should render as a centered grey info line (no bubble). */
+    val isSystem: Boolean = false,
+    /** Pre-rendered text for the system info line. Only set when [isSystem] is true. */
+    val systemText: String = ""
 )
 
 /**
@@ -144,9 +151,11 @@ fun Message.toUiModel(
     currentUserId: String,
     timeFormatter: (Long) -> String,
     dateKeyFormatter: (Long) -> String,
-    nicknames: Map<String, String> = emptyMap()
+    nicknames: Map<String, String> = emptyMap(),
+    nameResolver: (String) -> String? = { null }
 ): MessageUiModel {
     val direction = if (senderId == currentUserId) BubbleDirection.SENT else BubbleDirection.RECEIVED
+    val isSystem = type == MessageType.SYSTEM
     val isLocation = type == MessageType.LOCATION
     val isLiveLocation = type == MessageType.LIVE_LOCATION
     val isImage = type == MessageType.IMAGE
@@ -157,6 +166,20 @@ fun Message.toUiModel(
 
     // Resolve sender name: use nickname if available, otherwise fall back to senderName
     val resolvedSenderName = nicknames[senderId]?.takeIf { it.isNotBlank() } ?: senderName
+
+    // Pre-render the system event text once so the composable stays declarative.
+    val systemRendered: String = if (isSystem) {
+        com.ovi.where.presentation.chat.system.SystemMessageRenderer.render(
+            eventType = systemEventType,
+            payload = systemEventPayload,
+            actorName = resolvedSenderName,
+            targetName = targetUserId?.let { nicknames[it]?.takeIf(String::isNotBlank) ?: nameResolver(it) },
+            currentUserId = currentUserId,
+            actorId = senderId,
+            targetId = targetUserId,
+            fallback = text
+        )
+    } else ""
 
     // Pre-compute sender initials for avatar fallback
     val initials = computeSenderInitials(resolvedSenderName)
@@ -186,6 +209,7 @@ fun Message.toUiModel(
             else -> text
         },
         formattedTime  = timeFormatter(timestamp),
+        timestampMs    = timestamp,
         dateKey        = dateKeyFormatter(timestamp),
         direction      = direction,
         isLocation     = isLocation,
@@ -219,6 +243,9 @@ fun Message.toUiModel(
         linkPreviewImageUrl = linkPreviewImageUrl,
         linkPreviewDomain = linkPreviewDomain,
         // Mentions: pass through for rendering in primary color + bold (Requirement 14.4)
-        mentionedUserIds = mentionedUserIds.toImmutableList()
+        mentionedUserIds = mentionedUserIds.toImmutableList(),
+        // System messages — populated only when type == SYSTEM
+        isSystem = isSystem,
+        systemText = systemRendered
     )
 }

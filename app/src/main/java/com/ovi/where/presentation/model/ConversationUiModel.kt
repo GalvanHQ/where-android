@@ -171,6 +171,9 @@ private fun formatLastMessagePreview(type: MessageType, text: String): String {
         MessageType.LIVE_LOCATION -> "📍 Location"
         MessageType.VIDEO -> "🎥 Video"
         MessageType.DOCUMENT -> "📄 Document"
+        // System events: Cloud Functions write the localised English line
+        // into `lastMessageText` directly, so reuse it as-is. No "You: " prefix.
+        MessageType.SYSTEM -> text.ifEmpty { "Group activity" }
         else -> text.ifEmpty { "No messages yet" }
     }
 }

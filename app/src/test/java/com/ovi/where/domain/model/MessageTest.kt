@@ -113,17 +113,34 @@ class MessageTest {
     }
 
     @Test
-    fun `SYSTEM message is always valid`() {
+    fun `SYSTEM message is valid when systemEventType is set`() {
         val message = Message(
             id = "msg1",
             conversationId = "conv1",
-            senderId = "system",
-            senderName = "System",
-            text = "",
+            senderId = "actor1",
+            senderName = "Ovi",
+            text = "Ovi renamed the group to \"Trip\"",
             type = MessageType.SYSTEM,
-            timestamp = 1000L
+            timestamp = 1000L,
+            systemEventType = SystemEventType.GROUP_RENAMED,
+            systemEventPayload = mapOf("oldName" to "Group", "newName" to "Trip")
         )
         assertTrue(message.isValid())
+    }
+
+    @Test
+    fun `SYSTEM message is invalid when systemEventType is null`() {
+        val message = Message(
+            id = "msg1",
+            conversationId = "conv1",
+            senderId = "actor1",
+            senderName = "Ovi",
+            text = "fallback only",
+            type = MessageType.SYSTEM,
+            timestamp = 1000L,
+            systemEventType = null
+        )
+        assertFalse(message.isValid())
     }
 
     @Test

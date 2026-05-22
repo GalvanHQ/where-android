@@ -139,7 +139,7 @@ fun GroupInfoScreen(
         onToggleMute = { viewModel.toggleMute() },
         onLeaveGroup = { viewModel.leaveGroup { onNavigateBack() } },
         onDeleteGroup = { viewModel.deleteGroup { onNavigateBack() } },
-        onUpdateGroupName = { viewModel.updateGroupName(it) },
+        onUpdateGroupDetails = { name, description -> viewModel.updateGroupDetails(name, description) },
         onUpdateThemeColor = { viewModel.updateThemeColor(it) },
         onUpdateEmojiShortcut = { viewModel.updateEmojiShortcut(it) },
         onChangeGroupPhoto = { imagePickerLauncher.launch("image/*") },
@@ -167,7 +167,7 @@ internal fun GroupInfoScreenContent(
     onToggleMute: () -> Unit,
     onLeaveGroup: () -> Unit,
     onDeleteGroup: () -> Unit,
-    onUpdateGroupName: (String) -> Unit = {},
+    onUpdateGroupDetails: (name: String, description: String) -> Unit = { _, _ -> },
     onUpdateThemeColor: (String?) -> Unit = {},
     onUpdateEmojiShortcut: (String?) -> Unit = {},
     onChangeGroupPhoto: () -> Unit = {},
@@ -242,6 +242,7 @@ internal fun GroupInfoScreenContent(
                 // ── Header: Large avatar + group name + member count ─────────
                 GroupInfoHeader(
                     groupName = uiState.groupName,
+                    groupDescription = uiState.groupDescription,
                     groupPhotoUrl = uiState.groupPhotoUrl,
                     memberCount = uiState.memberCount
                 )
@@ -400,16 +401,17 @@ internal fun GroupInfoScreenContent(
         )
     }
 
-    // ── Edit Group Name Dialog ───────────────────────────────────────────────
+    // ── Edit Group Name & Description Dialog ─────────────────────────────────
     if (showEditNameDialog) {
         var newName by remember { mutableStateOf(uiState.groupName) }
+        var newDescription by remember { mutableStateOf(uiState.groupDescription) }
         AlertDialog(
             onDismissRequest = { showEditNameDialog = false },
-            title = { Text("Edit Group Name") },
+            title = { Text("Edit Group Details") },
             text = {
                 Column {
                     Text(
-                        text = "Enter a new group name:",
+                        text = "Update the group's name and description.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -417,9 +419,32 @@ internal fun GroupInfoScreenContent(
                         value = newName,
                         onValueChange = { newName = it },
                         singleLine = true,
+                        label = { Text("Name") },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 16.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                            unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant
+                        )
+                    )
+                    TextField(
+                        value = newDescription,
+                        onValueChange = {
+                            // Cap description length to avoid Firestore bloat;
+                            // matches CreateGroup's 200-char limit.
+                            if (it.length <= 200) newDescription = it
+                        },
+                        label = { Text("Description") },
+                        placeholder = { Text("What's this group about?") },
+                        supportingText = { Text("${newDescription.length} / 200") },
+                        minLines = 2,
+                        maxLines = 4,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
                             unfocusedContainerColor = Color.Transparent,
@@ -433,9 +458,18 @@ internal fun GroupInfoScreenContent(
                 TextButton(
                     onClick = {
                         showEditNameDialog = false
-                        if (newName.isNotBlank() && newName != uiState.groupName) {
-                            onUpdateGroupName(newName)
-                            context.showToast("Group name updated")
+                        val trimmedName = newName.trim()
+                        val trimmedDescription = newDescription.trim()
+                        val nameChanged = trimmedName.isNotBlank() && trimmedName != uiState.groupName
+                        val descChanged = trimmedDescription != uiState.groupDescription
+                        if (nameChanged || descChanged) {
+                            // Send the current value for whichever didn't change so
+                            // the VM doesn't blank it out on Firestore.
+                            onUpdateGroupDetails(
+                                if (nameChanged) trimmedName else uiState.groupName,
+                                trimmedDescription
+                            )
+                            context.showToast("Group details updated")
                         }
                     }
                 ) {
@@ -567,6 +601,7 @@ internal fun GroupInfoScreenContent(
 @Composable
 private fun GroupInfoHeader(
     groupName: String,
+    groupDescription: String,
     groupPhotoUrl: String?,
     memberCount: Int
 ) {
@@ -605,6 +640,20 @@ private fun GroupInfoHeader(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
+        // Description (only when set — keep the header tight when empty)
+        if (groupDescription.isNotBlank()) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = groupDescription,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+        }
     }
 }
 
@@ -755,7 +804,7 @@ private fun CustomizeChatSection(
 
         SectionListItem(
             icon = Icons.Default.Edit,
-            label = "Edit Group Name",
+            label = "Edit Group Details",
             onClick = onEditGroupName
         )
 

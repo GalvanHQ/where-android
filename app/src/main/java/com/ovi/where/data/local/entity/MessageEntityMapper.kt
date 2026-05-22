@@ -3,6 +3,7 @@ package com.ovi.where.data.local.entity
 import com.ovi.where.domain.model.Message
 import com.ovi.where.domain.model.MessageStatus
 import com.ovi.where.domain.model.MessageType
+import com.ovi.where.domain.model.SystemEventType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -10,6 +11,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import timber.log.Timber
 
 private val json = Json { ignoreUnknownKeys = true }
 
@@ -43,7 +45,10 @@ fun MessageEntity.toDomain(): Message {
         mentionedUserIds = parseMentionedUserIdsJson(mentionedUserIdsJson),
         locationSharingSessionId = locationSharingSessionId,
         locationSharingDurationMinutes = locationSharingDurationMinutes,
-        forwardedFrom = forwardedFrom
+        forwardedFrom = forwardedFrom,
+        systemEventType = SystemEventType.fromStringOrNull(systemEventType),
+        systemEventPayload = parseSystemEventPayloadJson(systemEventPayload),
+        targetUserId = targetUserId
     )
 }
 
@@ -77,7 +82,10 @@ fun Message.toEntity(): MessageEntity {
         mentionedUserIdsJson = serializeMentionedUserIds(mentionedUserIds),
         locationSharingSessionId = locationSharingSessionId,
         locationSharingDurationMinutes = locationSharingDurationMinutes,
-        forwardedFrom = forwardedFrom
+        forwardedFrom = forwardedFrom,
+        systemEventType = systemEventType?.name,
+        systemEventPayload = serializeSystemEventPayload(systemEventPayload),
+        targetUserId = targetUserId
     )
 }
 
@@ -149,4 +157,33 @@ private fun serializeMentionedUserIds(mentionedUserIds: List<String>): String? {
     if (mentionedUserIds.isEmpty()) return null
     val jsonArray = JsonArray(mentionedUserIds.map { JsonPrimitive(it) })
     return jsonArray.toString()
+}
+
+/**
+ * Decodes the JSON-encoded `Map<String, String>` for system message payloads.
+ * Treats malformed input as an empty payload + Timber log; never throws and
+ * never drops the row. Matches Requirement 2.4 from the group-system-messages spec.
+ */
+private fun parseSystemEventPayloadJson(jsonString: String?): Map<String, String> {
+    if (jsonString.isNullOrBlank() || jsonString == "{}") return emptyMap()
+    return try {
+        val obj = json.parseToJsonElement(jsonString).jsonObject
+        obj.mapValues { (_, value) -> value.jsonPrimitive.content }
+    } catch (e: Exception) {
+        Timber.tag("MessageEntityMapper").w(
+            e, "Failed to parse systemEventPayload JSON; treating as empty"
+        )
+        emptyMap()
+    }
+}
+
+/**
+ * JSON-encodes the system event payload. Returns null when empty so the column
+ * stays NULL (slightly cheaper) and round-trip with [parseSystemEventPayloadJson]
+ * is preserved.
+ */
+private fun serializeSystemEventPayload(payload: Map<String, String>): String? {
+    if (payload.isEmpty()) return null
+    val obj = JsonObject(payload.mapValues { (_, value) -> JsonPrimitive(value) })
+    return obj.toString()
 }

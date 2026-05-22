@@ -114,6 +114,10 @@ fun GroupMembersScreen(
                             viewModel.makeAdmin(member.userId)
                             context.showToast("${member.displayName} is now admin")
                         },
+                        onDemoteAdmin = {
+                            viewModel.demoteAdmin(member.userId)
+                            context.showToast("${member.displayName} is no longer admin")
+                        },
                         onRemoveMember = {
                             viewModel.removeMember(member.userId)
                             context.showToast("${member.displayName} removed")
@@ -148,6 +152,10 @@ fun GroupMembersScreen(
                             viewModel.makeAdmin(member.userId)
                             context.showToast("${member.displayName} is now admin")
                         },
+                        onDemoteAdmin = {
+                            viewModel.demoteAdmin(member.userId)
+                            context.showToast("${member.displayName} is no longer admin")
+                        },
                         onRemoveMember = {
                             viewModel.removeMember(member.userId)
                             context.showToast("${member.displayName} removed")
@@ -165,6 +173,7 @@ private fun MemberListRow(
     isCurrentUserAdmin: Boolean,
     onClick: () -> Unit,
     onMakeAdmin: () -> Unit,
+    onDemoteAdmin: () -> Unit,
     onRemoveMember: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -205,8 +214,8 @@ private fun MemberListRow(
             )
         }
 
-        // Admin actions for non-admin members
-        if (isCurrentUserAdmin && !member.isAdmin) {
+        // Admin actions — admin can promote/demote/remove anyone but themselves.
+        if (isCurrentUserAdmin) {
             Box {
                 IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
                     Icon(
@@ -217,10 +226,17 @@ private fun MemberListRow(
                     )
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                    DropdownMenuItem(
-                        text = { Text("Make Admin") },
-                        onClick = { showMenu = false; onMakeAdmin() }
-                    )
+                    if (member.isAdmin) {
+                        DropdownMenuItem(
+                            text = { Text("Remove admin") },
+                            onClick = { showMenu = false; onDemoteAdmin() }
+                        )
+                    } else {
+                        DropdownMenuItem(
+                            text = { Text("Make admin") },
+                            onClick = { showMenu = false; onMakeAdmin() }
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text("Remove", color = MaterialTheme.colorScheme.error) },
                         onClick = { showMenu = false; onRemoveMember() }

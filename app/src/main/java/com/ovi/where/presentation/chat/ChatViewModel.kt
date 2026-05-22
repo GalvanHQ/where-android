@@ -107,7 +107,8 @@ class ChatViewModel @Inject constructor(
     private val voiceRecorder: VoiceRecorder,
     private val onlineStatusDao: OnlineStatusDao,
     private val userRepository: UserRepository,
-    private val getOrCreateDirectConversationUseCase: com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
+    private val getOrCreateDirectConversationUseCase: com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase,
+    private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter
 ) : AndroidViewModel(application) {
 
     /**
@@ -1543,6 +1544,20 @@ class ChatViewModel @Inject constructor(
 
                     // Insert live location message into conversation
                     insertLiveLocationMessage(targetId, durationMinutes)
+
+                    // Emit a SYSTEM info line so the timeline shows "X started
+                    // sharing live location". The detailed live-location bubble
+                    // covers the actual UI; this is the audit trail.
+                    val convId = _uiState.value.conversationId
+                    if (convId != null) {
+                        val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
+                        systemMessageWriter.writeSystemMessage(
+                            conversationId = convId,
+                            eventType = com.ovi.where.domain.model.SystemEventType.LIVE_LOCATION_STARTED,
+                            payload = mapOf("durationMinutes" to durationMinutes.toString()),
+                            fallbackText = "$actor started sharing their live location"
+                        )
+                    }
 
                     // The repo's activeSharingState flow drives the banner /
                     // header pill / meetup sheet — no per-screen state set

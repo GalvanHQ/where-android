@@ -39,7 +39,12 @@ data class Message(
     val locationSharingSessionId: String? = null,
     val locationSharingDurationMinutes: Long? = null,
     // Forward
-    val forwardedFrom: String? = null
+    val forwardedFrom: String? = null,
+    // System messages (group renamed, member added, etc.) — only set when type == SYSTEM.
+    // See spec/group-system-messages.
+    val systemEventType: SystemEventType? = null,
+    val systemEventPayload: Map<String, String> = emptyMap(),
+    val targetUserId: String? = null
 ) {
     /**
      * Validates this message based on its type.
@@ -49,7 +54,7 @@ data class Message(
         MessageType.TEXT -> text.isNotEmpty()
         MessageType.LOCATION -> latitude != null && longitude != null
         MessageType.IMAGE -> imageUrl != null
-        MessageType.SYSTEM -> true
+        MessageType.SYSTEM -> systemEventType != null
         MessageType.VOICE -> voiceUrl != null
         MessageType.LIVE_LOCATION -> locationSharingSessionId != null
         MessageType.VIDEO -> imageUrl != null // video uses imageUrl for the video URL
@@ -60,3 +65,38 @@ data class Message(
 enum class MessageType { TEXT, LOCATION, IMAGE, SYSTEM, VOICE, LIVE_LOCATION, VIDEO, DOCUMENT }
 
 enum class MessageStatus { PENDING, SENT, DELIVERED, READ, FAILED }
+
+/**
+ * Discriminator for [MessageType.SYSTEM] messages. Each value corresponds to
+ * one Cloud Functions trigger that authors the system message in response to
+ * a Firestore data change. Stored as a string in Room and Firestore.
+ *
+ * See `.kiro/specs/group-system-messages/` for the full event matrix.
+ */
+enum class SystemEventType {
+    GROUP_RENAMED,
+    GROUP_DESCRIPTION_CHANGED,
+    GROUP_PHOTO_CHANGED,
+    MEMBER_ADDED,
+    MEMBER_REMOVED,
+    MEMBER_LEFT,
+    MEMBER_JOINED,
+    MEMBER_PROMOTED,
+    MEMBER_DEMOTED,
+    NICKNAME_CHANGED,
+    THEME_COLOR_CHANGED,
+    EMOJI_SHORTCUT_CHANGED,
+    LIVE_LOCATION_STARTED,
+    USER_BLOCKED;
+
+    companion object {
+        /** Safe parse from a string; returns null on unknown values (forward-compat). */
+        fun fromStringOrNull(value: String?): SystemEventType? = value?.let {
+            try {
+                valueOf(it)
+            } catch (_: IllegalArgumentException) {
+                null
+            }
+        }
+    }
+}

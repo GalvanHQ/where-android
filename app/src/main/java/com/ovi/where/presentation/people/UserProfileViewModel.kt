@@ -56,7 +56,8 @@ class UserProfileViewModel @Inject constructor(
     private val unblockUserUseCase: UnblockUserUseCase,
     private val getOrCreateDirectConversationUseCase: GetOrCreateDirectConversationUseCase,
     private val firebaseAuth: FirebaseAuth,
-    private val locationRepository: com.ovi.where.domain.repository.LocationRepository
+    private val locationRepository: com.ovi.where.domain.repository.LocationRepository,
+    private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UserProfileUiState())
@@ -192,6 +193,24 @@ class UserProfileViewModel @Inject constructor(
         viewModelScope.launch {
             val result = blockUserUseCase(userId)
             handleActionResult(result, userId, _uiState.value.profile?.friendshipAction ?: ProfileFriendshipAction.AddFriend)
+
+            // On success, drop a USER_BLOCKED system message into the DM
+            // timeline. The repo filters this out for non-target viewers, so
+            // only the blocked user ever sees it. Keeps the DM honest about
+            // what happened, exactly like Messenger.
+            if (result is Resource.Success) {
+                val convResult = getOrCreateDirectConversationUseCase(userId)
+                val convId = (convResult as? Resource.Success)?.data?.id
+                if (convId != null) {
+                    val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
+                    systemMessageWriter.writeSystemMessage(
+                        conversationId = convId,
+                        eventType = com.ovi.where.domain.model.SystemEventType.USER_BLOCKED,
+                        targetUserId = userId,
+                        fallbackText = "$actor blocked you"
+                    )
+                }
+            }
         }
     }
 

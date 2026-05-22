@@ -643,6 +643,7 @@ fun ChatScreen(
                             key = { it.id },
                             contentType = { msg ->
                                 when {
+                                    msg.isSystem -> "system_event"
                                     msg.isVoice -> "voice_bubble"
                                     msg.isImage -> "image_bubble"
                                     msg.isLocation -> "location_bubble"
@@ -651,6 +652,21 @@ fun ChatScreen(
                                 }
                             }
                         ) { message ->
+                            // System messages (group renamed, member added, etc.)
+                            // render as a centered grey info line and skip every
+                            // bubble concern — no avatar, no reactions, no swipe.
+                            if (message.isSystem) {
+                                Column {
+                                    if (message.showDateSeparator && message.dateSeparatorLabel != null) {
+                                        DateSeparator(label = message.dateSeparatorLabel)
+                                    }
+                                    com.ovi.where.presentation.chat.components.ChatSystemMessage(
+                                        text = message.systemText,
+                                        timestamp = message.timestampMs
+                                    )
+                                }
+                                return@items
+                            }
                             // Determine if this message is a search result and if it's the current focused result
                             val isSearchHighlighted = searchQuery != null &&
                                     searchResultIds.contains(message.id)

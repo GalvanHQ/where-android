@@ -105,10 +105,21 @@ class MessageRepositoryImpl @Inject constructor(
     /**
      * Observes messages for a conversation from Room database.
      * Room is the single source of truth; messages are sorted by timestamp ASC.
+     *
+     * Filters out `USER_BLOCKED` system messages where the current user is not
+     * the target — Cloud Functions write a single doc into the DM and rely on
+     * client-side filtering for visibility (see group-system-messages spec, Req 9.2).
      */
     override fun observeMessages(conversationId: String): Flow<List<Message>> {
         return messageDao.observeByConversation(conversationId).map { entities ->
-            entities.map { it.toDomain() }
+            val currentUid = firebaseAuth.currentUser?.uid
+            entities
+                .map { it.toDomain() }
+                .filterNot { msg ->
+                    msg.systemEventType ==
+                            com.ovi.where.domain.model.SystemEventType.USER_BLOCKED &&
+                            msg.targetUserId != currentUid
+                }
         }
     }
 
@@ -1232,6 +1243,7 @@ class MessageRepositoryImpl @Inject constructor(
                 "LOCATION" -> MessageType.LOCATION.name
                 "IMAGE" -> MessageType.IMAGE.name
                 "VOICE" -> MessageType.VOICE.name
+                "SYSTEM" -> MessageType.SYSTEM.name
                 else -> MessageType.TEXT.name
             },
             timestamp = timestamp,

@@ -46,5 +46,10 @@ data class MessageEntity(
     val locationSharingSessionId: String? = null,
     val locationSharingDurationMinutes: Long? = null,
     // Forward
-    val forwardedFrom: String? = null
+    val forwardedFrom: String? = null,
+    // System messages — populated only when type == SYSTEM.
+    // systemEventPayload is JSON-encoded `Map<String, String>` for forward-compat.
+    val systemEventType: String? = null,
+    val systemEventPayload: String? = null,
+    val targetUserId: String? = null
 )

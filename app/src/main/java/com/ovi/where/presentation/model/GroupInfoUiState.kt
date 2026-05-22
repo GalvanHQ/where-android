@@ -6,6 +6,7 @@ package com.ovi.where.presentation.model
  */
 data class GroupInfoUiState(
     val groupName: String = "",
+    val groupDescription: String = "",
     val groupPhotoUrl: String? = null,
     val memberCount: Int = 0,
     val members: List<GroupMemberUiModel> = emptyList(),

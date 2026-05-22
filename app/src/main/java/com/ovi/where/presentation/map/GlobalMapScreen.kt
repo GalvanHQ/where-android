@@ -64,6 +64,7 @@ import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.NearMe
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.SocialDistance
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetScaffold
@@ -3708,7 +3709,7 @@ private fun NavigationStatusCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.NearMe,
+                        imageVector = ImageVector.vectorResource(id = R.drawable.navigate_to),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp)
@@ -3777,7 +3778,7 @@ private fun NavigationStatusCard(
                 ) {
                     if (distanceLabel != null) {
                         NavMetricChip(
-                            icon = Icons.Rounded.NearMe,
+                            icon = Icons.Rounded.SocialDistance,
                             label = "Distance",
                             value = distanceLabel,
                             modifier = Modifier.weight(1f)

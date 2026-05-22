@@ -1,67 +1,48 @@
 package com.ovi.where.data.remote.directions
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import retrofit2.http.GET
-import retrofit2.http.Query
+import retrofit2.http.Body
+import retrofit2.http.Header
+import retrofit2.http.POST
 
 /**
- * Google Directions API client.
+ * Server-side directions proxy.
  *
- * Docs: https://developers.google.com/maps/documentation/directions/get-directions
+ * The route lives on **our** Cloud Run backend
+ * (`POST /api/directions`) — not on Google directly.
  *
- * We only consume the encoded `overview_polyline` plus distance / duration
- * from the first leg of the first route — that's enough for in-app
- * "draw a line from me to the meetup point" navigation. Full step-by-step
- * is out of scope for v1 (would need voice TTS + on-route reroute).
+ * Why proxy:
+ *  • Keeps the Routes API key on the server, never shipped in an APK.
+ *  • Side-steps the "Requests from this Android client application
+ *    <empty> are blocked" failure mode that hits when an Android-
+ *    restricted Cloud key is used outside the Maps SDK.
+ *  • Lets the server enforce auth, rate-limit, and (later) cache.
+ *
+ * Auth: same `Authorization: Bearer <id-token>` pattern the chat API
+ * already uses — re-uses the existing Firebase ID-token flow.
  */
 interface DirectionsApi {
 
-    /**
-     * Fetches a route between [origin] and [destination] (both in
-     * `lat,lng` string form, e.g. `"37.7749,-122.4194"`).
-     *
-     * [mode] controls the routing mode. Defaults to `driving`; we'll let
-     * the caller swap to `walking` if the user prefers that.
-     */
-    @GET("maps/api/directions/json")
-    suspend fun getDirections(
-        @Query("origin") origin: String,
-        @Query("destination") destination: String,
-        @Query("key") apiKey: String,
-        @Query("mode") mode: String = "driving"
-    ): DirectionsResponse
+    @POST("/api/directions")
+    suspend fun getRoute(
+        @Header("Authorization") token: String,
+        @Body request: ServerDirectionsRequest
+    ): ServerDirectionsResponse
 }
 
 @Serializable
-data class DirectionsResponse(
-    val status: String? = null,
-    val routes: List<DirectionsRoute> = emptyList(),
-    @SerialName("error_message")
-    val errorMessage: String? = null
+data class ServerDirectionsRequest(
+    val originLat: Double,
+    val originLng: Double,
+    val destLat: Double,
+    val destLng: Double,
+    /** "DRIVE" / "WALK" / "BICYCLE" / "TWO_WHEELER" / "TRANSIT". Server defaults to DRIVE. */
+    val mode: String? = null
 )
 
 @Serializable
-data class DirectionsRoute(
-    @SerialName("overview_polyline")
-    val overviewPolyline: DirectionsOverviewPolyline? = null,
-    val legs: List<DirectionsLeg> = emptyList()
-)
-
-@Serializable
-data class DirectionsOverviewPolyline(
-    val points: String? = null
-)
-
-@Serializable
-data class DirectionsLeg(
-    val distance: DirectionsValue? = null,
-    val duration: DirectionsValue? = null
-)
-
-@Serializable
-data class DirectionsValue(
-    val text: String? = null,
-    /** Distance: meters. Duration: seconds. */
-    val value: Long? = null
+data class ServerDirectionsResponse(
+    val distanceMeters: Long = 0,
+    val durationSeconds: Long = 0,
+    val encodedPolyline: String = ""
 )

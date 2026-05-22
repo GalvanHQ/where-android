@@ -1,69 +1,89 @@
 package com.ovi.where.data.repository
 
 import com.google.android.gms.maps.model.LatLng
-import com.ovi.where.BuildConfig
+import com.google.firebase.auth.FirebaseAuth
 import com.ovi.where.core.common.Resource
 import com.ovi.where.data.remote.directions.DirectionsApi
 import com.ovi.where.data.remote.directions.PolylineDecoder
+import com.ovi.where.data.remote.directions.ServerDirectionsRequest
 import com.ovi.where.domain.model.Route
 import com.ovi.where.domain.repository.DirectionsRepository
+import kotlinx.coroutines.tasks.await
+import retrofit2.HttpException
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Default Directions repository.
+ * Default [DirectionsRepository] — talks to our **own** Cloud Run
+ * backend (`POST /api/directions`), which proxies the Routes API.
  *
- * Hits Google's REST endpoint with the same API key the rest of the
- * app already uses for Maps SDK / Places. Decodes the encoded
- * polyline locally so the UI can render it as a `Polyline` over our
- * own GoogleMap composable.
+ * Auth flow: pull a fresh Firebase ID token (cached internally by the
+ * SDK), forward as a `Bearer` header. Same shape as the rest of the
+ * REST surface, so 401s are handled the same way and the server gets
+ * a verifiable user identity for rate-limiting.
  */
 @Singleton
 class DirectionsRepositoryImpl @Inject constructor(
-    private val api: DirectionsApi
+    private val api: DirectionsApi,
+    private val firebaseAuth: FirebaseAuth
 ) : DirectionsRepository {
 
     override suspend fun getRoute(origin: LatLng, destination: LatLng): Resource<Route> {
-        val key = BuildConfig.MAPS_API_KEY
-        if (key.isBlank()) {
-            return Resource.Error("Maps API key missing — can't fetch directions.")
-        }
+        val user = firebaseAuth.currentUser
+            ?: return Resource.Error("Sign in to load directions.")
         return try {
-            val response = api.getDirections(
-                origin = "${origin.latitude},${origin.longitude}",
-                destination = "${destination.latitude},${destination.longitude}",
-                apiKey = key
-            )
-            val status = response.status?.uppercase()
-            if (status != "OK") {
-                Timber.w("Directions API status=$status err=${response.errorMessage}")
-                return Resource.Error(
-                    response.errorMessage
-                        ?: "No route available (status=$status)."
-                )
-            }
-            val firstRoute = response.routes.firstOrNull()
-                ?: return Resource.Error("No route returned.")
+            val tokenResult = user.getIdToken(false).await()
+            val token = tokenResult.token
+                ?: return Resource.Error("Sign in to load directions.")
 
-            val points = PolylineDecoder.decode(firstRoute.overviewPolyline?.points)
+            val response = api.getRoute(
+                token = "Bearer $token",
+                request = ServerDirectionsRequest(
+                    originLat = origin.latitude,
+                    originLng = origin.longitude,
+                    destLat = destination.latitude,
+                    destLng = destination.longitude
+                )
+            )
+
+            val points = PolylineDecoder.decode(response.encodedPolyline)
             if (points.size < 2) {
                 return Resource.Error("Route geometry was empty.")
             }
-            val leg = firstRoute.legs.firstOrNull()
-            val distance = leg?.distance?.value ?: 0L
-            val duration = leg?.duration?.value ?: 0L
-
             Resource.Success(
                 Route(
                     points = points,
-                    distanceMeters = distance,
-                    durationSeconds = duration
+                    distanceMeters = response.distanceMeters,
+                    durationSeconds = response.durationSeconds
                 )
             )
+        } catch (e: HttpException) {
+            // Server returns `{ error: "..." }` on 4xx/5xx. Surface
+            // the upstream message to the UI so misconfiguration
+            // (API not enabled, billing) is debuggable.
+            val body = runCatching { e.response()?.errorBody()?.string() }.getOrNull()
+            Timber.w("Directions HTTP ${e.code()}: $body")
+            Resource.Error(extractErrorMessage(body) ?: e.message ?: "Could not load directions.")
         } catch (e: Exception) {
             Timber.e(e, "Directions request failed")
             Resource.Error(e.message ?: "Could not load directions.")
         }
+    }
+
+    /**
+     * Pulls `error` (string) out of a JSON body without spinning up the
+     * full kotlinx-serialization parser on the failure path. Returns
+     * null on parse failure so the caller can fall back to a generic
+     * message.
+     */
+    private fun extractErrorMessage(body: String?): String? {
+        if (body.isNullOrBlank()) return null
+        val marker = "\"error\""
+        val keyIdx = body.indexOf(marker).takeIf { it >= 0 } ?: return null
+        val colon = body.indexOf(':', keyIdx).takeIf { it >= 0 } ?: return null
+        val firstQuote = body.indexOf('"', colon).takeIf { it >= 0 } ?: return null
+        val end = body.indexOf('"', firstQuote + 1).takeIf { it >= 0 } ?: return null
+        return body.substring(firstQuote + 1, end).takeIf { it.isNotBlank() }
     }
 }

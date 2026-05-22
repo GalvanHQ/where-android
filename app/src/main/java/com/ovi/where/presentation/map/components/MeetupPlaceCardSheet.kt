@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.NearMe
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SignalWifiOff
+import androidx.compose.material.icons.rounded.SocialDistance
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -211,7 +212,7 @@ fun MeetupPlaceCardSheet(
                 ) {
                     if (distanceText != null) {
                         MetricCard(
-                            icon = Icons.Rounded.NearMe,
+                            icon = Icons.Rounded.SocialDistance,
                             label = "Distance",
                             value = distanceText,
                             modifier = Modifier.weight(1f)

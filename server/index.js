@@ -5,6 +5,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const { auth } = require('./src/firebase');
 const conversationRoutes = require('./src/routes/conversations');
+const directionsRoutes = require('./src/routes/directions');
 
 const app = express();
 const server = http.createServer(app);
@@ -37,6 +38,7 @@ app.use(async (req, res, next) => {
 
 // Routes
 app.use('/api/conversations', conversationRoutes);
+app.use('/api/directions', directionsRoutes);
 
 // Health check
 app.get('/', (req, res) => {

@@ -14,5 +14,3 @@ import kotlin.math.tan
 fun avatarColorFor(userId: String): Color =
     AvatarColors[userId.hashCode().and(0x7FFFFFFF) % AvatarColors.size]
 
-// ── Avatar Marker Overlay ─────────────────────────────────────────────────────
-

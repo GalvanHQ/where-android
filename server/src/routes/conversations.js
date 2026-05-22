@@ -378,16 +378,22 @@ router.patch('/:conversationId/read', async (req, res) => {
  * into the conversation's chat timeline. The Android client calls this whenever
  * it mutates state worth surfacing as a Messenger-style "info line".
  *
- * Why this lives server-side rather than as a direct Firestore client write:
- *   1. The `messages` collection is locked down (Admin SDK only) so we don't
- *      have to allow any client-side writes that would need rule-level
- *      validation of payload shape, sender identity, and embed integrity.
- *   2. We already have a vetted message-persistence path (`persistMessage`
- *      pattern in socket.js) — this route mirrors that transactional shape so
- *      `recentMessages`, `lastMessage*`, and the archive stay consistent.
- *   3. Idempotency: the deterministic `messageId` from the client + a
- *      `set` overwrite means retries during transient errors collapse to a
- *      single document.
+ * Storage model: matches the existing `persistMessage` pattern in socket.js —
+ * the message is embedded into `conversations/{id}.recentMessages[]` (the
+ * single source of truth, capped at 50 entries). The top-level `messages`
+ * collection is *archive only* (overflow + pagination history) and is not
+ * written here. This keeps the Firestore footprint identical to a regular
+ * chat message and avoids doubling the doc count for system events.
+ *
+ * Why server-side (not direct Firestore client write):
+ *   1. The `messages` collection rule is Admin-SDK-only — keeping it that way
+ *      means we don't have to encode payload validation, sender identity, and
+ *      `recentMessages` integrity in declarative rules.
+ *   2. We reuse the same transactional shape as `persistMessage` so embedded
+ *      pagination, chat list previews, and the archive stay consistent.
+ *   3. Idempotency: deterministic `messageId` from the client + an
+ *      already-embedded check inside the transaction means retries collapse
+ *      to a single entry.
  *   4. Notifications stay suppressed by construction — this route does not
  *      call sendFCM(). System events are informational only.
  *
@@ -395,7 +401,7 @@ router.patch('/:conversationId/read', async (req, res) => {
  *   {
  *     messageId:     string  (deterministic id from the client)
  *     systemEventType: string  (e.g. "GROUP_RENAMED")
- *     systemEventPayload: object | null  (event-specific data)
+ *     systemEventPayload: object | null
  *     targetUserId:  string | null
  *     fallbackText:  string  (English line for legacy clients & lastMessageText)
  *     timestamp:     number  (epoch ms)
@@ -455,8 +461,8 @@ router.post('/:conversationId/system-message', async (req, res) => {
             return res.status(403).json({ error: 'Not a participant' });
         }
 
-        // Resolve actor name once. Falls back to "Someone" so the line is
-        // never empty even if the user doc is missing.
+        // Resolve actor name. Falls back to "Someone" so the line is never
+        // empty even if the user doc is missing.
         let actorName = req.user.name || '';
         if (!actorName) {
             try {
@@ -468,7 +474,9 @@ router.post('/:conversationId/system-message', async (req, res) => {
         }
         const actorPhotoUrl = (req.user.picture) || null;
 
-        const msgDto = {
+        // Embedded copy mirrors what persistMessage stores — no conversationId
+        // (implicit), with the new system-event fields. Last 50 cap matches.
+        const embeddedMsg = {
             id: messageId,
             senderId: uid,
             senderName: actorName,
@@ -483,20 +491,9 @@ router.post('/:conversationId/system-message', async (req, res) => {
             targetUserId: targetUserId || null
         };
 
-        // Archive copy carries conversationId; embedded copy doesn't (saves space).
-        const archiveDto = { ...msgDto, conversationId };
-        const embeddedDto = { ...msgDto };
-
-        const msgRef = db.collection('messages').doc(messageId);
-
-        // Idempotency: deterministic id + .set() makes retries within the
-        // same second collapse to a single document. Two distinct calls land
-        // in different timestamp buckets, so they don't clash.
-        await msgRef.set(archiveDto);
-
-        // Update conversation preview fields atomically with the recentMessages
-        // append. Mirrors the `persistMessage` shape in socket.js so embedded
-        // pagination keeps working. unreadCounts intentionally NOT incremented.
+        // Single transaction: idempotent append to recentMessages + lastMessage*
+        // update. unreadCounts intentionally NOT incremented (system events are
+        // informational; we don't want to bump the chat-list badge for them).
         await db.runTransaction(async (transaction) => {
             const fresh = await transaction.get(convRef);
             if (!fresh.exists) return;
@@ -504,23 +501,25 @@ router.post('/:conversationId/system-message', async (req, res) => {
             const data = fresh.data();
             const existing = data.recentMessages || [];
 
-            // Skip the embed if we've already added this exact message id.
-            // Catches a retry where the message was previously archived but
-            // the conversation update didn't land.
+            // Idempotency guard — retries with the same deterministic id are
+            // a no-op for the array side. We still re-stamp lastMessage*
+            // (cheap, and harmless if it was already set to the same value).
             const alreadyEmbedded = existing.some(m => m.id === messageId);
-            const recentMessages = alreadyEmbedded
+            const nextRecent = alreadyEmbedded
                 ? existing
-                : [...existing, embeddedDto].slice(-50); // MAX_RECENT_MESSAGES
+                : [...existing, embeddedMsg].slice(-50); // MAX_RECENT_MESSAGES
+
+            const oldestRecentTimestamp = nextRecent.length > 0
+                ? nextRecent[0].timestamp
+                : timestamp;
 
             transaction.update(convRef, {
                 lastMessageText: fallbackText,
                 lastMessageType: 'SYSTEM',
                 lastMessageSenderId: uid,
                 lastMessageTimestamp: timestamp,
-                recentMessages,
-                oldestRecentTimestamp: recentMessages.length > 0
-                    ? recentMessages[0].timestamp
-                    : timestamp
+                recentMessages: nextRecent,
+                oldestRecentTimestamp
             });
         });
 

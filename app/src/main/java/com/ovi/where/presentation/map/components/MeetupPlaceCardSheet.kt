@@ -1,6 +1,8 @@
 package com.ovi.where.presentation.map.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,18 +11,25 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Flag
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.NearMe
-import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.rounded.Block
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DirectionsCar
+import androidx.compose.material.icons.rounded.Flag
+import androidx.compose.material.icons.rounded.NearMe
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.SignalWifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,11 +44,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
@@ -49,24 +65,51 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.MarkerComposable
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
+import com.ovi.where.R
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.domain.model.MeetupDestination
+import com.ovi.where.domain.model.MeetupParticipantStatus
+
+/**
+ * Per-participant view model for the place-card list. Resolved by the
+ * screen via the existing user cache + the live-share heartbeat to
+ * compute "inactive" without persisting an extra field.
+ */
+data class MeetupParticipantUiModel(
+    val userId: String,
+    val displayName: String,
+    val photoUrl: String?,
+    val status: MeetupParticipantStatus,
+    val isYou: Boolean,
+    val isCreator: Boolean,
+    /** True when this user has no recent location heartbeat (>5min stale). */
+    val isInactive: Boolean,
+    /** Pre-formatted distance label for ON_THE_WAY users. Null for terminal/inactive. */
+    val distanceLabel: String?
+)
 
 /**
  * Place-card bottom sheet for the active meetup destination.
  *
- * Adopts the existing map-screen sheet vocabulary: 38dp top corners,
- * `surface` container, `surfaceContainerHigh` cards inside (`CardShape`
- * 20dp), `primary` filled CTA at 52dp / 16dp, secondary actions at the same
- * height with `surfaceContainerHigh` background. No tertiary gradients.
+ * Adds:
+ *  • Participant list with status chips (on the way / arrived / can't make it / inactive)
+ *  • "Get directions" handoff to Google Maps for everyone
+ *  • "Can't make it" action for non-creators
+ *  • "Clear" action restricted to the creator
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MeetupPlaceCardSheet(
     destination: MeetupDestination,
+    groupName: String?,
     distanceText: String?,
     etaText: String?,
+    participants: List<MeetupParticipantUiModel>,
+    isCreator: Boolean,
+    selfStatus: MeetupParticipantStatus,
     onShowOnMap: () -> Unit,
+    onGetDirections: () -> Unit,
+    onCantMakeIt: () -> Unit,
     onClear: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -99,7 +142,7 @@ fun MeetupPlaceCardSheet(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Flag,
+                        imageVector = Icons.Rounded.Flag,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
@@ -108,11 +151,17 @@ fun MeetupPlaceCardSheet(
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "MEETUP POINT",
+                        text = if (!groupName.isNullOrBlank()) {
+                            "MEETUP POINT FOR ${groupName.uppercase()}"
+                        } else {
+                            "MEETUP POINT"
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
+                        letterSpacing = 1.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = destination.name.ifBlank { "Meetup point" },
@@ -156,7 +205,7 @@ fun MeetupPlaceCardSheet(
                 ) {
                     if (distanceText != null) {
                         MetricCard(
-                            icon = Icons.Filled.NearMe,
+                            icon = Icons.Rounded.NearMe,
                             label = "Distance",
                             value = distanceText,
                             modifier = Modifier.weight(1f)
@@ -164,7 +213,7 @@ fun MeetupPlaceCardSheet(
                     }
                     if (etaText != null) {
                         MetricCard(
-                            icon = Icons.Filled.Schedule,
+                            icon = Icons.Rounded.Schedule,
                             label = "ETA",
                             value = etaText,
                             modifier = Modifier.weight(1f)
@@ -173,54 +222,271 @@ fun MeetupPlaceCardSheet(
                 }
             }
 
+            // ── Participants section ─────────────────────────────────────
+            if (participants.isNotEmpty()) {
+                Spacer(Modifier.height(Dimens.spaceLarge))
+                ParticipantsSection(participants = participants)
+            }
+
             Spacer(Modifier.height(Dimens.spaceLarge))
 
-            // ── CTA row — same 52dp / 16dp shape as share-target sheet ──
+            // ── Primary action: Get directions (handoff to Google Maps) ─
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium),
+                    .padding(horizontal = Dimens.spaceLarge),
                 horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
             ) {
                 Button(
-                    onClick = onClear,
+                    onClick = onShowOnMap,
                     modifier = Modifier
                         .weight(1f)
                         .height(52.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = MaterialTheme.colorScheme.error
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     )
                 ) {
-                    Icon(Icons.Filled.Delete, null, Modifier.size(18.dp))
+                    Icon(imageVector = ImageVector.vectorResource(id = R.drawable.map), null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "Clear",
+                        "Show on map",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
                 Button(
-                    onClick = onShowOnMap,
+                    onClick = onGetDirections,
                     modifier = Modifier
-                        .weight(2f)
+                        .weight(1f)
                         .height(52.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
-                    Icon(Icons.Filled.Map, null, Modifier.size(18.dp))
+                    Icon(Icons.Rounded.DirectionsCar, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "Show on map",
+                        "Directions",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
+
+            Spacer(Modifier.height(Dimens.spaceMedium))
+
+            // ── Role-aware secondary action ──────────────────────────────
+            // Creator sees Clear (red). Non-creators see Can't make it,
+            // unless they've already arrived or already opted out (in
+            // which case the action is hidden — they can't undo here).
+            val showSecondary = when {
+                isCreator -> true
+                selfStatus == MeetupParticipantStatus.ON_THE_WAY -> true
+                else -> false
+            }
+            if (showSecondary) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall)
+                ) {
+                    Button(
+                        onClick = if (isCreator) onClear else onCantMakeIt,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(
+                            imageVector = if (isCreator) Icons.Rounded.Delete else Icons.Rounded.Block,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (isCreator) "Clear meetup" else "I can't make it",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(Dimens.spaceMedium))
         }
+    }
+}
+
+/**
+ * Vertical list of participant rows. Caps the visible height so the rest
+ * of the sheet (metrics, actions) stays reachable; users can scroll the
+ * list internally on long member lists.
+ */
+@Composable
+private fun ParticipantsSection(participants: List<MeetupParticipantUiModel>) {
+    Column {
+        Text(
+            text = "PARTICIPANTS · ${participants.size}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(horizontal = Dimens.spaceLarge + 4.dp)
+        )
+        Spacer(Modifier.height(Dimens.spaceSmall))
+        // Cap the list height so it doesn't dominate the sheet on big groups.
+        val listHeight = (participants.size.coerceAtMost(5) * 64).dp
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 0.dp, max = listHeight)
+                .padding(horizontal = Dimens.spaceLarge),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(participants, key = { it.userId }) { participant ->
+                ParticipantRow(participant = participant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ParticipantRow(participant: MeetupParticipantUiModel) {
+    val context = LocalContext.current
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Avatar with subtle de-saturation when inactive
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!participant.photoUrl.isNullOrBlank()) {
+                    val request = remember(participant.photoUrl) {
+                        ImageRequest.Builder(context)
+                            .data(participant.photoUrl)
+                            .size(160)
+                            .crossfade(true)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .memoryCacheKey(participant.photoUrl)
+                            .diskCacheKey(participant.photoUrl)
+                            .build()
+                    }
+                    AsyncImage(
+                        model = request,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Rounded.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (participant.isYou) "You" else participant.displayName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (participant.isCreator) {
+                        Spacer(Modifier.width(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                        ) {
+                            Text(
+                                text = "Host",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                }
+                ParticipantStatusLine(participant = participant)
+            }
+            ParticipantStatusBadge(participant = participant)
+        }
+    }
+}
+
+@Composable
+private fun ParticipantStatusLine(participant: MeetupParticipantUiModel) {
+    val (label, color) = when {
+        participant.isInactive && participant.status == MeetupParticipantStatus.ON_THE_WAY ->
+            "Inactive — last seen recently" to MaterialTheme.colorScheme.onSurfaceVariant
+        participant.status == MeetupParticipantStatus.ARRIVED ->
+            "Arrived" to MaterialTheme.colorScheme.tertiary
+        participant.status == MeetupParticipantStatus.CANT_MAKE_IT ->
+            "Can't make it" to MaterialTheme.colorScheme.error
+        participant.distanceLabel != null ->
+            "${participant.distanceLabel} away" to MaterialTheme.colorScheme.onSurfaceVariant
+        else ->
+            "On the way" to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Text(
+        text = label,
+        style = MaterialTheme.typography.bodySmall,
+        color = color,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
+}
+
+@Composable
+private fun ParticipantStatusBadge(participant: MeetupParticipantUiModel) {
+    val (icon, tint) = when {
+        participant.status == MeetupParticipantStatus.ARRIVED ->
+            Icons.Rounded.Check to MaterialTheme.colorScheme.tertiary
+        participant.status == MeetupParticipantStatus.CANT_MAKE_IT ->
+            Icons.Rounded.Block to MaterialTheme.colorScheme.error
+        participant.isInactive ->
+            Icons.Rounded.SignalWifiOff to MaterialTheme.colorScheme.onSurfaceVariant
+        else -> return  // ON_THE_WAY + active → no badge, distance line carries the info
+    }
+    Box(
+        modifier = Modifier
+            .size(28.dp)
+            .clip(CircleShape)
+            .background(tint.copy(alpha = 0.14f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(16.dp)
+        )
     }
 }
 
@@ -235,17 +501,34 @@ private fun HeroMap(
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(target, 16f)
     }
+    val isNightTime = remember {
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        hour < 6 || hour >= 19
+    }
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 1.dp
+        color = if (isNightTime) {
+            Color(0xFF202C3B)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        },
+        tonalElevation = 1.dp,
+        border = BorderStroke(
+            width = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
     ) {
         GoogleMap(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(RoundedCornerShape(20.dp)),
             cameraPositionState = cameraPositionState,
+            mapColorScheme = if (isNightTime) {
+                com.google.maps.android.compose.ComposeMapColorScheme.DARK
+            } else {
+                com.google.maps.android.compose.ComposeMapColorScheme.LIGHT
+            },
             properties = MapProperties(mapType = MapType.NORMAL, isMyLocationEnabled = false),
             uiSettings = MapUiSettings(
                 zoomControlsEnabled = false,

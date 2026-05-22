@@ -1087,18 +1087,36 @@ class LocationRepositoryImpl @Inject constructor(
         latitude: Double,
         longitude: Double,
         name: String,
-        address: String
+        address: String,
+        memberIds: List<String>
     ): Resource<Unit> {
         return try {
             val uid = currentUid ?: return Resource.Error("Not authenticated")
+            val now = System.currentTimeMillis()
+
+            // Seed the participants map so every group member starts in
+            // ON_THE_WAY. This is what drives every member's auto-share on
+            // their device when the snapshot lands. Falls back to just the
+            // creator if memberIds is empty (defensive — shouldn't happen
+            // when called from the VM, but a meetup with the creator alone
+            // is still valid).
+            val seedMembers = memberIds.ifEmpty { listOf(uid) }
+            val participantsMap = seedMembers.associateWith {
+                hashMapOf(
+                    "status" to com.ovi.where.domain.model.MeetupParticipantStatus.ON_THE_WAY.name,
+                    "updatedAt" to now
+                )
+            }
+
             val destinationData = hashMapOf(
                 "latitude" to latitude,
                 "longitude" to longitude,
                 "name" to name,
                 "address" to address,
                 "setBy" to uid,
-                "setAt" to System.currentTimeMillis(),
-                "isActive" to true
+                "setAt" to now,
+                "isActive" to true,
+                "participants" to participantsMap
             )
             firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
                 .document(groupId)
@@ -1119,7 +1137,8 @@ class LocationRepositoryImpl @Inject constructor(
                     "meetupDestination", hashMapOf(
                         "isActive" to false,
                         "latitude" to 0.0,
-                        "longitude" to 0.0
+                        "longitude" to 0.0,
+                        "participants" to emptyMap<String, Any>()
                     )
                 )
                 .await()
@@ -1127,6 +1146,34 @@ class LocationRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "Failed to clear meetup destination")
             Resource.Error(e.message ?: "Failed to clear meetup destination")
+        }
+    }
+
+    /**
+     * Updates only the calling user's entry in the participants map.
+     * Uses Firestore's dotted-path syntax so other participants' entries
+     * are untouched and we minimize the document write footprint.
+     */
+    override suspend fun updateMeetupParticipantStatus(
+        groupId: String,
+        status: com.ovi.where.domain.model.MeetupParticipantStatus
+    ): Resource<Unit> {
+        return try {
+            val uid = currentUid ?: return Resource.Error("Not authenticated")
+            val now = System.currentTimeMillis()
+            firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
+                .document(groupId)
+                .update(
+                    mapOf(
+                        "meetupDestination.participants.$uid.status" to status.name,
+                        "meetupDestination.participants.$uid.updatedAt" to now
+                    )
+                )
+                .await()
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to update meetup participant status")
+            Resource.Error(e.message ?: "Failed to update status")
         }
     }
 
@@ -1141,6 +1188,20 @@ class LocationRepositoryImpl @Inject constructor(
                 }
                 val destMap = snapshot?.get("meetupDestination") as? Map<*, *>
                 if (destMap != null && destMap["isActive"] == true) {
+                    val rawParticipants = destMap["participants"] as? Map<*, *>
+                    val participants = rawParticipants
+                        ?.mapNotNull { (k, v) ->
+                            val uid = k as? String ?: return@mapNotNull null
+                            val entry = v as? Map<*, *> ?: return@mapNotNull null
+                            uid to com.ovi.where.domain.model.MeetupParticipant(
+                                status = com.ovi.where.domain.model.MeetupParticipantStatus
+                                    .fromString(entry["status"] as? String),
+                                updatedAt = (entry["updatedAt"] as? Number)?.toLong() ?: 0L
+                            )
+                        }
+                        ?.toMap()
+                        .orEmpty()
+
                     val destination = MeetupDestination(
                         latitude = (destMap["latitude"] as? Number)?.toDouble() ?: 0.0,
                         longitude = (destMap["longitude"] as? Number)?.toDouble() ?: 0.0,
@@ -1148,7 +1209,8 @@ class LocationRepositoryImpl @Inject constructor(
                         address = destMap["address"] as? String ?: "",
                         setBy = destMap["setBy"] as? String ?: "",
                         setAt = (destMap["setAt"] as? Number)?.toLong() ?: 0L,
-                        isActive = true
+                        isActive = true,
+                        participants = participants
                     )
                     trySend(destination).isSuccess
                 } else {

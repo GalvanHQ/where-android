@@ -98,13 +98,15 @@ class GroupInfoViewModel @Inject constructor(
     fun setMeetupDestination(latitude: Double, longitude: Double, name: String, address: String = "") {
         viewModelScope.launch {
             val trimmed = name.trim().ifBlank { "Meetup point" }
+            val memberIds = _uiState.value.members.map { it.userId }
             when (
                 setMeetupDestinationUseCase(
                     groupId = groupId,
                     latitude = latitude,
                     longitude = longitude,
                     name = trimmed,
-                    address = address
+                    address = address,
+                    memberIds = memberIds
                 )
             ) {
                 is Resource.Success -> {

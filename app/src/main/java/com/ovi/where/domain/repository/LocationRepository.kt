@@ -109,18 +109,31 @@ interface LocationRepository {
 
     /**
      * Sets a meetup destination for a group. All members will see this pin on the map
-     * along with their distance and ETA to the destination.
+     * along with their distance and ETA to the destination. The creator's
+     * UID is captured server-side via the auth token; [memberIds] seeds the
+     * participants map so every member starts in `ON_THE_WAY`.
      */
     suspend fun setMeetupDestination(
         groupId: String,
         latitude: Double,
         longitude: Double,
         name: String,
-        address: String = ""
+        address: String = "",
+        memberIds: List<String>
     ): Resource<Unit>
 
-    /** Clears the active meetup destination for a group. */
+    /** Clears the active meetup destination for a group. Creator-only at the rule layer. */
     suspend fun clearMeetupDestination(groupId: String): Resource<Unit>
+
+    /**
+     * Updates the calling user's participation status on an active meetup
+     * destination. Each participant flips their own entry — never anyone
+     * else's. Firestore rules enforce that.
+     */
+    suspend fun updateMeetupParticipantStatus(
+        groupId: String,
+        status: com.ovi.where.domain.model.MeetupParticipantStatus
+    ): Resource<Unit>
 
     /** Observes the meetup destination for a group (real-time updates). */
     fun observeMeetupDestination(groupId: String): Flow<MeetupDestination?>

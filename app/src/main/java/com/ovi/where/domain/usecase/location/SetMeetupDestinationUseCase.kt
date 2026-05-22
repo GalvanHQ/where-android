@@ -22,7 +22,8 @@ class SetMeetupDestinationUseCase @Inject constructor(
         latitude: Double,
         longitude: Double,
         name: String,
-        address: String = ""
+        address: String = "",
+        memberIds: List<String>
     ): Resource<Unit> {
         if (groupId.isBlank()) {
             return Resource.Error("Group ID is required")
@@ -30,6 +31,13 @@ class SetMeetupDestinationUseCase @Inject constructor(
         if (latitude == 0.0 && longitude == 0.0) {
             return Resource.Error("Invalid destination coordinates")
         }
-        return locationRepository.setMeetupDestination(groupId, latitude, longitude, name, address)
+        return locationRepository.setMeetupDestination(
+            groupId = groupId,
+            latitude = latitude,
+            longitude = longitude,
+            name = name,
+            address = address,
+            memberIds = memberIds
+        )
     }
 }

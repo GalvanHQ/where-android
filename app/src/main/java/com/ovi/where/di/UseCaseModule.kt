@@ -106,6 +106,8 @@ object UseCaseModule {
     @Provides fun provideClearMeetupDestinationUseCase(r: LocationRepository) = ClearMeetupDestinationUseCase(r)
     @Provides fun provideObserveMeetupDestinationUseCase(r: LocationRepository) = ObserveMeetupDestinationUseCase(r)
     @Provides fun provideDetectArrivalUseCase() = DetectArrivalUseCase()
+    @Provides fun provideUpdateMeetupParticipantStatusUseCase(r: LocationRepository) =
+        com.ovi.where.domain.usecase.location.UpdateMeetupParticipantStatusUseCase(r)
 
     // ── User ─────────────────────────────────────────────────────────────────
     @Provides fun provideGetUsersUseCase(r: UserRepository) = GetUsersUseCase(r)

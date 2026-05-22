@@ -48,8 +48,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -85,6 +87,16 @@ data class FriendLocationUiModel(
  */
 private const val MAX_PREVIEW_AVATARS = 3
 
+/**
+ * Default duration (in minutes) of the live-location share that auto-starts
+ * when a meetup destination is set. This is a fail-safe ceiling — the real
+ * lifecycle owner is the arrival auto-stop in [GlobalMapViewModel.checkSelfArrival]
+ * and the clear handler. 4 hours covers the long tail of real meetups
+ * (across-town drives, restaurant reservations, multi-stop errands)
+ * without forcing the user to babysit the share.
+ */
+private const val MEETUP_AUTO_SHARE_DURATION_MINUTES: Long = 4 * 60
+
 /** Simple group representation for the filter pill / sheet. */
 data class GroupFilter(
     val id: String,
@@ -119,6 +131,7 @@ class GlobalMapViewModel @Inject constructor(
     private val clearMeetupDestinationUseCase: ClearMeetupDestinationUseCase,
     private val observeMeetupDestinationUseCase: ObserveMeetupDestinationUseCase,
     private val detectArrivalUseCase: DetectArrivalUseCase,
+    private val updateMeetupParticipantStatusUseCase: com.ovi.where.domain.usecase.location.UpdateMeetupParticipantStatusUseCase,
     private val conversationRepository: ConversationRepository,
     private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter
 ) : AndroidViewModel(application) {
@@ -151,6 +164,10 @@ class GlobalMapViewModel @Inject constructor(
 
     // Meetup destination listener (per active group filter)
     private var meetupDestinationJob: Job? = null
+
+    // Placement-mode geocoder job — cancelled on every new camera idle so
+    // only the latest pan's address ever lands in state.
+    private var placementGeocodeJob: Job? = null
 
     // Cache raw SharedLocation list for re-processing without re-subscribing
     @Volatile
@@ -413,6 +430,10 @@ class GlobalMapViewModel @Inject constructor(
                     // group picker (and any other stacked-avatar surface)
                     // shows real faces.
                     resolveGroupMemberPhotos(groups)
+                    // Subscribe to every group's meetup destination so the
+                    // pin / chip / place card stay visible regardless of
+                    // which filter is active.
+                    observeAllMeetupDestinations(groups.map { it.id })
                     // Check sharing sessions in background
                     checkAllSharingSessions()
                 }
@@ -690,82 +711,303 @@ class GlobalMapViewModel @Inject constructor(
         if (lastRawLocations.isNotEmpty()) {
             processLocationUpdates(lastRawLocations)
         }
-        // Switch the destination listener to the newly-selected group.
-        observeMeetupDestinationFor(filter)
+        // Meetup destinations are observed across ALL groups, not per-filter,
+        // so they remain visible regardless of the active filter.
     }
 
     // ── Meetup destination ──────────────────────────────────────────────────
 
     /**
-     * Single Firestore listener per active group filter. Direct conversations
-     * and the "all groups" view (filter == null) clear the destination state
-     * and cancel the listener so we don't pay for a stray snapshot listener
-     * outside of a group context.
+     * Subscribes to meetup-destination snapshots for **every** group the
+     * current user is in. Multi-group state lives in
+     * [GlobalMapUiState.meetupDestinationsByGroup]; the single-value
+     * [GlobalMapUiState.meetupDestination] is the most-recently-set one
+     * (sorted by `setAt`) so the chip / pin / place card always have a
+     * canonical "active meetup" to render.
+     *
+     * Filter changes never affect this — a meetup the user set in any
+     * group remains visible whether the filter is on that group, on
+     * "All Friends", or on a different group.
      */
-    private fun observeMeetupDestinationFor(filter: GroupFilter?) {
+    private fun observeAllMeetupDestinations(groupIds: List<String>) {
         meetupDestinationJob?.cancel()
-        if (filter == null || filter.isDirect || filter.id.isBlank()) {
+        val targets = groupIds.distinct().filter { it.isNotBlank() }
+        if (targets.isEmpty()) {
             _uiState.value = _uiState.value.copy(
+                meetupDestinationsByGroup = emptyMap(),
                 meetupDestination = null,
+                meetupDestinationGroupId = null,
                 meetupDestinationDistanceText = null,
-                meetupDestinationEtaText = null,
-                arrivedDestinationKey = null
+                meetupDestinationEtaText = null
             )
             return
         }
-        val groupId = filter.id
         meetupDestinationJob = viewModelScope.launch {
-            observeMeetupDestinationUseCase(groupId).collect { destination ->
-                val previous = _uiState.value.meetupDestination
-                val newKey = destination?.let { destinationKey(groupId, it) }
-                val previousKey = previous?.let { destinationKey(groupId, it) }
-                _uiState.value = _uiState.value.copy(
-                    meetupDestination = destination,
-                    arrivedDestinationKey = if (newKey != previousKey) null else _uiState.value.arrivedDestinationKey
-                )
-                recomputeDestinationMetrics()
-                // Re-check arrival immediately when a new destination lands —
-                // the user may already be inside the radius.
-                if (_uiState.value.hasMyLocation) {
-                    checkSelfArrival(_uiState.value.myLatitude, _uiState.value.myLongitude)
+            // Merge per-group listeners with combine() so we always have the
+            // freshest snapshot of every group's destination. Each listener
+            // emits the group's current MeetupDestination? — null for groups
+            // with no active meetup.
+            val flows: List<kotlinx.coroutines.flow.Flow<Pair<String, MeetupDestination?>>> =
+                targets.map { groupId ->
+                    observeMeetupDestinationUseCase(groupId)
+                        .map { destination -> groupId to destination }
                 }
+            combine(flows) { pairs: Array<Pair<String, MeetupDestination?>> ->
+                pairs.toMap()
+            }.collect { snapshot ->
+                applyMeetupSnapshot(snapshot)
             }
         }
     }
+
+    /**
+     * Reduces a per-group destination snapshot down to UI state:
+     *  • Strips groups with no active destination.
+     *  • Picks the most recently set destination as the canonical [meetupDestination].
+     *  • Recomputes the arrival-key set so we don't double-announce arrivals
+     *    for a destination the user has already arrived at.
+     *  • Recomputes distance / ETA against the canonical destination.
+     *  • Triggers an arrival check immediately when a fresh destination lands —
+     *    the user may already be inside the 100m radius.
+     *  • Auto-starts a live share with the destination's group when this
+     *    user is a participant in `ON_THE_WAY` status.
+     *  • If this user is the destination's creator and every participant has
+     *    reached a terminal status (ARRIVED / CANT_MAKE_IT), auto-clears
+     *    the destination.
+     */
+    private fun applyMeetupSnapshot(snapshot: Map<String, MeetupDestination?>) {
+        val activeByGroup = snapshot
+            .mapNotNull { (groupId, dest) ->
+                if (dest != null && dest.isActive && dest.hasValidLocation) {
+                    groupId to dest
+                } else null
+            }
+            .toMap()
+
+        // Most-recently-set wins as the canonical "current" destination.
+        val canonical = activeByGroup
+            .maxByOrNull { it.value.setAt }
+
+        // Drop arrival keys for destinations that no longer exist (the user
+        // can be ready to "arrive again" if a new destination is set later
+        // for the same group).
+        val activeKeys = activeByGroup
+            .map { (groupId, dest) -> destinationKey(groupId, dest) }
+            .toSet()
+        val prunedArrivalKeys = _uiState.value.arrivedDestinationKeys
+            .filter { it in activeKeys }
+            .toSet()
+
+        _uiState.value = _uiState.value.copy(
+            meetupDestinationsByGroup = activeByGroup,
+            meetupDestination = canonical?.value,
+            meetupDestinationGroupId = canonical?.key,
+            arrivedDestinationKeys = prunedArrivalKeys
+        )
+        recomputeDestinationMetrics()
+        if (_uiState.value.hasMyLocation) {
+            // Run arrival checks against every active destination so users
+            // who set multiple meetups still get correct arrival firing.
+            checkSelfArrival(_uiState.value.myLatitude, _uiState.value.myLongitude)
+        }
+
+        // Per-member auto-behaviour: every device reacts to its own
+        // participant entry. The setter doesn't have a privileged path
+        // here — they go through the same logic as everyone else.
+        reconcileParticipantBehavior(activeByGroup)
+
+        // Creator-only auto-clear when every participant is in a terminal
+        // status. Only the creator's device fires the clear so we don't
+        // race writes from N members.
+        maybeAutoClearMeetups(activeByGroup)
+    }
+
+    /**
+     * For each active destination, looks at the local user's participant
+     * entry and reconciles auto-share state:
+     *
+     *   ON_THE_WAY   → ensure live share to this group is running.
+     *   ARRIVED      → ensure meetup-owned share for this group is stopped.
+     *   CANT_MAKE_IT → ensure meetup-owned share for this group is stopped.
+     *
+     * Status transitions written by other devices (this user's own
+     * `markCantMakeIt` from elsewhere, sync after re-login, etc.) flow
+     * through here too so the local share state stays consistent with the
+     * server-of-truth participant entry.
+     */
+    private fun reconcileParticipantBehavior(activeByGroup: Map<String, MeetupDestination>) {
+        val uid = currentUserId ?: return
+        activeByGroup.forEach { (groupId, destination) ->
+            val myEntry = destination.participants[uid] ?: return@forEach
+            when (myEntry.status) {
+                com.ovi.where.domain.model.MeetupParticipantStatus.ON_THE_WAY ->
+                    autoStartShareForMeetup(groupId)
+                com.ovi.where.domain.model.MeetupParticipantStatus.ARRIVED,
+                com.ovi.where.domain.model.MeetupParticipantStatus.CANT_MAKE_IT ->
+                    stopMeetupAutoShareForGroup(groupId)
+            }
+        }
+
+        // Stop owned shares for groups whose destinations are no longer
+        // active (cleared while we were offline, etc).
+        val ownedNoLongerActive = _uiState.value.meetupOwnedShareGroupIds
+            .filter { it !in activeByGroup.keys }
+        ownedNoLongerActive.forEach { stopMeetupAutoShareForGroup(it) }
+    }
+
+    /**
+     * Creator-only side effect: when every participant of a destination is
+     * in a terminal status, clear the destination. Each device that is the
+     * setter sees the same snapshot so only the creator's device fires the
+     * clear — preventing N members from racing the same write.
+     */
+    private fun maybeAutoClearMeetups(activeByGroup: Map<String, MeetupDestination>) {
+        val uid = currentUserId ?: return
+        activeByGroup.forEach { (groupId, destination) ->
+            if (destination.setBy != uid) return@forEach
+            val participants = destination.participants
+            if (participants.isEmpty()) return@forEach
+            val allTerminal = participants.values.all { it.status.isTerminal }
+            if (!allTerminal) return@forEach
+            // Skip if we've already attempted clear for this destination key
+            // — prevents a runaway loop if Firestore is slow to ack.
+            val key = destinationKey(groupId, destination)
+            if (key in _autoClearedKeys) return@forEach
+            _autoClearedKeys += key
+            viewModelScope.launch {
+                clearMeetupDestinationUseCase(groupId)
+            }
+        }
+    }
+
+    /** Latches that prevent the same destination from being auto-cleared twice. */
+    private val _autoClearedKeys = mutableSetOf<String>()
 
     /** Stable per-session id used to deduplicate `MEETUP_ARRIVED` writes. */
     private fun destinationKey(groupId: String, destination: MeetupDestination): String =
         "${groupId}_${destination.setAt}"
 
     /**
-     * Re-renders the distance + ETA labels on the destination card. Cheap —
-     * just reformats existing values, no Firestore reads.
+     * Re-renders the distance + ETA labels on the destination card AND the
+     * participants list. Cheap — just reformats existing values, no Firestore
+     * reads. Called on every snapshot, location update, and user-cache
+     * hydration so the UI stays consistent.
      */
     private fun recomputeDestinationMetrics() {
         val state = _uiState.value
         val destination = state.meetupDestination
-        if (destination == null || !destination.hasValidLocation || !state.hasMyLocation) {
+        if (destination == null || !destination.hasValidLocation) {
             _uiState.value = state.copy(
                 meetupDestinationDistanceText = null,
-                meetupDestinationEtaText = null
+                meetupDestinationEtaText = null,
+                meetupParticipants = emptyList(),
+                isMeetupCreator = false,
+                selfMeetupStatus = com.ovi.where.domain.model.MeetupParticipantStatus.ON_THE_WAY
             )
             return
         }
-        val results = FloatArray(1)
-        android.location.Location.distanceBetween(
-            state.myLatitude, state.myLongitude,
-            destination.latitude, destination.longitude,
-            results
-        )
-        val distance = results[0]
-        // Find the local user's current speed from cached locations (if they're
-        // sharing). Falls back to 0 → ETA helper assumes ~50 km/h.
-        val mySpeed = lastRawLocations.firstOrNull { it.userId == currentUserId }?.speed ?: 0f
+
+        // Self-distance / ETA against the destination.
+        val (distanceText, etaText) = if (state.hasMyLocation) {
+            val results = FloatArray(1)
+            android.location.Location.distanceBetween(
+                state.myLatitude, state.myLongitude,
+                destination.latitude, destination.longitude,
+                results
+            )
+            val distance = results[0]
+            val mySpeed = lastRawLocations.firstOrNull { it.userId == currentUserId }?.speed ?: 0f
+            formatDistance(distance) to computeEta(distance, mySpeed)
+        } else {
+            null to null
+        }
+
+        val uid = currentUserId
+        val groupId = state.meetupDestinationGroupId
+        val isCreator = uid != null && destination.setBy == uid
+        val selfStatus = uid?.let { destination.participants[it]?.status }
+            ?: com.ovi.where.domain.model.MeetupParticipantStatus.ON_THE_WAY
+
+        // Build participant rows. Sort: arrived → on the way → can't make it,
+        // then by name. Self always pinned to the top.
+        val now = System.currentTimeMillis()
+        val staleThresholdMs = 5 * 60_000L
+        val participantRows = destination.participants
+            .map { (participantUid, entry) ->
+                val user = userCache[participantUid]
+                val displayName = user?.displayName?.ifBlank { null } ?: "Member"
+                val photoUrl = user?.photoUrl
+
+                // "Inactive" = no recent live-share heartbeat. Only meaningful
+                // for ON_THE_WAY users (terminal statuses already have a
+                // dedicated badge).
+                val locationFrame = lastRawLocations.firstOrNull { it.userId == participantUid }
+                val isInactive = entry.status == com.ovi.where.domain.model.MeetupParticipantStatus.ON_THE_WAY
+                    && (locationFrame == null
+                        || (locationFrame.timestamp > 0 && now - locationFrame.timestamp > staleThresholdMs))
+
+                // Per-participant distance to the destination — only for
+                // ON_THE_WAY users with a known location.
+                val perUserDistanceLabel = if (locationFrame != null
+                    && locationFrame.latitude != 0.0
+                    && locationFrame.longitude != 0.0
+                    && entry.status == com.ovi.where.domain.model.MeetupParticipantStatus.ON_THE_WAY
+                ) {
+                    val results = FloatArray(1)
+                    android.location.Location.distanceBetween(
+                        locationFrame.latitude, locationFrame.longitude,
+                        destination.latitude, destination.longitude,
+                        results
+                    )
+                    formatDistance(results[0])
+                } else null
+
+                com.ovi.where.presentation.map.components.MeetupParticipantUiModel(
+                    userId = participantUid,
+                    displayName = displayName,
+                    photoUrl = photoUrl,
+                    status = entry.status,
+                    isYou = participantUid == uid,
+                    isCreator = participantUid == destination.setBy,
+                    isInactive = isInactive,
+                    distanceLabel = perUserDistanceLabel
+                )
+            }
+            .sortedWith(
+                compareByDescending<com.ovi.where.presentation.map.components.MeetupParticipantUiModel> { it.isYou }
+                    .thenBy { rowOrderForStatus(it.status) }
+                    .thenBy { it.displayName.lowercase() }
+            )
+
+        // Hydrate user cache for any participant we don't know about yet —
+        // names and photos appear once the fetch completes (re-runs this
+        // metric pass, no UI flicker because rows have stable keys).
+        val unknownIds = destination.participants.keys
+            .filter { it.isNotBlank() && it != uid && it !in userCache }
+        if (unknownIds.isNotEmpty()) {
+            debouncedFetchUsers(unknownIds)
+        }
+
         _uiState.value = state.copy(
-            meetupDestinationDistanceText = formatDistance(distance),
-            meetupDestinationEtaText = computeEta(distance, mySpeed)
+            meetupDestinationDistanceText = distanceText,
+            meetupDestinationEtaText = etaText,
+            meetupParticipants = participantRows,
+            isMeetupCreator = isCreator,
+            selfMeetupStatus = selfStatus
         )
     }
+
+    /**
+     * Sort key so the list reads top-to-bottom as: people heading there,
+     * people who arrived, people who opted out. Within each bucket the
+     * caller does a name sort.
+     */
+    private fun rowOrderForStatus(status: com.ovi.where.domain.model.MeetupParticipantStatus): Int =
+        when (status) {
+            com.ovi.where.domain.model.MeetupParticipantStatus.ON_THE_WAY -> 0
+            com.ovi.where.domain.model.MeetupParticipantStatus.ARRIVED -> 1
+            com.ovi.where.domain.model.MeetupParticipantStatus.CANT_MAKE_IT -> 2
+        }
 
     /**
      * Called by [GlobalMapScreen] when the user long-presses the map.
@@ -847,6 +1089,7 @@ class GlobalMapViewModel @Inject constructor(
 
     /** Cancels placement mode without setting a destination. */
     fun cancelMeetupPlacement() {
+        placementGeocodeJob?.cancel()
         _uiState.value = _uiState.value.copy(
             isMeetupPlacementMode = false,
             placementAddress = null,
@@ -862,14 +1105,20 @@ class GlobalMapViewModel @Inject constructor(
      */
     fun onPlacementCameraIdle(latitude: Double, longitude: Double) {
         if (!_uiState.value.isMeetupPlacementMode) return
+        // Cancel the previous geocode so a slow / timed-out request can't
+        // overwrite a fresher result and leave the spinner stuck.
+        placementGeocodeJob?.cancel()
         _uiState.value = _uiState.value.copy(isResolvingPlacementAddress = true)
-        viewModelScope.launch {
+        placementGeocodeJob = viewModelScope.launch {
             val resolved = geocodeAddress(latitude, longitude)
             // Only apply the result if the user is still in placement mode —
             // they may have cancelled while geocoding was in flight.
             if (_uiState.value.isMeetupPlacementMode) {
                 _uiState.value = _uiState.value.copy(
-                    placementAddress = resolved,
+                    // Empty result → fall through to a coord label so the
+                    // action bar never reads "Finding address" forever.
+                    placementAddress = resolved
+                        ?: "Lat ${"%.5f".format(latitude)}, Lng ${"%.5f".format(longitude)}",
                     isResolvingPlacementAddress = false
                 )
             }
@@ -936,13 +1185,23 @@ class GlobalMapViewModel @Inject constructor(
         val trimmed = name.trim().ifBlank { pick.address?.substringBefore(',')?.trim().orEmpty() }
             .ifBlank { "Meetup point" }
         viewModelScope.launch {
+            // Resolve memberIds before the write so the seed participants
+            // map is correct. Falls back to the cached group's memberIds if
+            // the network fetch fails — better than empty.
+            val memberIds = try {
+                locationRepository.getGroupMemberIds(groupId)
+            } catch (e: Exception) {
+                Timber.w(e, "Falling back to local memberIds for $groupId")
+                emptyList()
+            }
             when (
                 setMeetupDestinationUseCase(
                     groupId = groupId,
                     latitude = pick.latitude,
                     longitude = pick.longitude,
                     name = trimmed,
-                    address = pick.address.orEmpty()
+                    address = pick.address.orEmpty(),
+                    memberIds = memberIds
                 )
             ) {
                 is Resource.Success -> {
@@ -950,6 +1209,22 @@ class GlobalMapViewModel @Inject constructor(
                         showSetDestinationSheet = false,
                         pendingDestinationPick = null
                     )
+
+                    // Frame the camera on the new pin so the user has immediate
+                    // visual feedback that the destination took effect. The
+                    // multi-group observer (observeAllMeetupDestinations) is
+                    // already listening and will populate the destination
+                    // state on the next snapshot — no filter switch needed.
+                    _uiState.value = _uiState.value.copy(requestDestinationFocus = true)
+
+                    // Auto-start a live-location share with the destination's
+                    // group. WHERE's whole purpose is to kill the "where are
+                    // you?" loop on meetups — defaulting to opt-in here is the
+                    // wrong tradeoff. Sharing is scoped to this group only,
+                    // and auto-stops on arrival (see checkSelfArrival) or
+                    // when the destination is cleared.
+                    autoStartShareForMeetup(groupId)
+
                     writeMeetupSystemMessage(
                         groupId = groupId,
                         eventType = SystemEventType.MEETUP_DESTINATION_SET,
@@ -980,18 +1255,39 @@ class GlobalMapViewModel @Inject constructor(
         }
     }
 
-    /** Clears the active destination for the currently-filtered group. */
+    /**
+     * Clears the canonical active meetup destination. Creator-only — other
+     * participants see the Clear control hidden in the UI, and even if the
+     * call were forced, the server-side rule should reject. Works
+     * regardless of which group filter is currently active because the
+     * destination state is no longer filter-bound.
+     */
     fun clearMeetupDestination() {
-        val filter = _uiState.value.activeGroupFilter ?: return
-        if (filter.isDirect || filter.id.isBlank()) return
-        val previous = _uiState.value.meetupDestination
+        val state = _uiState.value
+        val groupId = state.meetupDestinationGroupId ?: return
+        val previous = state.meetupDestination ?: return
+        val uid = currentUserId
+        if (previous.setBy.isNotBlank() && previous.setBy != uid) {
+            viewModelScope.launch {
+                _uiEvent.send(
+                    UiEvent.ShowSnackbar(
+                        UiText.DynamicString("Only the creator can clear this meetup")
+                    )
+                )
+            }
+            return
+        }
         viewModelScope.launch {
-            when (clearMeetupDestinationUseCase(filter.id)) {
+            when (clearMeetupDestinationUseCase(groupId)) {
                 is Resource.Success -> {
+                    // Meetup is over — kill the meetup-owned share too. Manual
+                    // shares the user started themselves are not touched.
+                    stopMeetupAutoShareForGroup(groupId)
+
                     writeMeetupSystemMessage(
-                        groupId = filter.id,
+                        groupId = groupId,
                         eventType = SystemEventType.MEETUP_DESTINATION_CLEARED,
-                        payload = mapOf("name" to (previous?.name ?: "")),
+                        payload = mapOf("name" to previous.name),
                         fallbackText = run {
                             val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
                             "$actor cleared the meetup point"
@@ -1016,31 +1312,86 @@ class GlobalMapViewModel @Inject constructor(
     }
 
     /**
-     * One-shot arrival check. If the local user has just entered the arrival
-     * radius for the current destination and we haven't authored
-     * `MEETUP_ARRIVED` for this destination key yet, write the system message
-     * and remember the key.
+     * One-shot arrival check across every active meetup destination.
+     *
+     * For each destination the user is part of: if they've just entered the
+     * 100m radius and we haven't authored `MEETUP_ARRIVED` for this
+     * destination's `(groupId, setAt)` key yet, write the system message,
+     * latch the key, flip the participant status to ARRIVED, and stop the
+     * meetup-owned share for that group.
      */
     private fun checkSelfArrival(myLat: Double, myLng: Double) {
         val state = _uiState.value
-        val destination = state.meetupDestination ?: return
-        val filter = state.activeGroupFilter ?: return
-        if (filter.isDirect || filter.id.isBlank()) return
-        if (!destination.hasValidLocation || !destination.isActive) return
-        val key = destinationKey(filter.id, destination)
-        if (state.arrivedDestinationKey == key) return // already announced
-        if (!detectArrivalUseCase.hasArrived(myLat, myLng, destination)) return
+        val active = state.meetupDestinationsByGroup
+        if (active.isEmpty()) return
+        val uid = currentUserId
 
-        _uiState.value = state.copy(arrivedDestinationKey = key)
+        val newKeys = mutableSetOf<String>()
+        active.forEach { (groupId, destination) ->
+            if (!destination.hasValidLocation || !destination.isActive) return@forEach
+            val key = destinationKey(groupId, destination)
+            if (key in state.arrivedDestinationKeys) return@forEach
+            // Skip if this user isn't a participant or isn't on the way
+            // (already arrived / opted out).
+            val myEntry = uid?.let { destination.participants[it] }
+            if (myEntry?.status != com.ovi.where.domain.model.MeetupParticipantStatus.ON_THE_WAY) return@forEach
+            if (!detectArrivalUseCase.hasArrived(myLat, myLng, destination)) return@forEach
+
+            newKeys += key
+            viewModelScope.launch {
+                writeMeetupSystemMessage(
+                    groupId = groupId,
+                    eventType = SystemEventType.MEETUP_ARRIVED,
+                    payload = mapOf("name" to destination.name),
+                    fallbackText = run {
+                        val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
+                        "$actor arrived at the meetup point"
+                    }
+                )
+                // Server-side latch — drives every other member's view of
+                // this user's arrival, plus the auto-clear check.
+                updateMeetupParticipantStatusUseCase(
+                    groupId = groupId,
+                    status = com.ovi.where.domain.model.MeetupParticipantStatus.ARRIVED
+                )
+            }
+            // You're here — kill the meetup-owned share for this group so we
+            // stop pinging your GPS to the group. Manual shares the user
+            // started themselves are untouched.
+            stopMeetupAutoShareForGroup(groupId)
+        }
+
+        if (newKeys.isNotEmpty()) {
+            _uiState.value = _uiState.value.copy(
+                arrivedDestinationKeys = state.arrivedDestinationKeys + newKeys
+            )
+        }
+    }
+
+    /**
+     * Marks the calling user as "can't make it" for the given group's
+     * meetup. Stops their meetup-owned share immediately and writes the
+     * status to Firestore so other members see the change. Available to
+     * any participant — the constraint here is "you can only flip your
+     * own entry", not "only the creator can do this".
+     */
+    fun markCantMakeIt(groupId: String) {
+        val state = _uiState.value
+        val destination = state.meetupDestinationsByGroup[groupId] ?: return
+        if (!destination.isActive) return
         viewModelScope.launch {
-            writeMeetupSystemMessage(
-                groupId = filter.id,
-                eventType = SystemEventType.MEETUP_ARRIVED,
-                payload = mapOf("name" to destination.name),
-                fallbackText = run {
-                    val actor = firebaseAuth.currentUser?.displayName ?: "Someone"
-                    "$actor arrived at the meetup point"
-                }
+            updateMeetupParticipantStatusUseCase(
+                groupId = groupId,
+                status = com.ovi.where.domain.model.MeetupParticipantStatus.CANT_MAKE_IT
+            )
+            // Local stop is fast — server snapshot will reconcile in next
+            // tick anyway, but this avoids a UX lag where the share pill
+            // lingers for the round-trip.
+            stopMeetupAutoShareForGroup(groupId)
+            _uiEvent.send(
+                UiEvent.ShowSnackbar(
+                    UiText.DynamicString("You let the group know you can't make it")
+                )
             )
         }
     }
@@ -1076,18 +1427,65 @@ class GlobalMapViewModel @Inject constructor(
      * synchronous overload (Android 13+ has an async API but the sync one is
      * fine on `Dispatchers.IO`).
      */
+    /**
+     * Reverse-geocode helper.
+     *
+     * On Android 33+ the synchronous [android.location.Geocoder.getFromLocation]
+     * is deprecated and returns empty silently on many devices. We use the
+     * async overload there via a cancellable coroutine, and fall back to the
+     * sync API on older versions. A 4s timeout prevents the resolving spinner
+     * from hanging forever when the geocoder backend is slow or offline.
+     *
+     * Returns the best available address line, or null if the geocoder is
+     * absent / returned nothing / timed out.
+     */
     private suspend fun geocodeAddress(latitude: Double, longitude: Double): String? {
+        val app = getApplication<Application>()
+        if (!android.location.Geocoder.isPresent()) {
+            Timber.w("geocodeAddress: Geocoder.isPresent() == false on this device")
+            return null
+        }
+        val geocoder = android.location.Geocoder(app, java.util.Locale.getDefault())
         return try {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                val geocoder = android.location.Geocoder(getApplication(), java.util.Locale.getDefault())
-                @Suppress("DEPRECATION")
-                val results = geocoder.getFromLocation(latitude, longitude, 1)
-                results?.firstOrNull()?.getAddressLine(0)
-            }
+            kotlinx.coroutines.withTimeoutOrNull(4_000L) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    // Android 13+ — async API. The sync one is deprecated and
+                    // returns null on a lot of OEM builds.
+                    kotlinx.coroutines.suspendCancellableCoroutine<List<android.location.Address>?> { cont ->
+                        geocoder.getFromLocation(latitude, longitude, 1) { addresses ->
+                            if (cont.isActive) cont.resumeWith(Result.success(addresses))
+                        }
+                    }
+                } else {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        @Suppress("DEPRECATION")
+                        geocoder.getFromLocation(latitude, longitude, 1)
+                    }
+                }
+            }?.firstOrNull()?.let(::formatAddress)
         } catch (e: Exception) {
             Timber.w(e, "geocodeAddress failed")
             null
         }
+    }
+
+    /**
+     * Picks the best human-readable label out of a [android.location.Address].
+     * Prefers `getAddressLine(0)` (full street line); falls back through
+     * locality / sub-locality / feature name / admin area so we never end up
+     * showing nothing when the geocoder partially succeeded.
+     */
+    private fun formatAddress(addr: android.location.Address): String? {
+        val line = addr.getAddressLine(0)?.takeIf { it.isNotBlank() }
+        if (line != null) return line
+        val parts = listOfNotNull(
+            addr.featureName?.takeIf { it.isNotBlank() },
+            addr.subLocality?.takeIf { it.isNotBlank() },
+            addr.locality?.takeIf { it.isNotBlank() },
+            addr.adminArea?.takeIf { it.isNotBlank() },
+            addr.countryName?.takeIf { it.isNotBlank() }
+        ).distinct()
+        return if (parts.isEmpty()) null else parts.joinToString(", ")
     }
 
     fun selectFriend(friend: FriendLocationUiModel?) {
@@ -1302,6 +1700,77 @@ class GlobalMapViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(showMeetupPlaceCard = false)
     }
 
+    /**
+     * Consumes the post-set "share with this group?" prompt without acting
+     * on it. Called by the screen when the snackbar dismisses by timeout
+     * or swipe.
+     */
+    fun consumeShareForGroupPrompt() {
+        _uiState.value = _uiState.value.copy(promptShareForGroupId = null)
+    }
+
+    /**
+     * Accepts the post-set prompt and starts a 1-hour live-location share
+     * targeted at the prompt's group. If the user is already sharing with
+     * other targets, this adds the group as an additional target instead of
+     * replacing the session.
+     */
+    fun acceptShareForGroupPrompt(durationMinutes: Long = 60L) {
+        val groupId = _uiState.value.promptShareForGroupId ?: return
+        _uiState.value = _uiState.value.copy(promptShareForGroupId = null)
+        if (_uiState.value.isSharing) {
+            addSharingTarget(groupId, durationMinutes)
+        } else {
+            startSharing(listOf(groupId), durationMinutes)
+        }
+    }
+
+    /**
+     * Auto-starts a live share targeted at [groupId] after a meetup
+     * destination is set. No-op when the user is already sharing with
+     * this group. Records the group in [meetupOwnedShareGroupIds] so the
+     * arrival / clear flows know exactly which target they own.
+     *
+     * Default duration is 4 hours — the arrival auto-stop is the real
+     * lifecycle owner. Duration is just a fail-safe ceiling; long enough
+     * to cover most real meetups (across-town drives, restaurant
+     * reservations, errands) without bleeding battery if the user
+     * forgets the meetup is still active.
+     */
+    private fun autoStartShareForMeetup(groupId: String) {
+        val state = _uiState.value
+        if (groupId in state.sharingTargetIds) {
+            // Already sharing with this group — don't reset their existing
+            // timer or claim ownership of a share they started manually.
+            return
+        }
+        val durationMinutes = MEETUP_AUTO_SHARE_DURATION_MINUTES
+        if (state.isSharing) {
+            addSharingTarget(groupId, durationMinutes)
+        } else {
+            startSharing(listOf(groupId), durationMinutes)
+        }
+        _uiState.value = _uiState.value.copy(
+            meetupOwnedShareGroupIds = _uiState.value.meetupOwnedShareGroupIds + groupId
+        )
+    }
+
+    /**
+     * Stops the meetup-owned share for [groupId], if any. Called when the
+     * user arrives at that group's destination or when the destination is
+     * cleared. Manual shares the user started themselves are not touched.
+     */
+    private fun stopMeetupAutoShareForGroup(groupId: String) {
+        val state = _uiState.value
+        if (groupId !in state.meetupOwnedShareGroupIds) return
+        _uiState.value = state.copy(
+            meetupOwnedShareGroupIds = state.meetupOwnedShareGroupIds - groupId
+        )
+        if (groupId in state.sharingTargetIds) {
+            removeSharingTarget(groupId)
+        }
+    }
+
     fun onAutoZoomConsumed() {
         _uiState.value = _uiState.value.copy(hasAutoZoomed = true)
     }
@@ -1386,6 +1855,7 @@ class GlobalMapViewModel @Inject constructor(
         timeAgoRefreshJob?.cancel()
         countdownJob?.cancel()
         meetupDestinationJob?.cancel()
+        placementGeocodeJob?.cancel()
         unregisterLocationProviderReceiver()
     }
 }
@@ -1465,6 +1935,65 @@ data class GlobalMapUiState(
     val requestDestinationFocus: Boolean = false,
     /** Whether the place-card sheet for the active destination is visible. */
     val showMeetupPlaceCard: Boolean = false,
+    /**
+     * One-shot prompt — set after a successful destination set when the user
+     * is not already sharing live location with that group. Drives an
+     * actionable snackbar that lets them start sharing in a single tap.
+     * Null when no prompt is pending.
+     *
+     * Deprecated by the auto-share-on-set behavior — kept for compatibility
+     * with the existing screen-side LaunchedEffect, but no longer set.
+     */
+    val promptShareForGroupId: String? = null,
+    /**
+     * Group id whose live-location share was auto-started by a meetup
+     * destination set. We track this so we can auto-stop *only* the meetup
+     * share when the user arrives or clears the destination, without
+     * touching unrelated shares the user started manually.
+     *
+     * Deprecated single-value field — kept for source compat but no longer
+     * read or written. See [meetupOwnedShareGroupIds] for the multi-group
+     * truth.
+     */
+    val meetupAutoSharedGroupId: String? = null,
+    /**
+     * Groups whose live shares were auto-started by the meetup flow. Each
+     * entry's share auto-stops on arrival at that group's destination or
+     * when the destination is cleared. A user can have multiple
+     * concurrent meetups across different groups; ownership is per-group.
+     */
+    val meetupOwnedShareGroupIds: Set<String> = emptySet(),
+    /**
+     * Per-group active meetup destinations. Multi-group state so the chip
+     * and pin remain visible regardless of which filter the user has on.
+     * The single-value [meetupDestination] below is the most-recently-set
+     * active one, derived from this map.
+     */
+    val meetupDestinationsByGroup: Map<String, MeetupDestination> = emptyMap(),
+    /**
+     * The group id of [meetupDestination], or null when no meetup is
+     * active. Used by the place-card sheet to label the destination
+     * ("MEETUP POINT FOR {GroupName}") and by the clear/arrival flows so
+     * they target the right group.
+     */
+    val meetupDestinationGroupId: String? = null,
+    /**
+     * Per-(group, setAt) keys for which we've already authored
+     * `MEETUP_ARRIVED`. Multi-group support means a single string is no
+     * longer enough — each meetup needs its own arrival latch.
+     */
+    val arrivedDestinationKeys: Set<String> = emptySet(),
+    /**
+     * Resolved participant rows for the canonical [meetupDestination].
+     * Built from the destination's participants map + the user cache +
+     * the live-share heartbeat. Empty when no destination is active.
+     */
+    val meetupParticipants: List<com.ovi.where.presentation.map.components.MeetupParticipantUiModel> = emptyList(),
+    /** True when the local user is the creator of the canonical meetup. */
+    val isMeetupCreator: Boolean = false,
+    /** Local user's status on the canonical meetup, defaulting to ON_THE_WAY. */
+    val selfMeetupStatus: com.ovi.where.domain.model.MeetupParticipantStatus =
+        com.ovi.where.domain.model.MeetupParticipantStatus.ON_THE_WAY,
     /**
      * Stable key (`"${groupId}_${destination.setAt}"`) of the destination the
      * local user has already authored a `MEETUP_ARRIVED` system message for.

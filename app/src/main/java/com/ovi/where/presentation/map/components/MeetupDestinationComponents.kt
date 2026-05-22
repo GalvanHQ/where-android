@@ -310,7 +310,6 @@ private fun HeroPickPreview(
         position = CameraPosition.fromLatLngZoom(target, 16f)
     }
 
-    val context = LocalContext.current
     val isNightTime = remember {
         val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
         hour < 6 || hour >= 19

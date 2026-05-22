@@ -143,6 +143,7 @@ import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.LocationUtils
 import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.map.components.DestinationPinMarker
+import com.ovi.where.presentation.map.components.MeetupPlaceCardSheet
 import com.ovi.where.presentation.map.components.MeetupPlacementActionBar
 import com.ovi.where.presentation.map.components.SetMeetupDestinationSheet
 import com.ovi.where.presentation.map.components.fanOutOverlappingMarkers
@@ -495,6 +496,7 @@ fun GlobalMapScreen(
                         activeFilter = uiState.activeGroupFilter,
                         sharingTargetIds = uiState.sharingTargetIds,
                         sharingTargetExpiries = uiState.sharingTargetExpiries,
+                        meetupOwnedShareGroupIds = uiState.meetupOwnedShareGroupIds,
                         groups = uiState.groups,
                         directTargets = uiState.directTargets,
                         bottomReservedSpace = totalNavBarHeight,
@@ -1138,8 +1140,12 @@ fun GlobalMapScreen(
             }
 
             // ── Frame the camera onto the active destination on demand ─────
-            // Triggered by the FAB action sheet's "Show on map" item.
-            LaunchedEffect(uiState.requestDestinationFocus) {
+            // Triggered by the place-card sheet's "Show on map" action and
+            // by confirmDestinationPick after a successful write. Keyed on
+            // both the request flag AND the destination state so we still
+            // fire correctly when the destination is set just-in-time (the
+            // Firestore listener attaches after the request flag flips).
+            LaunchedEffect(uiState.requestDestinationFocus, uiState.meetupDestination) {
                 val destination = uiState.meetupDestination
                 if (uiState.requestDestinationFocus && destination != null && destination.hasValidLocation) {
                     cameraPositionState.animate(
@@ -1344,13 +1350,54 @@ fun GlobalMapScreen(
     // marker on the map (Google-Maps-style "tap a place" pattern).
     val activeMeetup = uiState.meetupDestination
     if (uiState.showMeetupPlaceCard && activeMeetup != null && activeMeetup.hasValidLocation) {
-        com.ovi.where.presentation.map.components.MeetupPlaceCardSheet(
+        // Google Maps handoff for "Get directions". Uses the geo: scheme
+        // with a `q=` label so the dropped pin shows the meetup name.
+        val openDirections: () -> Unit = {
+            val name = activeMeetup.name.ifBlank { "Meetup point" }
+            val uri = android.net.Uri.parse(
+                "geo:${activeMeetup.latitude},${activeMeetup.longitude}" +
+                    "?q=${activeMeetup.latitude},${activeMeetup.longitude}" +
+                    "(${java.net.URLEncoder.encode(name, "UTF-8")})"
+            )
+            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
+                // Prefer Google Maps when installed; falls back to the chooser.
+                setPackage("com.google.android.apps.maps")
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            try {
+                context.startActivity(intent)
+            } catch (_: android.content.ActivityNotFoundException) {
+                // Google Maps not installed — try any available maps app.
+                context.startActivity(
+                    android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                )
+            }
+        }
+
+        MeetupPlaceCardSheet(
             destination = activeMeetup,
+            groupName = uiState.meetupDestinationGroupId
+                ?.let { id -> uiState.groups.firstOrNull { it.id == id }?.name },
             distanceText = uiState.meetupDestinationDistanceText,
             etaText = uiState.meetupDestinationEtaText,
+            participants = uiState.meetupParticipants,
+            isCreator = uiState.isMeetupCreator,
+            selfStatus = uiState.selfMeetupStatus,
             onShowOnMap = {
                 viewModel.dismissMeetupPlaceCard()
                 viewModel.requestDestinationFocus()
+            },
+            onGetDirections = {
+                viewModel.dismissMeetupPlaceCard()
+                openDirections()
+            },
+            onCantMakeIt = {
+                viewModel.dismissMeetupPlaceCard()
+                uiState.meetupDestinationGroupId?.let { groupId ->
+                    viewModel.markCantMakeIt(groupId)
+                }
             },
             onClear = {
                 viewModel.dismissMeetupPlaceCard()
@@ -1362,13 +1409,18 @@ fun GlobalMapScreen(
 
     // ── Clear meetup destination confirm dialog ──────────────────────────────
     if (showMeetupClearConfirm) {
+        // Resolve the meetup's actual group name (not the active filter,
+        // which may be a different group or "All Friends" since meetups
+        // are observed across all groups).
+        val meetupGroupName = uiState.meetupDestinationGroupId
+            ?.let { id -> uiState.groups.firstOrNull { it.id == id }?.name }
+            ?: "the group"
         AlertDialog(
             onDismissRequest = { showMeetupClearConfirm = false },
             title = { Text("Clear meetup point?") },
             text = {
                 Text(
-                    "Everyone in ${uiState.activeGroupFilter?.name ?: "the group"} " +
-                        "will stop seeing it on the map."
+                    "Everyone in $meetupGroupName will stop seeing it on the map."
                 )
             },
             confirmButton = {
@@ -1456,6 +1508,7 @@ private fun HomeSheetContent(
     activeFilter: GroupFilter?,
     sharingTargetIds: List<String>,
     sharingTargetExpiries: Map<String, Long>,
+    meetupOwnedShareGroupIds: Set<String>,
     groups: List<GroupFilter>,
     directTargets: List<GroupFilter>,
     bottomReservedSpace: androidx.compose.ui.unit.Dp,
@@ -1525,6 +1578,7 @@ private fun HomeSheetContent(
                 MapHomeTab.MyShares -> MySharesTabContent(
                     sharingTargetIds = sharingTargetIds,
                     sharingTargetExpiries = sharingTargetExpiries,
+                    meetupOwnedShareGroupIds = meetupOwnedShareGroupIds,
                     groups = groups,
                     directTargets = directTargets,
                     bottomReservedSpace = bottomReservedSpace,
@@ -1671,6 +1725,7 @@ private fun FriendsTabContent(
 private fun MySharesTabContent(
     sharingTargetIds: List<String>,
     sharingTargetExpiries: Map<String, Long>,
+    meetupOwnedShareGroupIds: Set<String>,
     groups: List<GroupFilter>,
     directTargets: List<GroupFilter>,
     bottomReservedSpace: androidx.compose.ui.unit.Dp,
@@ -1762,6 +1817,7 @@ private fun MySharesTabContent(
                 ActiveShareRow(
                     target = target,
                     expiry = sharingTargetExpiries[target.id],
+                    isMeetupShare = target.id in meetupOwnedShareGroupIds,
                     onStop = { onStopOne(target.id) }
                 )
             }
@@ -2527,6 +2583,7 @@ private fun FilterRow(
 private fun ActiveShareRow(
     target: GroupFilter,
     expiry: Long?,
+    isMeetupShare: Boolean = false,
     onStop: () -> Unit
 ) {
     Surface(
@@ -2553,7 +2610,14 @@ private fun ActiveShareRow(
                     SharingPulseDot()
                     Spacer(Modifier.width(6.dp))
                     val typeLabel = if (target.isDirect) "Direct" else "Group"
-                    val timerLabel = formatExpiryLabel(expiry)
+                    // Meetup-owned shares auto-stop on arrival; the timer is
+                    // only a safety ceiling. Show the lifecycle, not the
+                    // raw timer, so users understand it'll end on its own.
+                    val timerLabel = if (isMeetupShare) {
+                        "Until you arrive"
+                    } else {
+                        formatExpiryLabel(expiry)
+                    }
                     Text(
                         text = "$typeLabel • $timerLabel",
                         style = MaterialTheme.typography.labelSmall,

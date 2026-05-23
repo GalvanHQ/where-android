@@ -422,9 +422,6 @@ fun AppNavGraph(
                     onNavigateToMessages = {
                         navController.navigateToTab(Screen.ChatsTab.route)
                     },
-                    onNavigateToGroups = {
-                        navController.navigateToTab(Screen.PeopleTab.route)
-                    },
                     onNavigateToLocationSharing = {
                         navController.navigateToTab(Screen.MapTab.route)
                     }
@@ -452,7 +449,6 @@ fun AppNavGraph(
                             }
                         },
                         onNavigateToMessages = { navController.popBackStack() },
-                        onNavigateToGroups = { navController.popBackStack() },
                         onNavigateToLocationSharing = { navController.popBackStack() },
                         contentPadding = PaddingValues(top = 48.dp)
                     )

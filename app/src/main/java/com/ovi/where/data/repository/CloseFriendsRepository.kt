@@ -77,23 +77,35 @@ class CloseFriendsRepository @Inject constructor(
 
     suspend fun add(friendUid: String) {
         val uid = firebaseAuth.currentUser?.uid ?: return
-        firestore
+        // Use a dotted-path update so we *add* an entry to the existing
+        // members map instead of replacing the whole map. SetOptions.merge()
+        // does a shallow merge — passing { members: { newId: ts } } would
+        // overwrite the entire `members` field with a single entry.
+        val ref = firestore
             .collection("users").document(uid)
             .collection("preferences").document(DOC_ID)
-            .set(
-                mapOf("members" to mapOf(friendUid to System.currentTimeMillis())),
-                SetOptions.merge()
-            )
-            .await()
+        try {
+            ref.update("members.$friendUid", System.currentTimeMillis()).await()
+        } catch (e: Exception) {
+            // Doc didn't exist yet — create it with the first entry.
+            ref.set(
+                mapOf("members" to mapOf(friendUid to System.currentTimeMillis()))
+            ).await()
+        }
     }
 
     suspend fun remove(friendUid: String) {
         val uid = firebaseAuth.currentUser?.uid ?: return
-        firestore
-            .collection("users").document(uid)
-            .collection("preferences").document(DOC_ID)
-            .update("members.$friendUid", com.google.firebase.firestore.FieldValue.delete())
-            .await()
+        try {
+            firestore
+                .collection("users").document(uid)
+                .collection("preferences").document(DOC_ID)
+                .update("members.$friendUid", com.google.firebase.firestore.FieldValue.delete())
+                .await()
+        } catch (e: Exception) {
+            // No doc to remove from — nothing to do. Silent success matches
+            // the "remove what isn't there" Set semantics callers expect.
+        }
     }
 
     /** Suspends and returns the current set. */

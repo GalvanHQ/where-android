@@ -430,9 +430,7 @@ fun UserProfileScreen(
                                                 contentColor = MaterialTheme.colorScheme.onSurface
                                             )
                                         ) {
-                                            Icon(imageVector = ImageVector.vectorResource(id = R.drawable.location), contentDescription = null, Modifier.size(Dimens.iconSizeSmall))
-                                            Spacer(Modifier.width(Dimens.spaceMedium))
-                                            Text("Location", style = MaterialTheme.typography.labelLarge)
+                                            Text("Share Location", style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         }
                                         // Close-friend star toggle. Filled when active.
                                         // The whole notification system honors this:

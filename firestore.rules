@@ -49,6 +49,20 @@ service cloud.firestore {
         allow read, write: if isSelf(userId);
       }
 
+      // ── Preferences (private to the user) ──
+      // Holds per-user app preferences that are too small for their own
+      // collection — currently just the "close friends" set used by the
+      // notification system to bypass quiet hours.
+      //
+      // Doc shape (closeFriends):
+      //   { members: Map<friendUid, addedAtMillis> }
+      //
+      // Read + write are owner-only. No other user has any business
+      // touching another user's preferences.
+      match /preferences/{docId} {
+        allow read, write: if isSelf(userId);
+      }
+
       // ── Notifications inbox ──────────────────────────────────────────
       // SINGLE-DOC AGGREGATE PATTERN — mirrors the friend-requests inbox.
       // One document at `users/{uid}/inbox/notifications` holds the entire

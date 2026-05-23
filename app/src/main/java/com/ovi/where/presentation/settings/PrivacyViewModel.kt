@@ -6,6 +6,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.ovi.where.core.constants.AppConstants
 import com.ovi.where.core.constants.AppConstants.STATE_FLOW_SUBSCRIBE_TIMEOUT_MS
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -13,6 +16,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import timber.log.Timber
 import javax.inject.Inject
 
 /**
@@ -46,13 +51,22 @@ enum class ProfileVisibility(val key: String, val displayName: String, val descr
 /**
  * ViewModel for the Privacy settings screen.
  *
- * Reads and writes location sharing and profile visibility preferences to DataStore.
+ * Persists location-sharing and profile-visibility choices to:
+ *  • DataStore — fast local read on the hot path (start-sharing checks).
+ *  • Firestore (`users/{uid}` doc) — cross-device sync + the field the
+ *    user-search query consults to enforce profile visibility from other
+ *    users' searches.
+ *
+ * The two stores are kept in sync best-effort. On boot the local copy is
+ * authoritative if Firestore is unreachable; on every set we write both.
  *
  * Requirements: 8.8
  */
 @HiltViewModel
 class PrivacyViewModel @Inject constructor(
-    private val dataStore: DataStore<Preferences>
+    private val dataStore: DataStore<Preferences>,
+    private val firestore: FirebaseFirestore,
+    private val firebaseAuth: FirebaseAuth
 ) : ViewModel() {
 
     val locationSharing: StateFlow<LocationSharingMode> = dataStore.data
@@ -77,17 +91,39 @@ class PrivacyViewModel @Inject constructor(
 
     fun setLocationSharing(mode: LocationSharingMode) {
         viewModelScope.launch {
-            dataStore.edit { preferences ->
-                preferences[LOCATION_SHARING_KEY] = mode.key
-            }
+            dataStore.edit { it[LOCATION_SHARING_KEY] = mode.key }
+            // Mirror to Firestore so the field is available cross-device.
+            // Search queries don't read it (locationSharingMode only governs
+            // outgoing share starts), but cross-device sync keeps the user's
+            // selection consistent if they sign in on a tablet.
+            persistUserField("locationSharingMode", mode.key)
         }
     }
 
     fun setProfileVisibility(visibility: ProfileVisibility) {
         viewModelScope.launch {
-            dataStore.edit { preferences ->
-                preferences[PROFILE_VISIBILITY_KEY] = visibility.key
-            }
+            dataStore.edit { it[PROFILE_VISIBILITY_KEY] = visibility.key }
+            // Mirror to Firestore so other users' search queries can filter
+            // out hidden / friends-only profiles when running their searches.
+            persistUserField("profileVisibility", visibility.key)
+        }
+    }
+
+    /**
+     * Writes a single field on the current user's profile doc. Best-effort —
+     * we don't want a transient network failure to block the local UI flip
+     * since the DataStore write already succeeded. Worst case the
+     * cross-device mirror is one re-launch behind.
+     */
+    private suspend fun persistUserField(field: String, value: String) {
+        val uid = firebaseAuth.currentUser?.uid ?: return
+        try {
+            firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                .document(uid)
+                .update(field, value)
+                .await()
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to mirror $field=$value to Firestore")
         }
     }
 

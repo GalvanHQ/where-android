@@ -10,6 +10,7 @@ import com.ovi.where.domain.repository.UserRepository
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -17,7 +18,8 @@ import javax.inject.Singleton
 @Singleton
 class UserRepositoryImpl @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val lazyFriendshipRepository: dagger.Lazy<com.ovi.where.domain.repository.FriendshipRepository>
 ) : UserRepository {
 
     private val currentUid: String?
@@ -82,6 +84,20 @@ class UserRepositoryImpl @Inject constructor(
 
     /**
      * Searches by both displayName prefix and username prefix, merges and deduplicates results.
+     *
+     * Profile-visibility filter:
+     *  • "hidden" → never appears in results
+     *  • "friends" → only appears if the searcher is already a friend
+     *  • "everyone" (default) → always visible
+     *
+     * The check happens client-side because Firestore can't filter result
+     * sets by a target field condition without a compound index per query
+     * shape, and the existing prefix-search already pulls a small page so
+     * the cost of post-filtering is negligible. A determined attacker
+     * could still call Firestore directly to bypass this — the visibility
+     * promise here is best-effort UX, not a hard security boundary. For a
+     * stronger guarantee we'd need a separate `searchableUsers` collection
+     * maintained by a Cloud Function trigger.
      */
     override suspend fun searchUsers(query: String): Resource<List<User>> {
         return try {
@@ -103,7 +119,25 @@ class UserRepositoryImpl @Inject constructor(
             val merged = (byName + byUsername)
                 .distinctBy { it.id }
                 .filter { it.id != uid }
-            Resource.Success(merged)
+
+            // Resolve the searcher's friend list once so we can apply the
+            // friends-only filter below without N round trips.
+            val friendIds: Set<String> = runCatching {
+                lazyFriendshipRepository.get()
+                    .observeFriends()
+                    .first()
+                    .map { it.friendUid }
+                    .toSet()
+            }.getOrDefault(emptySet())
+
+            val visible = merged.filter { user ->
+                when (user.profileVisibility) {
+                    "hidden" -> false
+                    "friends" -> user.id in friendIds
+                    else -> true // "everyone" or any forward-compat value
+                }
+            }
+            Resource.Success(visible)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to search users")
         }

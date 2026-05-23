@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -43,7 +44,9 @@ class LocationRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val lazyChatSocketIoClient: Lazy<ChatSocketIoClient>,
     private val locationDao: LocationDao,
-    private val meetupDestinationDao: MeetupDestinationDao
+    private val meetupDestinationDao: MeetupDestinationDao,
+    private val privacyPolicyRepository: PrivacyPolicyRepository,
+    private val lazyFriendshipRepository: Lazy<com.ovi.where.domain.repository.FriendshipRepository>
 ) : LocationRepository {
 
     /**
@@ -278,6 +281,75 @@ class LocationRepositoryImpl @Inject constructor(
         return expiries.filterValues { it == Long.MAX_VALUE || it > now }
     }
 
+    /**
+     * Enforces the user's [PrivacyPolicyRepository.LocationSharingMode] before
+     * any Firestore write happens. Returns Resource.Error with a copy that
+     * names the active mode so the UI can surface a meaningful message
+     * instead of a generic "permission denied".
+     *
+     * Mode semantics:
+     *  • ALWAYS — no extra check; the caller's targets pass through.
+     *  • FRIENDS — every target must be either:
+     *      • a direct share to a confirmed friend, OR
+     *      • a group where every member is a confirmed friend.
+     *    Group sharing with non-friend members is the trickiest case —
+     *    we err on the side of refusal because the user opted into a
+     *    "friends-only" policy, and group ownership doesn't imply that
+     *    every other member is a contact they trust.
+     *  • NEVER — categorical rejection. Users who picked this kill switch
+     *    expect "no" to mean "no", even via a group they're already in.
+     *
+     * The check runs against the local DataStore (not Firestore) so it
+     * stays instant and works offline. Friendship lookups go through the
+     * existing reactive friend stream — fetched once per call.
+     */
+    private suspend fun enforceLocationPolicy(targetIds: List<String>): Resource<Unit> {
+        val mode = privacyPolicyRepository.currentLocationSharingMode()
+
+        when (mode) {
+            PrivacyPolicyRepository.LocationSharingMode.ALWAYS -> return Resource.Success(Unit)
+
+            PrivacyPolicyRepository.LocationSharingMode.NEVER ->
+                return Resource.Error(
+                    "Location sharing is disabled in your privacy settings. " +
+                        "Open Settings to change."
+                )
+
+            PrivacyPolicyRepository.LocationSharingMode.FRIENDS -> {
+                val friendIds = runCatching {
+                    lazyFriendshipRepository.get().observeFriends().first()
+                        .map { it.friendUid }
+                        .toSet()
+                }.getOrDefault(emptySet())
+
+                for (target in targetIds) {
+                    if (isDirectTarget(target)) {
+                        val friendId = directFriendId(target)
+                        if (friendId !in friendIds) {
+                            return Resource.Error(
+                                "Friends-only mode: you can only share with friends. " +
+                                    "Add this person before sharing."
+                            )
+                        }
+                    } else {
+                        // Group target — every member must be a friend.
+                        val members = runCatching { getGroupMemberIds(target) }
+                            .getOrDefault(emptyList())
+                            .filter { it != currentUid } // exclude self
+                        val nonFriendMembers = members - friendIds
+                        if (nonFriendMembers.isNotEmpty()) {
+                            return Resource.Error(
+                                "Friends-only mode: this group has members who aren't your friends. " +
+                                    "Switch to \"Always\" in Privacy settings to share."
+                            )
+                        }
+                    }
+                }
+                return Resource.Success(Unit)
+            }
+        }
+    }
+
     override suspend fun startLocationSharing(targetIds: List<String>, durationMinutes: Long): Resource<Unit> {
         return try {
             val uid = currentUid ?: return Resource.Error("Not authenticated")
@@ -285,6 +357,11 @@ class LocationRepositoryImpl @Inject constructor(
             if (sanitized.isEmpty()) {
                 return Resource.Error("Pick at least one friend or group to share with")
             }
+
+            // Privacy policy check — runs BEFORE any state mutation or
+            // Firestore write so a rejected share leaves no trace.
+            val policyResult = enforceLocationPolicy(sanitized)
+            if (policyResult is Resource.Error) return policyResult
 
             val expiry = expiryFromDuration(durationMinutes)
             // All targets in this start call get the same expiry. Existing targets
@@ -368,6 +445,12 @@ class LocationRepositoryImpl @Inject constructor(
             if (targetId.isBlank() || targetId in session.targetExpiries) {
                 return Resource.Success(Unit)
             }
+
+            // Privacy policy check — same gate as startLocationSharing.
+            // We check just the new target since existing targets in the
+            // session were already validated when added.
+            val policyResult = enforceLocationPolicy(listOf(targetId))
+            if (policyResult is Resource.Error) return policyResult
 
             val newExpiry = expiryFromDuration(durationMinutes)
             // Existing per-target expiries are preserved — only the new target gets newExpiry.

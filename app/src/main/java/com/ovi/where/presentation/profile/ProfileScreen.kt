@@ -76,7 +76,6 @@ fun ProfileScreen(
     onNavigateToEditProfile: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToMessages: () -> Unit,
-    onNavigateToGroups: () -> Unit,
     onNavigateToLocationSharing: () -> Unit,
     contentPadding: PaddingValues = PaddingValues(),
     viewModel: ProfileViewModel = hiltViewModel()
@@ -220,7 +219,7 @@ fun ProfileScreen(
                             icon = Icons.Outlined.Group,
                             title = "Groups",
                             subtitle = "Manage your groups",
-                            onClick = onNavigateToGroups
+                            onClick = onNavigateToMessages
                         )
                         HorizontalDivider(
                             modifier = Modifier.padding(start = 56.dp),

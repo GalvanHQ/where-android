@@ -39,9 +39,10 @@ import com.ovi.where.data.local.entity.VoiceMessageCacheEntity
         LinkPreviewCacheEntity::class,
         OnlineStatusEntity::class,
         MeetupDestinationEntity::class,
-        NotificationEntity::class
+        NotificationEntity::class,
+        com.ovi.where.data.local.entity.UserCacheEntity::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -56,6 +57,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun onlineStatusDao(): OnlineStatusDao
     abstract fun meetupDestinationDao(): MeetupDestinationDao
     abstract fun notificationDao(): NotificationDao
+    abstract fun userCacheDao(): com.ovi.where.data.local.dao.UserCacheDao
 
     companion object {
         val MIGRATION_5_6 = object : Migration(5, 6) {
@@ -259,6 +261,33 @@ abstract class AppDatabase : RoomDatabase() {
                         `groupId` TEXT,
                         `userId` TEXT,
                         `destinationName` TEXT,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
+        /**
+         * Adds the `user_cache` table — persistent per-uid mirror of user
+         * profile data. Exists so VM-scoped `userCache` maps survive
+         * process death and the UI doesn't render "Member" / placeholder
+         * names + null avatars while Firestore re-resolves on cold start.
+         */
+        val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `user_cache` (
+                        `id` TEXT NOT NULL,
+                        `displayName` TEXT NOT NULL,
+                        `username` TEXT NOT NULL,
+                        `email` TEXT NOT NULL,
+                        `bio` TEXT NOT NULL,
+                        `photoUrl` TEXT,
+                        `isOnline` INTEGER NOT NULL,
+                        `lastSeen` INTEGER NOT NULL,
+                        `cachedAt` INTEGER NOT NULL,
                         PRIMARY KEY(`id`)
                     )
                     """.trimIndent()

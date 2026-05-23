@@ -122,17 +122,11 @@ fun Life360PinMarker(
     }
 }
 
-/** Consistent avatar color assignment based on userId hash. */
-val AvatarMarkerColors = listOf(
-    Color(0xFF6366F1), // Indigo
-    Color(0xFF8B5CF6), // Violet
-    Color(0xFFEC4899), // Pink
-    Color(0xFFF59E0B), // Amber
-    Color(0xFF10B981), // Emerald
-    Color(0xFF06B6D4), // Cyan
-    Color(0xFFEF4444), // Red
-    Color(0xFF3B82F6), // Blue
-)
+/** Consistent avatar color assignment based on userId hash.
+ *  Mirrors the canonical [com.ovi.where.core.theme.AvatarColors] so map
+ *  pins, chat sender colors, and any other avatar use site stay in lockstep
+ *  with the brand palette. */
+val AvatarMarkerColors = com.ovi.where.core.theme.AvatarColors
 
 fun avatarColorForUser(userId: String): Color {
     return AvatarMarkerColors[userId.hashCode().and(0x7FFFFFFF) % AvatarMarkerColors.size]

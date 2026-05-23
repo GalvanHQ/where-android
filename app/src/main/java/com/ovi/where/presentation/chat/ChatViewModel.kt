@@ -109,7 +109,8 @@ class ChatViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val getOrCreateDirectConversationUseCase: com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase,
     private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter,
-    private val observeMeetupDestinationUseCase: com.ovi.where.domain.usecase.location.ObserveMeetupDestinationUseCase
+    private val observeMeetupDestinationUseCase: com.ovi.where.domain.usecase.location.ObserveMeetupDestinationUseCase,
+    private val userCachePersistent: com.ovi.where.data.cache.UserCache
 ) : AndroidViewModel(application) {
 
     /**
@@ -151,6 +152,7 @@ class ChatViewModel @Inject constructor(
         savedStateHandle.get<String>("conversationId")
 
     init {
+        hydrateUserCacheFromPersistent()
         conversationId?.let { convId ->
             _uiState.value = _uiState.value.copy(conversationId = convId)
             loadConversation(convId)
@@ -163,6 +165,26 @@ class ChatViewModel @Inject constructor(
             observeOfflineState()
             observePresenceForOnlineCount()
             observeRepoSharingState()
+        }
+    }
+
+    /**
+     * Pre-fills the in-memory [participantNames] / [participantPhotos] maps
+     * from the persistent `user_cache` Room table. Cures the "names + photos
+     * vanish in the chat header" bug after process death — the maps used to
+     * live only in the VM, so a fresh VM started with empty maps and the
+     * top bar showed "Unknown User" and a placeholder avatar until the
+     * Firestore fetch completed.
+     */
+    private fun hydrateUserCacheFromPersistent() {
+        viewModelScope.launch {
+            userCachePersistent.observeAllCached().collect { users ->
+                users.forEach {
+                    participantNames[it.id] = it.displayName
+                    participantPhotos[it.id] = it.photoUrl
+                    if (it.lastSeen > 0L) lastSeenByUser[it.id] = it.lastSeen
+                }
+            }
         }
     }
 

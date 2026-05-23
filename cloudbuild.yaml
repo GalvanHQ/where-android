@@ -63,7 +63,12 @@ steps:
       - '--concurrency'
       - '80'
       - '--session-affinity'
-      - '--set-env-vars'
+      # Use --update-env-vars (not --set-env-vars) so we only manage the
+      # vars listed here and don't accidentally clobber out-of-band secrets
+      # like GOOGLE_ROUTES_API_KEY. That key is set on the service via
+      # `gcloud run services update --update-env-vars=GOOGLE_ROUTES_API_KEY=...`
+      # and lives outside source control.
+      - '--update-env-vars'
       - 'NODE_ENV=production,REST_RATE_LIMIT=300'
 
 options:

@@ -5,12 +5,18 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.constants.AppConstants
+import com.ovi.where.data.local.dao.UserCacheDao
+import com.ovi.where.data.local.entity.toCacheEntity
 import com.ovi.where.domain.model.User
 import com.ovi.where.domain.repository.UserRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,18 +25,45 @@ import javax.inject.Singleton
 class UserRepositoryImpl @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
+    private val userCacheDao: UserCacheDao,
     private val lazyFriendshipRepository: dagger.Lazy<com.ovi.where.domain.repository.FriendshipRepository>
 ) : UserRepository {
 
+    /**
+     * Singleton scope for write-through cache populates. We don't await the
+     * Room write because the caller already has the User in hand and the
+     * UI bound to the cache flow will pick the row up reactively.
+     */
+    private val cacheScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
     private val currentUid: String?
         get() = firebaseAuth.currentUser?.uid
+
+    /** Upserts every successful Firestore read into the persistent cache so
+     *  it survives ViewModel + process recreations. The cache is what the
+     *  rest of the app reads from. */
+    private fun warmCache(users: List<User>) {
+        if (users.isEmpty()) return
+        val now = System.currentTimeMillis()
+        cacheScope.launch {
+            runCatching {
+                userCacheDao.upsertAll(
+                    users.filter { it.id.isNotBlank() }
+                        .map { it.toCacheEntity(now) }
+                )
+            }
+        }
+    }
 
     override suspend fun getUser(userId: String): Resource<User> {
         return try {
             val doc = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
                 .document(userId).get().await()
             val user = doc.toObject(User::class.java)
-            if (user != null) Resource.Success(user) else Resource.Error("User not found")
+            if (user != null) {
+                warmCache(listOf(user))
+                Resource.Success(user)
+            } else Resource.Error("User not found")
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to fetch user")
         }
@@ -51,6 +84,7 @@ class UserRepositoryImpl @Inject constructor(
                     .get().await()
                 users.addAll(snapshot.toObjects(User::class.java))
             }
+            warmCache(users)
             Resource.Success(users)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to fetch users")
@@ -71,7 +105,12 @@ class UserRepositoryImpl @Inject constructor(
                 if (snapshot != null && !snapshot.exists() && snapshot.metadata.isFromCache) {
                     return@addSnapshotListener
                 }
-                trySend(snapshot?.toObject(User::class.java)).isSuccess
+                val user = snapshot?.toObject(User::class.java)
+                // Warm the persistent cache on every fresh read so VMs
+                // and the inbox + meetup sheet have name/photo data
+                // immediately available after process death.
+                if (user != null) warmCache(listOf(user))
+                trySend(user).isSuccess
             }
         awaitClose { listener.remove() }
     }

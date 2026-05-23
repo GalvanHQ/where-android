@@ -8,7 +8,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,7 +31,7 @@ import androidx.compose.ui.unit.dp
 fun MeetupPin(
     modifier: Modifier = Modifier,
     size: Dp = 44.dp,
-    accentColor: Color = MaterialTheme.colorScheme.primary
+    accentColor: Color = Color.Green
 ) {
     Box(
         modifier = modifier

@@ -291,11 +291,10 @@ private fun StatusLine(showDot: Boolean, text: String, color: Color) {
     }
 }
 
-private val SharerColors = listOf(
-    Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFFEC4899),
-    Color(0xFFF59E0B), Color(0xFF10B981), Color(0xFF06B6D4),
-    Color(0xFFEF4444), Color(0xFF3B82F6)
-)
+/** Sender colour palette — mirrors the canonical
+ *  [com.ovi.where.core.theme.AvatarColors] so the chat live-share row,
+ *  map pins, and group avatars all draw from the same hue set. */
+private val SharerColors = com.ovi.where.core.theme.AvatarColors
 
 /**
  * Stacked, pulsing row of avatar chips for the people currently sharing

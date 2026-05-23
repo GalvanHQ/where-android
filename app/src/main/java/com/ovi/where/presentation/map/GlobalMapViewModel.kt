@@ -148,7 +148,8 @@ class GlobalMapViewModel @Inject constructor(
     private val updateMeetupParticipantNoteUseCase: com.ovi.where.domain.usecase.location.UpdateMeetupParticipantNoteUseCase,
     private val getMeetupRouteUseCase: com.ovi.where.domain.usecase.location.GetMeetupRouteUseCase,
     private val conversationRepository: ConversationRepository,
-    private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter
+    private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter,
+    private val userCachePersistent: com.ovi.where.data.cache.UserCache
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(GlobalMapUiState())
@@ -211,6 +212,7 @@ class GlobalMapViewModel @Inject constructor(
     }
 
     init {
+        hydrateUserCacheFromPersistent()
         restoreLastCameraPosition()
         loadGroupsAndStartObserving()
         observeFriends()
@@ -223,6 +225,30 @@ class GlobalMapViewModel @Inject constructor(
         autoLocateOnLaunch()
         restoreSharingState()
         observeRepoSharingState()
+    }
+
+    /**
+     * Pre-fills the in-memory [userCache] from the persistent
+     * `user_cache` Room table at VM start. This is the cure for the
+     * "names + photos vanish on cold start" bug — without this hydration
+     * the map shows "Member" / placeholder avatars until Firestore
+     * re-resolves each uid (which can take seconds on a cold network).
+     *
+     * The persistent cache is populated by `UserRepositoryImpl` on every
+     * successful Firestore read, so by the time we hit this code path on
+     * a returning user we have warm data for everyone they've ever
+     * encountered.
+     *
+     * We collect the persistent cache reactively, so any background
+     * writes by the repository (a fresh user resolution from a different
+     * screen) flow into our in-memory map without us having to re-read.
+     */
+    private fun hydrateUserCacheFromPersistent() {
+        viewModelScope.launch {
+            userCachePersistent.observeAllCached().collect { users ->
+                users.forEach { userCache[it.id] = it }
+            }
+        }
     }
 
     /**

@@ -58,7 +58,8 @@ class ChatsViewModel @Inject constructor(
     private val getSuggestionsUseCase: GetSuggestionsUseCase,
     private val onlineStatusDao: OnlineStatusDao,
     private val connectivityObserver: ConnectivityObserver,
-    private val observeActiveLocationsUseCase: ObserveActiveLocationsUseCase
+    private val observeActiveLocationsUseCase: ObserveActiveLocationsUseCase,
+    private val userCachePersistent: com.ovi.where.data.cache.UserCache
 ) : ViewModel() {
 
     /**
@@ -144,10 +145,30 @@ class ChatsViewModel @Inject constructor(
     init {
         // Network requests are initiated ONLY from this init block (Requirement 11.1)
         // This ensures no duplicate API calls from Compose recomposition
+        hydrateUserCacheFromPersistent()
         loadConversationsWithFastFirstPaint()
         observePresenceUpdates()
         observeOfflineState()
         observeLocationSharingStatus()
+    }
+
+    /**
+     * Pre-fills [participantNames] / [participantPhotos] from the persistent
+     * `user_cache` Room table. Without this, a fresh ChatsViewModel (process
+     * death, low-memory eviction) starts with empty maps and DM rows render
+     * as "Unknown User" with no avatar until the Firestore `getUsers` call
+     * resolves — visible flicker on every cold start.
+     */
+    private fun hydrateUserCacheFromPersistent() {
+        viewModelScope.launch {
+            userCachePersistent.observeAllCached().collect { users ->
+                users.forEach {
+                    participantNames[it.id] = it.displayName
+                    participantPhotos[it.id] = it.photoUrl
+                    if (it.lastSeen > 0L) lastSeenByUser[it.id] = it.lastSeen
+                }
+            }
+        }
     }
 
     // ── Initial Load with Fast First Paint (Requirements 20.2, 20.3) ────────

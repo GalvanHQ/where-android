@@ -1,14 +1,11 @@
 package com.ovi.where.presentation.chat.components
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -16,29 +13,24 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import androidx.compose.ui.graphics.Color
+import com.ovi.where.core.links.LinkRouter
+import com.ovi.where.core.links.LinkText
 
 /**
  * Renders a link preview card below a message bubble.
  *
- * Displays:
- * - Thumbnail image (max 160dp height) if available from Open Graph metadata
- * - Title (pre-truncated to 80 chars with ellipsis by the mapper)
- * - Domain name
- *
- * On tap: opens the URL in the system browser via implicit intent.
- *
- * Requirements: 12.1, 12.4, 12.5, 12.6
+ * Tap behaviour is delegated to [LinkRouter.openRaw] so the same pipeline
+ * that handles URLs typed into chat text (Custom Tab, internal `where://`
+ * deep-links, mailto/tel) drives this card too.
  */
 @Composable
 fun LinkPreviewCard(
@@ -54,11 +46,7 @@ fun LinkPreviewCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clickable {
-                // Requirement 12.4: Open URL in system browser via implicit intent
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                context.startActivity(intent)
-            },
+            .clickable { LinkRouter.openRaw(context, url) },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer
@@ -103,7 +91,7 @@ fun LinkPreviewCard(
                     text = title,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 3.dp)
@@ -125,73 +113,25 @@ fun LinkPreviewCard(
     }
 }
 
-
 /**
- * Renders text with URLs detected and styled as tappable hyperlinks.
+ * Backwards-compatible shim: the chat bubble still calls `LinkableText`,
+ * but it now defers to the centralized [LinkText] which handles bare
+ * domains, `where://` deep-links, mailto/tel, and trailing punctuation.
  *
- * Used when a message contains URLs but no link preview metadata
- * (e.g., when the link preview API timed out or failed).
- *
- * Requirement 12.3: Render URL as tappable hyperlink without a preview card.
- * Requirement 12.4: On tap, open URL in system browser via implicit intent.
+ * Kept in this file so existing imports keep resolving without a sweep.
  */
 @Composable
 fun LinkableText(
     text: String,
-    style: androidx.compose.ui.text.TextStyle,
+    style: TextStyle,
     color: Color,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    val urlRegex = Regex("""https?://[^\s]+""")
-    val matches = urlRegex.findAll(text).toList()
-
-    if (matches.isEmpty()) {
-        Text(
-            text = text,
-            style = style,
-            color = color,
-            modifier = modifier
-        )
-        return
-    }
-
-    val linkColor = MaterialTheme.colorScheme.tertiary
-    val annotatedString = buildAnnotatedString {
-        var lastIndex = 0
-        matches.forEach { match ->
-            // Append text before the URL
-            if (match.range.first > lastIndex) {
-                withStyle(SpanStyle(color = color)) {
-                    append(text.substring(lastIndex, match.range.first))
-                }
-            }
-            // Append the URL with link styling
-            pushStringAnnotation(tag = "URL", annotation = match.value)
-            withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
-                append(match.value)
-            }
-            pop()
-            lastIndex = match.range.last + 1
-        }
-        // Append remaining text after last URL
-        if (lastIndex < text.length) {
-            withStyle(SpanStyle(color = color)) {
-                append(text.substring(lastIndex))
-            }
-        }
-    }
-
-    ClickableText(
-        text = annotatedString,
+    LinkText(
+        text = text,
         style = style,
+        color = color,
+        linkColor = MaterialTheme.colorScheme.tertiary,
         modifier = modifier,
-        onClick = { offset ->
-            annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
-                .firstOrNull()?.let { annotation ->
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(annotation.item))
-                    context.startActivity(intent)
-                }
-        }
     )
 }

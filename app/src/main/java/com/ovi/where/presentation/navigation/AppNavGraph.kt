@@ -870,49 +870,126 @@ internal fun NavHostController.navigateToTab(route: String) {
 
 // ── Deep-link router ──────────────────────────────────────────────────────────
 
+/**
+ * Resolves a route string into a NavController navigation. Routes are the
+ * lower-cased, slash-separated form used everywhere notifications, the
+ * `where://` URI scheme, and the in-app inbox flow:
+ *
+ *   chat/{conversationId}            → Chat screen
+ *   conversation_info/{id}           → Conversation info
+ *   group_info/{groupId}             → Group info
+ *   group_details/{groupId}          → (alias of group_info, kept for back-compat)
+ *   group_map/{groupId}              → Group map
+ *   group_members/{groupId}          → Group members list
+ *   user_profile/{userId}            → Other user's profile
+ *   media_gallery/{conversationId}   → Media gallery
+ *   nicknames/{conversationId}       → Group nicknames
+ *   friend_requests                  → Friend requests
+ *   notifications                    → In-app notifications inbox
+ *   permissions                      → Settings → Permissions
+ *   notification_preferences         → Settings → Notification preferences
+ *   tab_map / tab_chats / tab_people / tab_profile  → bottom-tab switch
+ *
+ * Unrecognized or empty routes fall through to the Notifications inbox so
+ * the tap *always* takes the user somewhere meaningful — better UX than a
+ * silent dismissal, which felt like a broken notification.
+ */
 internal fun navigateToDeepLink(navController: NavHostController, route: String) {
-    val segments = route.split("/")
+    val trimmed = route.trim().trim('/')
+    if (trimmed.isEmpty()) {
+        navController.fallbackToNotifications()
+        return
+    }
+
+    val segments = trimmed.split("/").filter { it.isNotBlank() }
+    val head = segments.firstOrNull() ?: run {
+        navController.fallbackToNotifications()
+        return
+    }
+
     when {
-        segments.size == 2 && segments[0] == "chat" && segments[1].isNotBlank() -> {
+        // ── Chat surfaces ───────────────────────────────────────────────────
+        head == "chat" && segments.getOrNull(1)?.isNotBlank() == true -> {
             navController.navigate(Screen.Chat.createRoute(segments[1])) {
                 launchSingleTop = true
             }
         }
-        route == "friend_requests" -> {
-            navController.navigate(Screen.FriendRequests.route) {
+        head == "conversation_info" && segments.getOrNull(1)?.isNotBlank() == true -> {
+            navController.navigate(Screen.ConversationInfo.createRoute(segments[1])) {
                 launchSingleTop = true
             }
         }
-        route == "notifications" -> {
-            navController.navigate(Screen.Notifications.route) {
+        head == "media_gallery" && segments.getOrNull(1)?.isNotBlank() == true -> {
+            navController.navigate(Screen.MediaGallery.createRoute(segments[1])) {
                 launchSingleTop = true
             }
         }
-        route == "tab_map" -> {
-            navController.navigateToTab(Screen.MapTab.route)
-        }
-        segments.size == 2 && segments[0] == "user_profile" && segments[1].isNotBlank() -> {
-            navController.navigate(Screen.UserProfile.createRoute(segments[1])) {
+        head == "nicknames" && segments.getOrNull(1)?.isNotBlank() == true -> {
+            navController.navigate(Screen.Nicknames.createRoute(segments[1])) {
                 launchSingleTop = true
             }
         }
-        segments.size == 2 && segments[0] == "group_map" && segments[1].isNotBlank() -> {
+
+        // ── Group surfaces ──────────────────────────────────────────────────
+        // group_details is an older alias kept around for back-compat with
+        // notifications emitted before group_info became canonical.
+        (head == "group_info" || head == "group_details") &&
+            segments.getOrNull(1)?.isNotBlank() == true -> {
+            navController.navigate(Screen.GroupInfo.createRoute(segments[1])) {
+                launchSingleTop = true
+            }
+        }
+        head == "group_map" && segments.getOrNull(1)?.isNotBlank() == true -> {
             navController.navigate(Screen.GroupMap.createRoute(segments[1])) {
                 launchSingleTop = true
             }
         }
-        segments.size == 2 && segments[0] == "group_details" && segments[1].isNotBlank() -> {
-            navController.navigate(Screen.GroupInfo.createRoute(segments[1])) {
+        head == "group_members" && segments.getOrNull(1)?.isNotBlank() == true -> {
+            navController.navigate(Screen.GroupMembers.createRoute(segments[1])) {
                 launchSingleTop = true
             }
         }
-        segments.size == 2 && segments[0] == "group_info" && segments[1].isNotBlank() -> {
-            navController.navigate(Screen.GroupInfo.createRoute(segments[1])) {
+
+        // ── People surfaces ─────────────────────────────────────────────────
+        head == "user_profile" && segments.getOrNull(1)?.isNotBlank() == true -> {
+            navController.navigate(Screen.UserProfile.createRoute(segments[1])) {
                 launchSingleTop = true
             }
         }
-        else -> {
-            // Unrecognized deep link URI — discard silently.
+        trimmed == "friend_requests" -> {
+            navController.navigate(Screen.FriendRequests.route) { launchSingleTop = true }
         }
+
+        // ── Settings + inbox ───────────────────────────────────────────────
+        trimmed == "notifications" -> {
+            navController.navigate(Screen.Notifications.route) { launchSingleTop = true }
+        }
+        trimmed == "permissions" -> {
+            navController.navigate(Screen.Permissions.route) { launchSingleTop = true }
+        }
+        trimmed == "notification_preferences" -> {
+            navController.navigate(Screen.NotificationPreferences.route) { launchSingleTop = true }
+        }
+
+        // ── Bottom tabs ─────────────────────────────────────────────────────
+        trimmed == Screen.MapTab.route -> navController.navigateToTab(Screen.MapTab.route)
+        trimmed == Screen.ChatsTab.route -> navController.navigateToTab(Screen.ChatsTab.route)
+        trimmed == Screen.PeopleTab.route -> navController.navigateToTab(Screen.PeopleTab.route)
+        trimmed == Screen.ProfileTab.route -> navController.navigateToTab(Screen.ProfileTab.route)
+
+        // ── Fallback ───────────────────────────────────────────────────────
+        // Always land somewhere useful instead of dropping the tap.
+        else -> navController.fallbackToNotifications()
+    }
+}
+
+/**
+ * Fallback target when a notification carries an unrecognized or empty
+ * deep-link route. The Notifications inbox is the single screen guaranteed
+ * to have context for the missed event, so it's the safest landing pad.
+ */
+private fun NavHostController.fallbackToNotifications() {
+    navigate(Screen.Notifications.route) {
+        launchSingleTop = true
     }
 }

@@ -53,13 +53,55 @@ class NotificationsViewModel @Inject constructor(
     val pendingNavigation: StateFlow<String?> = _pendingNavigation.asStateFlow()
 
     /**
-     * Marks a notification read and emits its deep-link route for the
-     * screen to consume. Routes resolve through [com.ovi.where.DeepLinkManager].
+     * Marks a notification read and emits a deep-link route for the screen
+     * to consume. If the persisted entry has no route (legacy data, or the
+     * producer didn't have enough context to compute one), we re-resolve it
+     * from the type + ids the entry carries — this keeps the in-app inbox
+     * tap-target source-of-truth in one place. Worst case (truly nothing to
+     * navigate to) we fall back to opening the inbox itself, which is still
+     * better than the previous silent no-op behavior.
      */
     fun onNotificationClick(item: NotificationUiModel) {
         viewModelScope.launch { repository.markAsRead(item.id) }
-        _pendingNavigation.value = item.deepLinkRoute
+        val route = item.deepLinkRoute?.takeIf { it.isNotBlank() }
+            ?: resolveFallbackRoute(item)
+        _pendingNavigation.value = route
     }
+
+    /**
+     * Recomputes a deep-link route from the entry's type + denormalized ids
+     * when the persisted `deepLinkRoute` is missing. Mirrors the resolver
+     * in [com.ovi.where.core.notification.NotificationHelper.resolveDeepLinkRoute]
+     * — same canonical mapping, just keyed off the [NotificationUiModel].
+     */
+    private fun resolveFallbackRoute(item: NotificationUiModel): String =
+        when (item.type) {
+            NotificationType.NEW_MESSAGE,
+            NotificationType.MENTION ->
+                item.conversationId?.let { "chat/$it" } ?: "notifications"
+
+            NotificationType.FRIEND_REQUEST -> "friend_requests"
+            NotificationType.FRIEND_ACCEPTED ->
+                item.userId?.let { "user_profile/$it" } ?: "notifications"
+
+            NotificationType.MEMBER_JOINED,
+            NotificationType.MEMBER_LEFT ->
+                item.groupId?.let { "group_info/$it" } ?: "notifications"
+
+            NotificationType.LOCATION_UPDATE,
+            NotificationType.LIVE_LOCATION_STARTED,
+            NotificationType.LIVE_LOCATION_STOPPED ->
+                item.groupId?.let { "group_map/$it" }
+                    ?: item.conversationId?.let { "chat/$it" }
+                    ?: "tab_map"
+
+            NotificationType.MEETUP_DESTINATION_SET,
+            NotificationType.MEETUP_DESTINATION_CLEARED,
+            NotificationType.MEETUP_MEMBER_ARRIVED ->
+                item.groupId?.let { "group_map/$it" } ?: "notifications"
+
+            NotificationType.GENERAL -> "notifications"
+        }
 
     fun onNavigationConsumed() {
         _pendingNavigation.value = null
@@ -93,7 +135,12 @@ data class NotificationUiModel(
     val body: String,
     val timestamp: Long,
     val isRead: Boolean,
-    val deepLinkRoute: String?
+    val deepLinkRoute: String?,
+    /** Denormalized ids from the inbox doc — used as a fallback when
+     *  [deepLinkRoute] is missing so a tap still navigates somewhere. */
+    val conversationId: String? = null,
+    val groupId: String? = null,
+    val userId: String? = null,
 )
 
 /** Maps the persisted entity to the UI model, defaulting unknown types to GENERAL. */
@@ -107,6 +154,9 @@ internal fun NotificationEntity.toUiModel(): NotificationUiModel {
         body = body,
         timestamp = timestamp,
         isRead = isRead,
-        deepLinkRoute = deepLinkRoute
+        deepLinkRoute = deepLinkRoute,
+        conversationId = conversationId,
+        groupId = groupId,
+        userId = userId,
     )
 }

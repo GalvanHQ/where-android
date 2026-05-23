@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ovi.where.DeepLinkManager
 import com.ovi.where.R
+import com.ovi.where.core.links.LinkText
 import com.ovi.where.core.notification.NotificationType
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.presentation.common.WhereTopAppBar
@@ -158,7 +159,10 @@ private fun NotificationRow(
             )
             if (item.body.isNotBlank()) {
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
+                // Render URLs in notification bodies as tappable links.
+                // Internal `where://` URIs route through DeepLinkManager;
+                // everything else opens in a Custom Tab (or system browser).
+                LinkText(
                     text = item.body,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

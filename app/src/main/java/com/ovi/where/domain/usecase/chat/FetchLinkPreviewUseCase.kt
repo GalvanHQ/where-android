@@ -26,9 +26,6 @@ class FetchLinkPreviewUseCase @Inject constructor(
     private val linkPreviewCacheDao: LinkPreviewCacheDao
 ) {
     companion object {
-        /** Regex to detect URLs in message text. Requirement 12.1 */
-        private val URL_REGEX = Regex("""https?://[^\s]+""")
-
         /** Timeout for the link preview API call. Requirement 12.3 */
         private const val FETCH_TIMEOUT_MS = 5_000L
 
@@ -37,14 +34,18 @@ class FetchLinkPreviewUseCase @Inject constructor(
     }
 
     /**
-     * Extracts the first URL from the given text.
-     * Requirement 12.5: Only preview the first URL if multiple are present.
+     * Extracts the first external URL (http/https or bare domain) from the
+     * given text. Requirement 12.5: only preview the first URL if multiple
+     * are present.
      *
-     * @return The first URL found, or null if no URL is present.
+     * Detection is delegated to [com.ovi.where.core.links.LinkParser] so
+     * the link-preview pipeline, the chat bubble's tappable text, and the
+     * notification inbox all agree on what counts as a URL.
+     *
+     * @return The first external URL found, or null if no URL is present.
      */
-    fun extractFirstUrl(text: String): String? {
-        return URL_REGEX.find(text)?.value
-    }
+    fun extractFirstUrl(text: String): String? =
+        com.ovi.where.core.links.LinkParser.firstExternalUrl(text)
 
     /**
      * Fetches link preview metadata for the given URL.

@@ -323,19 +323,28 @@ fun ChatBubble(
                                         val ranges = mentionRegex.findAll(message.text)
                                             .map { it.range }
                                             .toList()
-                                        val styledText = buildMentionAnnotatedString(
+                                        val mentionTint = if (isSent) Color.White
+                                            else MaterialTheme.colorScheme.primary
+                                        val linkTint = if (isSent) Color.White
+                                            else MaterialTheme.colorScheme.tertiary
+                                        val ctx = androidx.compose.ui.platform.LocalContext.current
+                                        val styledText = buildMentionAndLinkAnnotatedString(
                                             text = message.text,
                                             mentionRanges = ranges,
-                                            primaryColor = if (isSent) Color.White
-                                            else MaterialTheme.colorScheme.primary
+                                            baseColor = textColor,
+                                            mentionColor = mentionTint,
+                                            linkColor = linkTint,
+                                            onLinkClick = { match ->
+                                                com.ovi.where.core.links.LinkRouter.open(ctx, match)
+                                            }
                                         )
-                                        Text(
+                                        androidx.compose.foundation.text.BasicText(
                                             text = styledText,
                                             style = MaterialTheme.typography.bodyMedium.copy(
                                                 fontSize = 15.sp,
-                                                lineHeight = 20.sp
+                                                lineHeight = 20.sp,
+                                                color = textColor,
                                             ),
-                                            color = textColor
                                         )
                                     } else {
                                         LinkableText(

@@ -1,13 +1,37 @@
 steps:
-  # Step 1: Build Docker image from server/ directory (latest tag only)
+  # Step 1: Build Docker image (latest tag only, layered cache from previous build)
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node/where-chat-server-node:latest', 'server']
+    args:
+      - 'build'
+      - '--cache-from'
+      - 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node/where-chat-server-node:latest'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node/where-chat-server-node:latest'
+      - '-f'
+      - 'Dockerfile'
+      - '.'
 
-  # Step 2: Push image (latest tag only — no accumulating build ID tags)
+  # Step 2: Push image
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'us-central1-docker.pkg.dev/where-loc/where-chat-server-node/where-chat-server-node:latest']
 
   # Step 3: Deploy to Cloud Run
+  #
+  # Tuning notes:
+  #   • memory 512Mi  — Socket.IO + Firestore listeners + LRU caches push
+  #     RSS to ~180 MB under modest load; 256 MB triggered OOM-style restarts
+  #     on chat bursts. 512 MB gives stable headroom.
+  #   • cpu 1, concurrency 80 — Node single-threaded, but I/O-bound; one CPU
+  #     handles 80 sockets comfortably. Past that, autoscaling spreads load.
+  #   • min-instances 1 — eliminates cold starts on chat / location traffic.
+  #     Cloud Run keeps the JVM/Node warm; this is the single biggest user-
+  #     observable latency win.
+  #   • max-instances 10 — doubled from 5 to absorb event spikes (group
+  #     announcements, geo-fan-out) without throttling new sockets.
+  #   • timeout 3600 — Socket.IO long-poll fallback can hold a request open
+  #     up to an hour; keep parity with the LB.
+  #   • cpu-boost — start-up latency boost so the first request after a
+  #     scale-out doesn't pay double cold-start cost.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
@@ -22,9 +46,10 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
       - '--memory'
-      - '256Mi'
+      - '512Mi'
       - '--cpu'
       - '1'
+      - '--cpu-boost'
       - '--port'
       - '8080'
       - '--ingress'
@@ -32,11 +57,15 @@ steps:
       - '--timeout'
       - '3600'
       - '--min-instances'
-      - '0'
+      - '1'
       - '--max-instances'
-      - '5'
+      - '10'
       - '--concurrency'
       - '80'
+      - '--session-affinity'
+      - '--set-env-vars'
+      - 'NODE_ENV=production,REST_RATE_LIMIT=300'
 
 options:
   logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'

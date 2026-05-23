@@ -322,6 +322,9 @@ fun AppNavGraph(
             // preservation for free.
 
             composable(Screen.MapTab.route) {
+                // Ask for POST_NOTIFICATIONS once on first map entry after
+                // sign-in. The effect no-ops if the prompt has already run.
+                com.ovi.where.core.notification.NotificationPermissionEffect()
                 GlobalMapScreen(
                     onNavigateToChat = { convId ->
                         navController.navigate(Screen.Chat.createRoute(convId)) {
@@ -345,6 +348,11 @@ fun AppNavGraph(
                     },
                     onNavigateToAddFriends = {
                         navController.navigate(Screen.Search.createRoute("people")) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToNotifications = {
+                        navController.navigate(Screen.Notifications.route) {
                             launchSingleTop = true
                         }
                     }
@@ -539,6 +547,12 @@ fun AppNavGraph(
             }
             composable(Screen.About.route) {
                 AboutScreen(onNavigateBack = { navController.popBackStack() })
+            }
+
+            composable(Screen.Notifications.route) {
+                com.ovi.where.presentation.notification.NotificationsScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
 
             // ── Chat ──────────────────────────────────────────────────────────
@@ -862,6 +876,14 @@ internal fun navigateToDeepLink(navController: NavHostController, route: String)
                 launchSingleTop = true
             }
         }
+        route == "notifications" -> {
+            navController.navigate(Screen.Notifications.route) {
+                launchSingleTop = true
+            }
+        }
+        route == "tab_map" -> {
+            navController.navigateToTab(Screen.MapTab.route)
+        }
         segments.size == 2 && segments[0] == "user_profile" && segments[1].isNotBlank() -> {
             navController.navigate(Screen.UserProfile.createRoute(segments[1])) {
                 launchSingleTop = true
@@ -873,6 +895,11 @@ internal fun navigateToDeepLink(navController: NavHostController, route: String)
             }
         }
         segments.size == 2 && segments[0] == "group_details" && segments[1].isNotBlank() -> {
+            navController.navigate(Screen.GroupInfo.createRoute(segments[1])) {
+                launchSingleTop = true
+            }
+        }
+        segments.size == 2 && segments[0] == "group_info" && segments[1].isNotBlank() -> {
             navController.navigate(Screen.GroupInfo.createRoute(segments[1])) {
                 launchSingleTop = true
             }

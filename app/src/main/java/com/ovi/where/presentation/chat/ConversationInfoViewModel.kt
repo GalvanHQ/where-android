@@ -240,9 +240,25 @@ class ConversationInfoViewModel @Inject constructor(
             } else {
                 conversationRepository.muteConversation(conversationId)
             }
-
             if (result is Resource.Success) {
                 _uiState.update { it.copy(isMuted = !currentMuted) }
+            }
+        }
+    }
+
+    /**
+     * Mutes this conversation for a specific [option] duration.
+     *
+     * Writes the per-user expiry to `conversations/{id}.mutedUntil[uid]`
+     * (server respects this when fanning out FCM) and flips the local
+     * `isMuted` flag for immediate UI feedback. Mentions still bypass the
+     * mute on the server.
+     */
+    fun muteFor(option: com.ovi.where.domain.model.MuteOption) {
+        viewModelScope.launch {
+            val result = conversationRepository.muteConversationFor(conversationId, option)
+            if (result is Resource.Success) {
+                _uiState.update { it.copy(isMuted = true) }
             }
         }
     }

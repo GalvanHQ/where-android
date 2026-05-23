@@ -20,47 +20,58 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
+import androidx.core.net.toUri
 
 /**
- * Centralized singleton responsible for notification channel creation and posting.
+ * Centralized notification helper.
  *
- * Channels are created on initialization (when the app process starts and Hilt
- * constructs this singleton). Posting checks POST_NOTIFICATIONS permission on
- * Android 13+ and silently discards the notification if permission is not granted.
+ * Responsibilities:
+ *  • Create the system notification channels at process start.
+ *  • Resolve `(NotificationType, NotificationData)` pairs into channel ids,
+ *    deep-link routes, and ready-to-fire [PendingIntent]s.
+ *  • Post notifications, gating on POST_NOTIFICATIONS (Android 13+),
+ *    per-channel user preferences, and active-screen suppression
+ *    (open chat / visible map).
+ *  • Manage message-grouping with summary support.
  *
- * Additionally, posting checks per-channel user preferences from DataStore and
- * suppresses the notification if the target channel is disabled by the user.
+ * Channels (one per logical category):
  *
- * Requirements: 12.1, 12.2, 12.3, 12.6, 12.7
+ *  | id                | name              | importance | UX intent              |
+ *  |-------------------|-------------------|------------|------------------------|
+ *  | messages          | Messages          | HIGH       | chat + @mentions       |
+ *  | social            | Friends & Social  | DEFAULT    | friend requests        |
+ *  | location_updates  | Location Updates  | HIGH       | live location sharing  |
+ *  | group_activity    | Group Activity    | DEFAULT    | member join / leave    |
+ *  | meetup            | Meetup            | HIGH       | destination + arrivals |
+ *  | general           | General           | DEFAULT    | fallback               |
  */
 @Singleton
 class NotificationHelper @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val preferencesRepository: NotificationPreferencesRepository
+    private val preferencesRepository: NotificationPreferencesRepository,
+    private val activeConversationTracker: ActiveConversationTracker,
+    private val activeMapTracker: ActiveMapTracker,
+    private val chatNotificationStyler: ChatNotificationStyler,
+    private val conversationShortcutManager: ConversationShortcutManager,
+    private val quietHoursRepository: com.ovi.where.data.repository.QuietHoursRepository,
+    private val closeFriendsRepository: com.ovi.where.data.repository.CloseFriendsRepository
 ) {
 
     private val notificationManager: NotificationManagerCompat =
         NotificationManagerCompat.from(context)
 
-    /** Tracks distinct conversation IDs with active notifications for grouping logic. */
+    /** Active conversations with on-screen pushes — drives summary creation. */
     private val activeConversationIds: MutableSet<String> = mutableSetOf()
 
     init {
         createChannels()
     }
 
-    // ── Channel Creation ──────────────────────────────────────────────────────
+    // ── Channel creation ──────────────────────────────────────────────────
 
     /**
-     * Creates all notification channels required by the app.
-     * Safe to call multiple times — the system ignores re-creation of existing channels.
-     *
-     * Channels:
-     * - messages: high importance (chat messages)
-     * - social: default importance (friend requests, social activity)
-     * - location_updates: high importance (location sharing notifications)
-     * - group_activity: default importance (group membership changes)
-     * - general: default importance (fallback for unrecognized types)
+     * Creates every channel the app uses. Safe to call multiple times — the
+     * system de-duplicates by channel id.
      */
     fun createChannels() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -68,40 +79,48 @@ class NotificationHelper @Inject constructor(
         val channels = listOf(
             NotificationChannel(
                 CHANNEL_MESSAGES,
-                "Messages",
+                context.getString(R.string.notification_channel_messages),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "New chat messages from friends and groups"
+                description = context.getString(R.string.notification_channel_messages_desc)
                 enableVibration(true)
                 enableLights(true)
             },
             NotificationChannel(
                 CHANNEL_SOCIAL,
-                "Friends & Social",
+                context.getString(R.string.notification_channel_social),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Friend requests and social activity"
+                description = context.getString(R.string.notification_channel_social_desc)
             },
             NotificationChannel(
                 CHANNEL_LOCATION_UPDATES,
-                "Location Updates",
+                context.getString(R.string.notification_channel_location_updates),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Notifications when group members share their location"
+                description = context.getString(R.string.notification_channel_location_updates_desc)
             },
             NotificationChannel(
                 CHANNEL_GROUP_ACTIVITY,
-                "Group Activity",
+                context.getString(R.string.notification_channel_group_activity),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Notifications about group membership changes"
+                description = context.getString(R.string.notification_channel_group_activity_desc)
+            },
+            NotificationChannel(
+                CHANNEL_MEETUP,
+                context.getString(R.string.notification_channel_meetup),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = context.getString(R.string.notification_channel_meetup_desc)
+                enableVibration(true)
             },
             NotificationChannel(
                 CHANNEL_GENERAL,
-                "General",
+                context.getString(R.string.notification_channel_general),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "General notifications"
+                description = context.getString(R.string.notification_channel_general_desc)
             }
         )
 
@@ -110,133 +129,408 @@ class NotificationHelper @Inject constructor(
         systemManager.createNotificationChannels(channels)
     }
 
-    // ── Posting ───────────────────────────────────────────────────────────────
+    // ── High-level entry point ─────────────────────────────────────────────
 
     /**
-     * Posts a notification after verifying POST_NOTIFICATIONS permission on Android 13+
-     * and checking per-channel user preferences.
+     * Builds and posts a notification for the given [type] / [data] pair.
      *
-     * If the permission has not been granted on Android 13+, the notification is
-     * silently discarded without crashing (Requirement 12.3).
+     * Honors:
+     *  • POST_NOTIFICATIONS permission on Android 13+
+     *  • Per-channel user preferences (DataStore)
+     *  • Foreground-suppression rules (active chat / visible map)
      *
-     * If the target channel is disabled in user preferences, the notification is
-     * suppressed without displaying it (Requirement 12.6).
-     *
-     * @param notificationId Unique ID for this notification (used for updates/cancellation).
-     * @param channelId The notification channel ID to check preferences for.
-     * @param notification The built [NotificationCompat.Builder] ready to post.
+     * Returns true if a system notification was actually posted.
      */
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
-    suspend fun postNotification(
-        notificationId: Int,
-        channelId: String,
-        notification: NotificationCompat.Builder
-    ) {
+    suspend fun postForType(type: NotificationType, data: NotificationData): Boolean {
+        val channelId = resolveChannelForType(type)
+
         if (!canPostNotifications()) {
-            Timber.w("POST_NOTIFICATIONS permission not granted — discarding notification id=$notificationId")
-            return
+            Timber.w("POST_NOTIFICATIONS permission not granted - dropping $type")
+            return false
+        }
+        if (!notificationManager.areNotificationsEnabled()) {
+            Timber.i("Notifications disabled at the system level - dropping $type")
+            return false
+        }
+        if (!isChannelEnabledOnSystem(channelId)) {
+            Timber.i("Channel '$channelId' disabled at the system level - dropping $type")
+            return false
         }
         if (!preferencesRepository.isChannelEnabledSync(channelId)) {
-            Timber.i("Channel '$channelId' disabled by user — suppressing notification id=$notificationId")
-            return
+            Timber.i("Channel '$channelId' disabled - suppressing $type")
+            return false
         }
-        notificationManager.notify(notificationId, notification.build())
+        if (shouldSuppressInForeground(type, data)) {
+            Timber.i("Suppressing $type because the relevant screen is foregrounded")
+            return false
+        }
+
+        // Quiet-hours: bypass for close friends + meetup arrivals (the
+        // app's most time-critical events). Otherwise either drop entirely
+        // or post silently depending on the user's full-block preference.
+        val quietApplies = quietHoursRepository.shouldMuteNow()
+            && !shouldBypassQuietHours(type, data)
+        val downgradeToSilent = quietApplies && !quietHoursRepository.isFullBlock()
+        if (quietApplies && quietHoursRepository.isFullBlock()) {
+            Timber.i("Quiet hours full-block - dropping $type")
+            return false
+        }
+
+        // Chat notifications take a richer path — MessagingStyle, conversation
+        // shortcut, inline reply, mark-as-read. Keeping this branch separate
+        // keeps the generic path lean for the simpler notification types.
+        val notification = if (type == NotificationType.NEW_MESSAGE || type == NotificationType.MENTION) {
+            buildChatNotification(type, data, channelId) ?: return false
+        } else {
+            buildNotification(type, data, channelId)
+        }
+
+        val notificationId = buildNotificationId(type, data)
+
+        // Apply quiet-hours silent downgrade by suppressing default sound /
+        // vibration on the posted notification. The shade entry still
+        // appears so the user can see the message at-a-glance, but their
+        // peace doesn't get interrupted.
+        val finalNotification = if (downgradeToSilent) {
+            notification.also {
+                it.defaults = 0
+                it.sound = null
+                it.vibrate = null
+                it.flags = it.flags or Notification.FLAG_ONLY_ALERT_ONCE
+            }
+        } else notification
+
+        notificationManager.notify(notificationId, finalNotification)
+
+        if (type == NotificationType.NEW_MESSAGE || type == NotificationType.MENTION) {
+            data.conversationId?.let { rememberActiveConversation(it) }
+        }
+        return true
     }
 
     /**
-     * Posts a pre-built [Notification] after verifying permission and preferences.
+     * Returns true when this notification should bypass quiet hours. Two
+     * categories qualify:
+     *  • Sender is in the user's "close friends" list — they always come
+     *    through (matches WhatsApp's "important contacts" semantics).
+     *  • Type is a time-critical safety event (currently meetup arrivals;
+     *    extend if more domain events get added later).
+     */
+    private suspend fun shouldBypassQuietHours(
+        type: NotificationType,
+        data: NotificationData
+    ): Boolean {
+        if (type == NotificationType.MEETUP_MEMBER_ARRIVED) return true
+        val senderUid = data.userId ?: return false
+        return runCatching {
+            closeFriendsRepository.isCloseFriend(senderUid)
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Suppresses notifications for the screen the user is already looking at.
+     * Returns true when the system tray push should be dropped.
+     */
+    private fun shouldSuppressInForeground(type: NotificationType, data: NotificationData): Boolean {
+        return when (type) {
+            NotificationType.NEW_MESSAGE,
+            NotificationType.MENTION -> activeConversationTracker.isActive(data.conversationId)
+
+            NotificationType.LOCATION_UPDATE,
+            NotificationType.LIVE_LOCATION_STARTED,
+            NotificationType.LIVE_LOCATION_STOPPED,
+            NotificationType.MEETUP_DESTINATION_SET,
+            NotificationType.MEETUP_DESTINATION_CLEARED,
+            NotificationType.MEETUP_MEMBER_ARRIVED -> activeMapTracker.isMapVisible()
+
+            else -> false
+        }
+    }
+
+    /**
+     * Builds a chat-specific notification using [NotificationCompat.MessagingStyle].
      *
-     * @param notificationId Unique ID for this notification.
-     * @param channelId The notification channel ID to check preferences for.
-     * @param notification The already-built notification object.
+     * Adds inline Reply (RemoteInput) and Mark-as-Read action buttons,
+     * attaches the conversation Shortcut + LocusId so the system promotes
+     * the chat as a "conversation" (Bubbles, priority, per-thread settings),
+     * and renders the last few messages from Room as the shade history.
+     *
+     * Returns null when the conversation id is missing (which would mean an
+     * upstream payload bug — refuse to show a misleading "?" notification).
+     */
+    private suspend fun buildChatNotification(
+        type: NotificationType,
+        data: NotificationData,
+        channelId: String
+    ): Notification? {
+        val conversationId = data.conversationId ?: return null
+        val pendingIntent = buildDeepLinkPendingIntent(type, data)
+        val notificationId = buildNotificationId(type, data)
+
+        // Refresh the dynamic shortcut so the OS associates this notification
+        // with a "conversation" — required for Priority + Bubbles on R+.
+        val shortcutId = runCatching {
+            conversationShortcutManager.pushShortcut(conversationId)
+        }.getOrNull()
+
+        // The MessagingStyle pulls the recent message list from Room so the
+        // shade renders a coherent thread, not a single line.
+        val style = chatNotificationStyler.buildStyle(
+            conversationId = conversationId,
+            incomingSenderId = data.userId.orEmpty(),
+            incomingSenderName = data.title.takeIf { it.isNotBlank() } ?: "Someone",
+            incomingSenderPhotoUrl = null,
+            incomingText = data.body,
+            incomingTimestamp = System.currentTimeMillis()
+        )
+
+        val builder = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setGroup(GROUP_KEY_MESSAGES)
+            .setOnlyAlertOnce(false)
+
+        // MessagingStyle is the canonical chat presentation. Falls back to
+        // BigText when the style fails to build (e.g. unauthenticated state).
+        if (style != null) {
+            builder.setStyle(style)
+        } else {
+            builder.setContentTitle(data.title)
+                .setContentText(data.body)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(data.body))
+        }
+
+        // Conversation shortcut linkage — the system uses this to enable
+        // Bubbles + the "Priority" / "Silent" / per-conversation settings.
+        if (shortcutId != null) {
+            builder.setShortcutId(shortcutId)
+            builder.setLocusId(androidx.core.content.LocusIdCompat(shortcutId))
+        }
+
+        // Inline Reply — RemoteInput driven, handled by ChatActionReceiver.
+        builder.addAction(buildReplyAction(conversationId, notificationId))
+        // Mark as Read — clears the unread counter without opening the chat.
+        builder.addAction(buildMarkReadAction(conversationId, notificationId))
+
+        return builder.build()
+    }
+
+    /**
+     * Builds the inline-reply action. The user types in the shade →
+     * [com.ovi.where.data.remote.ChatActionReceiver] receives the broadcast,
+     * pushes the message through [com.ovi.where.data.repository.MessageRepositoryImpl.sendMessage],
+     * and dismisses the notification.
+     */
+    private fun buildReplyAction(
+        conversationId: String,
+        notificationId: Int
+    ): NotificationCompat.Action {
+        val remoteInput = androidx.core.app.RemoteInput.Builder(
+            com.ovi.where.data.remote.ChatActionReceiver.KEY_TEXT_REPLY
+        ).setLabel("Reply").build()
+
+        val replyIntent = Intent(
+            context,
+            com.ovi.where.data.remote.ChatActionReceiver::class.java
+        ).apply {
+            action = com.ovi.where.data.remote.ChatActionReceiver.ACTION_REPLY
+            putExtra(
+                com.ovi.where.data.remote.ChatActionReceiver.EXTRA_CONVERSATION_ID,
+                conversationId
+            )
+            putExtra(
+                com.ovi.where.data.remote.ChatActionReceiver.EXTRA_NOTIFICATION_ID,
+                notificationId
+            )
+            // Unique URI so the PendingIntent isn't deduped across conversations.
+            data = "where://reply/$conversationId/$notificationId".toUri()
+        }
+
+        val replyPendingIntent = PendingIntent.getBroadcast(
+            context,
+            "reply_$conversationId".hashCode(),
+            replyIntent,
+            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        return NotificationCompat.Action.Builder(
+            R.drawable.ic_notification, "Reply", replyPendingIntent
+        )
+            .addRemoteInput(remoteInput)
+            .setAllowGeneratedReplies(true)
+            .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
+            .setShowsUserInterface(false)
+            .build()
+    }
+
+    /** Builds the mark-as-read action button. */
+    private fun buildMarkReadAction(
+        conversationId: String,
+        notificationId: Int
+    ): NotificationCompat.Action {
+        val markReadIntent = Intent(
+            context,
+            com.ovi.where.data.remote.ChatActionReceiver::class.java
+        ).apply {
+            action = com.ovi.where.data.remote.ChatActionReceiver.ACTION_MARK_READ
+            putExtra(
+                com.ovi.where.data.remote.ChatActionReceiver.EXTRA_CONVERSATION_ID,
+                conversationId
+            )
+            putExtra(
+                com.ovi.where.data.remote.ChatActionReceiver.EXTRA_NOTIFICATION_ID,
+                notificationId
+            )
+            data = "where://markread/$conversationId/$notificationId".toUri()
+        }
+
+        val markReadPendingIntent = PendingIntent.getBroadcast(
+            context,
+            "markread_$conversationId".hashCode(),
+            markReadIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        return NotificationCompat.Action.Builder(
+            R.drawable.ic_notification, "Mark as read", markReadPendingIntent
+        )
+            .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ)
+            .setShowsUserInterface(false)
+            .build()
+    }
+
+    /**
+     * Builds a [Notification] for the given type. Style + actions vary per
+     * type but every notification gets the same auto-cancel + deep-link
+     * boilerplate.
+     */
+    private fun buildNotification(
+        type: NotificationType,
+        data: NotificationData,
+        channelId: String
+    ): Notification {
+        val pendingIntent = buildDeepLinkPendingIntent(type, data)
+
+        val priority = when (channelId) {
+            CHANNEL_MESSAGES, CHANNEL_LOCATION_UPDATES, CHANNEL_MEETUP ->
+                NotificationCompat.PRIORITY_HIGH
+            else -> NotificationCompat.PRIORITY_DEFAULT
+        }
+
+        val category = when (type) {
+            NotificationType.NEW_MESSAGE,
+            NotificationType.MENTION -> NotificationCompat.CATEGORY_MESSAGE
+            NotificationType.FRIEND_REQUEST,
+            NotificationType.FRIEND_ACCEPTED -> NotificationCompat.CATEGORY_SOCIAL
+            NotificationType.LOCATION_UPDATE,
+            NotificationType.LIVE_LOCATION_STARTED,
+            NotificationType.LIVE_LOCATION_STOPPED -> NotificationCompat.CATEGORY_STATUS
+            NotificationType.MEETUP_DESTINATION_SET,
+            NotificationType.MEETUP_DESTINATION_CLEARED,
+            NotificationType.MEETUP_MEMBER_ARRIVED -> NotificationCompat.CATEGORY_EVENT
+            NotificationType.MEMBER_JOINED,
+            NotificationType.MEMBER_LEFT -> NotificationCompat.CATEGORY_SOCIAL
+            NotificationType.GENERAL -> NotificationCompat.CATEGORY_RECOMMENDATION
+        }
+
+        val builder = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(data.title)
+            .setContentText(data.body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(data.body))
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setPriority(priority)
+            .setCategory(category)
+
+        // Group message + mention notifications so the shade stays tidy on chatty days
+        if (type == NotificationType.NEW_MESSAGE || type == NotificationType.MENTION) {
+            builder.setGroup(GROUP_KEY_MESSAGES)
+        }
+
+        return builder.build()
+    }
+
+    /**
+     * Tracks the conversation as having an active push. When the count of
+     * distinct conversations crosses the [SUMMARY_THRESHOLD], a summary
+     * notification is posted on the messages channel.
+     */
+    private fun rememberActiveConversation(conversationId: String) {
+        activeConversationIds.add(conversationId)
+        if (activeConversationIds.size >= SUMMARY_THRESHOLD) {
+            postSummaryNotification()
+        }
+    }
+
+    /**
+     * Posts a summary "X conversations" notification grouping individual
+     * message bubbles in the shade.
      */
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
-    suspend fun postNotification(
-        notificationId: Int,
-        channelId: String,
-        notification: Notification
-    ) {
-        if (!canPostNotifications()) {
-            Timber.w("POST_NOTIFICATIONS permission not granted — discarding notification id=$notificationId")
-            return
-        }
-        if (!preferencesRepository.isChannelEnabledSync(channelId)) {
-            Timber.i("Channel '$channelId' disabled by user — suppressing notification id=$notificationId")
-            return
-        }
-        notificationManager.notify(notificationId, notification)
+    private fun postSummaryNotification() {
+        if (!canPostNotifications()) return
+        val summaryText = "${activeConversationIds.size} conversations"
+        val summary = NotificationCompat.Builder(context, CHANNEL_MESSAGES)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.app_name))
+            .setContentText(summaryText)
+            .setStyle(NotificationCompat.InboxStyle().setSummaryText(summaryText))
+            .setGroup(GROUP_KEY_MESSAGES)
+            .setGroupSummary(true)
+            .setAutoCancel(true)
+            .build()
+        notificationManager.notify(SUMMARY_NOTIFICATION_ID, summary)
+    }
+
+    /** Removes a conversation from grouping bookkeeping on dismissal. */
+    fun removeConversationFromGroup(conversationId: String) {
+        activeConversationIds.remove(conversationId)
     }
 
     /**
-     * Posts a notification without preference checking (fire-and-forget, non-suspend).
-     * Only checks POST_NOTIFICATIONS permission.
+     * Cancels any active system-tray notifications associated with the
+     * given conversation. Called from the chat screen on resume so the
+     * user doesn't see stale shade entries for messages they're now
+     * actively reading.
      *
-     * Use this for cases where preference checking is handled externally or not applicable.
+     * Also drops the conversation from the grouping bookkeeping so the
+     * "X conversations" summary shrinks when one of the rows clears.
      */
-    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
-    fun postNotificationDirect(notificationId: Int, notification: NotificationCompat.Builder) {
-        if (!canPostNotifications()) {
-            Timber.w("POST_NOTIFICATIONS permission not granted — discarding notification id=$notificationId")
-            return
+    fun cancelForConversation(conversationId: String) {
+        if (conversationId.isBlank()) return
+        // Cancel the message + mention notifications for this conversation.
+        // The id derivation must match buildNotificationId().
+        val data = NotificationData(title = "", body = "", conversationId = conversationId)
+        val ids = listOf(NotificationType.NEW_MESSAGE, NotificationType.MENTION)
+            .map { type -> buildNotificationId(type, data) }
+        ids.forEach { notificationManager.cancel(it) }
+
+        activeConversationIds.remove(conversationId)
+        // If the summary's group dropped below the threshold, hide it too.
+        if (activeConversationIds.size < SUMMARY_THRESHOLD) {
+            notificationManager.cancel(SUMMARY_NOTIFICATION_ID)
         }
-        notificationManager.notify(notificationId, notification.build())
     }
 
-    /**
-     * Posts a pre-built notification without preference checking (fire-and-forget, non-suspend).
-     */
-    fun postNotificationDirect(notificationId: Int, notification: android.app.Notification) {
-        if (!canPostNotifications()) {
-            Timber.w("POST_NOTIFICATIONS permission not granted — discarding notification id=$notificationId")
-            return
-        }
-        notificationManager.notify(notificationId, notification)
-    }
+    // ── Deep-link PendingIntents ───────────────────────────────────────────
 
-    /**
-     * Cancels an active notification by its ID.
-     */
-    fun cancelNotification(notificationId: Int) {
-        notificationManager.cancel(notificationId)
-    }
-
-    // ── Deep-Link PendingIntents (Requirement 12.4) ───────────────────────────
-
-    /**
-     * Builds a [PendingIntent] that opens [MainActivity] and navigates to the
-     * screen corresponding to the given [NotificationType].
-     *
-     * Mapping:
-     * - NEW_MESSAGE      → Chat screen for [NotificationData.conversationId]
-     * - FRIEND_REQUEST   → FriendRequests screen
-     * - FRIEND_ACCEPTED  → UserProfile screen for [NotificationData.userId]
-     * - MEMBER_JOINED    → GroupDetails screen for [NotificationData.groupId]
-     * - MEMBER_LEFT      → GroupDetails screen for [NotificationData.groupId]
-     * - LOCATION_UPDATE  → GroupMap screen for [NotificationData.groupId]
-     * - GENERAL          → App default (no deep link)
-     *
-     * The route is delivered via [MainActivity.EXTRA_DEEP_LINK_ROUTE] string extra.
-     *
-     * @param type The notification type determining the target screen.
-     * @param data The notification payload containing relevant IDs.
-     * @param requestCode Unique code for the PendingIntent (defaults to type + targetId hash).
-     * @return A [PendingIntent] that launches the correct screen on tap.
-     */
+    /** Builds a [PendingIntent] that opens [MainActivity] with the resolved deep-link. */
     fun buildDeepLinkPendingIntent(
         type: NotificationType,
         data: NotificationData,
-        requestCode: Int = buildRequestCode(type, data)
+        requestCode: Int = buildNotificationId(type, data)
     ): PendingIntent {
         val route = resolveDeepLinkRoute(type, data)
-
         val intent = Intent(context, MainActivity::class.java).apply {
             action = Intent.ACTION_VIEW
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            if (route != null) {
-                putExtra(MainActivity.EXTRA_DEEP_LINK_ROUTE, route)
-            }
+            if (route != null) putExtra(MainActivity.EXTRA_DEEP_LINK_ROUTE, route)
         }
-
         return PendingIntent.getActivity(
             context,
             requestCode,
@@ -246,197 +540,106 @@ class NotificationHelper @Inject constructor(
     }
 
     /**
-     * Resolves the deep-link route string for a given notification type and data.
+     * Resolves the in-app navigation route for the notification, or null when
+     * the notification has no associated screen.
+     */
+    fun resolveDeepLinkRoute(type: NotificationType, data: NotificationData): String? = when (type) {
+        NotificationType.NEW_MESSAGE,
+        NotificationType.MENTION -> data.conversationId?.let { "chat/$it" }
+
+        NotificationType.FRIEND_REQUEST -> "friend_requests"
+        NotificationType.FRIEND_ACCEPTED -> data.userId?.let { "user_profile/$it" }
+
+        NotificationType.MEMBER_JOINED,
+        NotificationType.MEMBER_LEFT -> data.groupId?.let { "group_info/$it" }
+
+        NotificationType.LOCATION_UPDATE,
+        NotificationType.LIVE_LOCATION_STARTED,
+        NotificationType.LIVE_LOCATION_STOPPED ->
+            data.groupId?.let { "group_map/$it" }
+                ?: data.conversationId?.let { "chat/$it" }
+                ?: "tab_map"
+
+        NotificationType.MEETUP_DESTINATION_SET,
+        NotificationType.MEETUP_DESTINATION_CLEARED,
+        NotificationType.MEETUP_MEMBER_ARRIVED -> data.groupId?.let { "group_map/$it" }
+
+        NotificationType.GENERAL -> null
+    }
+
+    /** Stable id for de-duping notifications across redeliveries. */
+    private fun buildNotificationId(type: NotificationType, data: NotificationData): Int {
+        val anchor = data.conversationId
+            ?: data.groupId
+            ?: data.userId
+            ?: data.targetId
+            ?: ""
+        return (type.name + anchor).hashCode()
+    }
+
+    // ── Preference / permission helpers ────────────────────────────────────
+
+    /** True when the OS allows the app to post notifications. */
+    fun canPostNotifications(): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+    } else {
+        true
+    }
+
+    /**
+     * True when the OS reports the given channel as importance ≥ MIN.
      *
-     * @return The route string (e.g., "chat/abc123") or null for GENERAL type.
-     */
-    fun resolveDeepLinkRoute(type: NotificationType, data: NotificationData): String? {
-        return when (type) {
-            NotificationType.NEW_MESSAGE -> data.conversationId?.let { "chat/$it" }
-            NotificationType.FRIEND_REQUEST -> "friend_requests"
-            NotificationType.FRIEND_ACCEPTED -> data.userId?.let { "user_profile/$it" }
-            NotificationType.MEMBER_JOINED -> data.groupId?.let { "group_details/$it" }
-            NotificationType.MEMBER_LEFT -> data.groupId?.let { "group_details/$it" }
-            NotificationType.LOCATION_UPDATE -> data.groupId?.let { "group_map/$it" }
-            NotificationType.GENERAL -> null
-        }
-    }
-
-    // ── Notification Grouping (Requirement 12.5) ──────────────────────────────
-
-    /**
-     * Posts a message notification grouped by [conversationId] using
-     * [NotificationCompat.Builder.setGroup]. When 2 or more distinct conversations
-     * have active notifications, a summary notification is also posted.
+     * Users can disable individual channels in the Android settings even
+     * when the global toggle is on. We treat IMPORTANCE_NONE as "off" and
+     * skip posting so we don't waste cycles on a ghost notification.
      *
-     * @param conversationId The conversation this message belongs to.
-     * @param data The notification payload (title, body, etc.).
-     * @param notificationId Unique ID for this individual notification.
+     * Pre-O devices don't have channels; always returns true.
      */
-    fun postGroupedMessageNotification(
-        conversationId: String,
-        data: NotificationData,
-        notificationId: Int = conversationId.hashCode() xor data.body.hashCode()
-    ) {
-        if (!canPostNotifications()) {
-            Timber.w("POST_NOTIFICATIONS permission not granted — discarding grouped notification")
-            return
-        }
-
-        // Track active conversation IDs for summary logic
-        activeConversationIds.add(conversationId)
-
-        val pendingIntent = buildDeepLinkPendingIntent(
-            type = NotificationType.NEW_MESSAGE,
-            data = data.copy(conversationId = conversationId),
-            requestCode = notificationId
-        )
-
-        val notification = NotificationCompat.Builder(context, CHANNEL_MESSAGES)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(data.title)
-            .setContentText(data.body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(data.body))
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .setGroup(GROUP_KEY_MESSAGES)
-            .build()
-
-        notificationManager.notify(notificationId, notification)
-
-        // Post summary notification when 2+ distinct conversations are active
-        if (activeConversationIds.size >= SUMMARY_THRESHOLD) {
-            postSummaryNotification()
-        }
+    private fun isChannelEnabledOnSystem(channelId: String): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
+        val systemManager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channel = systemManager.getNotificationChannel(channelId) ?: return true
+        return channel.importance != NotificationManager.IMPORTANCE_NONE
     }
 
-    /**
-     * Removes a conversation from the active tracking set.
-     * Call this when a conversation's notifications are dismissed or cleared.
-     */
-    fun removeConversationFromGroup(conversationId: String) {
-        activeConversationIds.remove(conversationId)
+    /** Channel id for a given [NotificationType]. */
+    fun resolveChannelForType(type: NotificationType): String = when (type) {
+        NotificationType.NEW_MESSAGE,
+        NotificationType.MENTION -> CHANNEL_MESSAGES
+
+        NotificationType.FRIEND_REQUEST,
+        NotificationType.FRIEND_ACCEPTED -> CHANNEL_SOCIAL
+
+        NotificationType.LOCATION_UPDATE,
+        NotificationType.LIVE_LOCATION_STARTED,
+        NotificationType.LIVE_LOCATION_STOPPED -> CHANNEL_LOCATION_UPDATES
+
+        NotificationType.MEMBER_JOINED,
+        NotificationType.MEMBER_LEFT -> CHANNEL_GROUP_ACTIVITY
+
+        NotificationType.MEETUP_DESTINATION_SET,
+        NotificationType.MEETUP_DESTINATION_CLEARED,
+        NotificationType.MEETUP_MEMBER_ARRIVED -> CHANNEL_MEETUP
+
+        NotificationType.GENERAL -> CHANNEL_GENERAL
     }
 
-    /**
-     * Clears all tracked active conversations.
-     */
-    fun clearActiveConversations() {
-        activeConversationIds.clear()
-    }
-
-    /**
-     * Returns the current number of distinct active conversations with notifications.
-     */
-    fun getActiveConversationCount(): Int = activeConversationIds.size
-
-    /**
-     * Posts a summary notification that groups all active message notifications.
-     * Displayed when 2+ distinct conversations have active notifications.
-     */
-    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
-    private fun postSummaryNotification() {
-        val summaryText = "${activeConversationIds.size} conversations"
-
-        val summaryNotification = NotificationCompat.Builder(context, CHANNEL_MESSAGES)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(context.getString(R.string.app_name))
-            .setContentText(summaryText)
-            .setStyle(
-                NotificationCompat.InboxStyle()
-                    .setSummaryText(summaryText)
-            )
-            .setGroup(GROUP_KEY_MESSAGES)
-            .setGroupSummary(true)
-            .setAutoCancel(true)
-            .build()
-
-        notificationManager.notify(SUMMARY_NOTIFICATION_ID, summaryNotification)
-    }
-
-    // ── Private Helpers ───────────────────────────────────────────────────────
-
-    /**
-     * Generates a stable request code for PendingIntent uniqueness.
-     */
-    private fun buildRequestCode(type: NotificationType, data: NotificationData): Int {
-        val targetId = when (type) {
-            NotificationType.NEW_MESSAGE -> data.conversationId
-            NotificationType.FRIEND_REQUEST -> "friend_requests"
-            NotificationType.FRIEND_ACCEPTED -> data.userId
-            NotificationType.MEMBER_JOINED -> data.groupId
-            NotificationType.MEMBER_LEFT -> data.groupId
-            NotificationType.LOCATION_UPDATE -> data.groupId
-            NotificationType.GENERAL -> null
-        }
-        return (type.name + (targetId ?: "")).hashCode()
-    }
-
-    // ── Preference Check ──────────────────────────────────────────────────────
-
-    /**
-     * Checks whether the given channel is enabled in user preferences.
-     * Returns true if enabled or if no preference has been set (default enabled).
-     */
-    suspend fun isChannelEnabled(channelId: String): Boolean {
-        return preferencesRepository.isChannelEnabledSync(channelId)
-    }
-
-    // ── Permission Check ──────────────────────────────────────────────────────
-
-    /**
-     * Returns true if the app is allowed to post notifications.
-     *
-     * On Android 13+ (API 33), this checks the POST_NOTIFICATIONS runtime permission.
-     * On earlier versions, notifications are always allowed (channels control visibility).
-     */
-    fun canPostNotifications(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-        } else {
-            true
-        }
-    }
-
-    // ── Channel Resolution ────────────────────────────────────────────────────
-
-    /**
-     * Resolves the appropriate notification channel for a given FCM message type.
-     *
-     * If the type is unrecognized, returns [CHANNEL_GENERAL] (Requirement 12.7).
-     */
-    fun resolveChannelForType(type: String?): String {
-        return when (type) {
-            TYPE_NEW_MESSAGE -> CHANNEL_MESSAGES
-            TYPE_FRIEND_REQUEST, TYPE_FRIEND_ACCEPTED -> CHANNEL_SOCIAL
-            TYPE_LOCATION_UPDATE -> CHANNEL_LOCATION_UPDATES
-            TYPE_MEMBER_JOINED, TYPE_MEMBER_LEFT -> CHANNEL_GROUP_ACTIVITY
-            else -> CHANNEL_GENERAL
-        }
-    }
+    /** Legacy entry-point retained for callers that hand us the FCM string directly. */
+    fun resolveChannelForType(type: String?): String =
+        resolveChannelForType(NotificationType.fromFcmType(type))
 
     companion object {
-        // Notification channel IDs
         const val CHANNEL_MESSAGES = "messages"
         const val CHANNEL_SOCIAL = "social"
         const val CHANNEL_LOCATION_UPDATES = "location_updates"
         const val CHANNEL_GROUP_ACTIVITY = "group_activity"
+        const val CHANNEL_MEETUP = "meetup"
         const val CHANNEL_GENERAL = "general"
 
-        // FCM message type values (mirrored from FcmMessagingService for resolution)
-        const val TYPE_NEW_MESSAGE = "new_message"
-        const val TYPE_FRIEND_REQUEST = "friend_request"
-        const val TYPE_FRIEND_ACCEPTED = "friend_accepted"
-        const val TYPE_LOCATION_UPDATE = "location_update"
-        const val TYPE_MEMBER_JOINED = "member_joined"
-        const val TYPE_MEMBER_LEFT = "member_left"
-
-        // Notification grouping
         const val GROUP_KEY_MESSAGES = "com.ovi.where.GROUP_MESSAGES"
         const val SUMMARY_NOTIFICATION_ID = 9999
         const val SUMMARY_THRESHOLD = 2

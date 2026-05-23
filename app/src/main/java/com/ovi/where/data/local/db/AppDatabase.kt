@@ -11,6 +11,7 @@ import com.ovi.where.data.local.dao.LinkPreviewCacheDao
 import com.ovi.where.data.local.dao.LocationDao
 import com.ovi.where.data.local.dao.MeetupDestinationDao
 import com.ovi.where.data.local.dao.MessageDao
+import com.ovi.where.data.local.dao.NotificationDao
 import com.ovi.where.data.local.dao.OfflineOperationDao
 import com.ovi.where.data.local.dao.OnlineStatusDao
 import com.ovi.where.data.local.dao.VoiceMessageCacheDao
@@ -20,6 +21,7 @@ import com.ovi.where.data.local.entity.InteractionEntity
 import com.ovi.where.data.local.entity.LinkPreviewCacheEntity
 import com.ovi.where.data.local.entity.MeetupDestinationEntity
 import com.ovi.where.data.local.entity.MessageEntity
+import com.ovi.where.data.local.entity.NotificationEntity
 import com.ovi.where.data.local.entity.OfflineOperationEntity
 import com.ovi.where.data.local.entity.OnlineStatusEntity
 import com.ovi.where.data.local.entity.SharedLocationEntity
@@ -36,9 +38,10 @@ import com.ovi.where.data.local.entity.VoiceMessageCacheEntity
         VoiceMessageCacheEntity::class,
         LinkPreviewCacheEntity::class,
         OnlineStatusEntity::class,
-        MeetupDestinationEntity::class
+        MeetupDestinationEntity::class,
+        NotificationEntity::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -52,6 +55,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun linkPreviewCacheDao(): LinkPreviewCacheDao
     abstract fun onlineStatusDao(): OnlineStatusDao
     abstract fun meetupDestinationDao(): MeetupDestinationDao
+    abstract fun notificationDao(): NotificationDao
 
     companion object {
         val MIGRATION_5_6 = object : Migration(5, 6) {
@@ -228,6 +232,34 @@ abstract class AppDatabase : RoomDatabase() {
                         `isActive` INTEGER NOT NULL,
                         `participantsJson` TEXT NOT NULL,
                         PRIMARY KEY(`groupId`)
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
+        /**
+         * Adds the `notifications` table - durable inbox for the in-app
+         * notification list. Mirrors the FCM payload plus an `isRead` flag and
+         * the resolved deep-link route. Old rows are pruned by the repo.
+         */
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `notifications` (
+                        `id` TEXT NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `body` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        `isRead` INTEGER NOT NULL,
+                        `deepLinkRoute` TEXT,
+                        `conversationId` TEXT,
+                        `groupId` TEXT,
+                        `userId` TEXT,
+                        `destinationName` TEXT,
+                        PRIMARY KEY(`id`)
                     )
                     """.trimIndent()
                 )

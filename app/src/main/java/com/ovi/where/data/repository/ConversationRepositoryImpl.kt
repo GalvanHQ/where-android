@@ -920,6 +920,42 @@ class ConversationRepositoryImpl @Inject constructor(
         }
 
     /**
+     * Mutes the conversation for the current user with a chosen duration.
+     *
+     * Writes two fields atomically:
+     *  • `mutedBy` — the legacy boolean array. Kept up to date so the
+     *    existing UI badges and filter logic work without a migration.
+     *  • `mutedUntil[uid]` — the expiry epoch millis. The server honors
+     *    this and lets entries expire automatically. `Long.MAX_VALUE`
+     *    encodes "until the user unmutes".
+     *
+     * Both writes go through a single Firestore update so a partial failure
+     * leaves the doc consistent.
+     */
+    override suspend fun muteConversationFor(
+        conversationId: String,
+        option: com.ovi.where.domain.model.MuteOption
+    ): Resource<Unit> = withContext(Dispatchers.IO) {
+        val uid = currentUid ?: return@withContext Resource.Error("User not authenticated")
+        try {
+            val expiry = option.expiryFromNow()
+            firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
+                .document(conversationId)
+                .update(
+                    mapOf(
+                        "mutedBy" to com.google.firebase.firestore.FieldValue.arrayUnion(uid),
+                        "mutedUntil.$uid" to expiry
+                    )
+                )
+                .await()
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to mute conversation with duration: $conversationId")
+            Resource.Error(e.message ?: "Failed to mute conversation")
+        }
+    }
+
+    /**
      * Unmutes a conversation for the current user.
      */
     override suspend fun unmuteConversation(conversationId: String): Resource<Unit> =
@@ -928,7 +964,15 @@ class ConversationRepositoryImpl @Inject constructor(
             try {
                 firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
                     .document(conversationId)
-                    .update("mutedBy", com.google.firebase.firestore.FieldValue.arrayRemove(uid))
+                    .update(
+                        mapOf(
+                            "mutedBy" to com.google.firebase.firestore.FieldValue.arrayRemove(uid),
+                            // Clear the per-user expiry too — leaving a stale
+                            // entry would let the server keep filtering this
+                            // recipient out even though they unmuted.
+                            "mutedUntil.$uid" to com.google.firebase.firestore.FieldValue.delete()
+                        )
+                    )
                     .await()
 
                 Resource.Success(Unit)

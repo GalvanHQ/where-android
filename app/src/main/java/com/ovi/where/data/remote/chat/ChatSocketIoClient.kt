@@ -1,13 +1,13 @@
 package com.ovi.where.data.remote.chat
 
 import android.util.Log
+import com.ovi.where.data.remote.chat.ChatSocketIoClient.Companion.FOREGROUND_RECONNECT_TIMEOUT_MS
 import io.socket.client.IO
 import io.socket.client.Socket
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -209,7 +209,14 @@ class ChatSocketIoClient @Inject constructor() {
         _connectionState.value = ConnectionState.DISCONNECTED
     }
 
-    suspend fun sendText(text: String, tempId: String, replyToId: String? = null, replyToText: String? = null, replyToSenderName: String? = null) {
+    fun sendText(
+        text: String,
+        tempId: String,
+        replyToId: String? = null,
+        replyToText: String? = null,
+        replyToSenderName: String? = null,
+        mentionedUserIds: List<String> = emptyList()
+    ) {
         if (_connectionState.value != ConnectionState.CONNECTED) return
         val payload = JSONObject().apply {
             put("tempId", tempId)
@@ -217,6 +224,14 @@ class ChatSocketIoClient @Inject constructor() {
             if (replyToId != null) put("replyToId", replyToId)
             if (replyToText != null) put("replyToText", replyToText)
             if (replyToSenderName != null) put("replyToSenderName", replyToSenderName)
+            // Carry @mention metadata so the server can route a separate
+            // notification type for mentioned users — bypasses mute lists,
+            // and lights up a different channel on the client.
+            if (mentionedUserIds.isNotEmpty()) {
+                val arr = org.json.JSONArray()
+                mentionedUserIds.forEach { arr.put(it) }
+                put("mentionedUserIds", arr)
+            }
         }
         socket?.emit("message", payload)
     }

@@ -223,7 +223,7 @@ class LocationTrackingService : Service() {
         return NotificationCompat.Builder(this, AppConstants.NOTIFICATION_CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_sharing_title))
             .setContentText(contentText)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
             .addAction(
                 R.drawable.ic_launcher_foreground,
@@ -243,7 +243,7 @@ class LocationTrackingService : Service() {
         val notification = NotificationCompat.Builder(this, AppConstants.NOTIFICATION_CHANNEL_ID)
             .setContentTitle("Location sharing ended")
             .setContentText("Your live location is no longer visible to the group")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setAutoCancel(true)
             .build()
 

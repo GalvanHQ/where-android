@@ -73,6 +73,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.ovi.where.core.theme.Dimens
+import com.ovi.where.core.notification.activeConversationTracker
 import com.ovi.where.core.utils.LocalReducedMotion
 import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.chat.components.AnimatedMessageBubble
@@ -279,6 +280,24 @@ fun ChatScreen(
             viewModel.pauseVoicePlayback()
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
+    }
+
+    // Notification suppression — register the open conversation with the
+    // tracker so the FCM service skips system-tray pushes for messages the
+    // user is already reading. The inbox row still gets persisted so the
+    // unread count is correct on first background.
+    DisposableEffect(conversationId) {
+        val tracker = context.activeConversationTracker()
+        tracker.setActive(conversationId)
+        // Cancel any system-tray notifications already posted for this
+        // conversation — the user is now reading the messages, the shade
+        // entry would just be visual noise.
+        runCatching {
+            val helper = com.ovi.where.core.notification
+                .NotificationTrackerEntryPointHolder.helper(context)
+            helper.cancelForConversation(conversationId)
+        }
+        onDispose { tracker.setActive(null) }
     }
 
     // Mark read when screen is shown

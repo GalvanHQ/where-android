@@ -89,7 +89,7 @@ const initializeSockets = (io) => {
         socket.on('message', async (data) => {
             if (!conversationId) return;
             try {
-                const { tempId, text, replyToId, replyToText, replyToSenderName } = data;
+                const { tempId, text, replyToId, replyToText, replyToSenderName, mentionedUserIds } = data;
                 if (!text || text.trim() === '') return;
 
                 const msgId = uuidv4();
@@ -114,6 +114,15 @@ const initializeSockets = (io) => {
                     msgDto.replyToSenderName = replyToSenderName || null;
                 }
 
+                // Pass mentions through to FCM so the client can route an
+                // @mention notification even when the conversation is muted.
+                const mentions = Array.isArray(mentionedUserIds)
+                    ? mentionedUserIds.filter(m => typeof m === 'string' && m)
+                    : [];
+                if (mentions.length > 0) {
+                    msgDto.mentionedUserIds = mentions;
+                }
+
                 await persistMessage(conversationId, msgId, msgDto, uid, text.trim(), now);
 
                 // Broadcast
@@ -121,7 +130,7 @@ const initializeSockets = (io) => {
                 socket.emit('ack', { tempId, id: msgId, timestamp: now });
 
                 // Send FCM push notifications to other participants
-                sendFCM(conversationId, uid, userName, text.trim());
+                sendFCM(conversationId, uid, userName, text.trim(), { mentions });
             } catch (err) {
                 console.error('Error handling message:', err);
                 socket.emit('error', { message: 'Internal server error' });
@@ -469,41 +478,182 @@ async function persistMessage(conversationId, msgId, msgDto, senderId, previewTe
     });
 }
 
-async function sendFCM(conversationId, senderId, senderName, text) {
+/**
+ * Sends data-only FCM notifications to every participant other than the
+ * sender. Honors mute lists and routes @mentioned users through a separate
+ * `type` so the Android client (FcmMessagingService) can use the messages
+ * channel for both — but pick the right title/body and surface mention
+ * notifications even on muted conversations.
+ *
+ * Behaviour matrix:
+ *  • Recipient muted, NOT mentioned     → push suppressed.
+ *  • Recipient muted, IS mentioned      → mention push (overrides mute).
+ *  • Recipient unmuted, IS mentioned    → mention push.
+ *  • Recipient unmuted, NOT mentioned   → standard new_message push.
+ *
+ * The Android side decides whether to actually display the system tray
+ * notification (channel preferences + active-conversation suppression),
+ * but the server can still cut down on wasted FCM traffic by filtering
+ * muted recipients up front.
+ *
+ * @param {Object} options
+ * @param {string[]} options.mentions   — uids explicitly @mentioned in the
+ *                                       message. Empty = no mention.
+ */
+async function sendFCM(conversationId, senderId, senderName, text, options = {}) {
+    const mentions = options.mentions || [];
     try {
         const convDoc = await db.collection('conversations').doc(conversationId).get();
         if (!convDoc.exists) return;
-        
-        const participants = convDoc.data().participantIds || [];
-        const recipients = participants.filter(id => id !== senderId);
 
+        const data = convDoc.data();
+        const participants = data.participantIds || [];
+        const mutedBy = data.mutedBy || [];
+        const mutedUntil = data.mutedUntil || {};
+        const conversationName = data.name || senderName;
+        const isGroup = (data.type || 'direct') === 'group';
+        const groupId = data.groupId || null;
+        const now = Date.now();
+
+        const recipients = participants
+            .filter(id => id !== senderId)
+            .filter(id => {
+                // Mention bypass — even muted recipients get a push when
+                // explicitly @mentioned. This is the WhatsApp / Slack norm.
+                if (mentions.includes(id)) return true;
+
+                // Per-user mute with expiry takes precedence. `Number.MAX_SAFE_INTEGER`
+                // (and `Long.MAX_VALUE` from Android) both encode "always muted".
+                const until = Number(mutedUntil[id] || 0);
+                if (until > now) return false;
+
+                // Legacy boolean array — present means "muted forever". The
+                // newer mutedUntil map is authoritative when set, so this
+                // only kicks in for clients that pre-date the per-duration
+                // feature.
+                if (mutedBy.includes(id) && !(id in mutedUntil)) return false;
+                return true;
+            });
         if (recipients.length === 0) return;
 
-        // Fetch FCM tokens for recipients from 'users' collection
-        const tokens = [];
-        for (const recipientId of recipients) {
+        const sends = await Promise.all(recipients.map(async (recipientId) => {
             const userDoc = await db.collection('users').doc(recipientId).get();
-            if (userDoc.exists && userDoc.data().fcmToken) {
-                tokens.push(userDoc.data().fcmToken);
-            }
-        }
+            const token = userDoc.exists ? userDoc.data().fcmToken : null;
 
-        if (tokens.length > 0) {
+            const isMention = mentions.includes(recipientId);
+            const title = isMention
+                ? `${senderName} mentioned you`
+                : (isGroup ? `${senderName} in ${conversationName}` : senderName);
+            const body = isMention ? `Mentioned you: ${text}` : text;
+            const type = isMention ? 'mention' : 'new_message';
+
+            // Mirror to the per-recipient Firestore inbox so cross-device
+            // read state and reinstall survival both work. We do this even
+            // when the FCM send is skipped (no token / dead token) so the
+            // recipient's inbox is the canonical source of truth.
+            await persistChatInboxEntry(recipientId, {
+                type,
+                title,
+                body,
+                conversationId,
+                senderId,
+                senderName,
+                groupId,
+                mentions,
+            }).catch(err => console.warn('inbox persist failed', recipientId, err.message));
+
+            if (!token) return null;
+
             const payload = {
-                notification: {
-                    title: senderName,
-                    body: text
-                },
+                token,
                 data: {
-                    conversationId: conversationId
+                    type,
+                    title,
+                    body,
+                    conversationId,
+                    senderId,
+                    senderName,
+                    text,
+                    conversationName,
+                    ...(groupId ? { groupId } : {}),
+                    ...(mentions.length > 0 ? { mentionedUserIds: mentions.join(',') } : {}),
                 },
-                tokens: tokens
+                android: { priority: 'high' }
             };
-            await messaging.sendEachForMulticast(payload);
-        }
+            return messaging.send(payload).catch(err => {
+                console.warn(`FCM send failed for ${recipientId}:`, err.code || err.message);
+                return null;
+            });
+        }));
+        // Drain — `await Promise.all` already resolved, but keep the var
+        // referenced so linters don't trim the assignment.
+        void sends;
     } catch (err) {
         console.error('Failed to send FCM:', err);
     }
 }
+
+/**
+ * Writes a chat notification into the single-doc inbox at
+ * `users/{recipient}/inbox/notifications`. Mirrors the shape used by the
+ * TypeScript Cloud Functions so the Android client sees a single coherent
+ * inbox stream regardless of producer.
+ *
+ * Single-doc aggregate pattern:
+ *   • One document holds `entries: Map<id, NotificationDoc>` keyed by
+ *     deterministic notification id.
+ *   • Costs 1 read per inbox open instead of N reads.
+ *   • FIFO eviction caps the map at MAX_INBOX_ENTRIES so the doc stays
+ *     comfortably under Firestore's 1 MiB cap.
+ *   • A scheduled Cloud Function (scheduledPruneNotifications) handles the
+ *     30-day time-based retention separately.
+ *
+ * Idempotent — same inbound message (retry / replay) replaces the same
+ * map slot rather than duplicating.
+ */
+async function persistChatInboxEntry(recipientUid, ctx) {
+    const now = Date.now();
+    const entryId = `${ctx.type}_${ctx.conversationId}_${now}`;
+    const entry = {
+        id: entryId,
+        type: ctx.type,
+        title: ctx.title,
+        body: ctx.body,
+        timestamp: now,
+        isRead: false,
+        deepLinkRoute: `chat/${ctx.conversationId}`,
+        conversationId: ctx.conversationId,
+        groupId: ctx.groupId || null,
+        userId: ctx.senderId,
+        destinationName: null,
+    };
+
+    const inboxRef = db.doc(`users/${recipientUid}/inbox/notifications`);
+
+    await db.runTransaction(async (tx) => {
+        const snap = await tx.get(inboxRef);
+        const existing = (snap.exists && (snap.data().entries || {})) || {};
+
+        // Insert / replace, then enforce FIFO cap.
+        const next = { ...existing, [entryId]: entry };
+        const sortedIds = Object.values(next)
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .slice(0, MAX_INBOX_ENTRIES)
+            .map(e => e.id);
+
+        const trimmed = {};
+        for (const id of sortedIds) {
+            if (next[id]) trimmed[id] = next[id];
+        }
+
+        tx.set(inboxRef, {
+            entries: trimmed,
+            updatedAt: now,
+        }, { merge: false });
+    });
+}
+
+/** Mirrors functions/src/lib/notify.ts MAX_INBOX_ENTRIES. */
+const MAX_INBOX_ENTRIES = 200;
 
 module.exports = { initializeSockets };

@@ -896,6 +896,26 @@ class ChatsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(confirmMuteConversationId = null)
     }
 
+    /**
+     * Mutes the pending conversation for a chosen [option] duration.
+     *
+     * Drives the bottom-sheet flow: long-press a conversation in the list →
+     * "Mute" tile → duration sheet → tap a duration → server-side
+     * `mutedUntil[uid]` is updated and the chat row updates to its muted
+     * appearance. The legacy `mutedBy` array is kept in sync by the repo so
+     * existing UI badges work without modification.
+     *
+     * No-ops if there's no pending conversation (defensive — shouldn't
+     * happen because the sheet only shows when one is pending).
+     */
+    fun muteConversationFor(option: com.ovi.where.domain.model.MuteOption) {
+        val conversationId = _uiState.value.confirmMuteConversationId ?: return
+        _uiState.value = _uiState.value.copy(confirmMuteConversationId = null)
+        viewModelScope.launch {
+            conversationRepository.muteConversationFor(conversationId, option)
+        }
+    }
+
 
 
     /**

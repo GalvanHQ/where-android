@@ -244,6 +244,39 @@ constructor(
     // ── Sign-out ──────────────────────────────────────────────────────────────
 
     override suspend fun signOut() {
+        // Best-effort FCM token cleanup BEFORE the Firebase sign-out wipes
+        // our auth context. Leaving the token on `users/{uid}` would route
+        // the previous account's pushes to whoever signs in next on this
+        // device — a privacy bug we want to avoid.
+        val uidToClear = currentUserId
+        if (uidToClear != null) {
+            try {
+                firestore
+                    .collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                    .document(uidToClear)
+                    .update(
+                        "fcmToken",
+                        com.google.firebase.firestore.FieldValue.delete()
+                    )
+                    .await()
+            } catch (e: Exception) {
+                // Non-fatal — the device may also delete the token client-side
+                // below, and the Firestore trigger keeps `fcmToken` in sync on
+                // the next session. Worst case is one orphaned push.
+                Timber.w(e, "Failed to clear FCM token on sign-out")
+            }
+        }
+        // Drop the local FCM token entirely so the next signed-in user gets
+        // a freshly-issued one (FirebaseMessaging.onNewToken fires on the
+        // re-login path and writes it back to Firestore).
+        try {
+            com.google.firebase.messaging.FirebaseMessaging.getInstance()
+                .deleteToken()
+                .await()
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to delete local FCM token on sign-out")
+        }
+
         // Requirement 21.2: On logout, cancel ChatSocketIoClient scope, disconnect socket,
         // cancel reconnection job, and reset TypingIndicatorManager.
         lazyChatSocketIoClient.get().logout()

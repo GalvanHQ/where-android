@@ -110,6 +110,16 @@
             </intent-filter>
         </service>
 
+        <!--
+            ChatActionReceiver — handles inline-reply RemoteInput and the
+            "Mark as read" action button on chat notifications. Not exported:
+            only PendingIntents we construct can target it.
+        -->
+        <receiver
+            android:name=".data.remote.ChatActionReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
         <!-- App Startup: Initializers for Firebase, Timber, and Coil -->
         <provider
             android:name="androidx.startup.InitializationProvider"

@@ -149,6 +149,7 @@ fun ConversationInfoScreen(
                     uiState = uiState,
                     currentUserId = viewModel.currentUserId ?: "",
                     onToggleMute = { viewModel.toggleMute() },
+                    onMuteFor = { option -> viewModel.muteFor(option) },
                     onUpdateThemeColor = { viewModel.updateThemeColor(it) },
                     onUpdateEmojiShortcut = { viewModel.updateEmojiShortcut(it) },
                     onNavigateToNicknames = onNavigateToNicknames,
@@ -169,6 +170,7 @@ internal fun ConversationInfoContent(
     uiState: ConversationInfoUiState,
     currentUserId: String = "",
     onToggleMute: () -> Unit,
+    onMuteFor: (com.ovi.where.domain.model.MuteOption) -> Unit = {},
     onUpdateThemeColor: (String?) -> Unit = {},
     onUpdateEmojiShortcut: (String?) -> Unit = {},
     onNavigateToNicknames: () -> Unit = {},
@@ -284,35 +286,40 @@ internal fun ConversationInfoContent(
         Spacer(modifier = Modifier.height(32.dp))
     }
 
-    // ── Mute Confirmation Dialog ─────────────────────────────────────────
+    // ── Mute flow ────────────────────────────────────────────────────────
+    // Already muted → quick unmute confirmation (the user only needs to
+    // confirm the destructive-ish reverse). Not muted yet → duration sheet.
     if (showMuteDialog) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showMuteDialog = false },
-            title = {
-                Text(if (uiState.isMuted) "Unmute conversation?" else "Mute conversation?")
-            },
-            text = {
-                Text(
-                    if (uiState.isMuted) "You will start receiving notifications from this conversation again."
-                    else "You will no longer receive notifications from this conversation."
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showMuteDialog = false
-                        onToggleMute()
+        if (uiState.isMuted) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showMuteDialog = false },
+                title = { Text("Unmute conversation?") },
+                text = {
+                    Text("You will start receiving notifications from this conversation again.")
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showMuteDialog = false
+                            onToggleMute()
+                        }
+                    ) { Text("Unmute") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showMuteDialog = false }) {
+                        Text("Cancel")
                     }
-                ) {
-                    Text(if (uiState.isMuted) "Unmute" else "Mute")
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showMuteDialog = false }) {
-                    Text("Cancel")
+            )
+        } else {
+            com.ovi.where.presentation.chat.components.MuteDurationSheet(
+                onDismiss = { showMuteDialog = false },
+                onSelect = { option ->
+                    showMuteDialog = false
+                    onMuteFor(option)
                 }
-            }
-        )
+            )
+        }
     }
 
     // ── Theme Color Picker Dialog ────────────────────────────────────────

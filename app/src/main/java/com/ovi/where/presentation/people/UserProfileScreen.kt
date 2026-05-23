@@ -28,7 +28,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.PersonRemove
@@ -431,6 +433,33 @@ fun UserProfileScreen(
                                             Icon(imageVector = ImageVector.vectorResource(id = R.drawable.location), contentDescription = null, Modifier.size(Dimens.iconSizeSmall))
                                             Spacer(Modifier.width(Dimens.spaceMedium))
                                             Text("Location", style = MaterialTheme.typography.labelLarge)
+                                        }
+                                        // Close-friend star toggle. Filled when active.
+                                        // The whole notification system honors this:
+                                        // close-friend pushes bypass quiet hours so urgent
+                                        // contacts always come through.
+                                        OutlinedButton(
+                                            onClick = { viewModel.toggleCloseFriend(userId) },
+                                            modifier = Modifier.height(44.dp),
+                                            shape = RoundedCornerShape(Dimens.cornerSmall),
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                contentColor = if (uiState.isCloseFriend)
+                                                    MaterialTheme.colorScheme.primary
+                                                else
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        ) {
+                                            Icon(
+                                                imageVector = if (uiState.isCloseFriend)
+                                                    Icons.Filled.Star
+                                                else
+                                                    Icons.Outlined.StarBorder,
+                                                contentDescription = if (uiState.isCloseFriend)
+                                                    "Remove from close friends"
+                                                else
+                                                    "Add to close friends",
+                                                modifier = Modifier.size(Dimens.iconSizeSmall)
+                                            )
                                         }
                                     }
                                     is ProfileFriendshipAction.Blocked -> {

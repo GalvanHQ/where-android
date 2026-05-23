@@ -30,6 +30,9 @@ class WhereApplication : Application() {
     @Inject
     lateinit var backgroundSyncLifecycleObserver: BackgroundSyncLifecycleObserver
 
+    @Inject
+    lateinit var notificationRepository: com.ovi.where.data.repository.NotificationRepository
+
     override fun onCreate() {
         super.onCreate()
         // Timber, Firebase, and Coil are initialized via App Startup (InitializationProvider).
@@ -39,12 +42,43 @@ class WhereApplication : Application() {
         }
         // Fetch and save FCM token on app start
         fetchAndSaveFcmToken()
+
+        // Re-save the FCM token whenever auth state flips to "signed in".
+        // Without this, fresh sign-ups never get their token persisted to
+        // Firestore (the call above runs before currentUser is non-null,
+        // and onNewToken only fires when the device's token actually
+        // changes — which it doesn't on a re-login from the same install).
+        FirebaseAuth.getInstance().addAuthStateListener { auth ->
+            if (auth.currentUser != null) {
+                fetchAndSaveFcmToken()
+                // Cross-device inbox starts replicating as soon as we know
+                // the uid. Idempotent — calling startSync twice for the
+                // same uid is a no-op.
+                notificationRepository.startSync()
+            } else {
+                notificationRepository.stopSync()
+            }
+        }
         // Track online status using the process lifecycle
         ProcessLifecycleOwner.get().lifecycle.addObserver(OnlineStatusObserver())
         // Requirement 21.4, 21.5: Manage socket and Firestore listener on app foreground/background
         ProcessLifecycleOwner.get().lifecycle.addObserver(chatProcessLifecycleObserver)
         // Requirement 22.1: Schedule background sync when app is in background > 5 minutes
         ProcessLifecycleOwner.get().lifecycle.addObserver(backgroundSyncLifecycleObserver)
+
+        // Best-effort prune of stale notification inbox rows. The repo's
+        // 30-day retention keeps the table from growing unbounded across
+        // long-lived installs without a recurring WorkManager job.
+        appScope.launch {
+            try {
+                notificationRepository.prune()
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to prune notification inbox")
+            }
+        }
+        // Schedule a daily prune so long-resident installs (tablets, kiosk
+        // mode) don't rely on cold starts to enforce retention.
+        com.ovi.where.data.sync.NotificationInboxPruneWorker.schedule(this)
     }
 
     /**

@@ -48,6 +48,30 @@ service cloud.firestore {
       match /blocks/{blockedUid} {
         allow read, write: if isSelf(userId);
       }
+
+      // ── Notifications inbox ──────────────────────────────────────────
+      // SINGLE-DOC AGGREGATE PATTERN — mirrors the friend-requests inbox.
+      // One document at `users/{uid}/inbox/notifications` holds the entire
+      // notification map keyed by notification id. Costs 1 read per inbox
+      // open instead of N reads (one per notification) — at 50–200
+      // notifications/user the savings dominate.
+      //
+      // Document shape:
+      //   {
+      //     entries: { [id]: { type, title, body, timestamp, isRead, ... } },
+      //     updatedAt: <epoch ms>
+      //   }
+      //
+      // Cloud Functions / socket server are the only writers that *create*
+      // entries; the client only flips `isRead` flags via dotted paths
+      // and removes individual entries on delete. A daily Cloud Scheduler
+      // job prunes entries older than 30 days from the map.
+      //
+      // Rule already covered by the broader `match /inbox/{docId}` rule
+      // above — no separate rule needed since both notification and
+      // friend-request inboxes share the same owner-only / admin-write
+      // semantics.
+      //
     }
 
     // ===== FRIENDSHIPS =====

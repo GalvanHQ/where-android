@@ -151,7 +151,7 @@ fun LoginScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = ImageVector.vectorResource(id = R.drawable.where_notification_logo),
+                    imageVector = ImageVector.vectorResource(id = R.drawable.ic_notification),
                     contentDescription = null,
                     modifier = Modifier.size(44.dp),
                     tint = MaterialTheme.colorScheme.onPrimary

@@ -265,8 +265,18 @@
     <string name="notification_channel_location_updates_desc">Notifications when group members share their location</string>
     <string name="notification_channel_group_activity">Group Activity</string>
     <string name="notification_channel_group_activity_desc">Notifications about group membership changes</string>
+    <string name="notification_channel_meetup">Meetup</string>
+    <string name="notification_channel_meetup_desc">Destination changes and arrival pings during a meetup</string>
     <string name="notification_channel_general">General</string>
     <string name="notification_channel_general_desc">General notifications</string>
+
+    <!-- Notifications inbox -->
+    <string name="notifications_title">Notifications</string>
+    <string name="notifications_empty_title">No notifications yet</string>
+    <string name="notifications_empty_body">When friends message you, share location, or set up a meetup, it shows up here.</string>
+    <string name="notifications_mark_all_read">Mark all read</string>
+    <string name="notifications_clear_all">Clear all</string>
+    <string name="notifications_unread_badge_a11y">%1$d unread notifications</string>
 
     <!-- DateTimeUtils -->
     <string name="time_expired">Expired</string>

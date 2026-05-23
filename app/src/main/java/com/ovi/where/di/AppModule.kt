@@ -81,7 +81,7 @@ object AppModule {
         context,
         AppDatabase::class.java,
         "nearby_database"
-    ).addMigrations(AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8, AppDatabase.MIGRATION_8_9, AppDatabase.MIGRATION_9_10, AppDatabase.MIGRATION_10_11, AppDatabase.MIGRATION_11_12, AppDatabase.MIGRATION_12_13, AppDatabase.MIGRATION_13_14, AppDatabase.MIGRATION_14_15, AppDatabase.MIGRATION_15_16)
+    ).addMigrations(AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8, AppDatabase.MIGRATION_8_9, AppDatabase.MIGRATION_9_10, AppDatabase.MIGRATION_10_11, AppDatabase.MIGRATION_11_12, AppDatabase.MIGRATION_12_13, AppDatabase.MIGRATION_13_14, AppDatabase.MIGRATION_14_15, AppDatabase.MIGRATION_15_16, AppDatabase.MIGRATION_16_17)
         .build()
 
     @Provides
@@ -123,6 +123,10 @@ object AppModule {
     @Provides
     @Singleton
     fun provideMeetupDestinationDao(database: AppDatabase) = database.meetupDestinationDao()
+
+    @Provides
+    @Singleton
+    fun provideNotificationDao(database: AppDatabase) = database.notificationDao()
 
     @Provides
     @Singleton

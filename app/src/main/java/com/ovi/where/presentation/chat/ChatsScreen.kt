@@ -254,41 +254,46 @@ fun ChatsScreen(
         }
     }
 
-    // ── Mute Confirmation Dialog ─────────────────────────────────────────
+    // ── Mute flow ────────────────────────────────────────────────────────
+    // If the conversation is already muted: show a quick "Unmute" confirm.
+    // If it's not muted yet: show the duration picker so the user can pick
+    // how long they want silence for. Mentions still bypass mute regardless.
     if (uiState.confirmMuteConversationId != null) {
         val muteConv = uiState.conversations.find { it.id == uiState.confirmMuteConversationId }
         val isMuted = muteConv?.isMuted == true
-        AlertDialog(
-            onDismissRequest = { viewModel.cancelMuteConversation() },
-            title = {
-                Text(
-                    text = if (isMuted) "Unmute conversation?" else "Mute conversation?",
-                    style = MaterialTheme.typography.headlineSmall
-                )
-            },
-            text = {
-                Text(
-                    text = if (isMuted) "You will start receiving notifications from this conversation again."
-                    else "You will no longer receive notifications from this conversation.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { viewModel.confirmMuteConversation() }
-                ) {
-                    Text(if (isMuted) "Unmute" else "Mute")
+        if (isMuted) {
+            AlertDialog(
+                onDismissRequest = { viewModel.cancelMuteConversation() },
+                title = {
+                    Text(
+                        text = "Unmute conversation?",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                },
+                text = {
+                    Text(
+                        text = "You will start receiving notifications from this conversation again.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.confirmMuteConversation() }) {
+                        Text("Unmute")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.cancelMuteConversation() }) {
+                        Text("Cancel")
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { viewModel.cancelMuteConversation() }
-                ) {
-                    Text("Cancel")
-                }
-            }
-        )
+            )
+        } else {
+            com.ovi.where.presentation.chat.components.MuteDurationSheet(
+                onDismiss = { viewModel.cancelMuteConversation() },
+                onSelect = { option -> viewModel.muteConversationFor(option) }
+            )
+        }
     }
 
     // ── Delete Confirmation Dialog ───────────────────────────────────────

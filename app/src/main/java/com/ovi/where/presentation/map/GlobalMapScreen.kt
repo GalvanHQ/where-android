@@ -145,6 +145,7 @@ import com.google.maps.android.compose.rememberCameraPositionState
 import com.ovi.where.R
 import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.core.theme.Dimens
+import com.ovi.where.core.notification.activeMapTracker
 import com.ovi.where.core.utils.LocationUtils
 import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.map.components.DestinationPinMarker
@@ -170,6 +171,7 @@ fun GlobalMapScreen(
     onNavigateToCreateGroup: () -> Unit = {},
     onNavigateToJoinGroup: () -> Unit = {},
     onNavigateToAddFriends: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
     viewModel: GlobalMapViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -177,6 +179,16 @@ fun GlobalMapScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Notification suppression — while the global map is foregrounded the
+    // user already sees live-location and meetup events on screen, so the
+    // FCM service drops their system-tray pushes. The inbox still gets
+    // populated so taps from notifications shade after backgrounding work.
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val tracker = context.activeMapTracker()
+        tracker.setMapVisible(true)
+        onDispose { tracker.setMapVisible(false) }
+    }
 
     fun hasLocationPerms(): Boolean {
         return ContextCompat.checkSelfPermission(
@@ -858,14 +870,15 @@ fun GlobalMapScreen(
                     onActiveClick = { viewModel.openMeetupPlaceCard() }
                 )
 
-                // Icon-only notifications chip — UI stub. The real
-                // notifications system gets wired up in a follow-up.
+                // Icon-only notifications chip — drives the in-app inbox.
+                // The unread count is observed via NotificationsViewModel and
+                // appears as a small primary badge on the top-right corner.
+                val notificationsVm: com.ovi.where.presentation.notification.NotificationsViewModel =
+                    androidx.hilt.navigation.compose.hiltViewModel()
+                val unreadCount by notificationsVm.unreadCount.collectAsState()
                 com.ovi.where.presentation.notification.components.NotificationChip(
-                    onClick = {
-                        // TODO: route to the Notifications screen once it
-                        // exists. For now, no-op so the chip is visible
-                        // but doesn't dead-end the user.
-                    }
+                    onClick = onNavigateToNotifications,
+                    unreadCount = unreadCount
                 )
                 }
             }

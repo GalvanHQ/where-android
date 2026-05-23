@@ -288,9 +288,9 @@ class MessageRepositoryImpl @Inject constructor(
         // Step 2: Send or queue
         val isConnected = wsClient.connectionState.value == ChatSocketIoClient.ConnectionState.CONNECTED
         if (isConnected) {
-            emitMessage(tempId, text, replyToId)
+            emitMessage(tempId, text, replyToId, mentionedUserIds)
         } else {
-            enqueueMessage(QueuedMessage(tempId, conversationId, text, replyToId, MessageType.TEXT))
+            enqueueMessage(QueuedMessage(tempId, conversationId, text, replyToId, MessageType.TEXT, mentionedUserIds = mentionedUserIds))
         }
 
         return Resource.Success(optimistic)
@@ -845,12 +845,17 @@ class MessageRepositoryImpl @Inject constructor(
 
     // ─── Private: Emit and Ack Handling ────────────────────────────────────────
 
-    private suspend fun emitMessage(tempId: String, text: String, replyToId: String?) {
+    private suspend fun emitMessage(
+        tempId: String,
+        text: String,
+        replyToId: String?,
+        mentionedUserIds: List<String> = emptyList()
+    ) {
         try {
             // Look up reply data from Room to send to server
             val replyToText = if (replyToId != null) messageDao.getById(replyToId)?.text else null
             val replyToSenderName = if (replyToId != null) messageDao.getById(replyToId)?.senderName else null
-            wsClient.sendText(text, tempId, replyToId, replyToText, replyToSenderName)
+            wsClient.sendText(text, tempId, replyToId, replyToText, replyToSenderName, mentionedUserIds)
             startAckTimeout(tempId)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to emit message $tempId: ${e.message}")
@@ -1205,7 +1210,7 @@ class MessageRepositoryImpl @Inject constructor(
                             emitImageMessage(queued.tempId, url)
                         }
                         else -> {
-                            emitMessage(queued.tempId, queued.text, queued.replyToId)
+                            emitMessage(queued.tempId, queued.text, queued.replyToId, queued.mentionedUserIds)
                         }
                     }
                     // Small delay between messages to avoid overwhelming the server
@@ -1486,5 +1491,6 @@ internal data class QueuedMessage(
     val type: MessageType,
     val latitude: Double? = null,
     val longitude: Double? = null,
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    val mentionedUserIds: List<String> = emptyList()
 )

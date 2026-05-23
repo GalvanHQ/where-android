@@ -83,6 +83,16 @@ interface ConversationRepository {
     suspend fun muteConversation(conversationId: String): Resource<Unit>
 
     /**
+     * Mutes a conversation for the current user with a duration. The expiry
+     * is written to `mutedUntil[uid]` and honored by the server when fanning
+     * out chat FCM. Mentions still bypass the mute (see socket.js).
+     */
+    suspend fun muteConversationFor(
+        conversationId: String,
+        option: com.ovi.where.domain.model.MuteOption
+    ): Resource<Unit>
+
+    /**
      * Unmutes a conversation for the current user.
      */
     suspend fun unmuteConversation(conversationId: String): Resource<Unit>

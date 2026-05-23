@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -57,7 +58,8 @@ class UserProfileViewModel @Inject constructor(
     private val getOrCreateDirectConversationUseCase: GetOrCreateDirectConversationUseCase,
     private val firebaseAuth: FirebaseAuth,
     private val locationRepository: com.ovi.where.domain.repository.LocationRepository,
-    private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter
+    private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter,
+    private val closeFriendsRepository: com.ovi.where.data.repository.CloseFriendsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UserProfileUiState())
@@ -109,6 +111,9 @@ class UserProfileViewModel @Inject constructor(
                             )
                         }
                     }
+                    // Resolve close-friend flag in parallel — the result
+                    // populates the star toggle in the action row.
+                    refreshCloseFriendStatus(userId)
                 }
                 is Resource.Error -> {
                     _uiState.value = _uiState.value.copy(isLoading = false, error = result.message)
@@ -341,6 +346,39 @@ class UserProfileViewModel @Inject constructor(
                 _snackbarEvent.tryEmit(msg)
         }
     }
+
+    /**
+     * Refreshes the close-friend flag for the currently-loaded profile.
+     * Called from [loadUser] and after [toggleCloseFriend] writes complete.
+     */
+    fun refreshCloseFriendStatus(userId: String) {
+        viewModelScope.launch {
+            val isClose = closeFriendsRepository.isCloseFriend(userId)
+            _uiState.update { it.copy(isCloseFriend = isClose) }
+        }
+    }
+
+    /**
+     * Adds or removes [userId] from the caller's close-friends set.
+     * Optimistic UI: flag flips immediately, then the repo write happens.
+     */
+    fun toggleCloseFriend(userId: String) {
+        val currentlyClose = _uiState.value.isCloseFriend
+        _uiState.update { it.copy(isCloseFriend = !currentlyClose) }
+        viewModelScope.launch {
+            try {
+                if (currentlyClose) {
+                    closeFriendsRepository.remove(userId)
+                } else {
+                    closeFriendsRepository.add(userId)
+                }
+            } catch (e: Exception) {
+                // Roll back the optimistic flip and surface a soft error.
+                _uiState.update { it.copy(isCloseFriend = currentlyClose) }
+                _snackbarEvent.tryEmit("Couldn't update close friends — try again")
+            }
+        }
+    }
 }
 
 data class UserProfileUiState(
@@ -351,5 +389,7 @@ data class UserProfileUiState(
     /** Whether location sharing was just started with this friend. */
     val locationSharingActive: Boolean = false,
     /** The target ID for the active location sharing session (e.g., "direct:friendId"). */
-    val locationSharingTargetId: String? = null
+    val locationSharingTargetId: String? = null,
+    /** Whether this user is in the caller's "close friends" list — drives the star toggle. */
+    val isCloseFriend: Boolean = false
 )

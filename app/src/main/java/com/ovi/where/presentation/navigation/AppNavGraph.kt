@@ -496,6 +496,11 @@ fun AppNavGraph(
                             launchSingleTop = true
                         }
                     },
+                    onNavigateToPermissions = {
+                        navController.navigate(Screen.Permissions.route) {
+                            launchSingleTop = true
+                        }
+                    },
                     onNavigateToSecurity = {
                         navController.navigate(Screen.Security.route) {
                             launchSingleTop = true
@@ -551,6 +556,12 @@ fun AppNavGraph(
 
             composable(Screen.Notifications.route) {
                 com.ovi.where.presentation.notification.NotificationsScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.Permissions.route) {
+                com.ovi.where.presentation.settings.PermissionsScreen(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

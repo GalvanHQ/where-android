@@ -549,12 +549,54 @@ class GroupInfoViewModel @Inject constructor(
     }
 
     /**
-     * Toggles mute state for the group.
+     * Toggles mute state for the group. Persists through the conversation
+     * doc (the group's notification settings live on the chat-side
+     * `mutedBy` array because that's where the FCM fan-out reads them).
+     *
+     * Optimistic UI: flips the local flag immediately, then writes to
+     * Firestore. On failure we roll back. We resolve the conversationId
+     * lazily because some groups are created before their chat doc exists.
+     *
      * Requirement 9.2
      */
     fun toggleMute() {
-        val currentMuted = _uiState.value.isMuted
-        _uiState.update { it.copy(isMuted = !currentMuted) }
+        val previousMuted = _uiState.value.isMuted
+        _uiState.update { it.copy(isMuted = !previousMuted) }
+        viewModelScope.launch {
+            val convId = ensureConversationId() ?: run {
+                _uiState.update { it.copy(isMuted = previousMuted) }
+                return@launch
+            }
+            val result = if (previousMuted) {
+                conversationRepository.unmuteConversation(convId)
+            } else {
+                conversationRepository.muteConversation(convId)
+            }
+            if (result is Resource.Error) {
+                _uiState.update { it.copy(isMuted = previousMuted) }
+            }
+        }
+    }
+
+    /**
+     * Mutes the group's chat for a specific [option] duration. Writes the
+     * per-user expiry to `conversations/{id}.mutedUntil[uid]`; the server
+     * honors that timestamp when fanning out FCM. @mentions still come
+     * through (see socket.js mute-bypass logic).
+     */
+    fun muteFor(option: com.ovi.where.domain.model.MuteOption) {
+        val previousMuted = _uiState.value.isMuted
+        _uiState.update { it.copy(isMuted = true) }
+        viewModelScope.launch {
+            val convId = ensureConversationId() ?: run {
+                _uiState.update { it.copy(isMuted = previousMuted) }
+                return@launch
+            }
+            val result = conversationRepository.muteConversationFor(convId, option)
+            if (result is Resource.Error) {
+                _uiState.update { it.copy(isMuted = previousMuted) }
+            }
+        }
     }
 
     /**

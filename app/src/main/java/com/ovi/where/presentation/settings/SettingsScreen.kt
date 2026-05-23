@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PrivacyTip
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -63,6 +64,7 @@ fun SettingsScreen(
     onNavigateToNotificationPreferences: () -> Unit = {},
     onNavigateToAppearance: () -> Unit = {},
     onNavigateToDataStorage: () -> Unit = {},
+    onNavigateToPermissions: () -> Unit = {},
     onNavigateToSecurity: () -> Unit = {},
     onNavigateToPrivacy: () -> Unit = {},
     onNavigateToHelp: () -> Unit = {},
@@ -135,6 +137,31 @@ fun SettingsScreen(
                         onClick = onNavigateToDataStorage
                     )
                 }
+            }
+
+            Spacer(modifier = Modifier.height(Dimens.spaceXLarge))
+
+            // ── Permissions section ──────────────────────────────────────
+            // Surfaces the four runtime conditions the app needs (location,
+            // background location, notifications, battery optimization).
+            // Pre-empts user confusion when location sharing or
+            // notifications stop working — they can self-diagnose here
+            // instead of contacting support.
+            SettingsSectionHeader("Permissions")
+
+            Spacer(modifier = Modifier.height(Dimens.spaceMedium))
+
+            Surface(
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                tonalElevation = 1.dp
+            ) {
+                SettingsRow(
+                    icon = Icons.Outlined.Shield,
+                    title = "App Permissions",
+                    subtitle = "Location, notifications, and battery",
+                    onClick = onNavigateToPermissions
+                )
             }
 
             Spacer(modifier = Modifier.height(Dimens.spaceXLarge))

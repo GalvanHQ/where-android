@@ -273,8 +273,12 @@ internal fun ConversationInfoContent(
 
         // More Actions section
         MoreActionsSection(
+            isMuted = uiState.isMuted,
             onSearchInConversation = onNavigateToChat,
-            onViewMedia = onNavigateToMediaGallery
+            onViewMedia = onNavigateToMediaGallery,
+            // Tapping the row reuses the same mute flow as the top action bar
+            // so the user gets one consistent UI for "manage notifications".
+            onOpenNotificationSettings = { showMuteDialog = true }
         )
 
         // Privacy & Support section (DM only — this screen is always DM)
@@ -593,11 +597,18 @@ private fun CustomizeChatSection(
 /**
  * "More Actions" section with Search in Conversation, View Media & Files,
  * and Notification Settings options.
+ *
+ * The Notification Settings row opens the same mute flow used by the top-of-
+ * screen mute toggle — a duration picker for not-yet-muted chats, an
+ * "Unmute" confirmation when already muted. This keeps a single UX for
+ * notification preferences regardless of which entry point the user picks.
  */
 @Composable
 private fun MoreActionsSection(
+    isMuted: Boolean = false,
     onSearchInConversation: () -> Unit = {},
     onViewMedia: () -> Unit = {},
+    onOpenNotificationSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -616,7 +627,11 @@ private fun MoreActionsSection(
         InfoListItem(
             icon = Icons.Filled.Notifications,
             title = "Notification Settings",
-            onClick = { /* Notification settings — not yet implemented */ }
+            // Subtitle gives the user a status glance without making them tap
+            // through. "On" / "Muted" is enough — duration detail is shown
+            // inside the picker if they want to change it.
+            subtitle = if (isMuted) "Muted" else "On",
+            onClick = onOpenNotificationSettings
         )
     }
 }

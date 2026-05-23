@@ -13,6 +13,17 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <!--
+        REQUEST_IGNORE_BATTERY_OPTIMIZATIONS — required by Android to fire the
+        ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS intent. Without this
+        declaration the system silently rejects the request and we have to
+        fall back to the generic app-settings page, which buries the toggle.
+        Google Play allows this permission for apps that need reliable
+        background execution (live-location sharing qualifies — without
+        battery-opt exemption, OEMs kill our foreground service after ~30
+        minutes and live shares stop reporting).
+    -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application

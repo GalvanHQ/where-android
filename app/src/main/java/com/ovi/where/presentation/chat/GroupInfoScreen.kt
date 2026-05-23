@@ -140,6 +140,7 @@ fun GroupInfoScreen(
         onClearMeetupDestination = { viewModel.clearMeetupDestination() },
         onRetry = { viewModel.retry() },
         onToggleMute = { viewModel.toggleMute() },
+        onMuteFor = { option -> viewModel.muteFor(option) },
         onLeaveGroup = { viewModel.leaveGroup { onNavigateBack() } },
         onDeleteGroup = { viewModel.deleteGroup { onNavigateBack() } },
         onUpdateGroupDetails = { name, description -> viewModel.updateGroupDetails(name, description) },
@@ -170,6 +171,7 @@ internal fun GroupInfoScreenContent(
     onClearMeetupDestination: () -> Unit = {},
     onRetry: () -> Unit,
     onToggleMute: () -> Unit,
+    onMuteFor: (com.ovi.where.domain.model.MuteOption) -> Unit = {},
     onLeaveGroup: () -> Unit,
     onDeleteGroup: () -> Unit,
     onUpdateGroupDetails: (name: String, description: String) -> Unit = { _, _ -> },
@@ -304,7 +306,11 @@ internal fun GroupInfoScreenContent(
                 }
 
                 // ── View Media & Files ───────────────────────────────────────
-                MoreActionsSection(onNavigateToMediaGallery = onNavigateToMediaGallery)
+                MoreActionsSection(
+                    isMuted = uiState.isMuted,
+                    onNavigateToMediaGallery = onNavigateToMediaGallery,
+                    onOpenNotificationSettings = { showMuteDialog = true }
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -384,35 +390,41 @@ internal fun GroupInfoScreenContent(
         )
     }
 
-    // ── Mute Confirmation Dialog ─────────────────────────────────────────────
+    // ── Mute flow ────────────────────────────────────────────────────────
+    // Already muted → quick unmute confirmation. Not muted yet → duration
+    // sheet so the user can pick how long they want silence for. Mentions
+    // bypass mute regardless.
     if (showMuteDialog) {
-        AlertDialog(
-            onDismissRequest = { showMuteDialog = false },
-            title = {
-                Text(if (uiState.isMuted) "Unmute group?" else "Mute group?")
-            },
-            text = {
-                Text(
-                    if (uiState.isMuted) "You will start receiving notifications from this group again."
-                    else "You will no longer receive notifications from this group."
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showMuteDialog = false
-                        onToggleMute()
+        if (uiState.isMuted) {
+            AlertDialog(
+                onDismissRequest = { showMuteDialog = false },
+                title = { Text("Unmute group?") },
+                text = {
+                    Text("You will start receiving notifications from this group again.")
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showMuteDialog = false
+                            onToggleMute()
+                        }
+                    ) { Text("Unmute") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showMuteDialog = false }) {
+                        Text("Cancel")
                     }
-                ) {
-                    Text(if (uiState.isMuted) "Unmute" else "Mute")
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showMuteDialog = false }) {
-                    Text("Cancel")
+            )
+        } else {
+            com.ovi.where.presentation.chat.components.MuteDurationSheet(
+                onDismiss = { showMuteDialog = false },
+                onSelect = { option ->
+                    showMuteDialog = false
+                    onMuteFor(option)
                 }
-            }
-        )
+            )
+        }
     }
 
     // ── Edit Group Name & Description Dialog ─────────────────────────────────
@@ -852,7 +864,9 @@ private fun CustomizeChatSection(
 
 @Composable
 private fun MoreActionsSection(
-    onNavigateToMediaGallery: () -> Unit
+    isMuted: Boolean = false,
+    onNavigateToMediaGallery: () -> Unit,
+    onOpenNotificationSettings: () -> Unit = {}
 ){
     Column(
         modifier = Modifier
@@ -876,7 +890,11 @@ private fun MoreActionsSection(
         SectionListItem(
             icon = Icons.Filled.Notifications,
             label = "Notification Settings",
-            onClick = { /* Notification settings — not yet implemented */ }
+            // Subtitle reflects current mute state so the user gets a glance
+            // without tapping through. Tapping opens the same mute flow as
+            // the top action bar.
+            subtitle = if (isMuted) "Muted" else "On",
+            onClick = onOpenNotificationSettings
         )
     }
 }

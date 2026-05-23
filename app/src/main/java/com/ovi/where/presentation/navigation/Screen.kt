@@ -90,6 +90,9 @@ sealed class Screen(val route: String) {
     @Serializable
     data object Notifications : Screen("notifications")
 
+    @Serializable
+    data object Permissions : Screen("permissions")
+
     // ── Chat routes ───────────────────────────────────────────────────────────
 
     @Serializable

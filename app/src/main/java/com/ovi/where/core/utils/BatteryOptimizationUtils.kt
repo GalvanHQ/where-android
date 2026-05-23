@@ -68,4 +68,28 @@ object BatteryOptimizationUtils {
             openAppSettings(context)
         }
     }
+
+    /**
+     * Returns true on OEM devices known to enforce extra battery-saver
+     * policies that override the standard `isIgnoringBatteryOptimizations`
+     * exemption. We don't try to deep-link into each vendor's auto-start
+     * page — Android offers no stable API for that and the activity names
+     * change between firmware versions. Instead, the UI surfaces a hint
+     * pointing users at the generic app-info screen.
+     *
+     * Sources for the list: AOSP reports + dontkillmyapp.com — the
+     * vendors with the most aggressive default kill behavior.
+     */
+    fun isAggressiveOemKnown(): Boolean {
+        val manufacturer = Build.MANUFACTURER.lowercase()
+        return manufacturer in setOf(
+            "xiaomi", "redmi", "poco", // MIUI family
+            "huawei", "honor",          // EMUI / HarmonyOS
+            "oppo", "realme",           // ColorOS / RealmeUI
+            "vivo", "iqoo",             // FunTouch / OriginOS
+            "oneplus",                  // OxygenOS (less aggressive but still on the list)
+            "asus",                     // ZenUI background-app limits
+            "samsung"                   // OneUI puts apps to sleep aggressively
+        )
+    }
 }

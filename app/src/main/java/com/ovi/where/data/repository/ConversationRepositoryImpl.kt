@@ -335,8 +335,8 @@ class ConversationRepositoryImpl @Inject constructor(
                             participantPhotosJson = serializeFirestoreMap(
                                 doc.get("participantPhotos") as? Map<*, *>
                             ),
-                            themeColor = doc.getString("themeColor"),
-                            emojiShortcut = doc.getString("emojiShortcut"),
+                            themeColor = doc.getString("themeColor") ?: DEFAULT_THEME_COLOR,
+                            emojiShortcut = doc.getString("emojiShortcut") ?: DEFAULT_EMOJI_SHORTCUT,
                             nicknamesJson = serializeFirestoreMap(
                                 doc.get("nicknames") as? Map<*, *>
                             )
@@ -585,8 +585,8 @@ class ConversationRepositoryImpl @Inject constructor(
                                 participantPhotosJson = serializeFirestoreMap(
                                     doc.get("participantPhotos") as? Map<*, *>
                                 ),
-                                themeColor = doc.getString("themeColor"),
-                                emojiShortcut = doc.getString("emojiShortcut"),
+                                themeColor = doc.getString("themeColor") ?: DEFAULT_THEME_COLOR,
+                                emojiShortcut = doc.getString("emojiShortcut") ?: DEFAULT_EMOJI_SHORTCUT,
                                 nicknamesJson = serializeFirestoreMap(
                                     doc.get("nicknames") as? Map<*, *>
                                 )
@@ -1191,5 +1191,18 @@ class ConversationRepositoryImpl @Inject constructor(
 
         /** Maximum number of pinned conversations per user (Requirement 24.4) */
         const val MAX_PINNED_CONVERSATIONS = 3
+
+        /**
+         * Default conversation branding applied when Firestore returns null
+         * for these fields. New conversations get the same defaults from the
+         * server (see server/src/routes/conversations.js); these constants
+         * cover legacy rows that were created before the defaults shipped.
+         *
+         * Keep in sync with `themeColorOptions` in ConversationInfoScreen.kt
+         * and `themeColors` in GroupInfoScreen.kt — Indigo is the first
+         * entry in each picker.
+         */
+        const val DEFAULT_THEME_COLOR = "#5170FF"
+        const val DEFAULT_EMOJI_SHORTCUT = "👍"
     }
 }

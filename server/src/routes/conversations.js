@@ -3,6 +3,25 @@ const { db } = require('../firebase');
 
 const router = express.Router();
 
+/**
+ * Default conversation branding applied at creation time.
+ *
+ *  • DEFAULT_THEME_COLOR — first entry in the Android theme picker
+ *    ("Indigo"). Matches `themeColorOptions` in ConversationInfoScreen.kt
+ *    and `themeColors` in GroupInfoScreen.kt. Keep these in sync if the
+ *    branding palette changes.
+ *  • DEFAULT_EMOJI_SHORTCUT — "thumbs up", the default quick-reaction
+ *    emoji users tap when they don't customize. Mirrors the Messenger
+ *    convention so users land in familiar territory.
+ *
+ * Without these defaults, conversations open with `themeColor: null` /
+ * `emojiShortcut: null` and the client falls back to the system primary
+ * tint + an empty shortcut, which feels broken when the rest of the UI
+ * is themed.
+ */
+const DEFAULT_THEME_COLOR = '#5170FF';
+const DEFAULT_EMOJI_SHORTCUT = '👍';
+
 // Middleware to verify Firebase Auth Token
 const requireAuth = (req, res, next) => {
     // We expect the auth user to be attached by a global middleware, 
@@ -290,7 +309,14 @@ router.post('/direct', async (req, res) => {
             return res.json(existingConv);
         }
 
-        // Create new direct conversation with empty recentMessages
+        // Create new direct conversation with empty recentMessages.
+        //
+        // Theme color + emoji shortcut are defaulted at creation so the
+        // chat opens with the project's "Indigo" / "thumbs-up" identity
+        // instead of falling back to the system primary + an empty
+        // shortcut. Users can change these later from the conversation
+        // info screen; the defaults match the first entry in the theme
+        // picker on the Android side.
         const newConvRef = db.collection('conversations').doc();
         const newConv = {
             type: 'direct',
@@ -298,7 +324,9 @@ router.post('/direct', async (req, res) => {
             createdAt: Date.now(),
             lastMessageTimestamp: Date.now(),
             recentMessages: [],
-            oldestRecentTimestamp: 0
+            oldestRecentTimestamp: 0,
+            themeColor: DEFAULT_THEME_COLOR,
+            emojiShortcut: DEFAULT_EMOJI_SHORTCUT
         };
 
         await newConvRef.set(newConv);
@@ -331,7 +359,11 @@ router.post('/group', async (req, res) => {
             createdAt: Date.now(),
             lastMessageTimestamp: Date.now(),
             recentMessages: [],
-            oldestRecentTimestamp: 0
+            oldestRecentTimestamp: 0,
+            // Default branding so the conversation never opens with
+            // null theme/emoji — matches the direct-conversation defaults.
+            themeColor: DEFAULT_THEME_COLOR,
+            emojiShortcut: DEFAULT_EMOJI_SHORTCUT
         };
 
         await newConvRef.set(newConv);

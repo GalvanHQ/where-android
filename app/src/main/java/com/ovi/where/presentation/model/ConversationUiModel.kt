@@ -67,8 +67,20 @@ fun Conversation.toUiModel(
     onlineUserIds: Set<String> = emptySet(),
     lastSeenByUser: Map<String, Long> = emptyMap()
 ): ConversationUiModel {
-    val unread = (unreadCounts[currentUserId] as? Int)
-        ?: (unreadCounts[currentUserId] as? Long)?.toInt()
+    // The Room entity stores a single `unreadCount: Int` for *the current
+    // user only*, but the domain `Conversation.unreadCounts` map is keyed
+    // by uid. The Room mapper keys the map by conversation id (not uid)
+    // because at that layer we don't know who's signed in. So the lookup
+    // by `currentUserId` here would always miss for Room-sourced rows.
+    //
+    // We resolve this by trying the proper uid key first (works for rows
+    // sourced directly from Firestore which DO key by uid), then falling
+    // back to the only-value-in-the-map (works for Room-sourced rows).
+    val rawCount = unreadCounts[currentUserId]
+        ?: unreadCounts.values.firstOrNull()
+        ?: 0
+    val unread = (rawCount as? Int)
+        ?: (rawCount as? Long)?.toInt()
         ?: 0
     val otherUid = if (type == ConversationType.DIRECT) {
         participantIds.firstOrNull { it != currentUserId }

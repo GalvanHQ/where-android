@@ -346,21 +346,67 @@ class ConversationRepositoryImpl @Inject constructor(
 
                 // Write to Room immediately so UI flow emits within 500ms (Requirement 12.3)
                 repositoryScope.launch {
-                    // Smart upsert: preserve locally-set customization fields
-                    // (themeColor, emojiShortcut, nicknamesJson, photoUrl) when Firestore
-                    // sends null for them (race condition with local writes).
+                    // ── Cache-snapshot guard ──
+                    // A cache snapshot with zero docs (cold start before
+                    // sync) doesn't prove the user has no conversations —
+                    // the local Room cache is the answer in that case.
+                    val isFromCache = snapshot?.metadata?.isFromCache == true
+                    if (isFromCache && entities.isEmpty()) {
+                        Timber.d("Conversation listener: ignoring empty cache snapshot")
+                        return@launch
+                    }
+
+                    // Smart upsert: preserve locally-set + denormalized fields
+                    // when the snapshot lacks them.
+                    //
+                    // Two situations cause null/empty arrivals that should NOT
+                    // overwrite richer Room state:
+                    //   1. Race between a local write and the snapshot read
+                    //      (themeColor, emojiShortcut, nicknames, photoUrl).
+                    //   2. Cache snapshot during cold start where the
+                    //      participantNames / participantPhotos / mutedBy /
+                    //      pinnedBy maps haven't synced yet — defaulting to
+                    //      empty would briefly blank the chat top-bar avatars
+                    //      and conversation row mute/pin badges.
+                    //
+                    // For maps/lists, "empty" from Firestore is treated the
+                    // same as "missing" — we keep the existing JSON. A
+                    // genuine empty state (the field actually shrunk to
+                    // zero) is rare and self-corrects on the next write
+                    // because we still upsert when the existing entry was
+                    // empty too.
                     val mergedEntities = entities.map { incoming ->
                         val existing = conversationDao.getById(incoming.id)
-                        if (existing != null) {
-                            incoming.copy(
-                                themeColor = incoming.themeColor ?: existing.themeColor,
-                                emojiShortcut = incoming.emojiShortcut ?: existing.emojiShortcut,
-                                nicknamesJson = incoming.nicknamesJson ?: existing.nicknamesJson,
-                                photoUrl = incoming.photoUrl ?: existing.photoUrl
-                            )
-                        } else {
-                            incoming
-                        }
+                        if (existing == null) return@map incoming
+
+                        incoming.copy(
+                            // Customization fields — preserve if incoming is
+                            // null (never overwrite richer local data with
+                            // null defaults from Firestore).
+                            themeColor = incoming.themeColor ?: existing.themeColor,
+                            emojiShortcut = incoming.emojiShortcut ?: existing.emojiShortcut,
+                            nicknamesJson = incoming.nicknamesJson ?: existing.nicknamesJson,
+                            photoUrl = incoming.photoUrl ?: existing.photoUrl,
+
+                            // Denormalized maps — same rule, but also treat
+                            // an empty serialization as "no info, keep what
+                            // we had". serializeFirestoreMap returns null
+                            // for empty maps, so the ?: branch is sufficient.
+                            participantNamesJson = incoming.participantNamesJson
+                                ?: existing.participantNamesJson,
+                            participantPhotosJson = incoming.participantPhotosJson
+                                ?: existing.participantPhotosJson,
+
+                            // Membership-state arrays — keep existing when
+                            // the incoming serialization is empty/null. We
+                            // accept the very rare case where an actual
+                            // unmute/unpin operation happens to coincide
+                            // with a stale snapshot; the next write resolves it.
+                            mutedByJson = if (incoming.mutedByJson.isNullOrBlank())
+                                existing.mutedByJson else incoming.mutedByJson,
+                            pinnedByJson = if (incoming.pinnedByJson.isNullOrBlank())
+                                existing.pinnedByJson else incoming.pinnedByJson,
+                        )
                     }
                     conversationDao.upsertAll(mergedEntities)
 
@@ -1195,14 +1241,17 @@ class ConversationRepositoryImpl @Inject constructor(
         /**
          * Default conversation branding applied when Firestore returns null
          * for these fields. New conversations get the same defaults from the
-         * server (see server/src/routes/conversations.js); these constants
+         * server (see `server/src/routes/conversations.js`); these constants
          * cover legacy rows that were created before the defaults shipped.
          *
-         * Keep in sync with `themeColorOptions` in ConversationInfoScreen.kt
-         * and `themeColors` in GroupInfoScreen.kt — Indigo is the first
-         * entry in each picker.
+         * Both values are aliases of the canonical entries on
+         * [com.ovi.where.core.theme.ConversationThemeColors] so the repo,
+         * picker UIs, and server stay in lockstep through a single Kotlin
+         * source of truth.
          */
-        const val DEFAULT_THEME_COLOR = "#5170FF"
-        const val DEFAULT_EMOJI_SHORTCUT = "👍"
+        const val DEFAULT_THEME_COLOR =
+            com.ovi.where.core.theme.ConversationThemeColors.DEFAULT
+        const val DEFAULT_EMOJI_SHORTCUT =
+            com.ovi.where.core.theme.ConversationThemeColors.DEFAULT_EMOJI_SHORTCUT
     }
 }

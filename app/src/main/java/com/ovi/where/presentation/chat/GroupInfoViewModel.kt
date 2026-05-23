@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 /**
@@ -723,12 +722,15 @@ class GroupInfoViewModel @Inject constructor(
                 timber.log.Timber.d("GroupInfoVM: updateGroupPhoto called, groupId=$groupId, url=$photoUrl")
 
                 // 1. Persist avatarUrl to the group Firestore document
-                com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                    .collection("groups")
-                    .document(groupId)
-                    .update("avatarUrl", photoUrl)
-                    .await()
-                timber.log.Timber.d("GroupInfoVM: group avatarUrl updated in Firestore")
+                val avatarRes = groupRepository.setGroupAvatar(groupId, photoUrl)
+                if (avatarRes is Resource.Error) {
+                    timber.log.Timber.w(
+                        "GroupInfoVM: setGroupAvatar failed: %s",
+                        avatarRes.message
+                    )
+                } else {
+                    timber.log.Timber.d("GroupInfoVM: group avatarUrl updated in Firestore")
+                }
 
                 // 2. Update conversation photo by groupId (Room + Firestore)
                 val result = conversationRepository.updateConversationPhotoUrlByGroupId(groupId, photoUrl)

@@ -679,6 +679,17 @@ class LocationRepositoryImpl @Inject constructor(
 
                 Timber.d("observeActiveLocations: received ${snapshot?.documents?.size ?: 0} documents")
 
+                // Cache-snapshot guard: a cache snapshot with zero documents
+                // is "I have no info" — *not* "no one is sharing". Emitting
+                // [] here would briefly wipe the top-bar location chips on
+                // every cold start until the server snapshot landed.
+                val isFromCache = snapshot?.metadata?.isFromCache == true
+                val docCount = snapshot?.documents?.size ?: 0
+                if (isFromCache && docCount == 0) {
+                    Timber.d("observeActiveLocations: ignoring empty cache snapshot")
+                    return@addSnapshotListener
+                }
+
                 val locations = snapshot?.documents?.mapNotNull { doc ->
                     try {
                         val location = parseSharedLocation(doc.id, doc.data)
@@ -753,6 +764,13 @@ class LocationRepositoryImpl @Inject constructor(
                             Timber.e(error, "Firestore cache-fallback listener error")
                             return@addSnapshotListener
                         }
+                        // Cache-snapshot guard — same reasoning as the
+                        // primary observeActiveLocations listener: don't
+                        // wipe live chips on cold cache reads.
+                        val isFromCache = snapshot?.metadata?.isFromCache == true
+                        val docCount = snapshot?.documents?.size ?: 0
+                        if (isFromCache && docCount == 0) return@addSnapshotListener
+
                         val locations = snapshot?.documents?.mapNotNull { doc ->
                             val location = doc.toObject(SharedLocation::class.java)
                             if (location != null) {
@@ -911,6 +929,13 @@ class LocationRepositoryImpl @Inject constructor(
                     Timber.e(error, "Firestore fallback listener error")
                     return@addSnapshotListener
                 }
+                // Cache-snapshot guard — same reasoning as the primary
+                // listener; refuse to overwrite the live in-memory cache
+                // with [] from a stale cache read.
+                val isFromCache = snapshot?.metadata?.isFromCache == true
+                val docCount = snapshot?.documents?.size ?: 0
+                if (isFromCache && docCount == 0) return@addSnapshotListener
+
                 val locations = snapshot?.documents?.mapNotNull { doc ->
                     val location = doc.toObject(SharedLocation::class.java)
                     if (location != null) {
@@ -960,6 +985,11 @@ class LocationRepositoryImpl @Inject constructor(
                     close(error)
                     return@addSnapshotListener
                 }
+                // Cache-snapshot guard.
+                val isFromCache = snapshot?.metadata?.isFromCache == true
+                val docCount = snapshot?.documents?.size ?: 0
+                if (isFromCache && docCount == 0) return@addSnapshotListener
+
                 val locations = snapshot?.documents?.mapNotNull { doc ->
                     val location = doc.toObject(SharedLocation::class.java)
                     if (location != null) {
@@ -989,6 +1019,12 @@ class LocationRepositoryImpl @Inject constructor(
                 .document(friendId)
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) return@addSnapshotListener
+                    // Cache-snapshot guard: if the doc doesn't exist yet
+                    // in the cache, leave the in-memory map untouched
+                    // until the server confirms.
+                    if (snapshot != null && !snapshot.exists() && snapshot.metadata.isFromCache) {
+                        return@addSnapshotListener
+                    }
                     val location = snapshot?.toObject(SharedLocation::class.java)
                     if (location != null) {
                         val now = System.currentTimeMillis()
@@ -1017,6 +1053,11 @@ class LocationRepositoryImpl @Inject constructor(
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     close(error)
+                    return@addSnapshotListener
+                }
+                // Cache-snapshot guard: don't emit null on a cache miss
+                // for a user we know is sharing — wait for server snapshot.
+                if (snapshot != null && !snapshot.exists() && snapshot.metadata.isFromCache) {
                     return@addSnapshotListener
                 }
                 val location = snapshot?.toObject(SharedLocation::class.java)
@@ -1324,6 +1365,8 @@ class LocationRepositoryImpl @Inject constructor(
                         return@addSnapshotListener
                     }
                     val destMap = snapshot?.get("meetupDestination") as? Map<*, *>
+                    val isFromCache = snapshot?.metadata?.isFromCache == true
+
                     if (destMap != null && destMap["isActive"] == true) {
                         val rawParticipants = destMap["participants"] as? Map<*, *>
                         val participants = rawParticipants
@@ -1354,6 +1397,17 @@ class LocationRepositoryImpl @Inject constructor(
                             meetupDestinationDao.upsert(destination.toEntity(groupId))
                         }
                     } else {
+                        // Cache-snapshot guard: a cache snapshot that's
+                        // missing the meetupDestination field doesn't prove
+                        // the destination has been cleared — only the server
+                        // snapshot is authoritative for deletions. Without
+                        // this guard a momentary cache hit would erase the
+                        // active destination from Room and the bottom sheet
+                        // would briefly show no meetup.
+                        if (isFromCache) {
+                            Timber.d("Meetup listener: ignoring inactive cache snapshot for $groupId")
+                            return@addSnapshotListener
+                        }
                         // Inactive / missing — drop the row so observers see null.
                         repositoryScope.launch {
                             meetupDestinationDao.deleteByGroup(groupId)

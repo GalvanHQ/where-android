@@ -29,12 +29,7 @@ const { v4: uuidv4 } = require('uuid');
 
 const { auth, db, messaging } = require('./firebase');
 const { verifyIdTokenCached } = require('./authCache');
-
-/** Max number of recent messages embedded inside a conversation doc. */
-const MAX_RECENT_MESSAGES = 50;
-
-/** Mirrors functions/src/lib/notify.ts MAX_INBOX_ENTRIES. */
-const MAX_INBOX_ENTRIES = 200;
+const { MAX_RECENT_MESSAGES, MAX_INBOX_ENTRIES } = require('./constants');
 
 /**
  * Validates a location_update frame has all required fields within valid ranges.
@@ -594,7 +589,10 @@ async function persistChatInboxEntry(recipientUid, ctx) {
         body: ctx.body,
         timestamp: now,
         isRead: false,
-        deepLinkRoute: `chat/${ctx.conversationId}`,
+        // Android recomputes the deep-link from `type` + the denormalized
+        // ids below. Mirrors the Cloud Functions side (functions/src/lib/notify.ts)
+        // — single resolver lives client-side now.
+        deepLinkRoute: null,
         conversationId: ctx.conversationId,
         groupId: ctx.groupId || null,
         userId: ctx.senderId,

@@ -2,6 +2,8 @@ package com.ovi.where.presentation.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ovi.where.core.constants.AppConstants.STATE_FLOW_SUBSCRIBE_TIMEOUT_MS
+import com.ovi.where.core.notification.NotificationHelper
 import com.ovi.where.data.repository.NotificationPreferencesRepository
 import com.ovi.where.data.repository.QuietHoursRepository
 import com.ovi.where.data.repository.QuietHoursSettings
@@ -21,7 +23,8 @@ import javax.inject.Inject
  *
  * Owns two independent surfaces:
  *  • Per-channel toggles (chat, social, location, etc.) — backed by
- *    [NotificationPreferencesRepository].
+ *    [NotificationPreferencesRepository]. Channel ids come from
+ *    [NotificationHelper] which is the canonical owner.
  *  • Quiet hours — backed by [QuietHoursRepository], a separate DataStore
  *    namespace because the schema (window minutes + full-block flag) is
  *    different and we want to evolve them independently.
@@ -43,7 +46,7 @@ class NotificationPrefsViewModel @Inject constructor(
     val quietHours: StateFlow<QuietHoursSettings> = quietHoursRepository.observe()
         .stateIn(
             viewModelScope,
-            SharingStarted.WhileSubscribed(5_000),
+            SharingStarted.WhileSubscribed(STATE_FLOW_SUBSCRIBE_TIMEOUT_MS),
             QuietHoursSettings(
                 enabled = false,
                 startMinuteOfDay = QuietHoursRepository.DEFAULT_START_MIN,
@@ -55,11 +58,11 @@ class NotificationPrefsViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             combine(
-                repository.isChannelEnabled(NotificationPreferencesRepository.CHANNEL_ID_SOCIAL),
-                repository.isChannelEnabled(NotificationPreferencesRepository.CHANNEL_ID_LOCATION_UPDATES),
-                repository.isChannelEnabled(NotificationPreferencesRepository.CHANNEL_ID_GROUP_ACTIVITY),
-                repository.isChannelEnabled(NotificationPreferencesRepository.CHANNEL_ID_MESSAGES),
-                repository.isChannelEnabled(NotificationPreferencesRepository.CHANNEL_ID_MEETUP)
+                repository.isChannelEnabled(NotificationHelper.CHANNEL_SOCIAL),
+                repository.isChannelEnabled(NotificationHelper.CHANNEL_LOCATION_UPDATES),
+                repository.isChannelEnabled(NotificationHelper.CHANNEL_GROUP_ACTIVITY),
+                repository.isChannelEnabled(NotificationHelper.CHANNEL_MESSAGES),
+                repository.isChannelEnabled(NotificationHelper.CHANNEL_MEETUP)
             ) { values ->
                 NotificationPrefsUiState(
                     friendRequestsEnabled = values[0],
@@ -74,23 +77,23 @@ class NotificationPrefsViewModel @Inject constructor(
     }
 
     fun setFriendRequestsEnabled(enabled: Boolean) = persist(
-        NotificationPreferencesRepository.CHANNEL_ID_SOCIAL, enabled
+        NotificationHelper.CHANNEL_SOCIAL, enabled
     ) { it.copy(friendRequestsEnabled = enabled) }
 
     fun setLocationUpdatesEnabled(enabled: Boolean) = persist(
-        NotificationPreferencesRepository.CHANNEL_ID_LOCATION_UPDATES, enabled
+        NotificationHelper.CHANNEL_LOCATION_UPDATES, enabled
     ) { it.copy(locationUpdatesEnabled = enabled) }
 
     fun setGroupActivityEnabled(enabled: Boolean) = persist(
-        NotificationPreferencesRepository.CHANNEL_ID_GROUP_ACTIVITY, enabled
+        NotificationHelper.CHANNEL_GROUP_ACTIVITY, enabled
     ) { it.copy(groupActivityEnabled = enabled) }
 
     fun setChatMessagesEnabled(enabled: Boolean) = persist(
-        NotificationPreferencesRepository.CHANNEL_ID_MESSAGES, enabled
+        NotificationHelper.CHANNEL_MESSAGES, enabled
     ) { it.copy(chatMessagesEnabled = enabled) }
 
     fun setMeetupEnabled(enabled: Boolean) = persist(
-        NotificationPreferencesRepository.CHANNEL_ID_MEETUP, enabled
+        NotificationHelper.CHANNEL_MEETUP, enabled
     ) { it.copy(meetupEnabled = enabled) }
 
     // ── Quiet hours ────────────────────────────────────────────────────

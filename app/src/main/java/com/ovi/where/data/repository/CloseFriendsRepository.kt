@@ -45,6 +45,13 @@ class CloseFriendsRepository @Inject constructor(
             .collection("users").document(uid)
             .collection("preferences").document(DOC_ID)
         val reg = ref.addSnapshotListener { snap, _ ->
+            // Cache-snapshot guard: a missing-from-cache doc would emit
+            // emptySet() and downstream UI would treat all friends as "not
+            // close", losing the quiet-hours bypass for them. Wait for the
+            // server snapshot before downgrading.
+            if (snap != null && !snap.exists() && snap.metadata.isFromCache) {
+                return@addSnapshotListener
+            }
             @Suppress("UNCHECKED_CAST")
             val members = (snap?.get("members") as? Map<String, *>)?.keys?.toSet().orEmpty()
             trySend(members)

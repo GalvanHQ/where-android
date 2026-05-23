@@ -512,10 +512,7 @@ internal fun GroupInfoScreenContent(
 
     // ── Theme Color Picker Dialog ────────────────────────────────────────────
     if (showThemeColorDialog) {
-        val themeColors = listOf(
-            "#5170FF", "#006878", "#8E3A8C", "#6B5E00",
-            "#006E2C", "#BA1A1A", "#006491", "#8B4513"
-        )
+        val themeColors = com.ovi.where.core.theme.ConversationThemeColors.HEX_VALUES
         AlertDialog(
             onDismissRequest = { showThemeColorDialog = false },
             title = { Text("Theme Color") },

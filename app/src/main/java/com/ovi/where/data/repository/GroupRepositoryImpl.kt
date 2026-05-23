@@ -248,6 +248,32 @@ class GroupRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun setGroupConversationId(
+        groupId: String,
+        conversationId: String
+    ): Resource<Unit> = try {
+        firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
+            .document(groupId)
+            .update("conversationId", conversationId)
+            .await()
+        Resource.Success(Unit)
+    } catch (e: Exception) {
+        Resource.Error(e.message ?: "Failed to set conversation id")
+    }
+
+    override suspend fun setGroupAvatar(
+        groupId: String,
+        avatarUrl: String
+    ): Resource<Unit> = try {
+        firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
+            .document(groupId)
+            .update("avatarUrl", avatarUrl)
+            .await()
+        Resource.Success(Unit)
+    } catch (e: Exception) {
+        Resource.Error(e.message ?: "Failed to set group avatar")
+    }
+
     override fun observeGroupMembers(groupId: String): Flow<List<GroupMember>> = callbackFlow {
         val listener: ListenerRegistration = firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
             .document(groupId)
@@ -257,7 +283,18 @@ class GroupRepositoryImpl @Inject constructor(
                     close(error)
                     return@addSnapshotListener
                 }
+
+                // Cache-snapshot guard: an empty cache snapshot doesn't
+                // prove the group is empty (a real group always has at
+                // least one member). Suppress so the meetup sheet's member
+                // avatars don't briefly disappear on cold start.
+                val isFromCache = snapshot?.metadata?.isFromCache == true
                 val members = snapshot?.toObjects(GroupMember::class.java) ?: emptyList()
+                if (isFromCache && members.isEmpty()) {
+                    Timber.d("observeGroupMembers: ignoring empty cache snapshot for %s", groupId)
+                    return@addSnapshotListener
+                }
+
                 trySend(members).isSuccess
             }
         awaitClose { listener.remove() }

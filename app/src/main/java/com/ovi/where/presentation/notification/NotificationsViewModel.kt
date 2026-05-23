@@ -2,6 +2,7 @@ package com.ovi.where.presentation.notification
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ovi.where.core.constants.AppConstants.STATE_FLOW_SUBSCRIBE_TIMEOUT_MS
 import com.ovi.where.core.notification.NotificationType
 import com.ovi.where.data.local.entity.NotificationEntity
 import com.ovi.where.data.repository.NotificationRepository
@@ -41,13 +42,13 @@ class NotificationsViewModel @Inject constructor(
         }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
+            started = SharingStarted.WhileSubscribed(STATE_FLOW_SUBSCRIBE_TIMEOUT_MS),
             initialValue = NotificationsUiState(isLoading = true)
         )
 
     /** Reactive unread count — surfaced by the bell chip on the map. */
     val unreadCount: StateFlow<Int> = repository.observeUnreadCount()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STATE_FLOW_SUBSCRIBE_TIMEOUT_MS), 0)
 
     private val _pendingNavigation = MutableStateFlow<String?>(null)
     val pendingNavigation: StateFlow<String?> = _pendingNavigation.asStateFlow()

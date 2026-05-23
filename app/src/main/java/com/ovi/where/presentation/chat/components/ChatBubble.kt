@@ -319,10 +319,8 @@ fun ChatBubble(
 
                                 if (message.text.isNotEmpty()) {
                                     if (message.mentionedUserIds.isNotEmpty()) {
-                                        val mentionRegex = Regex("""@\w+""")
-                                        val ranges = mentionRegex.findAll(message.text)
-                                            .map { it.range }
-                                            .toList()
+                                        val ranges = com.ovi.where.core.text.MentionDetector
+                                            .ranges(message.text)
                                         val mentionTint = if (isSent) Color.White
                                             else MaterialTheme.colorScheme.primary
                                         val linkTint = if (isSent) Color.White

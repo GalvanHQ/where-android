@@ -15,6 +15,20 @@ interface GroupRepository {
     suspend fun deleteGroup(groupId: String): Resource<Unit>
     suspend fun updateGroup(groupId: String, name: String, description: String): Resource<Group>
 
+    /**
+     * Persists the per-group conversation id back onto the group document.
+     * Called by the group-creation flow after the chat conversation is
+     * created server-side. Idempotent.
+     */
+    suspend fun setGroupConversationId(groupId: String, conversationId: String): Resource<Unit>
+
+    /**
+     * Updates the avatar URL on a group document. The avatar is uploaded
+     * separately (e.g. to Cloud Storage); this call only writes the
+     * resolved URL.
+     */
+    suspend fun setGroupAvatar(groupId: String, avatarUrl: String): Resource<Unit>
+
     fun observeGroupMembers(groupId: String): Flow<List<GroupMember>>
     suspend fun addMember(groupId: String, userId: String): Resource<Unit>
     suspend fun removeMember(groupId: String, userId: String): Resource<Unit>

@@ -730,16 +730,7 @@ private fun InfoListItem(
 
 // ── Theme Color Picker Dialog ────────────────────────────────────────────────
 
-private val themeColorOptions = listOf(
-    "#5170FF" to "Indigo",
-    "#006878" to "Teal",
-    "#8E3A8C" to "Purple",
-    "#6B5E00" to "Gold",
-    "#006E2C" to "Green",
-    "#BA1A1A" to "Red",
-    "#006491" to "Blue",
-    "#8B4513" to "Brown"
-)
+private val themeColorOptions = com.ovi.where.core.theme.ConversationThemeColors.OPTIONS
 
 @Composable
 private fun ThemeColorPickerDialog(

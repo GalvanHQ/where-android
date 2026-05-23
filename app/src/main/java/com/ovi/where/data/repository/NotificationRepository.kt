@@ -98,14 +98,34 @@ class NotificationRepository @Inject constructor(
                 }
                 val freshIds = parsed.map { it.id }.toSet()
 
+                // ── Cache-snapshot guard ──
+                // Firestore emits a cache snapshot before the server one when
+                // the doc has been seen before. Cache snapshots are not
+                // authoritative about *deletions* — they reflect whatever
+                // shred of state the local persistence layer happens to hold,
+                // which on cold starts can be empty or partial.
+                //
+                // If we naively reconciled "anything in Room not in the snap
+                // gets deleted", a single cache miss would wipe the whole
+                // inbox until the server snap arrived a few hundred ms later.
+                // That's the "notification badge disappeared briefly" bug.
+                //
+                // Rule: only run destructive reconcile (delete-not-present)
+                // on server snapshots. Cache snapshots can still fill the
+                // cache (insert), but never erase.
+                val isFromCache = snap.metadata.isFromCache
+
                 syncScope.launch {
-                    // Reconcile Room with the canonical map. We delete
-                    // anything Room has that the doc doesn't, then upsert
-                    // the rest — no migrations, no schema dance.
-                    val localIds = notificationDao.observeAllIds()
-                    for (localId in localIds) {
-                        if (localId !in freshIds) notificationDao.delete(localId)
+                    if (!isFromCache) {
+                        // Authoritative server snapshot — Room mirrors the doc.
+                        val localIds = notificationDao.observeAllIds()
+                        for (localId in localIds) {
+                            if (localId !in freshIds) notificationDao.delete(localId)
+                        }
                     }
+                    // Always upsert what we received — cache snapshots are
+                    // valid for *adding* known-good entries to Room, just
+                    // not for proving anything's gone.
                     parsed.forEach { notificationDao.insert(it) }
                 }
             }

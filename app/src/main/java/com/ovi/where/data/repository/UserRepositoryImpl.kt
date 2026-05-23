@@ -62,6 +62,15 @@ class UserRepositoryImpl @Inject constructor(
             .document(userId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) { close(error); return@addSnapshotListener }
+
+                // Cache-snapshot guard: a cache snapshot for a not-yet-
+                // existent doc returns `exists = false` even when the user
+                // *does* exist on the server. Suppress that single null so
+                // downstream UI (profile photos, names) doesn't briefly
+                // show "user not found" on cold start.
+                if (snapshot != null && !snapshot.exists() && snapshot.metadata.isFromCache) {
+                    return@addSnapshotListener
+                }
                 trySend(snapshot?.toObject(User::class.java)).isSuccess
             }
         awaitClose { listener.remove() }

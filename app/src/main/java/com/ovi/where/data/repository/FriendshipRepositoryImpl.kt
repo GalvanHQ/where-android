@@ -54,6 +54,12 @@ class FriendshipRepositoryImpl @Inject constructor(
             .orderBy("displayName")
             .addSnapshotListener { snap, err ->
                 if (err != null) { close(err); return@addSnapshotListener }
+                // Cache-snapshot guard: an empty cache snapshot for a user
+                // who has friends doesn't mean they unfriended everyone.
+                // Suppress so the People tab doesn't briefly empty out.
+                if (snap != null && snap.metadata.isFromCache && snap.isEmpty) {
+                    return@addSnapshotListener
+                }
                 trySend(snap?.toObjects(FriendEntry::class.java) ?: emptyList())
             }
         awaitClose { reg.remove() }
@@ -69,6 +75,9 @@ class FriendshipRepositoryImpl @Inject constructor(
             .collection("inbox").document("friendRequests")
             .addSnapshotListener { snap, err ->
                 if (err != null) { close(err); return@addSnapshotListener }
+                if (snap != null && !snap.exists() && snap.metadata.isFromCache) {
+                    return@addSnapshotListener
+                }
                 val inbox = snap?.toObject(RequestInbox::class.java) ?: RequestInbox()
                 trySend(inbox.entries.values.sortedByDescending { it.sentAt })
             }
@@ -84,6 +93,9 @@ class FriendshipRepositoryImpl @Inject constructor(
             .collection("outbox").document("friendRequests")
             .addSnapshotListener { snap, err ->
                 if (err != null) { close(err); return@addSnapshotListener }
+                if (snap != null && !snap.exists() && snap.metadata.isFromCache) {
+                    return@addSnapshotListener
+                }
                 val outbox = snap?.toObject(RequestInbox::class.java) ?: RequestInbox()
                 trySend(outbox.entries.values.sortedByDescending { it.sentAt })
             }
@@ -100,6 +112,9 @@ class FriendshipRepositoryImpl @Inject constructor(
             .collection("summary").document("social")
             .addSnapshotListener { snap, err ->
                 if (err != null) { close(err); return@addSnapshotListener }
+                if (snap != null && !snap.exists() && snap.metadata.isFromCache) {
+                    return@addSnapshotListener
+                }
                 trySend(snap?.toObject(SocialSummary::class.java) ?: SocialSummary())
             }
         awaitClose { reg.remove() }
@@ -113,6 +128,9 @@ class FriendshipRepositoryImpl @Inject constructor(
         val reg = firestore.collection("users").document(uid).collection("blocks")
             .addSnapshotListener { snap, err ->
                 if (err != null) { close(err); return@addSnapshotListener }
+                if (snap != null && snap.metadata.isFromCache && snap.isEmpty) {
+                    return@addSnapshotListener
+                }
                 trySend(snap?.toObjects(BlockEntry::class.java) ?: emptyList())
             }
         awaitClose { reg.remove() }
@@ -207,6 +225,16 @@ class FriendshipRepositoryImpl @Inject constructor(
             .whereArrayContains("memberIds", uid)
             .addSnapshotListener { groupSnapshot, error ->
                 if (error != null) { close(error); return@addSnapshotListener }
+
+                // Cache-snapshot guard: if the cache hasn't loaded our
+                // groups yet, suppress instead of saying "no locations".
+                if (groupSnapshot != null
+                    && groupSnapshot.metadata.isFromCache
+                    && groupSnapshot.isEmpty
+                ) {
+                    return@addSnapshotListener
+                }
+
                 val groupIds = groupSnapshot?.documents?.map { it.id } ?: emptyList()
                 val allLocations = mutableListOf<SharedLocation>()
 

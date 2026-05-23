@@ -1,26 +1,23 @@
 const express = require('express');
 const { db } = require('../firebase');
+const {
+    MAX_RECENT_MESSAGES,
+    DEFAULT_THEME_COLOR,
+    DEFAULT_EMOJI_SHORTCUT,
+} = require('../constants');
 
 const router = express.Router();
 
 /**
  * Default conversation branding applied at creation time.
  *
- *  • DEFAULT_THEME_COLOR — first entry in the Android theme picker
- *    ("Indigo"). Matches `themeColorOptions` in ConversationInfoScreen.kt
- *    and `themeColors` in GroupInfoScreen.kt. Keep these in sync if the
- *    branding palette changes.
- *  • DEFAULT_EMOJI_SHORTCUT — "thumbs up", the default quick-reaction
- *    emoji users tap when they don't customize. Mirrors the Messenger
- *    convention so users land in familiar territory.
- *
- * Without these defaults, conversations open with `themeColor: null` /
- * `emojiShortcut: null` and the client falls back to the system primary
- * tint + an empty shortcut, which feels broken when the rest of the UI
- * is themed.
+ * The defaults below come from the shared `server/src/constants.js`
+ * module so they stay in lockstep with the values used elsewhere on the
+ * server (and, by mirror, with the Android `ConversationThemeColors`
+ * object). Picker palettes and the canonical Indigo / 👍 defaults live
+ * client-side; this is the producer-side mirror for legacy rows that
+ * predate the defaults shipping.
  */
-const DEFAULT_THEME_COLOR = '#5170FF';
-const DEFAULT_EMOJI_SHORTCUT = '👍';
 
 // Middleware to verify Firebase Auth Token
 const requireAuth = (req, res, next) => {
@@ -543,7 +540,7 @@ router.post('/:conversationId/system-message', async (req, res) => {
             const alreadyEmbedded = existing.some(m => m.id === messageId);
             const nextRecent = alreadyEmbedded
                 ? existing
-                : [...existing, embeddedMsg].slice(-50); // MAX_RECENT_MESSAGES
+                : [...existing, embeddedMsg].slice(-MAX_RECENT_MESSAGES);
 
             const oldestRecentTimestamp = nextRecent.length > 0
                 ? nextRecent[0].timestamp

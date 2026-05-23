@@ -25,6 +25,7 @@ class UserPreferences @Inject constructor(
         val BATTERY_SAVER_MODE = booleanPreferencesKey("battery_saver_mode")
         val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
         val LOCATION_OFF_DIALOG_SHOWN = booleanPreferencesKey("location_off_dialog_shown")
+        val PERMISSION_ONBOARDING_SHOWN = booleanPreferencesKey("permission_onboarding_shown")
         // Sharing session persistence for service restart recovery
         val SHARING_TARGET_ID = stringPreferencesKey("sharing_target_id")
         val SHARING_EXPIRES_AT = longPreferencesKey("sharing_expires_at")
@@ -64,6 +65,16 @@ class UserPreferences @Inject constructor(
 
     val isLocationOffDialogShown: Flow<Boolean> = dataStore.data.map { preferences ->
         preferences[Keys.LOCATION_OFF_DIALOG_SHOWN] ?: false
+    }
+
+    /**
+     * Whether the first-run [com.ovi.where.presentation.permission.PermissionOnboardingSheet]
+     * has been shown and dismissed. Tracked separately from the legacy
+     * [isLocationOffDialogShown] flag so we can keep the old behavior for
+     * users who haven't seen the new sheet yet.
+     */
+    val isPermissionOnboardingShown: Flow<Boolean> = dataStore.data.map { preferences ->
+        preferences[Keys.PERMISSION_ONBOARDING_SHOWN] ?: false
     }
 
     suspend fun saveUserId(userId: String) {
@@ -111,6 +122,12 @@ class UserPreferences @Inject constructor(
     suspend fun setLocationOffDialogShown(shown: Boolean) {
         dataStore.edit { preferences ->
             preferences[Keys.LOCATION_OFF_DIALOG_SHOWN] = shown
+        }
+    }
+
+    suspend fun setPermissionOnboardingShown(shown: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[Keys.PERMISSION_ONBOARDING_SHOWN] = shown
         }
     }
 

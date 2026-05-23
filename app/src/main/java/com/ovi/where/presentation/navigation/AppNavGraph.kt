@@ -322,9 +322,11 @@ fun AppNavGraph(
             // preservation for free.
 
             composable(Screen.MapTab.route) {
-                // Ask for POST_NOTIFICATIONS once on first map entry after
-                // sign-in. The effect no-ops if the prompt has already run.
-                com.ovi.where.core.notification.NotificationPermissionEffect()
+                // Note: Permission prompts (notifications, location, background
+                // location, battery optimization) are now consolidated into the
+                // first-run [PermissionOnboardingSheet] inside [GlobalMapScreen].
+                // This avoids the previous chain of two stacked AlertDialogs that
+                // missed background location and battery opt entirely.
                 GlobalMapScreen(
                     onNavigateToChat = { convId ->
                         navController.navigate(Screen.Chat.createRoute(convId)) {

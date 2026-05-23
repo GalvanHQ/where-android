@@ -425,10 +425,8 @@ class GlobalMapViewModel @Inject constructor(
 
     private fun observeLocationOffDialogPref() {
         viewModelScope.launch {
-            userPreferences.isLocationOffDialogShown.collect { shown ->
-                if (!shown) {
-                    _uiState.value = _uiState.value.copy(showLocationOffDialog = true)
-                }
+            userPreferences.isPermissionOnboardingShown.collect { shown ->
+                _uiState.value = _uiState.value.copy(showPermissionOnboarding = !shown)
             }
         }
     }
@@ -1893,6 +1891,17 @@ class GlobalMapViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(showLocationOffDialog = show)
     }
 
+    fun dismissPermissionOnboarding() {
+        _uiState.value = _uiState.value.copy(showPermissionOnboarding = false)
+        viewModelScope.launch {
+            userPreferences.setPermissionOnboardingShown(true)
+            // Mirror the legacy flag too so the older AlertDialog code path
+            // (still wired up in case some users see it on old builds via
+            // the back stack) doesn't fire on the next ON_RESUME.
+            userPreferences.setLocationOffDialogShown(true)
+        }
+    }
+
     /**
      * Starts a multi-target sharing session.
      * @param targetIds list of group ids and "direct:{friendId}" entries.
@@ -2311,6 +2320,7 @@ data class GlobalMapUiState(
     val showGroupPicker: Boolean = false,
     val showShareSheet: Boolean = false,
     val showLocationOffDialog: Boolean = false,
+    val showPermissionOnboarding: Boolean = false,
     val myPhotoUrl: String? = null,
     val isLocationEnabled: Boolean = true,
     val isLoading: Boolean = true,

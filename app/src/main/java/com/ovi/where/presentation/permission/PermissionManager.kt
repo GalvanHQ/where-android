@@ -9,7 +9,16 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -19,7 +28,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -337,26 +351,54 @@ private fun RationaleDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        icon = {
+            // Premium icon hero — primary-tinted bubble matching the
+            // first-run onboarding sheet's visual language.
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+        },
         title = {
             Text(
-                text = "${rationale.permissionName} Permission Required",
-                style = MaterialTheme.typography.titleMedium
+                text = rationale.permissionName,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
             )
         },
         text = {
             Text(
                 text = rationale.explanation,
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         },
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
         confirmButton = {
-            TextButton(onClick = onProceed) {
-                Text("Continue")
+            Button(
+                onClick = onProceed,
+                shape = RoundedCornerShape(50),
+            ) {
+                Text(
+                    text = "Allow",
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("Not now")
             }
         }
     )
@@ -370,26 +412,52 @@ private fun SettingsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        icon = {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+        },
         title = {
             Text(
-                text = "$permissionName Permission Denied",
-                style = MaterialTheme.typography.titleMedium
+                text = "$permissionName needs to be enabled",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
             )
         },
         text = {
             Text(
-                text = "This permission has been permanently denied. Please enable it in the app settings to use this feature.",
-                style = MaterialTheme.typography.bodyMedium
+                text = "You've blocked this permission. Open the system settings to turn it on — we'll bring you straight back when you're done.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         },
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
         confirmButton = {
-            TextButton(onClick = onOpenSettings) {
-                Text("Open Settings")
+            Button(
+                onClick = onOpenSettings,
+                shape = RoundedCornerShape(50),
+            ) {
+                Text(
+                    text = "Open settings",
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("Not now")
             }
         }
     )

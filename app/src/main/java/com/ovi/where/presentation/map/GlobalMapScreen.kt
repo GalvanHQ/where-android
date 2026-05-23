@@ -958,48 +958,17 @@ fun GlobalMapScreen(
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
 
-            // ── Location permission dialog ─────────────────────────────────────────────
-            if (uiState.showLocationOffDialog && !locationGranted) {
-                AlertDialog(
-                    onDismissRequest = {
-                        viewModel.showLocationOffDialog(false)
-                        viewModel.setLocationOffDialogShown()
-                    },
-                    icon = {
-                        Icon(
-                            Icons.Rounded.LocationOn,
-                            contentDescription = null,
-                            modifier = Modifier.size(40.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    title = { Text("Location Permission Needed") },
-                    text = { Text("Where needs access to your location to show you on the map and share your position with friends.") },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                permissionLauncher.launch(
-                                    arrayOf(
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                    )
-                                )
-                                viewModel.showLocationOffDialog(false)
-                            }
-                        ) {
-                            Text("Allow")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(
-                            onClick = {
-                                viewModel.showLocationOffDialog(false)
-                                viewModel.setLocationOffDialogShown()
-                            }
-                        ) {
-                            Text("Not now")
-                        }
-                    }
+            // ── Permission onboarding sheet (first launch) ───────────────────────────
+            //
+            // Replaces the legacy single-permission AlertDialog with a full
+            // bottom sheet that surfaces every permission the app needs in
+            // one polished educational flow. Matches the pattern used by
+            // Life360, Google Maps, and Discord — a single onboarding
+            // moment, not a chain of system dialogs.
+            if (uiState.showPermissionOnboarding) {
+                com.ovi.where.presentation.permission.PermissionOnboardingSheet(
+                    onDismiss = { viewModel.dismissPermissionOnboarding() },
+                    onComplete = { viewModel.dismissPermissionOnboarding() },
                 )
             }
 

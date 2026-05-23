@@ -42,7 +42,7 @@ import com.ovi.where.data.local.entity.VoiceMessageCacheEntity
         NotificationEntity::class,
         com.ovi.where.data.local.entity.UserCacheEntity::class
     ],
-    version = 18,
+    version = 19,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -291,6 +291,24 @@ abstract class AppDatabase : RoomDatabase() {
                         PRIMARY KEY(`id`)
                     )
                     """.trimIndent()
+                )
+            }
+        }
+
+        /**
+         * Adds `targetIdsJson` to the `shared_location` table.
+         *
+         * Multi-target shares (one user fanning out to several groups +
+         * direct friends at once) carry an empty legacy `targetId` and
+         * stash the full membership in `targetIds`. Without persisting
+         * this list, the chat header's "who's actively sharing" filter
+         * was failing to match multi-target rows after they passed
+         * through Room — the header avatar row never rendered.
+         */
+        val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `shared_location` ADD COLUMN `targetIdsJson` TEXT DEFAULT NULL"
                 )
             }
         }

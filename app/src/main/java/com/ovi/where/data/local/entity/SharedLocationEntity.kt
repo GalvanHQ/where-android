@@ -30,6 +30,13 @@ data class SharedLocationEntity(
     val photoUrl: String? = null,
     val targetType: String = "",
     val targetId: String = "",
+    /** JSON-serialized list of target ids for multi-target shares.
+     *  When the sharer fans out to several groups + direct friends at once,
+     *  the legacy [targetId] is empty and only [targetIdsJson] carries the
+     *  full membership list. The chat header's "who's actively sharing"
+     *  filter relies on this — without it, multi-target shares were
+     *  invisible because Room dropped the field on its way to UI. */
+    val targetIdsJson: String? = null,
     val visibleTo: String? = null  // JSON-serialized list of user IDs
 )
 
@@ -51,6 +58,11 @@ fun SharedLocationEntity.toDomain(): SharedLocation {
         sharingStartedAt = sharingStartedAt,
         targetType = targetType,
         targetId = targetId,
+        targetIds = targetIdsJson?.let {
+            try {
+                Json.parseToJsonElement(it).jsonArray.map { el -> el.jsonPrimitive.content }
+            } catch (_: Exception) { emptyList() }
+        } ?: emptyList(),
         visibleTo = visibleTo?.let {
             try {
                 Json.parseToJsonElement(it).jsonArray.map { el -> el.jsonPrimitive.content }
@@ -77,6 +89,9 @@ fun SharedLocation.toEntity(): SharedLocationEntity {
         sharingStartedAt = sharingStartedAt,
         targetType = targetType,
         targetId = targetId,
+        targetIdsJson = if (targetIds.isNotEmpty()) {
+            JsonArray(targetIds.map { JsonPrimitive(it) }).toString()
+        } else null,
         visibleTo = if (visibleTo.isNotEmpty()) {
             JsonArray(visibleTo.map { JsonPrimitive(it) }).toString()
         } else null

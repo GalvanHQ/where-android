@@ -133,16 +133,47 @@ fun ChatScreen(
 
     // Pins of others sharing in THIS conversation, derived from the unified repo
     // stream filtered by this chat's targetId. Drives the header avatars row.
+    //
+    // Matching rules — a location row counts as "shared into this chat" when:
+    //   • The chat is a group and the row's groupId / targetIds reference the
+    //     groupId, OR
+    //   • The chat is a DM and the row was authored by the other user with
+    //     a `direct:${currentUserId}` target — i.e. they're sharing TO me.
+    //   • The chat is a DM and the row was authored by me with
+    //     `direct:${otherUserId}` (my outgoing share); excluded here on
+    //     purpose because the avatar row is "who else is sharing".
     val headerSharingAvatars = remember(
         uiState.cachedLocations,
         uiState.conversation?.groupId,
-        uiState.conversation?.otherUserId
+        uiState.conversation?.otherUserId,
+        viewModel.currentUserId,
     ) {
         val conv = uiState.conversation
-        val targetId = conv?.groupId ?: conv?.otherUserId?.let { "direct:$it" }
-        if (targetId == null) emptyList()
-        else uiState.cachedLocations.filter { loc ->
-            loc.isSharingActive && (loc.groupId == targetId || targetId in loc.targetIds)
+        val groupId = conv?.groupId
+        val otherUid = conv?.otherUserId
+        val myUid = viewModel.currentUserId
+        if (groupId == null && otherUid == null) return@remember emptyList()
+
+        uiState.cachedLocations.filter { loc ->
+            if (!loc.isSharingActive) return@filter false
+            // Skip myself — the row shows other people.
+            if (myUid != null && loc.userId == myUid) return@filter false
+
+            if (groupId != null) {
+                // Group chat: match the groupId on either the legacy single
+                // target field or the multi-target list.
+                loc.groupId == groupId || groupId in loc.targetIds
+            } else if (otherUid != null && myUid != null) {
+                // DM: the other user is sharing with me. Their location doc
+                // has `targetId = "direct:${myUid}"` from THEIR perspective.
+                // We match on userId == otherUid AND a direct: token that
+                // points to me.
+                if (loc.userId != otherUid) return@filter false
+                val directToMe = "direct:$myUid"
+                loc.targetId == directToMe ||
+                    loc.groupId == directToMe ||
+                    directToMe in loc.targetIds
+            } else false
         }
     }
 

@@ -38,8 +38,9 @@ export const scheduledPruneNotifications = onSchedule(
     // doc inside each user's `inbox` subcollection.
     const PAGE_SIZE = 200;
     let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+    let done = false;
 
-    while (true) {
+    while (!done) {
       let q = db
         .collectionGroup("inbox")
         .where(admin.firestore.FieldPath.documentId(), ">=", "notifications")
@@ -49,7 +50,10 @@ export const scheduledPruneNotifications = onSchedule(
       if (lastDoc) q = q.startAfter(lastDoc);
 
       const snap = await q.get();
-      if (snap.empty) break;
+      if (snap.empty) {
+        done = true;
+        break;
+      }
       totalScanned += snap.size;
 
       const writes: Promise<unknown>[] = [];
@@ -80,8 +84,11 @@ export const scheduledPruneNotifications = onSchedule(
       }
       if (writes.length > 0) await Promise.all(writes);
 
-      if (snap.size < PAGE_SIZE) break;
-      lastDoc = snap.docs[snap.docs.length - 1];
+      if (snap.size < PAGE_SIZE) {
+        done = true;
+      } else {
+        lastDoc = snap.docs[snap.docs.length - 1];
+      }
     }
 
     console.log(

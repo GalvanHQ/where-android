@@ -28,6 +28,19 @@ interface LocationDao {
     @Query("DELETE FROM shared_location WHERE timestamp < :expiryTime")
     suspend fun deleteExpiredLocations(expiryTime: Long)
 
+    /** Delete a single row by primary key (the doc id, which equals userId
+     *  for activeLocations rows). Used by the listener to reconcile when a
+     *  sharer drops off the visibleTo list entirely. */
+    @Query("DELETE FROM shared_location WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    /** Delete rows matching a (userId, target) pair. Used when a sharer
+     *  stops their session — Firestore writes `isSharingActive=false` and
+     *  the listener uses this to clean up Room so the cached-locations
+     *  Flow stops replaying the stale "Sharing" badge. */
+    @Query("DELETE FROM shared_location WHERE userId = :userId AND groupId = :targetId")
+    suspend fun deleteByUserAndTarget(userId: String, targetId: String)
+
     /**
      * Observes all active location sharing sessions from Room cache.
      * Used for aggressive local caching — serves cached positions within 100ms of screen open.

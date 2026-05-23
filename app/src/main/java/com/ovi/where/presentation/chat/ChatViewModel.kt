@@ -1847,13 +1847,30 @@ class ChatViewModel @Inject constructor(
 
     /**
      * Computes the number of active location sharers in this conversation.
-     * Matches against both legacy targetId and the new targetIds list.
+     *
+     * Matching rules:
+     *   • Group chat: any active row whose `groupId` or `targetIds` contains
+     *     the current group id.
+     *   • DM: any active row authored by the *other* user. We don't try to
+     *     parse their per-target `direct:` token because in DMs they're only
+     *     ever sharing TO me — userId equality is sufficient.
      */
     private fun computeActiveSharingCount(locations: List<SharedLocation>): Int {
         val conversation = _uiState.value.conversation ?: return 0
-        val targetId = conversation.groupId ?: "direct:${conversation.otherUserId}"
+        val groupId = conversation.groupId
+        val otherUid = conversation.otherUserId
         return locations.count { loc ->
-            loc.isSharingActive && (loc.groupId == targetId || targetId in loc.targetIds)
+            if (!loc.isSharingActive) return@count false
+            // Don't count my own outgoing share — this metric is "who else
+            // is in the live meetup".
+            val myUid = currentUserId
+            if (myUid != null && loc.userId == myUid) return@count false
+
+            if (groupId != null) {
+                loc.groupId == groupId || groupId in loc.targetIds
+            } else if (otherUid != null) {
+                loc.userId == otherUid
+            } else false
         }
     }
 

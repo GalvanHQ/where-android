@@ -690,34 +690,56 @@ class LocationRepositoryImpl @Inject constructor(
                     return@addSnapshotListener
                 }
 
-                val locations = snapshot?.documents?.mapNotNull { doc ->
-                    try {
-                        val location = parseSharedLocation(doc.id, doc.data)
-                            ?: return@mapNotNull null
-
-                        val now = System.currentTimeMillis()
-                        val stillActive = location.isSharingActive &&
-                            (location.sharingExpiresAt == 0L ||
-                             location.sharingExpiresAt == Long.MAX_VALUE ||
-                             now < location.sharingExpiresAt)
-                        if (stillActive && location.userId != uid) {
-                            location
-                        } else null
-                    } catch (e: Exception) {
+                // Parse every doc (active or inactive) so we can reconcile
+                // Room — inactive rows must be *deleted* locally, otherwise
+                // the cached-locations Flow keeps replaying old "Sharing"
+                // chips long after the user stopped.
+                val parsed = snapshot?.documents?.mapNotNull { doc ->
+                    try { parseSharedLocation(doc.id, doc.data) }
+                    catch (e: Exception) {
                         Timber.w(e, "observeActiveLocations: failed to parse doc=${doc.id}")
                         null
                     }
                 } ?: emptyList()
 
+                val now = System.currentTimeMillis()
+                val (active, inactive) = parsed.partition { location ->
+                    location.isSharingActive &&
+                        (location.sharingExpiresAt == 0L ||
+                         location.sharingExpiresAt == Long.MAX_VALUE ||
+                         now < location.sharingExpiresAt) &&
+                        location.userId != uid
+                }
+
                 // Persist-before-emit: write to Room cache BEFORE emitting to UI
                 repositoryScope.launch {
-                    if (locations.isNotEmpty()) {
-                        locationDao.insertLocations(locations.map { it.toEntity() })
+                    if (active.isNotEmpty()) {
+                        locationDao.insertLocations(active.map { it.toEntity() })
+                    }
+                    // Reconcile: delete Room rows for now-inactive sharers
+                    // and for users who are no longer in our `visibleTo`
+                    // set (i.e. they unshared with us specifically).
+                    if (!isFromCache) {
+                        // Inactive rows present in this snapshot — delete them.
+                        for (loc in inactive) {
+                            locationDao.deleteByUserAndTarget(loc.userId, loc.groupId)
+                        }
+                        // Also delete rows in Room for users not present in
+                        // this server snapshot at all (they removed us from
+                        // visibleTo). We compute the diff against the active
+                        // set since we want to keep their last-known position
+                        // as long as we're still authorized to see it.
+                        val seenUids = parsed.map { it.userId }.toSet()
+                        val missing = locationDao.getAllActive()
+                            .filter { it.userId != uid && it.userId !in seenUids }
+                        for (row in missing) {
+                            locationDao.deleteById(row.id)
+                        }
                     }
                 }
 
-                Timber.d("observeActiveLocations: emitting ${locations.size} active locations")
-                trySend(locations).isSuccess
+                Timber.d("observeActiveLocations: emitting ${active.size} active locations")
+                trySend(active).isSuccess
             }
         awaitClose { listener.remove() }
     }

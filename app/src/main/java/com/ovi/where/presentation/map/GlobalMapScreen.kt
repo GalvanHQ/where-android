@@ -136,6 +136,7 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.maps.android.compose.ComposeMapColorScheme
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapType
@@ -341,15 +342,6 @@ fun GlobalMapScreen(
     var showMeetupClearConfirm by remember { mutableStateOf(false) }
     var showMeetupStatusEditor by remember { mutableStateOf(false) }
 
-    // ── Night mode (auto-detect based on time of day) ─────────────────────────
-    // Uses ComposeMapColorScheme.DARK — Google's official Maps dark mode,
-    // applied before the first frame so there's no light-tile flash. We
-    // intentionally don't layer a custom mapStyleOptions JSON on top so the
-    // styling stays identical to Google Maps' production dark theme.
-    val isNightTime = remember {
-        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-        hour < 6 || hour >= 19 // Night = 7pm to 6am
-    }
 
     // Single persistent bottom sheet that switches views.
     // Replaces multiple modal bottom sheets for cleaner UX.
@@ -593,9 +585,8 @@ fun GlobalMapScreen(
                 // Backdrop tuned to match Google Maps' official dark/light tile
                 // colors. Painted under the GoogleMap so the brief mount-to-
                 // first-tile window blends into the theme instead of flashing.
-                .background(
-                    if (isNightTime) Color(0xFF202C3B) else Color(0xFFE8EDF1)
-                )
+
+
         ) {
             // ── Map (full screen — behind sheet, nav bar, and FABs) ───────────
             // Wait for the saved camera position to load from DataStore before
@@ -616,11 +607,7 @@ fun GlobalMapScreen(
                     // *before* the first frame, eliminating the light-tile flash
                     // we used to see while the JSON style was being applied. We
                     // keep mapStyleOptions for fine-tuning POI visibility etc.
-                    mapColorScheme = if (isNightTime) {
-                        com.google.maps.android.compose.ComposeMapColorScheme.DARK
-                    } else {
-                        com.google.maps.android.compose.ComposeMapColorScheme.LIGHT
-                    },
+                    mapColorScheme = ComposeMapColorScheme.FOLLOW_SYSTEM,
                     properties = MapProperties(
                         mapType = mapType,
                         isMyLocationEnabled = false

@@ -68,6 +68,7 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.ComposeMapColorScheme
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapType
@@ -309,19 +310,9 @@ private fun HeroPickPreview(
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(target, 16f)
     }
-
-    val isNightTime = remember {
-        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-        hour < 6 || hour >= 19
-    }
     Surface(
         modifier = modifier,
         shape = CardShape,
-        color = if (isNightTime) {
-            Color(0xFF202C3B)
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerHigh
-        },
         tonalElevation = 1.dp,
         border = BorderStroke(
             width = 0.5.dp,
@@ -333,11 +324,7 @@ private fun HeroPickPreview(
                 .fillMaxSize()
                 .clip(CardShape),
             cameraPositionState = cameraPositionState,
-            mapColorScheme = if (isNightTime) {
-                com.google.maps.android.compose.ComposeMapColorScheme.DARK
-            } else {
-                com.google.maps.android.compose.ComposeMapColorScheme.LIGHT
-            },
+            mapColorScheme = ComposeMapColorScheme.FOLLOW_SYSTEM,
             properties = MapProperties(mapType = MapType.NORMAL, isMyLocationEnabled = false),
             uiSettings = MapUiSettings(
                 zoomControlsEnabled = false,

@@ -35,7 +35,8 @@ class ConversationInfoViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val conversationRepository: ConversationRepository,
     private val messageDao: MessageDao,
-    private val firebaseAuth: FirebaseAuth
+    private val firebaseAuth: FirebaseAuth,
+    private val userCache: com.ovi.where.data.cache.UserCache,
 ) : ViewModel() {
 
     private val conversationId: String = savedStateHandle["conversationId"] ?: ""
@@ -110,55 +111,60 @@ class ConversationInfoViewModel @Inject constructor(
             val nicknames = conversation.nicknames
 
             if (conversation.type == ConversationType.DIRECT && otherUserId != null) {
-                // Load other user's profile for DM conversations
-                when (val userResult = userRepository.getUser(otherUserId)) {
-                    is Resource.Success -> {
-                        val user = userResult.data!!
-                        val lastActive = formatLastActiveTime(user.lastSeen, user.isOnline)
+                // Load other user's profile via the persistent UserCache so
+                // names + avatars survive ViewModel recreation. Try cache
+                // first (instant + offline-friendly), then warm if missing.
+                val cached = userCache.getCached(otherUserId)
+                val effectiveUser = if (cached != null) {
+                    // Refresh in background so the UI gets fresh data once
+                    // Firestore catches up. UserRepositoryImpl warm-writes
+                    // back into the cache; we just don't await it here.
+                    viewModelScope.launch { userCache.warmUp(otherUserId) }
+                    cached
+                } else {
+                    userCache.warmUp(otherUserId)
+                    userCache.getCached(otherUserId)
+                }
 
-                        // Load shared media thumbnails
-                        val sharedMedia = loadSharedMedia()
-
-                        _uiState.update {
-                            it.copy(
-                                conversationTitle = user.displayName.ifBlank { "Unknown User" },
-                                photoUrl = user.photoUrl,
-                                isOnline = user.isOnline,
-                                lastActiveTime = lastActive,
-                                otherUserId = otherUserId,
-                                sharedMedia = sharedMedia,
-                                isMuted = isMuted,
-                                themeColor = themeColor,
-                                emojiShortcut = emojiShortcut,
-                                nicknames = nicknames,
-                                isLoading = false
-                            )
-                        }
-                        _errorState.value = null
+                if (effectiveUser != null) {
+                    val user = effectiveUser
+                    val lastActive = formatLastActiveTime(user.lastSeen, user.isOnline)
+                    val sharedMedia = loadSharedMedia()
+                    _uiState.update {
+                        it.copy(
+                            conversationTitle = user.displayName.ifBlank { "Unknown User" },
+                            photoUrl = user.photoUrl,
+                            isOnline = user.isOnline,
+                            lastActiveTime = lastActive,
+                            otherUserId = otherUserId,
+                            sharedMedia = sharedMedia,
+                            isMuted = isMuted,
+                            themeColor = themeColor,
+                            emojiShortcut = emojiShortcut,
+                            nicknames = nicknames,
+                            isLoading = false
+                        )
                     }
-                    is Resource.Error -> {
-                        // Fall back to conversation name if user fetch fails
-                        val sharedMedia = loadSharedMedia()
-                        _uiState.update {
-                            it.copy(
-                                conversationTitle = conversation.name.ifBlank { "Unknown User" },
-                                photoUrl = conversation.photoUrl,
-                                isOnline = false,
-                                lastActiveTime = null,
-                                otherUserId = otherUserId,
-                                sharedMedia = sharedMedia,
-                                isMuted = isMuted,
-                                themeColor = themeColor,
-                                emojiShortcut = emojiShortcut,
-                                nicknames = nicknames,
-                                isLoading = false
-                            )
-                        }
-                        _errorState.value = null
+                    _errorState.value = null
+                } else {
+                    // Fall back to conversation name if user fetch failed.
+                    val sharedMedia = loadSharedMedia()
+                    _uiState.update {
+                        it.copy(
+                            conversationTitle = conversation.name.ifBlank { "Unknown User" },
+                            photoUrl = conversation.photoUrl,
+                            isOnline = false,
+                            lastActiveTime = null,
+                            otherUserId = otherUserId,
+                            sharedMedia = sharedMedia,
+                            isMuted = isMuted,
+                            themeColor = themeColor,
+                            emojiShortcut = emojiShortcut,
+                            nicknames = nicknames,
+                            isLoading = false
+                        )
                     }
-                    is Resource.Loading -> {
-                        // Keep loading state
-                    }
+                    _errorState.value = null
                 }
             } else {
                 // Group conversation fallback (shouldn't normally reach here,

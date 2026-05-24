@@ -44,7 +44,8 @@ class GroupInfoViewModel @Inject constructor(
     private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter,
     private val observeMeetupDestinationUseCase: com.ovi.where.domain.usecase.location.ObserveMeetupDestinationUseCase,
     private val setMeetupDestinationUseCase: com.ovi.where.domain.usecase.location.SetMeetupDestinationUseCase,
-    private val clearMeetupDestinationUseCase: com.ovi.where.domain.usecase.location.ClearMeetupDestinationUseCase
+    private val clearMeetupDestinationUseCase: com.ovi.where.domain.usecase.location.ClearMeetupDestinationUseCase,
+    private val userCache: com.ovi.where.data.cache.UserCache,
 ) : ViewModel() {
 
     private val groupId: String = savedStateHandle["groupId"] ?: ""
@@ -231,11 +232,12 @@ class GroupInfoViewModel @Inject constructor(
         viewModelScope.launch {
             groupRepository.observeGroupMembers(groupId).collect { members ->
                 val userIds = members.map { it.userId }
-                val users = when (val usersResult = userRepository.getUsers(userIds)) {
-                    is Resource.Success -> usersResult.data ?: emptyList()
-                    else -> emptyList()
-                }
-                val userMap = users.associateBy { it.id }
+                // Route through the persistent UserCache so names + avatars
+                // survive ViewModel recreation. The Room mirror is the SSOT;
+                // warm-up populates it from Firestore on miss, getCachedMany
+                // reads back synchronously.
+                userCache.warmUpMany(userIds)
+                val userMap = userCache.getCachedMany(userIds)
                 val uid = currentUserId
 
                 val memberUiModels = members.map { member ->
@@ -679,10 +681,17 @@ class GroupInfoViewModel @Inject constructor(
                 when (groupRepository.addMember(groupId, userId)) {
                     is Resource.Success -> {
                         if (convId != null) {
-                            // Resolve target name from the User repo since the
-                            // member isn't in the cached list yet.
-                            val targetName = (userRepository.getUser(userId) as? Resource.Success)
-                                ?.data?.displayName ?: "Someone"
+                            // Resolve target name from the User cache.
+                            // UserRepositoryImpl warm-writes the cache on
+                            // every read so this is offline-first as a
+                            // bonus. Falls back to "Someone" when missing.
+                            val targetName = userCache.getCached(userId)
+                                ?.displayName?.takeIf { it.isNotBlank() }
+                                ?: run {
+                                    userCache.warmUp(userId)
+                                    userCache.getCached(userId)?.displayName
+                                }
+                                ?: "Someone"
                             systemMessageWriter.writeSystemMessage(
                                 conversationId = convId,
                                 eventType = com.ovi.where.domain.model.SystemEventType.MEMBER_ADDED,

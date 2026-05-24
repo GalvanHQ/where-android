@@ -59,7 +59,8 @@ class UserProfileViewModel @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val locationRepository: com.ovi.where.domain.repository.LocationRepository,
     private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter,
-    private val closeFriendsRepository: com.ovi.where.data.repository.CloseFriendsRepository
+    private val closeFriendsRepository: com.ovi.where.data.repository.CloseFriendsRepository,
+    private val userCache: com.ovi.where.data.cache.UserCache,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UserProfileUiState())
@@ -80,7 +81,67 @@ class UserProfileViewModel @Inject constructor(
 
     fun loadUser(userId: String) {
         viewModelScope.launch {
+            // Cache-first: render whatever's already known so cold-starts
+            // don't blank out the profile while Firestore catches up.
+            val cached = userCache.getCached(userId)
+            if (cached != null) {
+                val friendship = friendshipRepository.getFriendship(userId)
+                val uid = callerUid ?: ""
+                _uiState.value = _uiState.value.copy(
+                    profile = cached.toOtherProfileUiModel(
+                        status = friendship?.status,
+                        callerUid = uid,
+                        requesterId = friendship?.requesterId
+                    ),
+                    isLoading = false,
+                )
+                if (!hasRecordedProfileView) {
+                    hasRecordedProfileView = true
+                    interactionRepository.recordInteraction(
+                        userId = userId,
+                        displayName = cached.displayName,
+                        photoUrl = cached.photoUrl,
+                        type = InteractionType.PROFILE_VIEWED
+                    )
+                }
+                refreshCloseFriendStatus(userId)
+                // Refresh in background — UserRepositoryImpl warm-writes
+                // back into the cache, so the next render sees fresh data.
+                launch { userCache.warmUp(userId) }
+                return@launch
+            }
+
             _uiState.value = _uiState.value.copy(isLoading = true, error = null, notFound = false)
+            // Cache miss path: warmUp goes through the repository (which
+            // also warm-writes the cache), so the next render hits.
+            userCache.warmUp(userId)
+            val warmed = userCache.getCached(userId)
+            if (warmed != null) {
+                val friendship = friendshipRepository.getFriendship(userId)
+                val uid = callerUid ?: ""
+                _uiState.value = _uiState.value.copy(
+                    profile = warmed.toOtherProfileUiModel(
+                        status = friendship?.status,
+                        callerUid = uid,
+                        requesterId = friendship?.requesterId
+                    ),
+                    isLoading = false,
+                )
+                if (!hasRecordedProfileView) {
+                    hasRecordedProfileView = true
+                    interactionRepository.recordInteraction(
+                        userId = userId,
+                        displayName = warmed.displayName,
+                        photoUrl = warmed.photoUrl,
+                        type = InteractionType.PROFILE_VIEWED
+                    )
+                }
+                refreshCloseFriendStatus(userId)
+                return@launch
+            }
+
+            // Last-resort fallback if the cache layer + repo both yielded
+            // nothing — fall through to the direct error/not-found path.
             when (val result = userRepository.getUser(userId)) {
                 is Resource.Success -> {
                     val user = result.data

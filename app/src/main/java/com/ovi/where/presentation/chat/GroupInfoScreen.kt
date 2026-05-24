@@ -336,30 +336,27 @@ internal fun GroupInfoScreenContent(
         }
     }
 
-    // ── Leave Group Confirmation Dialog ──────────────────────────────────────
+    // ── Leave Group Confirmation Sheet ──────────────────────────────────────
+    // Uses the unified DestructiveConfirmSheet for premium UX (avatar +
+    // consequence bullets + filled destructive button) instead of the
+    // single-line AlertDialog the previous design shipped with.
     if (showLeaveDialog) {
-        AlertDialog(
-            onDismissRequest = { showLeaveDialog = false },
-            title = { Text("Leave Group") },
-            text = { Text("Are you sure you want to leave this group? You won't be able to see messages or participate anymore.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showLeaveDialog = false
-                        onLeaveGroup()
-                    }
-                ) {
-                    Text(
-                        "Leave",
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
+        com.ovi.where.presentation.chat.components.DestructiveConfirmSheet(
+            title = "Leave ${uiState.groupName.ifBlank { "this group" }}?",
+            message = "You'll stop seeing messages and updates from this group.",
+            consequences = listOf(
+                "You'll be removed from the participant list",
+                "Other members will see a 'left' system message",
+                "You can rejoin only with a new invite"
+            ),
+            confirmLabel = "Leave group",
+            photoUrl = uiState.groupPhotoUrl,
+            icon = Icons.AutoMirrored.Filled.ExitToApp,
+            onConfirm = {
+                showLeaveDialog = false
+                onLeaveGroup()
             },
-            dismissButton = {
-                TextButton(onClick = { showLeaveDialog = false }) {
-                    Text("Cancel")
-                }
-            }
+            onDismiss = { showLeaveDialog = false }
         )
     }
 

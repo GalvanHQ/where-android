@@ -34,6 +34,7 @@ class ConversationInfoViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val userRepository: UserRepository,
     private val conversationRepository: ConversationRepository,
+    private val friendshipRepository: com.ovi.where.domain.repository.FriendshipRepository,
     private val messageDao: MessageDao,
     private val firebaseAuth: FirebaseAuth,
     private val userCache: com.ovi.where.data.cache.UserCache,
@@ -51,6 +52,24 @@ class ConversationInfoViewModel @Inject constructor(
 
     init {
         loadConversationInfo()
+        observeBlockedState()
+    }
+
+    /**
+     * Observes the local user's `users/{uid}/blocks` subcollection so
+     * the Block / Unblock affordance flips reactively whenever this
+     * conversation's other party is added to or removed from the block
+     * list — even when the change originated from another surface like
+     * the People tab or User Profile screen.
+     */
+    private fun observeBlockedState() {
+        viewModelScope.launch {
+            friendshipRepository.observeBlockedUsers().collect { blocks ->
+                val otherUid = _uiState.value.otherUserId
+                val isBlocked = otherUid != null && blocks.any { it.blockedUid == otherUid }
+                _uiState.update { it.copy(isBlocked = isBlocked) }
+            }
+        }
     }
 
     /**
@@ -265,6 +284,49 @@ class ConversationInfoViewModel @Inject constructor(
             val result = conversationRepository.muteConversationFor(conversationId, option)
             if (result is Resource.Success) {
                 _uiState.update { it.copy(isMuted = true) }
+            }
+        }
+    }
+
+    /**
+     * Blocks the other user in this DM.
+     *
+     * The optimistic UI flip happens immediately so the action feels
+     * responsive. Server-side, `FriendshipRepository.blockUser` calls the
+     * Cloud Function which writes to `users/{uid}/blocks/{blockedUid}`,
+     * which our `observeBlockedUsers` subscription will pick up and
+     * confirm. On failure we revert and surface the message.
+     *
+     * Caller is expected to feed a snackbar event from this VM's
+     * existing error path.
+     */
+    fun blockUser() {
+        val otherUid = _uiState.value.otherUserId ?: return
+        if (_uiState.value.isBlocked) return
+        // Optimistic
+        _uiState.update { it.copy(isBlocked = true) }
+        viewModelScope.launch {
+            val result = friendshipRepository.blockUser(otherUid)
+            if (result is Resource.Error) {
+                _uiState.update { it.copy(isBlocked = false) }
+                _errorState.value = result.message ?: "Failed to block user"
+            }
+        }
+    }
+
+    /**
+     * Unblocks the other user in this DM. Symmetric to [blockUser] —
+     * optimistic flip, server confirms, revert on failure.
+     */
+    fun unblockUser() {
+        val otherUid = _uiState.value.otherUserId ?: return
+        if (!_uiState.value.isBlocked) return
+        _uiState.update { it.copy(isBlocked = false) }
+        viewModelScope.launch {
+            val result = friendshipRepository.unblockUser(otherUid)
+            if (result is Resource.Error) {
+                _uiState.update { it.copy(isBlocked = true) }
+                _errorState.value = result.message ?: "Failed to unblock user"
             }
         }
     }

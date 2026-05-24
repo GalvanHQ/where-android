@@ -158,6 +158,8 @@ fun ConversationInfoScreen(
                         uiState.otherUserId?.let { onNavigateToUserProfile(it) }
                     },
                     onNavigateToChat = onNavigateToChat,
+                    onBlockUser = { viewModel.blockUser() },
+                    onUnblockUser = { viewModel.unblockUser() },
                     modifier = Modifier.padding(paddingValues)
                 )
             }
@@ -177,6 +179,8 @@ internal fun ConversationInfoContent(
     onNavigateToMediaGallery: () -> Unit,
     onNavigateToUserProfile: () -> Unit = {},
     onNavigateToChat: () -> Unit = {},
+    onBlockUser: () -> Unit = {},
+    onUnblockUser: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showMuteDialog by remember { mutableStateOf(false) }
@@ -283,6 +287,7 @@ internal fun ConversationInfoContent(
 
         // Privacy & Support section (DM only — this screen is always DM)
         PrivacySupportSection(
+            isBlocked = uiState.isBlocked,
             onBlockTap = { showBlockDialog = true },
             onReportTap = { showReportDialog = true }
         )
@@ -350,30 +355,48 @@ internal fun ConversationInfoContent(
         )
     }
 
-    // ── Block Confirmation Dialog ────────────────────────────────────────
+    // ── Block / Unblock Confirmation Sheet ────────────────────────────────
+    // Replaces the previous AlertDialog (which only showed a toast and did
+    // not actually block the user). Real call now flows through
+    // ConversationInfoViewModel.blockUser / unblockUser → FriendshipRepository
+    // → blockUser / unblockUser Cloud Functions.
     if (showBlockDialog) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showBlockDialog = false },
-            title = { Text("Block user?") },
-            text = {
-                Text("They won't be able to message you or see your profile. You can unblock them later from settings.")
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showBlockDialog = false
-                        context.showToast("User blocked")
-                    }
-                ) {
-                    Text("Block", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showBlockDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
+        val title = uiState.conversationTitle.ifBlank { "this user" }
+        if (uiState.isBlocked) {
+            com.ovi.where.presentation.chat.components.DestructiveConfirmSheet(
+                title = "Unblock $title?",
+                message = "They'll be able to message you and see your shared updates again.",
+                consequences = emptyList(),
+                confirmLabel = "Unblock",
+                photoUrl = uiState.photoUrl,
+                icon = androidx.compose.material.icons.Icons.Filled.Block,
+                onConfirm = {
+                    showBlockDialog = false
+                    onUnblockUser()
+                    context.showToast("User unblocked")
+                },
+                onDismiss = { showBlockDialog = false }
+            )
+        } else {
+            com.ovi.where.presentation.chat.components.DestructiveConfirmSheet(
+                title = "Block $title?",
+                message = "They won't know you blocked them.",
+                consequences = listOf(
+                    "You won't see their messages or location",
+                    "They can't message you or invite you to groups",
+                    "You can unblock them anytime from this menu"
+                ),
+                confirmLabel = "Block",
+                photoUrl = uiState.photoUrl,
+                icon = androidx.compose.material.icons.Icons.Filled.Block,
+                onConfirm = {
+                    showBlockDialog = false
+                    onBlockUser()
+                    context.showToast("User blocked")
+                },
+                onDismiss = { showBlockDialog = false }
+            )
+        }
     }
 
     // ── Report Confirmation Dialog ───────────────────────────────────────
@@ -642,6 +665,7 @@ private fun MoreActionsSection(
  */
 @Composable
 private fun PrivacySupportSection(
+    isBlocked: Boolean = false,
     onBlockTap: () -> Unit = {},
     onReportTap: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -651,9 +675,13 @@ private fun PrivacySupportSection(
 
         InfoListItem(
             icon = Icons.Filled.Block,
-            title = "Block",
+            title = if (isBlocked) "Unblock" else "Block",
             onClick = onBlockTap,
-            tintColor = MaterialTheme.colorScheme.error
+            tintColor = if (isBlocked) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.error
+            }
         )
         InfoListItem(
             icon = Icons.Filled.Flag,

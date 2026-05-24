@@ -23,7 +23,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ExitToApp
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.NotificationsOff
+import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -83,6 +90,11 @@ fun ChatHeader(
     isOtherUserFriend: Boolean = true,
     sharingLocations: List<SharedLocation> = emptyList(),
     onSharingAvatarsTap: () -> Unit = {},
+    isMuted: Boolean = false,
+    isBlocked: Boolean = false,
+    onToggleMute: () -> Unit = {},
+    onBlockOrUnblock: () -> Unit = {},
+    onLeaveGroup: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -192,6 +204,20 @@ fun ChatHeader(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
+                // ── Overflow menu ──────────────────────────────────────────
+                // Quick destructive actions (mute, block / leave) right
+                // next to the info icon so users don't have to navigate
+                // into the info screen for the most common chat-level
+                // controls. Items adapt to conversation type.
+                ChatHeaderOverflow(
+                    isGroup = conversation.isGroup,
+                    isMuted = isMuted,
+                    isBlocked = isBlocked,
+                    onToggleMute = onToggleMute,
+                    onBlockOrUnblock = onBlockOrUnblock,
+                    onLeaveGroup = onLeaveGroup
+                )
             } else {
                 // Fallback when conversation is null (loading state)
                 Text(
@@ -426,6 +452,127 @@ private fun SharingAvatarsRow(
                         fontSize = 10.sp
                     ),
                     color = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+        }
+    }
+}
+
+
+/**
+ * Compact dropdown overflow menu attached to the chat header.
+ *
+ * Surfaces the destructive / quick toggles users actually need from a
+ * chat (mute on/off, block-unblock for DMs, leave for groups) right next
+ * to the info button, so they don't have to dig into the info screen
+ * for them. Adapts items by conversation type — DMs see Block, groups
+ * see Leave.
+ */
+@Composable
+private fun ChatHeaderOverflow(
+    isGroup: Boolean,
+    isMuted: Boolean,
+    isBlocked: Boolean,
+    onToggleMute: () -> Unit,
+    onBlockOrUnblock: () -> Unit,
+    onLeaveGroup: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = "More options",
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 2.dp
+        ) {
+            // Mute toggle — shared by DMs and groups.
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        text = if (isMuted) "Unmute notifications" else "Mute notifications",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = if (isMuted) {
+                            Icons.Outlined.NotificationsActive
+                        } else {
+                            Icons.Outlined.NotificationsOff
+                        },
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onToggleMute()
+                }
+            )
+
+            if (isGroup) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = "Leave group",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ExitToApp,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onLeaveGroup()
+                    }
+                )
+            } else {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = if (isBlocked) "Unblock" else "Block",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (isBlocked) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            }
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Block,
+                            contentDescription = null,
+                            tint = if (isBlocked) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onBlockOrUnblock()
+                    }
                 )
             }
         }

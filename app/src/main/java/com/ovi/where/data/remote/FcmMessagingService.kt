@@ -94,10 +94,22 @@ class FcmMessagingService : FirebaseMessagingService() {
             // suppressed (active chat / mute / disabled channel). The bell
             // badge and the inbox screen are derived from this table, so a
             // missing entry here would silently lose the user a notification.
+            //
+            // EXCEPTION: chat messages and mentions are intentionally NOT
+            // mirrored into the in-app notifications inbox. The Chats tab
+            // already shows unread conversations with the latest preview,
+            // so duplicating each message into Notifications is noise. We
+            // still post the system tray push (handled below) so the user
+            // sees the heads-up the same way every other messenger app does
+            // (WhatsApp, Telegram, Messenger): tray push + Chats tab badge,
+            // no in-app inbox row. The Notifications screen stays for
+            // cross-cutting events (friend requests, meetup, location, etc).
             val deepLinkRoute = notificationHelper.resolveDeepLinkRoute(type, payload)
-            runCatching {
-                notificationRepository.add(type, payload, deepLinkRoute)
-            }.onFailure { Timber.w(it, "Failed to persist notification to inbox") }
+            if (type != NotificationType.NEW_MESSAGE && type != NotificationType.MENTION) {
+                runCatching {
+                    notificationRepository.add(type, payload, deepLinkRoute)
+                }.onFailure { Timber.w(it, "Failed to persist notification to inbox") }
+            }
 
             // Now post the system tray notification through the helper.
             // The helper short-circuits when the relevant screen is foregrounded,

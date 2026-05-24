@@ -29,7 +29,7 @@ const { v4: uuidv4 } = require('uuid');
 
 const { auth, db, messaging } = require('./firebase');
 const { verifyIdTokenCached } = require('./authCache');
-const { MAX_RECENT_MESSAGES, MAX_INBOX_ENTRIES } = require('./constants');
+const { MAX_RECENT_MESSAGES } = require('./constants');
 
 /**
  * Validates a location_update frame has all required fields within valid ranges.
@@ -513,23 +513,16 @@ async function sendFCM(conversationId, senderId, senderName, text, options = {})
             return { recipientId, token, title, body, type, isMention };
         });
 
-        // ── Inbox mirroring (parallel transactions) ────────────────────────
-        // Per-recipient inbox writes still need transactional semantics
-        // (two simultaneous messages to the same user must not clobber
-        // each other's entries). They are independent across recipients,
-        // so we run them in parallel rather than serially.
-        await Promise.all(ctxs.map((ctx) =>
-            persistChatInboxEntry(ctx.recipientId, {
-                type: ctx.type,
-                title: ctx.title,
-                body: ctx.body,
-                conversationId,
-                senderId,
-                senderName,
-                groupId,
-                mentions,
-            }).catch((err) => console.warn('inbox persist failed', ctx.recipientId, err.message))
-        ));
+        // ── Inbox mirroring intentionally skipped for chat ─────────────────
+        // Chat messages ('new_message') and mentions ('mention') are NOT
+        // mirrored to the in-app notifications inbox. They live in the
+        // Chats tab + the Android system tray. Mirroring them here would
+        // surface every chat line as an inbox row, which is the same
+        // anti-pattern WhatsApp / Messenger / Telegram avoid. The
+        // Notifications screen is reserved for cross-cutting events
+        // (friend requests, meetup, location). Server keeps writing those
+        // types via the Cloud Functions side (functions/src/lib/notify.ts).
+        // Skipping the write here saves N inbox transactions per send.
 
         // ── FCM dispatch via sendEach ──────────────────────────────────────
         // sendEach delivers all messages in one HTTP/2 connection burst,
@@ -570,58 +563,10 @@ async function sendFCM(conversationId, senderId, senderName, text, options = {})
     }
 }
 
-/**
- * Writes a chat notification into the single-doc inbox at
- * `users/{recipient}/inbox/notifications`. Mirrors the shape used by the
- * TypeScript Cloud Functions so the Android client sees a single coherent
- * inbox stream regardless of producer.
- *
- * Idempotent — same inbound message (retry / replay) replaces the same
- * map slot rather than duplicating.
- */
-async function persistChatInboxEntry(recipientUid, ctx) {
-    const now = Date.now();
-    const entryId = `${ctx.type}_${ctx.conversationId}_${now}`;
-    const entry = {
-        id: entryId,
-        type: ctx.type,
-        title: ctx.title,
-        body: ctx.body,
-        timestamp: now,
-        isRead: false,
-        // Android recomputes the deep-link from `type` + the denormalized
-        // ids below. Mirrors the Cloud Functions side (functions/src/lib/notify.ts)
-        // — single resolver lives client-side now.
-        deepLinkRoute: null,
-        conversationId: ctx.conversationId,
-        groupId: ctx.groupId || null,
-        userId: ctx.senderId,
-        destinationName: null,
-    };
-
-    const inboxRef = db.doc(`users/${recipientUid}/inbox/notifications`);
-
-    await db.runTransaction(async (tx) => {
-        const snap = await tx.get(inboxRef);
-        const existing = (snap.exists && (snap.data().entries || {})) || {};
-
-        // Insert / replace, then enforce FIFO cap.
-        const next = { ...existing, [entryId]: entry };
-        const sortedIds = Object.values(next)
-            .sort((a, b) => b.timestamp - a.timestamp)
-            .slice(0, MAX_INBOX_ENTRIES)
-            .map((e) => e.id);
-
-        const trimmed = {};
-        for (const id of sortedIds) {
-            if (next[id]) trimmed[id] = next[id];
-        }
-
-        tx.set(inboxRef, {
-            entries: trimmed,
-            updatedAt: now,
-        }, { merge: false });
-    });
-}
+// NOTE: previous helper `persistChatInboxEntry` was removed when the
+// in-app inbox stopped mirroring chat-type events. Chat lives on the
+// Chats tab + the OS notification tray now, in line with how WhatsApp /
+// Messenger / Telegram surface chat. If we ever need a chat-specific
+// inbox row again, restore from git history (commit before this change).
 
 module.exports = { initializeSockets };

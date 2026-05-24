@@ -96,6 +96,19 @@ class NotificationRepository @Inject constructor(
                 val parsed = entriesMap.values.mapNotNull { entry ->
                     runCatching { entry.toEntity() }.getOrNull()
                 }
+                    // Strip chat-type entries from what we mirror into Room.
+                    // Chat messages and mentions belong on the Chats tab and
+                    // the system tray, not in the in-app notifications inbox
+                    // (matches WhatsApp / Messenger / Telegram). This filter
+                    // is also a defensive backstop for legacy entries that
+                    // may already exist on the server doc — older builds did
+                    // persist them and we don't want them resurrecting after
+                    // an account swap or reinstall.
+                    .filter {
+                        val t = runCatching { NotificationType.valueOf(it.type) }
+                            .getOrDefault(NotificationType.GENERAL)
+                        t != NotificationType.NEW_MESSAGE && t != NotificationType.MENTION
+                    }
                 val freshIds = parsed.map { it.id }.toSet()
 
                 // ── Cache-snapshot guard ──

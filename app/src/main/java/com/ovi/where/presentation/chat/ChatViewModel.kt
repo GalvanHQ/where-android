@@ -111,7 +111,6 @@ class ChatViewModel @Inject constructor(
     private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter,
     private val observeMeetupDestinationUseCase: com.ovi.where.domain.usecase.location.ObserveMeetupDestinationUseCase,
     private val userCachePersistent: com.ovi.where.data.cache.UserCache,
-    private val observeActiveLocationsUseCase: com.ovi.where.domain.usecase.location.ObserveActiveLocationsUseCase,
 ) : AndroidViewModel(application) {
 
     /**
@@ -1816,23 +1815,6 @@ class ChatViewModel @Inject constructor(
                     isOtherUserSharingLocation = isOtherSharing
                 )
             }
-        }
-
-        // ── Active-locations Firestore subscription ────────────────────────
-        // The Socket.IO + 10s-fallback path ([observeLocationsWithCacheFallback])
-        // doesn't surface "someone started sharing" until the first
-        // location_update frame OR the 10s timer fires. That's too long for
-        // the chat header — the avatar row stayed empty for the first 10s
-        // even when a friend was actively sharing.
-        //
-        // [observeActiveLocations] writes to Room as a side-effect of every
-        // server snapshot, so subscribing here keeps Room (and therefore
-        // the cached-locations Flow above) fresh from the moment the chat
-        // opens. We don't bind its emissions to UI state directly — the
-        // Room Flow is the single source of truth — we just keep the
-        // listener alive while the chat is on screen.
-        viewModelScope.launch {
-            observeActiveLocationsUseCase().collect { /* drain */ }
         }
 
         // The repo's activeSharingState (observed by observeRepoSharingState)

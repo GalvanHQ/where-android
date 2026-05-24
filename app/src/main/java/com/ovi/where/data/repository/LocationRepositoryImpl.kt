@@ -762,122 +762,119 @@ class LocationRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Observes locations with Socket.IO as primary source and Firestore as fallback.
-     * If Socket.IO fails to deliver a location update within [fallbackTimeoutMs],
-     * falls back to Firestore listener. All updates are persisted to Room cache.
+     * Observes the live set of locations the current user can see.
      *
-     * Requirement 7.3: Display cached locations within 100ms, subscribe to Socket.IO,
-     * fall back to Firestore after 10s timeout.
+     * **Architecture:**
+     *   • Firestore is the truth for *membership* — i.e. "who is currently
+     *     sharing with me, and where they were last known to be." We start
+     *     a snapshot listener immediately so the UI sees the right roster
+     *     within milliseconds of the screen opening.
+     *   • Socket.IO is the channel for *position updates* — incremental
+     *     coordinate / speed / bearing changes for users we already know
+     *     about from Firestore. Sockets don't tell us "user X started
+     *     sharing"; that arrives via Firestore.
+     *   • Room is the single source of truth the UI actually reads from.
+     *     Both channels write through to Room; the Flow that the screen
+     *     collects is `locationDao.observeAllActive()`.
+     *
+     * **Why the rewrite:** the previous design waited 10 seconds for a
+     * socket frame before activating the Firestore listener. That meant
+     * users opening a chat or the map saw nothing for the first 10s after
+     * cold start (or whenever they didn't have an active socket frame in
+     * flight). The fallback was misnamed — Firestore *is* the primary
+     * roster source; the socket is a position firehose layered on top.
+     *
+     * The [fallbackTimeoutMs] parameter is retained for source compat but
+     * is no longer used as a gate — it's only logged.
      */
     override fun observeLocationsWithCacheFallback(fallbackTimeoutMs: Long): Flow<List<SharedLocation>> = callbackFlow {
         val uid = currentUid ?: run { trySend(emptyList()); close(); return@callbackFlow }
 
-        var receivedSocketUpdate = false
-        var fallbackListenerActive = false
-        var fallbackListener: ListenerRegistration? = null
+        // ── 1. Firestore listener (membership truth) ──
+        //
+        // Always running while this Flow is collected. Writes through to
+        // Room and reconciles stale rows when the snapshot says someone
+        // stopped sharing.
+        val firestoreListener = firestore
+            .collection(AppConstants.FIRESTORE_COLLECTION_ACTIVE_LOCATIONS)
+            .whereArrayContains("visibleTo", uid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Timber.e(error, "observeLocationsWithCacheFallback Firestore error")
+                    return@addSnapshotListener
+                }
+                val isFromCache = snapshot?.metadata?.isFromCache == true
+                val docCount = snapshot?.documents?.size ?: 0
+                if (isFromCache && docCount == 0) return@addSnapshotListener
 
-        // Start a timeout job: if no Socket.IO update within fallbackTimeoutMs, activate Firestore
-        val timeoutJob = repositoryScope.launch {
-            delay(fallbackTimeoutMs)
-            if (!receivedSocketUpdate && !fallbackListenerActive) {
-                Timber.d("No Socket.IO location update within ${fallbackTimeoutMs}ms — falling back to Firestore")
-                fallbackListenerActive = true
-                fallbackListener = firestore
-                    .collection(AppConstants.FIRESTORE_COLLECTION_ACTIVE_LOCATIONS)
-                    .whereArrayContains("visibleTo", uid)
-                    .addSnapshotListener { snapshot, error ->
-                        if (error != null) {
-                            Timber.e(error, "Firestore cache-fallback listener error")
-                            return@addSnapshotListener
-                        }
-                        // Cache-snapshot guard — same reasoning as the
-                        // primary observeActiveLocations listener: don't
-                        // wipe live chips on cold cache reads.
-                        val isFromCache = snapshot?.metadata?.isFromCache == true
-                        val docCount = snapshot?.documents?.size ?: 0
-                        if (isFromCache && docCount == 0) return@addSnapshotListener
-
-                        // Use the manual parser instead of `toObject` —
-                        // Firestore stores Float fields as Double, so
-                        // `toObject(SharedLocation::class.java)` silently
-                        // fails on accuracy/speed/bearing and returns a
-                        // partially-populated row, which is the root cause
-                        // of "Sharing avatar row never shows" reports.
-                        val parsed = snapshot?.documents?.mapNotNull { doc ->
-                            try { parseSharedLocation(doc.id, doc.data) }
-                            catch (e: Exception) {
-                                Timber.w(e, "fallback listener parse failed: ${doc.id}")
-                                null
-                            }
-                        } ?: emptyList()
-
-                        val now = System.currentTimeMillis()
-                        val (active, inactive) = parsed.partition { location ->
-                            location.isSharingActive &&
-                                (location.sharingExpiresAt == 0L ||
-                                 location.sharingExpiresAt == Long.MAX_VALUE ||
-                                 now < location.sharingExpiresAt) &&
-                                location.userId != uid
-                        }
-
-                        // Persist active rows + reconcile stale Room rows
-                        // (mirrors observeActiveLocations behaviour).
-                        repositoryScope.launch {
-                            if (active.isNotEmpty()) {
-                                locationDao.insertLocations(active.map { it.toEntity() })
-                            }
-                            if (!isFromCache) {
-                                for (loc in inactive) {
-                                    locationDao.deleteByUserAndTarget(loc.userId, loc.groupId)
-                                }
-                                val seenUids = parsed.map { it.userId }.toSet()
-                                val missing = locationDao.getAllActive()
-                                    .filter { it.userId != uid && it.userId !in seenUids }
-                                for (row in missing) locationDao.deleteById(row.id)
-                            }
-                        }
-                        trySend(active).isSuccess
+                val parsed = snapshot?.documents?.mapNotNull { doc ->
+                    try { parseSharedLocation(doc.id, doc.data) }
+                    catch (e: Exception) {
+                        Timber.w(e, "membership parse failed: ${doc.id}")
+                        null
                     }
-            }
-        }
+                } ?: emptyList()
 
-        // Collect Socket.IO location_update frames
-        val socketJob = repositoryScope.launch {
-            chatSocketIoClient.incomingFrames.collect { frame ->
-                if (frame is ServerFrame.LocationUpdate) {
-                    receivedSocketUpdate = true
-                    // Cancel Firestore fallback if it was activated
-                    if (fallbackListenerActive) {
-                        fallbackListener?.remove()
-                        fallbackListener = null
-                        fallbackListenerActive = false
+                val now = System.currentTimeMillis()
+                val (active, inactive) = parsed.partition { location ->
+                    location.isSharingActive &&
+                        (location.sharingExpiresAt == 0L ||
+                         location.sharingExpiresAt == Long.MAX_VALUE ||
+                         now < location.sharingExpiresAt) &&
+                        location.userId != uid
+                }
+
+                repositoryScope.launch {
+                    if (active.isNotEmpty()) {
+                        locationDao.insertLocations(active.map { it.toEntity() })
                     }
-                    timeoutJob.cancel()
-
-                    val location = SharedLocation(
-                        id = frame.userId,
-                        userId = frame.userId,
-                        latitude = frame.lat,
-                        longitude = frame.lng,
-                        accuracy = frame.accuracy,
-                        timestamp = frame.timestamp,
-                        isSharingActive = true
-                    )
-                    // Persist to Room for offline access
-                    locationDao.insertLocation(location.toEntity())
-
-                    // Emit updated list from cache
-                    val allActive = locationDao.getAllActive().map { it.toDomain() }
+                    if (!isFromCache) {
+                        for (loc in inactive) {
+                            locationDao.deleteByUserAndTarget(loc.userId, loc.groupId)
+                        }
+                        val seenUids = parsed.map { it.userId }.toSet()
+                        val missing = locationDao.getAllActive()
+                            .filter { it.userId != uid && it.userId !in seenUids }
+                        for (row in missing) locationDao.deleteById(row.id)
+                    }
+                    // Always emit the current Room state — that's the SSOT.
+                    val allActive = locationDao.getAllActive()
+                        .map { it.toDomain() }
                         .filter { it.userId != uid }
                     trySend(allActive).isSuccess
                 }
             }
+
+        // ── 2. Socket.IO position updates ──
+        //
+        // Live coordinate stream for users Firestore already told us are
+        // sharing. We update Room with the new coords and re-emit the
+        // current set so the map / chat header animate in real time.
+        val socketJob = repositoryScope.launch {
+            chatSocketIoClient.incomingFrames.collect { frame ->
+                if (frame !is ServerFrame.LocationUpdate) return@collect
+                val location = SharedLocation(
+                    id = frame.userId,
+                    userId = frame.userId,
+                    latitude = frame.lat,
+                    longitude = frame.lng,
+                    accuracy = frame.accuracy,
+                    timestamp = frame.timestamp,
+                    isSharingActive = true
+                )
+                locationDao.insertLocation(location.toEntity())
+                val allActive = locationDao.getAllActive()
+                    .map { it.toDomain() }
+                    .filter { it.userId != uid }
+                trySend(allActive).isSuccess
+            }
         }
 
+        Timber.d("observeLocationsWithCacheFallback started (timeout param ignored: ${fallbackTimeoutMs}ms)")
+
         awaitClose {
-            timeoutJob.cancel()
             socketJob.cancel()
-            fallbackListener?.remove()
+            firestoreListener.remove()
         }
     }
 

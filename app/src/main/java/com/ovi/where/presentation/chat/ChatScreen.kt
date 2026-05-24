@@ -480,6 +480,7 @@ fun ChatScreen(
                 onNavigateToConversationInfo = onNavigateToConversationInfo,
                 onlineMemberCount = uiState.onlineMemberCount,
                 isOtherUserFriend = uiState.isOtherUserFriend,
+                groupDescription = uiState.groupDescription,
                 sharingLocations = headerSharingAvatars,
                 onSharingAvatarsTap = { viewModel.openLiveMeetupSheet() }
             )

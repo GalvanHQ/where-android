@@ -438,6 +438,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             val uid = currentUserId ?: ""
             var adminObserved = false
+            var groupDescriptionLoaded = false
             observeConversationsUseCase().collect { conversations ->
                 val conv = conversations.firstOrNull { it.id == conversationId }
                 if (conv != null) {
@@ -500,7 +501,34 @@ class ChatViewModel @Inject constructor(
                         // global map.
                         observeMeetupDestination(uiModel.groupId)
                     }
+
+                    // Resolve the group description once per chat open so
+                    // the header subtitle can render it instead of the
+                    // generic "{n} members" line. Group docs change rarely
+                    // — a one-shot read on first resolve avoids a long-
+                    // lived listener for a static string.
+                    if (uiModel.isGroup && uiModel.groupId != null && !groupDescriptionLoaded) {
+                        groupDescriptionLoaded = true
+                        loadGroupDescription(uiModel.groupId)
+                    }
                 }
+            }
+        }
+    }
+
+    /**
+     * Fetches the group document and surfaces its `description` on
+     * [ChatUiState.groupDescription]. Caller-gated to fire once per chat
+     * open ([loadConversation] passes `groupDescriptionLoaded`). On
+     * failure we leave the field blank — the chat header falls back to
+     * the member-count subtitle.
+     */
+    private fun loadGroupDescription(groupId: String) {
+        viewModelScope.launch {
+            val result = groupRepository.getGroup(groupId)
+            if (result is Resource.Success) {
+                val description = result.data?.description.orEmpty()
+                _uiState.value = _uiState.value.copy(groupDescription = description)
             }
         }
     }
@@ -3411,6 +3439,13 @@ data class ChatUiState(
     // ─── Header State (Task 11.3) ─────────────────────────────────────────────
     /** Whether the other user in a 1:1 conversation is in the caller's friends list (Requirement 8.4). */
     val isOtherUserFriend: Boolean = false,
+    /**
+     * Free-form group description, surfaced in the chat header subtitle
+     * when this conversation is a group and the description is set.
+     * Empty for DMs or unset groups — the header then falls back to the
+     * member-count line.
+     */
+    val groupDescription: String = "",
     /**
      * True when the local user has the other DM party in their blocks
      * subcollection. Drives the chat composer — when true the input bar

@@ -81,6 +81,7 @@ fun ChatHeader(
     onNavigateToConversationInfo: (String) -> Unit = {},
     onlineMemberCount: Int = 0,
     isOtherUserFriend: Boolean = true,
+    groupDescription: String = "",
     sharingLocations: List<SharedLocation> = emptyList(),
     onSharingAvatarsTap: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -160,7 +161,8 @@ fun ChatHeader(
                         ActiveStatusSubtitle(
                             conversation = conversation,
                             onlineMemberCount = onlineMemberCount,
-                            isOtherUserFriend = isOtherUserFriend
+                            isOtherUserFriend = isOtherUserFriend,
+                            groupDescription = groupDescription
                         )
                     }
                 }
@@ -218,7 +220,8 @@ fun ChatHeader(
 private fun ActiveStatusSubtitle(
     conversation: ConversationUiModel,
     onlineMemberCount: Int,
-    isOtherUserFriend: Boolean
+    isOtherUserFriend: Boolean,
+    groupDescription: String = ""
 ) {
     // Tick every minute so the relative-time subtitle stays current.
     var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -231,16 +234,21 @@ private fun ActiveStatusSubtitle(
 
     when {
         conversation.isGroup -> {
+            // When someone is online we show the live "n of N active"
+            // line so the green-dot signal isn't lost. Otherwise prefer
+            // the group description — it's far more useful as a header
+            // subtitle than a flat member count, which the user already
+            // sees on the info screen and the group's avatar count.
             if (onlineMemberCount > 0) {
                 StatusLine(
                     showDot = true,
                     text = "$onlineMemberCount of ${conversation.memberCount} active",
                     color = MaterialTheme.colorScheme.tertiary
                 )
-            } else {
+            } else if (groupDescription.isNotBlank()) {
                 StatusLine(
                     showDot = false,
-                    text = "${conversation.memberCount} members",
+                    text = groupDescription,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

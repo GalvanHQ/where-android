@@ -112,7 +112,6 @@ class ChatViewModel @Inject constructor(
     private val observeMeetupDestinationUseCase: com.ovi.where.domain.usecase.location.ObserveMeetupDestinationUseCase,
     private val userCachePersistent: com.ovi.where.data.cache.UserCache,
     private val meetupPlaceCardEventBus: com.ovi.where.core.event.MeetupPlaceCardEventBus,
-    private val conversationRepository: com.ovi.where.domain.repository.ConversationRepository,
 ) : AndroidViewModel(application) {
 
     /**
@@ -459,11 +458,6 @@ class ChatViewModel @Inject constructor(
                         if (otherUid != null) {
                             dmPresenceSubscribed = true
                             subscribeToDmPresence(otherUid)
-                            // Also start the blocked-state observer so the
-                            // chat header overflow menu can flip "Block" /
-                            // "Unblock" reactively. Idempotent: collect
-                            // happens at most once per DM open.
-                            observeOtherUserBlockedState(otherUid)
                         }
                     }
 
@@ -3183,108 +3177,6 @@ class ChatViewModel @Inject constructor(
         return finalResult
     }
 
-    // ─── Quick destructive actions from chat header ──────────────────────────
-    /**
-     * Toggles the mute state of this conversation (DM or group).
-     * Errors surface through the standard snackbar channel.
-     */
-    fun toggleMuteFromHeader() {
-        val convId = _uiState.value.conversationId ?: return
-        val isMuted = _uiState.value.conversation?.isMuted == true
-        viewModelScope.launch {
-            val result = if (isMuted) {
-                conversationRepository.unmuteConversation(convId)
-            } else {
-                conversationRepository.muteConversation(convId)
-            }
-            if (result is Resource.Error) {
-                _snackbarEvent.tryEmit(
-                    SnackbarEvent(message = result.message ?: "Failed to update mute")
-                )
-            } else {
-                _snackbarEvent.tryEmit(
-                    SnackbarEvent(message = if (isMuted) "Notifications on" else "Notifications muted")
-                )
-            }
-        }
-    }
-
-    /**
-     * Blocks or unblocks the other DM participant from the chat header.
-     * Optimistic state flip (so the menu updates instantly), reverts on
-     * failure. Calls the FriendshipRepository which goes through the
-     * blockUser / unblockUser Cloud Functions.
-     */
-    fun toggleBlockFromHeader() {
-        val conversation = _uiState.value.conversation ?: return
-        if (conversation.isGroup) return
-        val otherUid = conversation.otherUserId ?: return
-        val wasBlocked = _uiState.value.isOtherUserBlocked
-        // Optimistic
-        _uiState.value = _uiState.value.copy(isOtherUserBlocked = !wasBlocked)
-        viewModelScope.launch {
-            val result = if (wasBlocked) {
-                friendshipRepository.unblockUser(otherUid)
-            } else {
-                friendshipRepository.blockUser(otherUid)
-            }
-            if (result is Resource.Error) {
-                // Revert
-                _uiState.value = _uiState.value.copy(isOtherUserBlocked = wasBlocked)
-                _snackbarEvent.tryEmit(
-                    SnackbarEvent(message = result.message ?: "Failed to update block")
-                )
-            } else {
-                _snackbarEvent.tryEmit(
-                    SnackbarEvent(
-                        message = if (wasBlocked) "User unblocked" else "User blocked"
-                    )
-                )
-            }
-        }
-    }
-
-    /**
-     * Leaves the current group from the chat header.
-     *
-     * Same flow GroupInfoViewModel uses: writes the system message via
-     * the SystemMessageWriter, then calls the repository which invokes
-     * the leaveGroup Cloud Function. Calls [onLeft] on success so the
-     * screen can pop the back stack.
-     */
-    fun leaveGroupFromHeader(onLeft: () -> Unit) {
-        val groupId = _uiState.value.conversation?.groupId ?: return
-        viewModelScope.launch {
-            when (val result = groupRepository.leaveGroup(groupId)) {
-                is Resource.Success -> {
-                    _snackbarEvent.tryEmit(SnackbarEvent(message = "You left the group"))
-                    onLeft()
-                }
-                is Resource.Error -> {
-                    _snackbarEvent.tryEmit(
-                        SnackbarEvent(message = result.message ?: "Failed to leave group")
-                    )
-                }
-                else -> {}
-            }
-        }
-    }
-
-    /**
-     * Subscribes to the local user's blocked-users subcollection so
-     * the chat header overflow menu can flip "Block" / "Unblock"
-     * reactively when this DM's other party is blocked or unblocked
-     * from any surface (UserProfile, ConversationInfo, People).
-     */
-    private fun observeOtherUserBlockedState(otherUserId: String) {
-        viewModelScope.launch {
-            friendshipRepository.observeBlockedUsers().collect { blocks ->
-                val blocked = blocks.any { it.blockedUid == otherUserId }
-                _uiState.value = _uiState.value.copy(isOtherUserBlocked = blocked)
-            }
-        }
-    }
-
     companion object {
         /** Number of messages to load on initial page and each subsequent page. */
         const val INITIAL_PAGE_SIZE = 30
@@ -3466,13 +3358,6 @@ data class ChatUiState(
     // ─── Header State (Task 11.3) ─────────────────────────────────────────────
     /** Whether the other user in a 1:1 conversation is in the caller's friends list (Requirement 8.4). */
     val isOtherUserFriend: Boolean = false,
-    /**
-     * True when the local user has the other DM party in their blocks
-     * subcollection. Drives the chat header's overflow menu so the
-     * destructive "Block" action becomes "Unblock" when already blocked.
-     * Always false for groups.
-     */
-    val isOtherUserBlocked: Boolean = false,
     // ─── Aggressive Local Caching State (Task 2.4) ────────────────────────────
     /** Cached locations from Room, served within 100ms of screen open (Requirement 7.2). */
     val cachedLocations: List<SharedLocation> = emptyList(),

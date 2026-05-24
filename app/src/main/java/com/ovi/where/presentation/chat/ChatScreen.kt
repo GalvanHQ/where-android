@@ -31,8 +31,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ExitToApp
-import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
@@ -132,13 +130,6 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-
-    // Confirm sheets for the chat header's quick destructive actions —
-    // "Block / Unblock" (DMs) and "Leave group" (groups). State is held in
-    // the screen because the sheets are pure UI: the VM exposes the
-    // toggle methods which the sheets fire on confirm.
-    var showBlockSheet by remember { mutableStateOf(false) }
-    var showLeaveSheet by remember { mutableStateOf(false) }
 
     // Pins of others sharing in THIS conversation, derived from the unified repo
     // stream filtered by this chat's targetId. Drives the header avatars row.
@@ -490,12 +481,7 @@ fun ChatScreen(
                 onlineMemberCount = uiState.onlineMemberCount,
                 isOtherUserFriend = uiState.isOtherUserFriend,
                 sharingLocations = headerSharingAvatars,
-                onSharingAvatarsTap = { viewModel.openLiveMeetupSheet() },
-                isMuted = uiState.conversation?.isMuted == true,
-                isBlocked = uiState.isOtherUserBlocked,
-                onToggleMute = { viewModel.toggleMuteFromHeader() },
-                onBlockOrUnblock = { showBlockSheet = true },
-                onLeaveGroup = { showLeaveSheet = true }
+                onSharingAvatarsTap = { viewModel.openLiveMeetupSheet() }
             )
         }
     ) { paddingValues ->
@@ -1336,72 +1322,6 @@ fun ChatScreen(
             onAcceptRequest = { userId ->
                 viewModel.acceptFriendRequest(userId)
             }
-        )
-    }
-
-    // ── Block / Unblock confirm sheet (DMs) ──────────────────────────────────
-    if (showBlockSheet) {
-        val conversation = uiState.conversation
-        val blocked = uiState.isOtherUserBlocked
-        val title = conversation?.title?.takeIf { it.isNotBlank() } ?: "this user"
-        if (blocked) {
-            // Unblock is non-destructive — single confirm with no
-            // bullet list. We still use the same sheet so the visuals
-            // stay consistent with Block / Leave.
-            com.ovi.where.presentation.chat.components.DestructiveConfirmSheet(
-                title = "Unblock $title?",
-                message = "They'll be able to message you and see your shared updates again.",
-                consequences = emptyList(),
-                confirmLabel = "Unblock",
-                photoUrl = conversation?.photoUrl,
-                icon = Icons.Filled.Block,
-                onConfirm = {
-                    viewModel.toggleBlockFromHeader()
-                    showBlockSheet = false
-                },
-                onDismiss = { showBlockSheet = false }
-            )
-        } else {
-            com.ovi.where.presentation.chat.components.DestructiveConfirmSheet(
-                title = "Block $title?",
-                message = "They won't know you blocked them.",
-                consequences = listOf(
-                    "You won't see their messages or location",
-                    "They can't message you or invite you to groups",
-                    "You can unblock them anytime from this menu"
-                ),
-                confirmLabel = "Block",
-                photoUrl = conversation?.photoUrl,
-                icon = Icons.Filled.Block,
-                onConfirm = {
-                    viewModel.toggleBlockFromHeader()
-                    showBlockSheet = false
-                },
-                onDismiss = { showBlockSheet = false }
-            )
-        }
-    }
-
-    // ── Leave-group confirm sheet ────────────────────────────────────────────
-    if (showLeaveSheet) {
-        val conversation = uiState.conversation
-        val title = conversation?.title?.takeIf { it.isNotBlank() } ?: "this group"
-        com.ovi.where.presentation.chat.components.DestructiveConfirmSheet(
-            title = "Leave $title?",
-            message = "You'll stop seeing messages and updates from this group.",
-            consequences = listOf(
-                "You'll be removed from the participant list",
-                "Other members will see a 'left' system message",
-                "You can rejoin only with a new invite"
-            ),
-            confirmLabel = "Leave group",
-            photoUrl = conversation?.photoUrl,
-            icon = Icons.AutoMirrored.Outlined.ExitToApp,
-            onConfirm = {
-                viewModel.leaveGroupFromHeader { onNavigateBack() }
-                showLeaveSheet = false
-            },
-            onDismiss = { showLeaveSheet = false }
         )
     }
 }

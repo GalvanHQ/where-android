@@ -23,6 +23,8 @@ class SettingsViewModel @Inject constructor(
     private val signOutUseCase: SignOutUseCase,
     private val observeCurrentUserUseCase: ObserveCurrentUserUseCase,
     private val appDatabase: AppDatabase,
+    private val userPreferences: com.ovi.where.data.local.prefs.UserPreferences,
+    private val conversationShortcutManager: com.ovi.where.core.notification.ConversationShortcutManager,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -63,14 +65,59 @@ class SettingsViewModel @Inject constructor(
     }
 
     private suspend fun clearAllCache() = withContext(Dispatchers.IO) {
-        // Clear Room database (all tables)
-        appDatabase.clearAllTables()
-        // Clear Coil image cache (memory + disk)
-        context.imageLoader.memoryCache?.clear()
-        context.imageLoader.diskCache?.clear()
-        // Clear internal cache directory
-        context.cacheDir.listFiles()?.forEach { file ->
-            if (file.isDirectory) file.deleteRecursively() else file.delete()
+        // ── Room: wipe every table ────────────────────────────────────────
+        // covers conversations, messages, users, locations, notifications,
+        // online status, friend cache, link previews, voice cache.
+        runCatching { appDatabase.clearAllTables() }
+
+        // ── Coil image cache ──────────────────────────────────────────────
+        runCatching {
+            context.imageLoader.memoryCache?.clear()
+            context.imageLoader.diskCache?.clear()
+        }
+
+        // ── Internal cache directory ─────────────────────────────────────
+        runCatching {
+            context.cacheDir.listFiles()?.forEach { file ->
+                if (file.isDirectory) file.deleteRecursively() else file.delete()
+            }
+        }
+
+        // ── DataStore (UserPreferences) ──────────────────────────────────
+        // Holds user_id, last GPS, sharing session, last share target,
+        // onboarding flags, etc. Without this the next account would
+        // inherit the previous user's seeded camera position and
+        // half-finished sharing session metadata.
+        runCatching { userPreferences.clearAll() }
+
+        // ── Legacy SharedPreferences ─────────────────────────────────────
+        // notification_permission_prefs tracks "have we asked the user
+        // about post-notification permission yet" — reset so the next
+        // account gets a fresh prompt experience.
+        runCatching {
+            context
+                .getSharedPreferences("notification_permission_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .clear()
+                .apply()
+        }
+
+        // ── Launcher conversation shortcuts ──────────────────────────────
+        // Per-conversation long-lived shortcuts surface in the system
+        // share sheet and notification bubbles. Leaving them after sign
+        // out leaks the previous user's chat list to whoever signs in
+        // next.
+        runCatching { conversationShortcutManager.clearAll() }
+
+        // ── Active notifications ─────────────────────────────────────────
+        // Pull anything we've already posted to the system tray so the
+        // next user doesn't see the previous user's chat / friend / meetup
+        // alerts. Channels themselves stay (they're per-app system
+        // settings, not user-scoped).
+        runCatching {
+            androidx.core.app.NotificationManagerCompat
+                .from(context)
+                .cancelAll()
         }
     }
 }

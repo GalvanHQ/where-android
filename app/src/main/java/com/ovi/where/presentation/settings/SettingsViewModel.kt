@@ -44,11 +44,13 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun signOut() {
+        if (_uiState.value.isSigningOut) return
         viewModelScope.launch {
+            _uiState.update { it.copy(isSigningOut = true) }
             // Clear all local data on sign out
             clearAllCache()
             signOutUseCase()
-            _uiState.update { it.copy(isSignedOut = true) }
+            _uiState.update { it.copy(isSigningOut = false, isSignedOut = true) }
         }
     }
 
@@ -77,6 +79,13 @@ data class SettingsUiState(
     val displayName: String = "",
     val email: String = "",
     val photoUrl: String? = null,
+    /**
+     * True while [SettingsViewModel.signOut] is running. Drives the
+     * sign-out row's spinner so the user gets immediate feedback that
+     * the action took (clearing Room + Coil caches + auth tokens can
+     * take a few hundred ms on cold storage).
+     */
+    val isSigningOut: Boolean = false,
     val isSignedOut: Boolean = false,
     val isClearingCache: Boolean = false,
     val cacheCleared: Boolean = false

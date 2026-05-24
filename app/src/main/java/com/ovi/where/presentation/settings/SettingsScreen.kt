@@ -232,11 +232,12 @@ fun SettingsScreen(
             ) {
                 SettingsRow(
                     icon = Icons.AutoMirrored.Outlined.Logout,
-                    title = "Sign Out",
+                    title = if (uiState.isSigningOut) "Signing out…" else "Sign Out",
                     subtitle = uiState.email,
                     onClick = { viewModel.signOut() },
                     tint = MaterialTheme.colorScheme.error,
-                    showChevron = false
+                    showChevron = false,
+                    isLoading = uiState.isSigningOut
                 )
             }
 
@@ -272,16 +273,24 @@ private fun SettingsRow(
     subtitle: String,
     onClick: () -> Unit,
     tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    showChevron: Boolean = true
+    showChevron: Boolean = true,
+    /**
+     * When `true`, the icon is replaced with a circular progress indicator
+     * (same color as the row's tint), the row's subtitle is hidden in
+     * favour of a "Signing out…" style label provided by the caller via
+     * [subtitle], and clicks are no-oped to prevent double-fire while the
+     * action is in flight.
+     */
+    isLoading: Boolean = false
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(enabled = !isLoading, onClick = onClick)
             .padding(horizontal = Dimens.spaceLarge, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Icon container
+        // Icon container — swaps to a spinner while loading.
         Box(
             modifier = Modifier
                 .size(Dimens.settingIconContainer)
@@ -294,12 +303,20 @@ private fun SettingsRow(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(Dimens.iconSizeMedium),
-                tint = tint
-            )
+            if (isLoading) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    modifier = Modifier.size(Dimens.iconSizeMedium),
+                    color = tint,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(Dimens.iconSizeMedium),
+                    tint = tint
+                )
+            }
         }
         Spacer(modifier = Modifier.width(Dimens.spaceLarge))
         Column(modifier = Modifier.weight(1f)) {
@@ -316,7 +333,7 @@ private fun SettingsRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        if (showChevron) {
+        if (showChevron && !isLoading) {
             Icon(
                 Icons.Outlined.ChevronRight,
                 contentDescription = null,

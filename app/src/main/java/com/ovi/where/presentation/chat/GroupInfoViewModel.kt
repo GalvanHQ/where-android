@@ -368,6 +368,11 @@ class GroupInfoViewModel @Inject constructor(
      * Requirement 9.4
      */
     fun makeAdmin(userId: String) {
+        // No-op when already admin — avoids a wasted Firestore write and a
+        // duplicate MEMBER_PROMOTED system message.
+        val target = _uiState.value.members.firstOrNull { it.userId == userId } ?: return
+        if (target.isAdmin) return
+
         val previousMembers = _uiState.value.members
 
         // Optimistic update
@@ -411,7 +416,18 @@ class GroupInfoViewModel @Inject constructor(
      * MEMBER_DEMOTED system message into the group's chat.
      */
     fun demoteAdmin(userId: String) {
-        val previousMembers = _uiState.value.members
+        // Defense in depth — the UI gates this already, but we reject:
+        //   • Self-demotion (admins must transfer admin first via the
+        //     group info screen).
+        //   • Last-admin demotion (would leave the group ungoverned).
+        val currentMembers = _uiState.value.members
+        val target = currentMembers.firstOrNull { it.userId == userId } ?: return
+        if (!target.isAdmin) return
+        if (userId == currentUserId) return
+        val adminCount = currentMembers.count { it.isAdmin }
+        if (adminCount <= 1) return
+
+        val previousMembers = currentMembers
 
         _uiState.update { state ->
             state.copy(
@@ -451,6 +467,12 @@ class GroupInfoViewModel @Inject constructor(
      * Requirement 9.4
      */
     fun removeMember(userId: String) {
+        // Self-removal must go through the leave-group flow, not the
+        // remove-member callable — they have different audit trails
+        // (MEMBER_LEFT vs MEMBER_REMOVED) and the leave path also handles
+        // last-admin transfer. Reject silently here.
+        if (userId == currentUserId) return
+
         val previousMembers = _uiState.value.members
         val previousMemberCount = _uiState.value.memberCount
 

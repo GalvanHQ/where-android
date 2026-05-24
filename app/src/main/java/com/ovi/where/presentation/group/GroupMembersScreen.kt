@@ -105,23 +105,16 @@ fun GroupMembersScreen(
                 items(admins, key = { it.userId }) { member ->
                     MemberListRow(
                         member = member,
+                        isCurrentUser = member.userId == currentUserId,
                         isCurrentUserAdmin = uiState.isCurrentUserAdmin,
+                        onlyAdmin = admins.size == 1,
                         onClick = {
                             if (member.userId == currentUserId) onNavigateToProfile()
                             else onNavigateToUserProfile(member.userId)
                         },
-                        onMakeAdmin = {
-                            viewModel.makeAdmin(member.userId)
-                            context.showToast("${member.displayName} is now admin")
-                        },
-                        onDemoteAdmin = {
-                            viewModel.demoteAdmin(member.userId)
-                            context.showToast("${member.displayName} is no longer admin")
-                        },
-                        onRemoveMember = {
-                            viewModel.removeMember(member.userId)
-                            context.showToast("${member.displayName} removed")
-                        }
+                        onMakeAdmin = { viewModel.makeAdmin(member.userId) },
+                        onDemoteAdmin = { viewModel.demoteAdmin(member.userId) },
+                        onRemoveMember = { viewModel.removeMember(member.userId) }
                     )
                 }
             }
@@ -143,23 +136,16 @@ fun GroupMembersScreen(
                 items(members, key = { it.userId }) { member ->
                     MemberListRow(
                         member = member,
+                        isCurrentUser = member.userId == currentUserId,
                         isCurrentUserAdmin = uiState.isCurrentUserAdmin,
+                        onlyAdmin = false,
                         onClick = {
                             if (member.userId == currentUserId) onNavigateToProfile()
                             else onNavigateToUserProfile(member.userId)
                         },
-                        onMakeAdmin = {
-                            viewModel.makeAdmin(member.userId)
-                            context.showToast("${member.displayName} is now admin")
-                        },
-                        onDemoteAdmin = {
-                            viewModel.demoteAdmin(member.userId)
-                            context.showToast("${member.displayName} is no longer admin")
-                        },
-                        onRemoveMember = {
-                            viewModel.removeMember(member.userId)
-                            context.showToast("${member.displayName} removed")
-                        }
+                        onMakeAdmin = { viewModel.makeAdmin(member.userId) },
+                        onDemoteAdmin = { viewModel.demoteAdmin(member.userId) },
+                        onRemoveMember = { viewModel.removeMember(member.userId) }
                     )
                 }
             }
@@ -170,13 +156,19 @@ fun GroupMembersScreen(
 @Composable
 private fun MemberListRow(
     member: GroupMemberUiModel,
+    isCurrentUser: Boolean,
     isCurrentUserAdmin: Boolean,
+    onlyAdmin: Boolean,
     onClick: () -> Unit,
     onMakeAdmin: () -> Unit,
     onDemoteAdmin: () -> Unit,
     onRemoveMember: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    var pendingAction by remember {
+        mutableStateOf<PendingAdminAction?>(null)
+    }
+    val context = LocalContext.current
 
     Row(
         modifier = Modifier
@@ -197,52 +189,172 @@ private fun MemberListRow(
         Spacer(Modifier.width(14.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = member.displayName,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = if (member.username.isNotBlank()) "@${member.username} • ${member.roleText}"
-                       else member.roleText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (isCurrentUser) "${member.displayName} (You)" else member.displayName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (member.isAdmin) {
+                    Spacer(Modifier.width(8.dp))
+                    AdminChip()
+                }
+            }
+            if (member.username.isNotBlank()) {
+                Text(
+                    text = "@${member.username}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
-        // Admin actions — admin can promote/demote/remove anyone but themselves.
-        if (isCurrentUserAdmin) {
+        // Admin actions — only visible when the local user is admin AND
+        // the row isn't the local user themselves. Self-management
+        // (leave / promote-someone-else-then-step-down) belongs on the
+        // group info screen, not the member row.
+        val showOverflow = isCurrentUserAdmin && !isCurrentUser
+        if (showOverflow) {
             Box {
                 IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
                     Icon(
                         Icons.Default.MoreVert,
-                        contentDescription = "Options",
+                        contentDescription = "Options for ${member.displayName}",
                         modifier = Modifier.size(20.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                     if (member.isAdmin) {
+                        // Last-admin guard: never let an admin demote the
+                        // sole remaining admin — the group would be left
+                        // ungoverned. Disabled menu item makes the rule
+                        // visible instead of silently failing.
                         DropdownMenuItem(
-                            text = { Text("Remove admin") },
-                            onClick = { showMenu = false; onDemoteAdmin() }
+                            text = {
+                                Text(
+                                    text = if (onlyAdmin) "Last admin (can't demote)" else "Remove admin"
+                                )
+                            },
+                            enabled = !onlyAdmin,
+                            onClick = {
+                                showMenu = false
+                                if (!onlyAdmin) {
+                                    pendingAction = PendingAdminAction.Demote
+                                }
+                            }
                         )
                     } else {
                         DropdownMenuItem(
                             text = { Text("Make admin") },
-                            onClick = { showMenu = false; onMakeAdmin() }
+                            onClick = {
+                                showMenu = false
+                                pendingAction = PendingAdminAction.Promote
+                            }
                         )
                     }
                     DropdownMenuItem(
-                        text = { Text("Remove", color = MaterialTheme.colorScheme.error) },
-                        onClick = { showMenu = false; onRemoveMember() }
+                        text = { Text("Remove from group", color = MaterialTheme.colorScheme.error) },
+                        onClick = {
+                            showMenu = false
+                            pendingAction = PendingAdminAction.Remove
+                        }
                     )
                 }
             }
         }
+    }
+
+    // ── Confirm sheets ────────────────────────────────────────────────────
+    // Make-admin and demote are quick, non-destructive — single-confirm
+    // dialog inside the sheet feels right. Remove is destructive and gets
+    // the full DestructiveConfirmSheet with consequence bullets.
+    when (pendingAction) {
+        PendingAdminAction.Promote -> {
+            com.ovi.where.presentation.chat.components.DestructiveConfirmSheet(
+                title = "Make ${member.displayName} an admin?",
+                message = "Admins can change group info, add or remove members, and promote others.",
+                consequences = emptyList(),
+                confirmLabel = "Make admin",
+                photoUrl = member.photoUrl,
+                icon = Icons.Default.PersonAdd,
+                onConfirm = {
+                    onMakeAdmin()
+                    context.showToast("${member.displayName} is now admin")
+                    pendingAction = null
+                },
+                onDismiss = { pendingAction = null }
+            )
+        }
+        PendingAdminAction.Demote -> {
+            com.ovi.where.presentation.chat.components.DestructiveConfirmSheet(
+                title = "Remove ${member.displayName} as admin?",
+                message = "They'll go back to a regular member and lose admin permissions.",
+                consequences = emptyList(),
+                confirmLabel = "Remove admin",
+                photoUrl = member.photoUrl,
+                icon = Icons.Default.MoreVert,
+                onConfirm = {
+                    onDemoteAdmin()
+                    context.showToast("${member.displayName} is no longer admin")
+                    pendingAction = null
+                },
+                onDismiss = { pendingAction = null }
+            )
+        }
+        PendingAdminAction.Remove -> {
+            com.ovi.where.presentation.chat.components.DestructiveConfirmSheet(
+                title = "Remove ${member.displayName}?",
+                message = "They'll lose access to this group's chat, location updates, and meetups.",
+                consequences = listOf(
+                    "Other members see a 'removed' system message",
+                    "${member.displayName} can rejoin only with a new invite",
+                    "Their messages stay in the chat history"
+                ),
+                confirmLabel = "Remove",
+                photoUrl = member.photoUrl,
+                icon = Icons.Default.MoreVert,
+                onConfirm = {
+                    onRemoveMember()
+                    context.showToast("${member.displayName} removed")
+                    pendingAction = null
+                },
+                onDismiss = { pendingAction = null }
+            )
+        }
+        null -> Unit
+    }
+}
+
+/**
+ * Pending admin action awaiting user confirmation. Holds the row-local
+ * state so the confirm sheet can render outside the IconButton-scoped
+ * DropdownMenu (which closes on touch).
+ */
+private enum class PendingAdminAction { Promote, Demote, Remove }
+
+/**
+ * Compact "Admin" pill rendered next to the member's display name.
+ * Lifts the role out of the username subtitle so it's scannable in a
+ * long member list.
+ */
+@Composable
+private fun AdminChip() {
+    androidx.compose.material3.Surface(
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+    ) {
+        Text(
+            text = "Admin",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+        )
     }
 }

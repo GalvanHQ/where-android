@@ -100,7 +100,7 @@ fun PeopleScreen(
     ) {
             // Search bar tap target — navigates to full-screen search
             SearchBarTapTarget(
-                placeholderText = "Search people...",
+                placeholderText = "Search friends...",
                 onClick = onNavigateToSearch,
                 modifier = Modifier.padding(horizontal = Dimens.spaceLarge)
             )

@@ -93,36 +93,37 @@ class NotificationRepository @Inject constructor(
                 val entriesMap = (snap.get("entries") as? Map<String, Map<String, Any?>>)
                     ?: emptyMap()
 
-                // Identify legacy chat-type entries and queue them for
-                // server-side purge. Older builds persisted chat messages
-                // and mentions to this doc; we no longer mirror them
-                // client-side, but the docs still hold rows from before
-                // the cutover. Purge them once on a server snapshot so
-                // every account's inbox doc converges to chat-free.
-                val chatEntryIdsToPurge = entriesMap.values.mapNotNull { entry ->
+                // Identify legacy non-important entries and queue them for
+                // server-side purge. Older builds persisted every type to
+                // this doc; we now only mirror "important" types client-
+                // side, but the server doc may still hold rows from before
+                // the cutover (chat messages, mentions, member join/leave,
+                // live-location start/stop, meetup cleared, location
+                // updates, GENERAL). Purge them once on a server snapshot
+                // so every account's inbox doc converges to important-only.
+                val legacyEntryIdsToPurge = entriesMap.values.mapNotNull { entry ->
                     val type = (entry["type"] as? String).orEmpty()
-                    val parsedType = runCatching { NotificationType.valueOf(type) }.getOrNull()
+                    val parsedType = runCatching { NotificationType.valueOf(type) }
+                        .getOrDefault(NotificationType.GENERAL)
                     val id = entry["id"] as? String
-                    if ((parsedType == NotificationType.NEW_MESSAGE || parsedType == NotificationType.MENTION) &&
-                        !id.isNullOrBlank()
-                    ) id else null
+                    if (!parsedType.isInboxImportant && !id.isNullOrBlank()) id else null
                 }
 
                 val parsed = entriesMap.values.mapNotNull { entry ->
                     runCatching { entry.toEntity() }.getOrNull()
                 }
-                    // Strip chat-type entries from what we mirror into Room.
-                    // Chat messages and mentions belong on the Chats tab and
-                    // the system tray, not in the in-app notifications inbox
-                    // (matches WhatsApp / Messenger / Telegram). This filter
-                    // is also a defensive backstop for legacy entries that
-                    // may already exist on the server doc — older builds did
-                    // persist them and we don't want them resurrecting after
-                    // an account swap or reinstall.
+                    // Strip non-important entries from what we mirror into
+                    // Room. Only action-required and high-signal events
+                    // belong in the in-app inbox (see
+                    // [NotificationType.isInboxImportant]). This filter is
+                    // also a defensive backstop for legacy entries that may
+                    // already exist on the server doc — older builds did
+                    // persist them and we don't want them resurrecting
+                    // after an account swap or reinstall.
                     .filter {
                         val t = runCatching { NotificationType.valueOf(it.type) }
                             .getOrDefault(NotificationType.GENERAL)
-                        t != NotificationType.NEW_MESSAGE && t != NotificationType.MENTION
+                        t.isInboxImportant
                     }
                 val freshIds = parsed.map { it.id }.toSet()
 
@@ -150,11 +151,11 @@ class NotificationRepository @Inject constructor(
                         for (localId in localIds) {
                             if (localId !in freshIds) notificationDao.delete(localId)
                         }
-                        // One-shot purge of legacy chat entries on the
-                        // canonical doc. Runs only after the server
+                        // One-shot purge of legacy non-important entries
+                        // on the canonical doc. Runs only after the server
                         // confirms what's actually there.
-                        if (chatEntryIdsToPurge.isNotEmpty()) {
-                            purgeChatEntries(uid, chatEntryIdsToPurge)
+                        if (legacyEntryIdsToPurge.isNotEmpty()) {
+                            purgeLegacyEntries(uid, legacyEntryIdsToPurge)
                         }
                     }
                     // Always upsert what we received — cache snapshots are
@@ -283,21 +284,22 @@ class NotificationRepository @Inject constructor(
     }
 
     /**
-     * One-shot purge of legacy chat-type entries from the canonical
+     * One-shot purge of legacy non-important entries from the canonical
      * inbox doc. Builds a single dotted-path update that deletes every
      * provided id at once, so the cost is one round trip regardless of
      * how many rows we're scrubbing.
      *
      * Called from the snapshot listener after a server snapshot reports
-     * any `NEW_MESSAGE` / `MENTION` rows. Once the server prunes them,
-     * subsequent snapshots won't trigger this path again (the input list
-     * is empty), so this is naturally self-healing.
+     * any rows of types that aren't [NotificationType.isInboxImportant].
+     * Once the server prunes them, subsequent snapshots won't trigger
+     * this path again (the input list is empty), so this is naturally
+     * self-healing.
      *
      * Safe to call when the user signs out and back in: it gates on the
      * uid the snapshot was for, so a stale callback never targets the
      * wrong account.
      */
-    private suspend fun purgeChatEntries(uid: String, ids: List<String>) {
+    private suspend fun purgeLegacyEntries(uid: String, ids: List<String>) {
         if (ids.isEmpty()) return
         try {
             val updates = mutableMapOf<String, Any>()
@@ -309,9 +311,9 @@ class NotificationRepository @Inject constructor(
             // Mirror to Room so the bell unread count drops immediately
             // even before the next snapshot arrives.
             ids.forEach { notificationDao.delete(it) }
-            Timber.i("Purged ${ids.size} legacy chat entries from inbox doc")
+            Timber.i("Purged ${ids.size} legacy non-important entries from inbox doc")
         } catch (e: Exception) {
-            Timber.w(e, "Failed to purge legacy chat entries")
+            Timber.w(e, "Failed to purge legacy non-important entries")
         }
     }
 

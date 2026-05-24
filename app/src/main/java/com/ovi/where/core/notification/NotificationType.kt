@@ -40,6 +40,50 @@ enum class NotificationType {
     // Fallback
     GENERAL;
 
+    /**
+     * Whether this type is worth persisting into the in-app inbox.
+     *
+     * Most apps in this category (WhatsApp, Telegram, Messenger) keep the
+     * in-app notifications surface for *high-signal, action-required, or
+     * one-shot* events and let the system tray + the relevant primary tab
+     * carry the noisy ephemeral stuff.
+     *
+     * Concretely:
+     *  • **Friend requests / accepted** — action-required, one-shot.
+     *  • **Meetup destination set** — group coordination signal, one per session.
+     *  • **Meetup member arrived** — high-signal moment.
+     *
+     * Everything else (chat messages, member join/leave, live location
+     * start/stop/update, meetup cleared, GENERAL) is intentionally excluded:
+     *  • *Chat messages and mentions* live on the Chats tab.
+     *  • *Live location* events are visible on the map in real time.
+     *  • *Member join/leave* is a low-action, high-frequency social event.
+     *  • *Meetup cleared* is paired with *set*, so seeing both is redundant.
+     *  • *Location update* fires per GPS tick — would dominate the inbox.
+     *
+     * The system tray push is **independent** from this flag — those still
+     * fire normally (subject to user channel preferences). Only the
+     * persisted inbox row is suppressed for non-important types, which
+     * also saves Firestore writes server-side (see `notify.ts`).
+     */
+    val isInboxImportant: Boolean
+        get() = when (this) {
+            FRIEND_REQUEST,
+            FRIEND_ACCEPTED,
+            MEETUP_DESTINATION_SET,
+            MEETUP_MEMBER_ARRIVED -> true
+
+            NEW_MESSAGE,
+            MENTION,
+            MEMBER_JOINED,
+            MEMBER_LEFT,
+            LOCATION_UPDATE,
+            LIVE_LOCATION_STARTED,
+            LIVE_LOCATION_STOPPED,
+            MEETUP_DESTINATION_CLEARED,
+            GENERAL -> false
+        }
+
     companion object {
         /** Maps an FCM `type` string to a [NotificationType]; defaults to [GENERAL]. */
         fun fromFcmType(type: String?): NotificationType = when (type) {

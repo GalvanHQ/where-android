@@ -272,11 +272,22 @@
 
     <!-- Notifications inbox -->
     <string name="notifications_title">Notifications</string>
-    <string name="notifications_empty_title">No notifications yet</string>
-    <string name="notifications_empty_body">When friends message you, share location, or set up a meetup, it shows up here.</string>
+    <string name="notifications_empty_title">You\'re all caught up</string>
+    <string name="notifications_empty_body">Friend requests, accepted requests, and meetup updates will land here.</string>
+    <string name="notifications_empty_filter_title">Nothing here</string>
+    <string name="notifications_empty_filter_body">No notifications match this filter.</string>
     <string name="notifications_mark_all_read">Mark all read</string>
     <string name="notifications_clear_all">Clear all</string>
     <string name="notifications_unread_badge_a11y">%1$d unread notifications</string>
+    <string name="notifications_filter_all">All</string>
+    <string name="notifications_filter_requests">Requests</string>
+    <string name="notifications_filter_meetups">Meetups</string>
+    <string name="notifications_section_today">Today</string>
+    <string name="notifications_section_this_week">This week</string>
+    <string name="notifications_section_earlier">Earlier</string>
+    <string name="notifications_action_accept">Accept</string>
+    <string name="notifications_action_decline">Decline</string>
+    <string name="notifications_action_dismiss">Dismiss</string>
 
     <!-- DateTimeUtils -->
     <string name="time_expired">Expired</string>

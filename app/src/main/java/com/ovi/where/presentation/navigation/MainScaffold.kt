@@ -54,7 +54,7 @@ internal sealed class BottomTab(
         route = Screen.PeopleTab.route,
         selectedIconResId = R.drawable.people_filled,
         unselectedIconResId = R.drawable.people_outlined,
-        label = "People"
+        label = "Friends"
     )
 
     object Profile : BottomTab(

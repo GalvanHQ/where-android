@@ -95,17 +95,19 @@ class FcmMessagingService : FirebaseMessagingService() {
             // badge and the inbox screen are derived from this table, so a
             // missing entry here would silently lose the user a notification.
             //
-            // EXCEPTION: chat messages and mentions are intentionally NOT
-            // mirrored into the in-app notifications inbox. The Chats tab
-            // already shows unread conversations with the latest preview,
-            // so duplicating each message into Notifications is noise. We
-            // still post the system tray push (handled below) so the user
-            // sees the heads-up the same way every other messenger app does
-            // (WhatsApp, Telegram, Messenger): tray push + Chats tab badge,
-            // no in-app inbox row. The Notifications screen stays for
-            // cross-cutting events (friend requests, meetup, location, etc).
+            // EXCEPTION: only "important" types are persisted. The in-app
+            // inbox is curated to action-required and one-shot events
+            // (friend requests, meetup set, meetup member arrived) — the
+            // rest (chat messages, mentions, live-location start/stop,
+            // member join/leave, location updates, meetup cleared, GENERAL)
+            // are intentionally skipped because they're already visible
+            // somewhere else (Chats tab, map UI), or noisy enough to
+            // dominate the inbox. See [NotificationType.isInboxImportant].
+            // The system tray push (handled below) is unaffected — users
+            // still get the heads-up the same way every other messenger
+            // app does (WhatsApp, Telegram, Messenger).
             val deepLinkRoute = notificationHelper.resolveDeepLinkRoute(type, payload)
-            if (type != NotificationType.NEW_MESSAGE && type != NotificationType.MENTION) {
+            if (type.isInboxImportant) {
                 runCatching {
                     notificationRepository.add(type, payload, deepLinkRoute)
                 }.onFailure { Timber.w(it, "Failed to persist notification to inbox") }

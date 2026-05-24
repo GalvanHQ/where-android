@@ -93,6 +93,21 @@ class NotificationRepository @Inject constructor(
                 val entriesMap = (snap.get("entries") as? Map<String, Map<String, Any?>>)
                     ?: emptyMap()
 
+                // Identify legacy chat-type entries and queue them for
+                // server-side purge. Older builds persisted chat messages
+                // and mentions to this doc; we no longer mirror them
+                // client-side, but the docs still hold rows from before
+                // the cutover. Purge them once on a server snapshot so
+                // every account's inbox doc converges to chat-free.
+                val chatEntryIdsToPurge = entriesMap.values.mapNotNull { entry ->
+                    val type = (entry["type"] as? String).orEmpty()
+                    val parsedType = runCatching { NotificationType.valueOf(type) }.getOrNull()
+                    val id = entry["id"] as? String
+                    if ((parsedType == NotificationType.NEW_MESSAGE || parsedType == NotificationType.MENTION) &&
+                        !id.isNullOrBlank()
+                    ) id else null
+                }
+
                 val parsed = entriesMap.values.mapNotNull { entry ->
                     runCatching { entry.toEntity() }.getOrNull()
                 }
@@ -134,6 +149,12 @@ class NotificationRepository @Inject constructor(
                         val localIds = notificationDao.observeAllIds()
                         for (localId in localIds) {
                             if (localId !in freshIds) notificationDao.delete(localId)
+                        }
+                        // One-shot purge of legacy chat entries on the
+                        // canonical doc. Runs only after the server
+                        // confirms what's actually there.
+                        if (chatEntryIdsToPurge.isNotEmpty()) {
+                            purgeChatEntries(uid, chatEntryIdsToPurge)
                         }
                     }
                     // Always upsert what we received — cache snapshots are
@@ -258,6 +279,39 @@ class NotificationRepository @Inject constructor(
             ).await()
         } catch (e: Exception) {
             Timber.w(e, "delete failed for $id")
+        }
+    }
+
+    /**
+     * One-shot purge of legacy chat-type entries from the canonical
+     * inbox doc. Builds a single dotted-path update that deletes every
+     * provided id at once, so the cost is one round trip regardless of
+     * how many rows we're scrubbing.
+     *
+     * Called from the snapshot listener after a server snapshot reports
+     * any `NEW_MESSAGE` / `MENTION` rows. Once the server prunes them,
+     * subsequent snapshots won't trigger this path again (the input list
+     * is empty), so this is naturally self-healing.
+     *
+     * Safe to call when the user signs out and back in: it gates on the
+     * uid the snapshot was for, so a stale callback never targets the
+     * wrong account.
+     */
+    private suspend fun purgeChatEntries(uid: String, ids: List<String>) {
+        if (ids.isEmpty()) return
+        try {
+            val updates = mutableMapOf<String, Any>()
+            ids.forEach { id ->
+                updates["entries.$id"] = FieldValue.delete()
+            }
+            updates["updatedAt"] = System.currentTimeMillis()
+            firestore.document(inboxPath(uid)).update(updates).await()
+            // Mirror to Room so the bell unread count drops immediately
+            // even before the next snapshot arrives.
+            ids.forEach { notificationDao.delete(it) }
+            Timber.i("Purged ${ids.size} legacy chat entries from inbox doc")
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to purge legacy chat entries")
         }
     }
 

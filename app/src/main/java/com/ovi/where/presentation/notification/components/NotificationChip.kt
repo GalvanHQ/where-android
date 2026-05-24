@@ -3,6 +3,9 @@ package com.ovi.where.presentation.notification.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,10 +19,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -118,23 +120,25 @@ private fun UnreadBadge(
     count: Int,
     modifier: Modifier = Modifier
 ) {
-    val label = if (count > 9) "9+" else count.toString()
+    val label = if (count > 99) "99+" else count.toString()
+
     Box(
         modifier = modifier
-            // Subtle white halo around the badge so the boundary against
-            // the chip border stays crisp regardless of background.
-            .shadow(elevation = 1.dp, shape = CircleShape)
-            .size(16.dp)
+            .height(18.dp)
+            .defaultMinSize(minWidth = 18.dp)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.primary)
-            .background(Color.Transparent),
+            .padding(horizontal = 5.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
             color = MaterialTheme.colorScheme.onPrimary,
             fontSize = 10.sp,
-            textAlign = TextAlign.Center
+            fontWeight = FontWeight.SemiBold,
+            lineHeight = 10.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 1
         )
     }
 }

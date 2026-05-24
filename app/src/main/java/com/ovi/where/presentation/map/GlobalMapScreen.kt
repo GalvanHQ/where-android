@@ -24,7 +24,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,6 +48,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -144,9 +144,9 @@ import com.google.maps.android.compose.MarkerComposable
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.ovi.where.R
+import com.ovi.where.core.notification.activeMapTracker
 import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.core.notification.activeMapTracker
 import com.ovi.where.core.utils.LocationUtils
 import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.map.components.DestinationPinMarker
@@ -155,6 +155,8 @@ import com.ovi.where.presentation.map.components.MeetupPlaceCardSheet
 import com.ovi.where.presentation.map.components.MeetupPlacementActionBar
 import com.ovi.where.presentation.map.components.SetMeetupDestinationSheet
 import com.ovi.where.presentation.map.components.fanOutOverlappingMarkers
+import com.ovi.where.presentation.notification.NotificationsViewModel
+import com.ovi.where.presentation.notification.components.NotificationChip
 import kotlinx.coroutines.launch
 
 /**
@@ -444,136 +446,138 @@ fun GlobalMapScreen(
                 label = "sheetViewAnim"
             ) { currentView ->
                 when (currentView) {
-                MapSheetView.FriendDetail -> {
-                    val friend = uiState.selectedFriend
-                    if (friend != null) {
-                        FriendDetailSheetContent(
-                            friend = friend,
+                    MapSheetView.FriendDetail -> {
+                        val friend = uiState.selectedFriend
+                        if (friend != null) {
+                            FriendDetailSheetContent(
+                                friend = friend,
+                                bottomReservedSpace = totalNavBarHeight,
+                                onMessage = {
+                                    viewModel.openOrCreateDm(friend.userId)
+                                    viewModel.dismissFriendSheet()
+                                    sheetView = MapSheetView.Home
+                                },
+                                onNavigateToUserProfile = {
+                                    onNavigateToUserProfile(friend.userId)
+                                    viewModel.dismissFriendSheet()
+                                    sheetView = MapSheetView.Home
+                                },
+                                onBack = {
+                                    viewModel.dismissFriendSheet()
+                                    sheetView = MapSheetView.Home
+                                }
+                            )
+                        } else {
+                            // Stale state — fall back to home
+                            sheetView = MapSheetView.Home
+                            Spacer(Modifier.height(1.dp))
+                        }
+                    }
+
+                    MapSheetView.Share -> {
+                        ShareTargetSheet(
+                            groups = uiState.groups,
+                            directTargets = uiState.directTargets,
+                            excludeTargetIds = uiState.sharingTargetIds,
                             bottomReservedSpace = totalNavBarHeight,
-                            onMessage = {
-                                viewModel.openOrCreateDm(friend.userId)
-                                viewModel.dismissFriendSheet()
+                            onCancel = { sheetView = MapSheetView.Home },
+                            onCreateGroup = {
                                 sheetView = MapSheetView.Home
+                                onNavigateToCreateGroup()
                             },
-                            onNavigateToUserProfile = {
-                                onNavigateToUserProfile(friend.userId)
-                                viewModel.dismissFriendSheet()
+                            onJoinGroup = {
                                 sheetView = MapSheetView.Home
+                                onNavigateToJoinGroup()
                             },
-                            onBack = {
-                                viewModel.dismissFriendSheet()
+                            onAddFriends = {
+                                sheetView = MapSheetView.Home
+                                onNavigateToAddFriends()
+                            },
+                            onStart = { targetIds, durationMinutes ->
+                                if (uiState.isSharing) {
+                                    targetIds.forEach { id ->
+                                        viewModel.addSharingTarget(id, durationMinutes)
+                                    }
+                                } else {
+                                    viewModel.startSharing(targetIds, durationMinutes)
+                                }
+                                // Land back on the My Shares tab to show what was just started.
+                                homeTab = MapHomeTab.MyShares
                                 sheetView = MapSheetView.Home
                             }
                         )
-                    } else {
-                        // Stale state — fall back to home
-                        sheetView = MapSheetView.Home
-                        Spacer(Modifier.height(1.dp))
                     }
-                }
-                MapSheetView.Share -> {
-                    ShareTargetSheet(
-                        groups = uiState.groups,
-                        directTargets = uiState.directTargets,
-                        excludeTargetIds = uiState.sharingTargetIds,
-                        bottomReservedSpace = totalNavBarHeight,
-                        onCancel = { sheetView = MapSheetView.Home },
-                        onCreateGroup = {
-                            sheetView = MapSheetView.Home
-                            onNavigateToCreateGroup()
-                        },
-                        onJoinGroup = {
-                            sheetView = MapSheetView.Home
-                            onNavigateToJoinGroup()
-                        },
-                        onAddFriends = {
-                            sheetView = MapSheetView.Home
-                            onNavigateToAddFriends()
-                        },
-                        onStart = { targetIds, durationMinutes ->
-                            if (uiState.isSharing) {
-                                targetIds.forEach { id ->
-                                    viewModel.addSharingTarget(id, durationMinutes)
+
+                    MapSheetView.Home -> {
+                        HomeSheetContent(
+                            homeTab = homeTab,
+                            onTabChange = { homeTab = it },
+                            friends = uiState.friendLocations,
+                            myLatitude = uiState.myLatitude,
+                            myLongitude = uiState.myLongitude,
+                            hasMyLocation = uiState.hasMyLocation,
+                            isSharing = uiState.isSharing,
+                            activeFilter = uiState.activeGroupFilter,
+                            sharingTargetIds = uiState.sharingTargetIds,
+                            sharingTargetExpiries = uiState.sharingTargetExpiries,
+                            meetupOwnedShareGroupIds = uiState.meetupOwnedShareGroupIds,
+                            hostedMeetupGroupIds = uiState.hostedMeetupGroupIds,
+                            groups = uiState.groups,
+                            directTargets = uiState.directTargets,
+                            bottomReservedSpace = totalNavBarHeight,
+                            onFriendClick = { friend ->
+                                viewModel.selectFriend(friend)
+                                if (friend.latitude != 0.0) {
+                                    scope.launch {
+                                        cameraPositionState.animate(
+                                            CameraUpdateFactory.newLatLngZoom(
+                                                LatLng(friend.latitude, friend.longitude),
+                                                15f
+                                            ),
+                                            durationMs = 600
+                                        )
+                                    }
                                 }
-                            } else {
-                                viewModel.startSharing(targetIds, durationMinutes)
-                            }
-                            // Land back on the My Shares tab to show what was just started.
-                            homeTab = MapHomeTab.MyShares
-                            sheetView = MapSheetView.Home
-                        }
-                    )
-                }
-                MapSheetView.Home -> {
-                    HomeSheetContent(
-                        homeTab = homeTab,
-                        onTabChange = { homeTab = it },
-                        friends = uiState.friendLocations,
-                        myLatitude = uiState.myLatitude,
-                        myLongitude = uiState.myLongitude,
-                        hasMyLocation = uiState.hasMyLocation,
-                        isSharing = uiState.isSharing,
-                        activeFilter = uiState.activeGroupFilter,
-                        sharingTargetIds = uiState.sharingTargetIds,
-                        sharingTargetExpiries = uiState.sharingTargetExpiries,
-                        meetupOwnedShareGroupIds = uiState.meetupOwnedShareGroupIds,
-                        hostedMeetupGroupIds = uiState.hostedMeetupGroupIds,
-                        groups = uiState.groups,
-                        directTargets = uiState.directTargets,
-                        bottomReservedSpace = totalNavBarHeight,
-                        onFriendClick = { friend ->
-                            viewModel.selectFriend(friend)
-                            if (friend.latitude != 0.0) {
-                                scope.launch {
-                                    cameraPositionState.animate(
-                                        CameraUpdateFactory.newLatLngZoom(
-                                            LatLng(friend.latitude, friend.longitude),
-                                            15f
-                                        ),
-                                        durationMs = 600
-                                    )
+                            },
+                            onShowOnMap = { friend ->
+                                // Collapse the sheet so the map is fully visible, then animate
+                                // camera to the friend with a smoother, deeper zoom.
+                                if (friend.latitude != 0.0 && friend.longitude != 0.0) {
+                                    scope.launch {
+                                        bottomSheetScaffoldState.bottomSheetState.partialExpand()
+                                        cameraPositionState.animate(
+                                            CameraUpdateFactory.newLatLngZoom(
+                                                LatLng(friend.latitude, friend.longitude),
+                                                17f
+                                            ),
+                                            durationMs = 900
+                                        )
+                                    }
                                 }
-                            }
-                        },
-                        onShowOnMap = { friend ->
-                            // Collapse the sheet so the map is fully visible, then animate
-                            // camera to the friend with a smoother, deeper zoom.
-                            if (friend.latitude != 0.0 && friend.longitude != 0.0) {
-                                scope.launch {
-                                    bottomSheetScaffoldState.bottomSheetState.partialExpand()
-                                    cameraPositionState.animate(
-                                        CameraUpdateFactory.newLatLngZoom(
-                                            LatLng(friend.latitude, friend.longitude),
-                                            17f
-                                        ),
-                                        durationMs = 900
+                            },
+                            onAddShare = {
+                                if (!locationGranted) {
+                                    permissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
                                     )
+                                } else {
+                                    sheetView = MapSheetView.Share
                                 }
+                            },
+                            onStopOne = { targetId ->
+                                viewModel.removeSharingTarget(targetId)
+                            },
+                            onStopAll = {
+                                viewModel.stopSharing()
+                            },
+                            onOpenMeetupCard = {
+                                viewModel.openMeetupPlaceCard()
                             }
-                        },
-                        onAddShare = {
-                            if (!locationGranted) {
-                                permissionLauncher.launch(
-                                    arrayOf(
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                    )
-                                )
-                            } else {
-                                sheetView = MapSheetView.Share
-                            }
-                        },
-                        onStopOne = { targetId ->
-                            viewModel.removeSharingTarget(targetId)
-                        },
-                        onStopAll = {
-                            viewModel.stopSharing()
-                        },
-                        onOpenMeetupCard = {
-                            viewModel.openMeetupPlaceCard()
-                        }
-                    )
-                }
+                        )
+                    }
                 }
             }
         },
@@ -600,198 +604,214 @@ fun GlobalMapScreen(
             // Without this gate, GoogleMap composes at (0,0) zoom 2 and stays
             // there if location is off (no live fix to override it).
             if (uiState.cameraRestored) {
-            GoogleMap(
-                modifier = Modifier.fillMaxSize(),
-                cameraPositionState = cameraPositionState,
-                contentPadding = innerPadding,
-                onMapLongClick = { latLng ->
-                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                    viewModel.onMapLongClick(latLng.latitude, latLng.longitude)
-                },
-                // mapColorScheme is the SDK's native dark mode and is applied
-                // *before* the first frame, eliminating the light-tile flash
-                // we used to see while the JSON style was being applied. We
-                // keep mapStyleOptions for fine-tuning POI visibility etc.
-                mapColorScheme = if (isNightTime) {
-                    com.google.maps.android.compose.ComposeMapColorScheme.DARK
-                } else {
-                    com.google.maps.android.compose.ComposeMapColorScheme.LIGHT
-                },
-                properties = MapProperties(
-                    mapType = mapType,
-                    isMyLocationEnabled = false
-                ),
-                uiSettings = MapUiSettings(
-                    myLocationButtonEnabled = false,
-                    zoomControlsEnabled = false
-                )
-            ) {
-                // ── Compute display positions (fan-out overlapping markers) ────
-                // When markers (me + friends) sit at the same spot, spread them out
-                // in a small circle around their centroid so all avatars are visible.
-                val validFriends = uiState.friendLocations.filter {
-                    it.latitude != 0.0 && it.longitude != 0.0
-                }
-                val displayPositions = remember(
-                    uiState.hasMyLocation,
-                    uiState.myLatitude,
-                    uiState.myLongitude,
-                    validFriends
-                ) {
-                    val all = mutableListOf<Pair<String, LatLng>>()
-                    if (uiState.hasMyLocation && uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
-                        all.add(MY_MARKER_KEY to LatLng(uiState.myLatitude, uiState.myLongitude))
-                    }
-                    validFriends.forEach {
-                        all.add(it.userId to LatLng(it.latitude, it.longitude))
-                    }
-                    fanOutOverlappingMarkers(all)
-                }
-
-                // ── My location marker (inside GoogleMap → sticks to LatLng) ──
-                if (uiState.hasMyLocation && uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
-                    val myDisplayPos = displayPositions[MY_MARKER_KEY]
-                        ?: LatLng(uiState.myLatitude, uiState.myLongitude)
-                    val myMarkerState = remember(myDisplayPos.latitude, myDisplayPos.longitude) {
-                        MarkerState(position = myDisplayPos)
-                    }
-
-                    // Pre-load my profile bitmap for marker
-                    var myAvatarBitmap by remember { mutableStateOf<Bitmap?>(null) }
-                    LaunchedEffect(uiState.myPhotoUrl) {
-                        val url = uiState.myPhotoUrl
-                        if (!url.isNullOrEmpty()) {
-                            val request = ImageRequest.Builder(context)
-                                .data(url)
-                                .allowHardware(false)
-                                .memoryCacheKey(url)
-                                .diskCacheKey(url)
-                                .memoryCachePolicy(CachePolicy.ENABLED)
-                                .diskCachePolicy(CachePolicy.ENABLED)
-                                .size(128)
-                                .build()
-                            val result = context.imageLoader.execute(request)
-                            if (result is SuccessResult) {
-                                myAvatarBitmap = (result.drawable as? BitmapDrawable)?.bitmap
-                            }
-                        }
-                    }
-
-                    MarkerComposable(
-                        keys = arrayOf(
-                            myAvatarBitmap ?: Unit,
-                            uiState.selfMeetupNote,
-                            uiState.selfMeetupStatus,
-                            uiState.meetupDestination != null
-                        ),
-                        state = myMarkerState,
-                        title = "My Location",
-                        zIndex = 10f,
-                        onClick = {
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                            showMyProfileSheet = true
-                            true
-                        }
-                    ) {
-                        MyLocationMarkerContent(
-                            avatarBitmap = myAvatarBitmap,
-                            note = uiState.selfMeetupNote,
-                            meetupStatus = uiState.selfMeetupStatus
-                                .takeIf { uiState.meetupDestination != null }
-                        )
-                    }
-                }
-
-                // ── Friend avatar markers (inside GoogleMap → sticks to LatLng) ──
-                validFriends.forEach { friend ->
-                    val friendDisplayPos = displayPositions[friend.userId]
-                        ?: LatLng(friend.latitude, friend.longitude)
-                    val friendMarkerState =
-                        remember(friend.userId, friendDisplayPos.latitude, friendDisplayPos.longitude) {
-                            MarkerState(position = friendDisplayPos)
-                        }
-
-                    // Pre-load friend avatar bitmap for marker
-                    var friendAvatarBitmap by remember(friend.userId) { mutableStateOf<Bitmap?>(null) }
-                    LaunchedEffect(friend.photoUrl) {
-                        val url = friend.photoUrl
-                        if (!url.isNullOrEmpty()) {
-                            val request = ImageRequest.Builder(context)
-                                .data(url)
-                                .allowHardware(false)
-                                .memoryCacheKey(url)
-                                .diskCacheKey(url)
-                                .memoryCachePolicy(CachePolicy.ENABLED)
-                                .diskCachePolicy(CachePolicy.ENABLED)
-                                .size(128)
-                                .build()
-                            val result = context.imageLoader.execute(request)
-                            if (result is SuccessResult) {
-                                friendAvatarBitmap = (result.drawable as? BitmapDrawable)?.bitmap
-                            }
-                        }
-                    }
-
-                    MarkerComposable(
-                        keys = arrayOf(
-                            friendAvatarBitmap ?: Unit,
-                            friend.meetupNote,
-                            friend.meetupStatus?.name ?: ""
-                        ),
-                        state = friendMarkerState,
-                        title = friend.displayName,
-                        snippet = friend.timeAgo,
-                        zIndex = 5f,
-                        onClick = {
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                            viewModel.selectFriend(friend)
-                            true
-                        }
-                    ) {
-                        FriendMapMarkerContent(
-                            friend = friend,
-                            avatarBitmap = friendAvatarBitmap
-                        )
-                    }
-                }
-
-                // ── Meetup destination marker ─────────────────────────────────
-                val destination = uiState.meetupDestination
-                if (destination != null && destination.hasValidLocation && destination.isActive) {
-                    val destinationLatLng = remember(destination.latitude, destination.longitude) {
-                        LatLng(destination.latitude, destination.longitude)
-                    }
-                    val destinationMarkerState = remember(destinationLatLng) {
-                        MarkerState(position = destinationLatLng)
-                    }
-                    MarkerComposable(
-                        state = destinationMarkerState,
-                        title = destination.name.ifEmpty { "Meetup point" },
-                        snippet = destination.address.takeIf { it.isNotBlank() },
-                        zIndex = 4f,
-                        onClick = {
-                            viewModel.openMeetupPlaceCard()
-                            true
-                        }
-                    ) {
-                        DestinationPinMarker()
-                    }
-                }
-
-                // ── In-app navigation polyline ────────────────────────────────
-                // Drawn over the existing GoogleMap when the user taps
-                // "Directions" on the meetup place card. Lives next to
-                // the destination marker so they share z-stacking.
-                uiState.navigationRoute?.points?.takeIf { it.size >= 2 }?.let { points ->
-                    com.google.maps.android.compose.Polyline(
-                        points = points,
-                        color = MaterialTheme.colorScheme.primary,
-                        width = 14f,
-                        geodesic = false,
-                        zIndex = 1f
+                GoogleMap(
+                    modifier = Modifier.fillMaxSize(),
+                    cameraPositionState = cameraPositionState,
+                    contentPadding = innerPadding,
+                    onMapLongClick = { latLng ->
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                        viewModel.onMapLongClick(latLng.latitude, latLng.longitude)
+                    },
+                    // mapColorScheme is the SDK's native dark mode and is applied
+                    // *before* the first frame, eliminating the light-tile flash
+                    // we used to see while the JSON style was being applied. We
+                    // keep mapStyleOptions for fine-tuning POI visibility etc.
+                    mapColorScheme = if (isNightTime) {
+                        com.google.maps.android.compose.ComposeMapColorScheme.DARK
+                    } else {
+                        com.google.maps.android.compose.ComposeMapColorScheme.LIGHT
+                    },
+                    properties = MapProperties(
+                        mapType = mapType,
+                        isMyLocationEnabled = false
+                    ),
+                    uiSettings = MapUiSettings(
+                        myLocationButtonEnabled = false,
+                        zoomControlsEnabled = false
                     )
+                ) {
+                    // ── Compute display positions (fan-out overlapping markers) ────
+                    // When markers (me + friends) sit at the same spot, spread them out
+                    // in a small circle around their centroid so all avatars are visible.
+                    val validFriends = uiState.friendLocations.filter {
+                        it.latitude != 0.0 && it.longitude != 0.0
+                    }
+                    val displayPositions = remember(
+                        uiState.hasMyLocation,
+                        uiState.myLatitude,
+                        uiState.myLongitude,
+                        validFriends
+                    ) {
+                        val all = mutableListOf<Pair<String, LatLng>>()
+                        if (uiState.hasMyLocation && uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
+                            all.add(
+                                MY_MARKER_KEY to LatLng(
+                                    uiState.myLatitude,
+                                    uiState.myLongitude
+                                )
+                            )
+                        }
+                        validFriends.forEach {
+                            all.add(it.userId to LatLng(it.latitude, it.longitude))
+                        }
+                        fanOutOverlappingMarkers(all)
+                    }
+
+                    // ── My location marker (inside GoogleMap → sticks to LatLng) ──
+                    if (uiState.hasMyLocation && uiState.myLatitude != 0.0 && uiState.myLongitude != 0.0) {
+                        val myDisplayPos = displayPositions[MY_MARKER_KEY]
+                            ?: LatLng(uiState.myLatitude, uiState.myLongitude)
+                        val myMarkerState =
+                            remember(myDisplayPos.latitude, myDisplayPos.longitude) {
+                                MarkerState(position = myDisplayPos)
+                            }
+
+                        // Pre-load my profile bitmap for marker
+                        var myAvatarBitmap by remember { mutableStateOf<Bitmap?>(null) }
+                        LaunchedEffect(uiState.myPhotoUrl) {
+                            val url = uiState.myPhotoUrl
+                            if (!url.isNullOrEmpty()) {
+                                val request = ImageRequest.Builder(context)
+                                    .data(url)
+                                    .allowHardware(false)
+                                    .memoryCacheKey(url)
+                                    .diskCacheKey(url)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .size(128)
+                                    .build()
+                                val result = context.imageLoader.execute(request)
+                                if (result is SuccessResult) {
+                                    myAvatarBitmap = (result.drawable as? BitmapDrawable)?.bitmap
+                                }
+                            }
+                        }
+
+                        MarkerComposable(
+                            keys = arrayOf(
+                                myAvatarBitmap ?: Unit,
+                                uiState.selfMeetupNote,
+                                uiState.selfMeetupStatus,
+                                uiState.meetupDestination != null
+                            ),
+                            state = myMarkerState,
+                            title = "My Location",
+                            zIndex = 10f,
+                            onClick = {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showMyProfileSheet = true
+                                true
+                            }
+                        ) {
+                            MyLocationMarkerContent(
+                                avatarBitmap = myAvatarBitmap,
+                                note = uiState.selfMeetupNote,
+                                meetupStatus = uiState.selfMeetupStatus
+                                    .takeIf { uiState.meetupDestination != null }
+                            )
+                        }
+                    }
+
+                    // ── Friend avatar markers (inside GoogleMap → sticks to LatLng) ──
+                    validFriends.forEach { friend ->
+                        val friendDisplayPos = displayPositions[friend.userId]
+                            ?: LatLng(friend.latitude, friend.longitude)
+                        val friendMarkerState =
+                            remember(
+                                friend.userId,
+                                friendDisplayPos.latitude,
+                                friendDisplayPos.longitude
+                            ) {
+                                MarkerState(position = friendDisplayPos)
+                            }
+
+                        // Pre-load friend avatar bitmap for marker
+                        var friendAvatarBitmap by remember(friend.userId) {
+                            mutableStateOf<Bitmap?>(
+                                null
+                            )
+                        }
+                        LaunchedEffect(friend.photoUrl) {
+                            val url = friend.photoUrl
+                            if (!url.isNullOrEmpty()) {
+                                val request = ImageRequest.Builder(context)
+                                    .data(url)
+                                    .allowHardware(false)
+                                    .memoryCacheKey(url)
+                                    .diskCacheKey(url)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .size(128)
+                                    .build()
+                                val result = context.imageLoader.execute(request)
+                                if (result is SuccessResult) {
+                                    friendAvatarBitmap =
+                                        (result.drawable as? BitmapDrawable)?.bitmap
+                                }
+                            }
+                        }
+
+                        MarkerComposable(
+                            keys = arrayOf(
+                                friendAvatarBitmap ?: Unit,
+                                friend.meetupNote,
+                                friend.meetupStatus?.name ?: ""
+                            ),
+                            state = friendMarkerState,
+                            title = friend.displayName,
+                            snippet = friend.timeAgo,
+                            zIndex = 5f,
+                            onClick = {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.selectFriend(friend)
+                                true
+                            }
+                        ) {
+                            FriendMapMarkerContent(
+                                friend = friend,
+                                avatarBitmap = friendAvatarBitmap
+                            )
+                        }
+                    }
+
+                    // ── Meetup destination marker ─────────────────────────────────
+                    val destination = uiState.meetupDestination
+                    if (destination != null && destination.hasValidLocation && destination.isActive) {
+                        val destinationLatLng =
+                            remember(destination.latitude, destination.longitude) {
+                                LatLng(destination.latitude, destination.longitude)
+                            }
+                        val destinationMarkerState = remember(destinationLatLng) {
+                            MarkerState(position = destinationLatLng)
+                        }
+                        MarkerComposable(
+                            state = destinationMarkerState,
+                            title = destination.name.ifEmpty { "Meetup point" },
+                            snippet = destination.address.takeIf { it.isNotBlank() },
+                            zIndex = 4f,
+                            onClick = {
+                                viewModel.openMeetupPlaceCard()
+                                true
+                            }
+                        ) {
+                            DestinationPinMarker()
+                        }
+                    }
+
+                    // ── In-app navigation polyline ────────────────────────────────
+                    // Drawn over the existing GoogleMap when the user taps
+                    // "Directions" on the meetup place card. Lives next to
+                    // the destination marker so they share z-stacking.
+                    uiState.navigationRoute?.points?.takeIf { it.size >= 2 }?.let { points ->
+                        com.google.maps.android.compose.Polyline(
+                            points = points,
+                            color = MaterialTheme.colorScheme.primary,
+                            width = 14f,
+                            geodesic = false,
+                            zIndex = 1f
+                        )
+                    }
                 }
-            }
             }
 
 
@@ -805,86 +825,85 @@ fun GlobalMapScreen(
             // the top of the map with its own status surface.
             if (!uiState.isMeetupNavigating) {
                 Row(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(top = 12.dp)
-                    .padding(horizontal = Dimens.spaceMedium)
-                    // Safety net: if the active meetup chip's label, the
-                    // group-filter name, and the notification chip can't
-                    // all fit on the smallest screen, let the strip
-                    // scroll horizontally rather than clipping the
-                    // notification chip off the right edge.
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Group filter chip — same chip language as the meetup chip.
-                Surface(
                     modifier = Modifier
-                        .height(40.dp)
-                        .clip(RoundedCornerShape(50))
-                        .clickable { viewModel.showGroupPicker(true) },
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 2.dp,
-                    tonalElevation = 2.dp,
-                    border = androidx.compose.foundation.BorderStroke(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(top = 12.dp)
+                        .padding(horizontal = Dimens.spaceMedium)
+                        // Safety net: if the active meetup chip's label, the
+                        // group-filter name, and the notification chip can't
+                        // all fit on the smallest screen, let the strip
+                        // scroll horizontally rather than clipping the
+                        // notification chip off the right edge.
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(start = 6.dp, end = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    // Group filter chip — same chip language as the meetup chip.
+                    Surface(
+                        modifier = Modifier
+                            .height(40.dp)
+                            .clip(RoundedCornerShape(50))
+                            .clickable { viewModel.showGroupPicker(true) },
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 2.dp,
+                        tonalElevation = 2.dp,
+                        border = androidx.compose.foundation.BorderStroke(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
                     ) {
-                        // Compact 28dp avatar — matches the meetup chip's
-                        // active-state inset bubble for visual rhythm.
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            modifier = Modifier.padding(start = 6.dp, end = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            FilterPillAvatar(filter = uiState.activeGroupFilter)
+                            // Compact 28dp avatar — matches the meetup chip's
+                            // active-state inset bubble for visual rhythm.
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                FilterPillAvatar(filter = uiState.activeGroupFilter)
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = uiState.activeGroupFilter?.name ?: "All Friends",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.widthIn(max = 110.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Icon(
+                                Icons.Default.ArrowDropDown,
+                                null,
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = uiState.activeGroupFilter?.name ?: "All Friends",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.widthIn(max = 110.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Icon(
-                            Icons.Default.ArrowDropDown,
-                            null,
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
-                }
 
-                MeetupChip(
-                    destination = uiState.meetupDestination,
-                    distanceText = uiState.meetupDestinationDistanceText,
-                    onIdleClick = { viewModel.enterMeetupPlacement() },
-                    onActiveClick = { viewModel.openMeetupPlaceCard() }
-                )
+                    MeetupChip(
+                        destination = uiState.meetupDestination,
+                        distanceText = uiState.meetupDestinationDistanceText,
+                        onIdleClick = { viewModel.enterMeetupPlacement() },
+                        onActiveClick = { viewModel.openMeetupPlaceCard() }
+                    )
 
-                // Icon-only notifications chip — drives the in-app inbox.
-                // The unread count is observed via NotificationsViewModel and
-                // appears as a small primary badge on the top-right corner.
-                val notificationsVm: com.ovi.where.presentation.notification.NotificationsViewModel =
-                    androidx.hilt.navigation.compose.hiltViewModel()
-                val unreadCount by notificationsVm.unreadCount.collectAsState()
-                com.ovi.where.presentation.notification.components.NotificationChip(
-                    onClick = onNavigateToNotifications,
-                    unreadCount = unreadCount
-                )
+                    // Icon-only notifications chip — drives the in-app inbox.
+                    // The unread count is observed via NotificationsViewModel and
+                    // appears as a small primary badge on the top-right corner.
+                    val notificationsVm: NotificationsViewModel = hiltViewModel()
+                    val unreadCount by notificationsVm.unreadCount.collectAsState()
+                    NotificationChip(
+                        onClick = onNavigateToNotifications,
+                        unreadCount = unreadCount
+                    )
                 }
             }
 
@@ -928,7 +947,10 @@ fun GlobalMapScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall),
+                                .padding(
+                                    horizontal = Dimens.spaceLarge,
+                                    vertical = Dimens.spaceSmall
+                                ),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
@@ -984,120 +1006,120 @@ fun GlobalMapScreen(
             // Hidden while placement mode is active to keep the placement
             // crosshair + action bar the only visible chrome.
             if (!uiState.isMeetupPlacementMode) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(innerPadding)
-                    .padding(
-                        end = Dimens.spaceLarge,
-                        bottom = 20.dp
-                    ),
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
-            ) {
-                // Map type
-                SmallFloatingActionButton(
-                    onClick = { showMapTypeSheet = true },
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    shape = CircleShape,
-                    elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
-                        defaultElevation = 6.dp,
-                        pressedElevation = 8.dp
-                    )
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(innerPadding)
+                        .padding(
+                            end = Dimens.spaceLarge,
+                            bottom = 20.dp
+                        ),
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
                 ) {
-                    Icon(
-                        imageVector = ImageVector.vectorResource(id = R.drawable.layers),
-                        contentDescription = "Map type",
-                        modifier = Modifier.size(Dimens.iconSizeMedium)
-                    )
-                }
-
-                // My location
-                SmallFloatingActionButton(
-                    onClick = {
-                        val hasPermission = ContextCompat.checkSelfPermission(
-                            context, Manifest.permission.ACCESS_FINE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED ||
-                                ContextCompat.checkSelfPermission(
-                                    context, Manifest.permission.ACCESS_COARSE_LOCATION
-                                ) == PackageManager.PERMISSION_GRANTED
-                        if (hasPermission) viewModel.locateMe()
-                        else permissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION
-                            )
-                        )
-                    },
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    shape = CircleShape,
-                    elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
-                        defaultElevation = 6.dp,
-                        pressedElevation = 8.dp
-                    )
-                ) {
-                    Icon(
-                        imageVector = ImageVector.vectorResource(id = R.drawable.location_crosshairs),
-                        contentDescription = stringResource(R.string.cd_my_location),
-                        modifier = Modifier.size(Dimens.iconSizeMedium)
-                    )
-                }
-
-                // Share / Stop sharing — primary FAB
-                if (uiState.isSharing) {
-                    FloatingActionButton(
-                        onClick = {
-                            sheetView = MapSheetView.Home
-                            homeTab = MapHomeTab.MyShares
-                            scope.launch { bottomSheetScaffoldState.bottomSheetState.expand() }
-                        },
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                        shape = RoundedCornerShape(24.dp),
+                    // Map type
+                    SmallFloatingActionButton(
+                        onClick = { showMapTypeSheet = true },
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        shape = CircleShape,
                         elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
-                            defaultElevation = 8.dp,
-                            pressedElevation = 12.dp
+                            defaultElevation = 6.dp,
+                            pressedElevation = 8.dp
                         )
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.Stop,
-                            contentDescription = stringResource(R.string.cd_stop_sharing),
-                            modifier = Modifier.size(Dimens.iconSizeLarge)
+                            imageVector = ImageVector.vectorResource(id = R.drawable.layers),
+                            contentDescription = "Map type",
+                            modifier = Modifier.size(Dimens.iconSizeMedium)
                         )
                     }
-                } else {
-                    FloatingActionButton(
+
+                    // My location
+                    SmallFloatingActionButton(
                         onClick = {
-                            if (!locationGranted) {
-                                permissionLauncher.launch(
-                                    arrayOf(
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                    )
+                            val hasPermission = ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.ACCESS_FINE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED ||
+                                    ContextCompat.checkSelfPermission(
+                                        context, Manifest.permission.ACCESS_COARSE_LOCATION
+                                    ) == PackageManager.PERMISSION_GRANTED
+                            if (hasPermission) viewModel.locateMe()
+                            else permissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
                                 )
-                            } else {
-                                sheetView = MapSheetView.Share
-                                scope.launch { bottomSheetScaffoldState.bottomSheetState.expand() }
-                            }
+                            )
                         },
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        shape = RoundedCornerShape(24.dp),
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        shape = CircleShape,
                         elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
-                            defaultElevation = 8.dp,
-                            pressedElevation = 12.dp
+                            defaultElevation = 6.dp,
+                            pressedElevation = 8.dp
                         )
                     ) {
                         Icon(
-                            imageVector = ImageVector.vectorResource(id = R.drawable.location_arrow),
-                            contentDescription = stringResource(R.string.cd_share_location),
-                            modifier = Modifier.size(Dimens.iconSizeLarge)
+                            imageVector = ImageVector.vectorResource(id = R.drawable.location_crosshairs),
+                            contentDescription = stringResource(R.string.cd_my_location),
+                            modifier = Modifier.size(Dimens.iconSizeMedium)
                         )
                     }
+
+                    // Share / Stop sharing — primary FAB
+                    if (uiState.isSharing) {
+                        FloatingActionButton(
+                            onClick = {
+                                sheetView = MapSheetView.Home
+                                homeTab = MapHomeTab.MyShares
+                                scope.launch { bottomSheetScaffoldState.bottomSheetState.expand() }
+                            },
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            shape = RoundedCornerShape(24.dp),
+                            elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
+                                defaultElevation = 8.dp,
+                                pressedElevation = 12.dp
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Stop,
+                                contentDescription = stringResource(R.string.cd_stop_sharing),
+                                modifier = Modifier.size(Dimens.iconSizeLarge)
+                            )
+                        }
+                    } else {
+                        FloatingActionButton(
+                            onClick = {
+                                if (!locationGranted) {
+                                    permissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                } else {
+                                    sheetView = MapSheetView.Share
+                                    scope.launch { bottomSheetScaffoldState.bottomSheetState.expand() }
+                                }
+                            },
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            shape = RoundedCornerShape(24.dp),
+                            elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
+                                defaultElevation = 8.dp,
+                                pressedElevation = 12.dp
+                            )
+                        ) {
+                            Icon(
+                                imageVector = ImageVector.vectorResource(id = R.drawable.location_arrow),
+                                contentDescription = stringResource(R.string.cd_share_location),
+                                modifier = Modifier.size(Dimens.iconSizeLarge)
+                            )
+                        }
+                    }
                 }
-            }
             } // end if (!uiState.isMeetupPlacementMode) — FAB column
 
             // ── Meetup placement overlay ─────────────────────────────────────
@@ -1162,7 +1184,7 @@ fun GlobalMapScreen(
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                text = "Move and zoom map to pick a spot",
+                                text = "Move and zoom the map to pick a spot",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1
@@ -1371,7 +1393,10 @@ fun GlobalMapScreen(
                         color = MaterialTheme.colorScheme.tertiaryContainer
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = Dimens.spaceSmall),
+                            modifier = Modifier.padding(
+                                horizontal = Dimens.spaceMedium,
+                                vertical = Dimens.spaceSmall
+                            ),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             SharingPulseDot()
@@ -1404,7 +1429,11 @@ fun GlobalMapScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.medium
                     ) {
-                        Icon(Icons.Rounded.Stop, null, modifier = Modifier.size(Dimens.iconSizeMedium))
+                        Icon(
+                            Icons.Rounded.Stop,
+                            null,
+                            modifier = Modifier.size(Dimens.iconSizeMedium)
+                        )
                         Spacer(Modifier.width(Dimens.spaceSmall))
                         Text("Manage active shares")
                     }
@@ -1417,7 +1446,11 @@ fun GlobalMapScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.medium
                     ) {
-                        Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(Dimens.iconSizeMedium))
+                        Icon(
+                            Icons.Default.LocationOn,
+                            null,
+                            modifier = Modifier.size(Dimens.iconSizeMedium)
+                        )
                         Spacer(Modifier.width(Dimens.spaceSmall))
                         Text("Share My Location")
                     }
@@ -1661,6 +1694,7 @@ private fun HomeSheetContent(
                     onFriendClick = onFriendClick,
                     onShowOnMap = onShowOnMap
                 )
+
                 MapHomeTab.MyShares -> MySharesTabContent(
                     sharingTargetIds = sharingTargetIds,
                     sharingTargetExpiries = sharingTargetExpiries,
@@ -1874,7 +1908,11 @@ private fun MySharesTabContent(
                         .height(50.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Icon(imageVector = ImageVector.vectorResource(id = R.drawable.location_arrow), null, modifier = Modifier.size(18.dp))
+                    Icon(
+                        imageVector = ImageVector.vectorResource(id = R.drawable.location_arrow),
+                        null,
+                        modifier = Modifier.size(18.dp)
+                    )
                     Spacer(Modifier.width(6.dp))
                     Text("Share location", fontWeight = FontWeight.Bold)
                 }
@@ -1931,7 +1969,11 @@ private fun MySharesTabContent(
                     .height(48.dp),
                 shape = RoundedCornerShape(14.dp)
             ) {
-                Icon(imageVector = ImageVector.vectorResource(id = R.drawable.location_arrow), null, modifier = Modifier.size(18.dp))
+                Icon(
+                    imageVector = ImageVector.vectorResource(id = R.drawable.location_arrow),
+                    null,
+                    modifier = Modifier.size(18.dp)
+                )
                 Spacer(Modifier.width(6.dp))
                 Text("Share more", style = MaterialTheme.typography.labelLarge)
             }
@@ -1948,7 +1990,11 @@ private fun MySharesTabContent(
             ) {
                 Icon(Icons.Rounded.Stop, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Stop all", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                Text(
+                    "Stop all",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
         Spacer(Modifier.height(bottomReservedSpace))
@@ -2085,7 +2131,11 @@ private fun FriendDetailSheetContent(
 
         Spacer(Modifier.height(Dimens.spaceLarge))
 
-        Text(text = friend.displayName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(
+            text = friend.displayName,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
         if (friend.username.isNotEmpty()) {
             Text(
                 text = "@${friend.username}",
@@ -2134,7 +2184,11 @@ private fun FriendDetailSheetContent(
                 modifier = Modifier.weight(1f),
                 shape = MaterialTheme.shapes.medium
             ) {
-                Icon(Icons.Default.ChatBubbleOutline, null, modifier = Modifier.size(Dimens.iconSizeMedium))
+                Icon(
+                    Icons.Default.ChatBubbleOutline,
+                    null,
+                    modifier = Modifier.size(Dimens.iconSizeMedium)
+                )
                 Spacer(Modifier.width(Dimens.spaceSmall))
                 Text("Message")
             }
@@ -2922,9 +2976,19 @@ private fun ShareTargetSheet(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            DurationSegment("15m", selectedDuration == 15L, Modifier.weight(1f)) { selectedDuration = 15L }
-            DurationSegment("1h", selectedDuration == 60L, Modifier.weight(1f)) { selectedDuration = 60L }
-            DurationSegment("4h", selectedDuration == 240L, Modifier.weight(1f)) { selectedDuration = 240L }
+            DurationSegment(
+                "15m",
+                selectedDuration == 15L,
+                Modifier.weight(1f)
+            ) { selectedDuration = 15L }
+            DurationSegment("1h", selectedDuration == 60L, Modifier.weight(1f)) {
+                selectedDuration = 60L
+            }
+            DurationSegment(
+                "4h",
+                selectedDuration == 240L,
+                Modifier.weight(1f)
+            ) { selectedDuration = 240L }
             DurationSegment("∞", selectedDuration == 0L, Modifier.weight(1f)) {
                 // Confirm continuous sharing — it has privacy implications and never auto-stops
                 showInfiniteConfirm = true
@@ -2953,7 +3017,7 @@ private fun ShareTargetSheet(
                     Column {
                         Text(
                             "Your live location will keep streaming with no time limit. " +
-                                "It will only stop when you tap Stop or remove this share manually.",
+                                    "It will only stop when you tap Stop or remove this share manually.",
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(Modifier.height(12.dp))
@@ -2997,7 +3061,7 @@ private fun ShareTargetSheet(
             )
         ) {
             Icon(
-                imageVector = ImageVector.vectorResource(id = R.drawable.location_arrow ),
+                imageVector = ImageVector.vectorResource(id = R.drawable.location_arrow),
                 contentDescription = null,
                 modifier = Modifier.size(20.dp)
             )
@@ -3081,7 +3145,10 @@ private fun ShareEmptyState(
         Spacer(Modifier.height(8.dp))
 
         // Secondary actions — group paths.
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Button(
                 onClick = onJoinGroup,
                 modifier = Modifier
@@ -3272,7 +3339,12 @@ private fun InfiniteShareBullet(text: String) {
 }
 
 @Composable
-private fun DurationSegment(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun DurationSegment(
+    text: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
     Surface(
         onClick = onClick,
         modifier = modifier,
@@ -3563,8 +3635,10 @@ private fun MyLocationMarkerContent(
         note.isNotBlank() -> FriendStatusLabel(text = note, tint = FriendStatusTint.Note)
         meetupStatus == com.ovi.where.domain.model.MeetupParticipantStatus.ARRIVED ->
             FriendStatusLabel(text = "Arrived", tint = FriendStatusTint.Success)
+
         meetupStatus == com.ovi.where.domain.model.MeetupParticipantStatus.CANT_MAKE_IT ->
             FriendStatusLabel(text = "Can't make it", tint = FriendStatusTint.Error)
+
         else -> null
     }
     Column(
@@ -3630,8 +3704,10 @@ private fun FriendLocationUiModel.statusBubbleLabel(): FriendStatusLabel? {
     return when (meetupStatus) {
         com.ovi.where.domain.model.MeetupParticipantStatus.ARRIVED ->
             FriendStatusLabel(text = "Arrived", tint = FriendStatusTint.Success)
+
         com.ovi.where.domain.model.MeetupParticipantStatus.CANT_MAKE_IT ->
             FriendStatusLabel(text = "Can't make it", tint = FriendStatusTint.Error)
+
         else -> null
     }
 }
@@ -3657,8 +3733,10 @@ private fun FriendStatusBubble(text: String, tint: FriendStatusTint) {
     val (bg, fg) = when (tint) {
         FriendStatusTint.Note ->
             MaterialTheme.colorScheme.surface to MaterialTheme.colorScheme.onSurface
+
         FriendStatusTint.Success ->
             MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
+
         FriendStatusTint.Error ->
             MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
     }

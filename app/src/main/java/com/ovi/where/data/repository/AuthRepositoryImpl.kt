@@ -79,6 +79,23 @@ constructor(
                                                             .isSuccess
                                                     return@addSnapshotListener
                                                 }
+                                                // Cache-snapshot guard: a
+                                                // cache snapshot showing
+                                                // `exists() == false` for a
+                                                // user we KNOW is signed in
+                                                // is "not synced yet", not
+                                                // "user doc deleted". Wait
+                                                // for server snapshot
+                                                // before falling through —
+                                                // otherwise we briefly emit
+                                                // a partial Auth-only User
+                                                // and downstream UI flickers.
+                                                if (snapshot != null
+                                                    && !snapshot.exists()
+                                                    && snapshot.metadata.isFromCache
+                                                ) {
+                                                    return@addSnapshotListener
+                                                }
                                                 if (snapshot != null && snapshot.exists()) {
                                                     val user =
                                                             snapshot.toObject(User::class.java)

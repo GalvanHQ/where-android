@@ -110,7 +110,8 @@ class ChatViewModel @Inject constructor(
     private val getOrCreateDirectConversationUseCase: com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase,
     private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter,
     private val observeMeetupDestinationUseCase: com.ovi.where.domain.usecase.location.ObserveMeetupDestinationUseCase,
-    private val userCachePersistent: com.ovi.where.data.cache.UserCache
+    private val userCachePersistent: com.ovi.where.data.cache.UserCache,
+    private val observeActiveLocationsUseCase: com.ovi.where.domain.usecase.location.ObserveActiveLocationsUseCase,
 ) : AndroidViewModel(application) {
 
     /**
@@ -582,33 +583,29 @@ class ChatViewModel @Inject constructor(
      * Requirements: 1.1, 2.1
      */
     private suspend fun resolveParticipantProfile(userId: String) {
-        when (val result = userRepository.getUser(userId)) {
-            is Resource.Success -> {
-                result.data?.let { user ->
-                    participantNames[user.id] = user.displayName
-                    participantPhotos[user.id] = user.photoUrl
-                    if (user.lastSeen > 0L) {
-                        lastSeenByUser[user.id] = user.lastSeen
-                    }
-                    // Persist presence snapshot from authoritative profile so offline reopens
-                    // show "Active 5m ago" without waiting for a socket frame.
-                    try {
-                        onlineStatusDao.upsert(
-                            OnlineStatusEntity(
-                                userId = user.id,
-                                isOnline = user.isOnline,
-                                lastUpdatedAt = System.currentTimeMillis(),
-                                lastSeen = user.lastSeen
-                            )
-                        )
-                    } catch (_: Exception) {
-                        // Best-effort; falls back to in-memory map.
-                    }
-                }
-            }
-            else -> {
-                // Silently fail — will retry on next conversation update
-            }
+        // Route through the persistent UserCache so the Room mirror stays
+        // warm. The hydration collector mirrors Room → in-memory maps.
+        userCachePersistent.warmUp(userId)
+        val cached = userCachePersistent.getCached(userId) ?: return
+        val user = cached
+        participantNames[user.id] = user.displayName
+        participantPhotos[user.id] = user.photoUrl
+        if (user.lastSeen > 0L) {
+            lastSeenByUser[user.id] = user.lastSeen
+        }
+        // Persist presence snapshot from authoritative profile so offline reopens
+        // show "Active 5m ago" without waiting for a socket frame.
+        try {
+            onlineStatusDao.upsert(
+                OnlineStatusEntity(
+                    userId = user.id,
+                    isOnline = user.isOnline,
+                    lastUpdatedAt = System.currentTimeMillis(),
+                    lastSeen = user.lastSeen
+                )
+            )
+        } catch (_: Exception) {
+            // Best-effort; falls back to in-memory map.
         }
     }
 
@@ -1821,6 +1818,23 @@ class ChatViewModel @Inject constructor(
             }
         }
 
+        // ── Active-locations Firestore subscription ────────────────────────
+        // The Socket.IO + 10s-fallback path ([observeLocationsWithCacheFallback])
+        // doesn't surface "someone started sharing" until the first
+        // location_update frame OR the 10s timer fires. That's too long for
+        // the chat header — the avatar row stayed empty for the first 10s
+        // even when a friend was actively sharing.
+        //
+        // [observeActiveLocations] writes to Room as a side-effect of every
+        // server snapshot, so subscribing here keeps Room (and therefore
+        // the cached-locations Flow above) fresh from the moment the chat
+        // opens. We don't bind its emissions to UI state directly — the
+        // Room Flow is the single source of truth — we just keep the
+        // listener alive while the chat is on screen.
+        viewModelScope.launch {
+            observeActiveLocationsUseCase().collect { /* drain */ }
+        }
+
         // The repo's activeSharingState (observed by observeRepoSharingState)
         // is the single source of truth for sharing status. We still kick a
         // checkSharingStatus() to populate the in-memory session from Firestore
@@ -2680,12 +2694,8 @@ class ChatViewModel @Inject constructor(
                 // Resolve display names for the member picker (Requirement 15.2)
                 val otherMembers = members.filter { it.userId != uid }
                 val userIds = otherMembers.map { it.userId }
-                val usersResult = userRepository.getUsers(userIds)
-                val userMap = if (usersResult is Resource.Success && usersResult.data != null) {
-                    usersResult.data.associateBy { it.id }
-                } else {
-                    emptyMap()
-                }
+                userCachePersistent.warmUpMany(userIds)
+                val userMap = userCachePersistent.getCachedMany(userIds)
 
                 val pickerItems = otherMembers.map { member ->
                     val displayName = userMap[member.userId]?.displayName ?: member.userId
@@ -2827,12 +2837,8 @@ class ChatViewModel @Inject constructor(
                 totalGroupSize = members.size
                 // Resolve display names for all members
                 val userIds = members.map { it.userId }
-                val usersResult = userRepository.getUsers(userIds)
-                val userMap = if (usersResult is Resource.Success && usersResult.data != null) {
-                    usersResult.data.associateBy { it.id }
-                } else {
-                    emptyMap()
-                }
+                userCachePersistent.warmUpMany(userIds)
+                val userMap = userCachePersistent.getCachedMany(userIds)
 
                 // Populate participant metadata so message UI models (read receipts,
                 // sender avatars, nicknames) can resolve photos and names for any

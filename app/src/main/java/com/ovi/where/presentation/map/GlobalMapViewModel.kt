@@ -517,11 +517,16 @@ class GlobalMapViewModel @Inject constructor(
             val unknownIds = previewIds.values.flatten().distinct()
                 .filter { it.isNotBlank() && it !in userCache }
             if (unknownIds.isNotEmpty()) {
-                when (val result = getUsersUseCase(unknownIds)) {
-                    is Resource.Success ->
-                        result.data?.forEach { userCache[it.id] = it }
-                    else -> {} // Best-effort — fall back to color dots.
-                }
+                // Route through the persistent cache so the Room mirror
+                // stays warm and other screens (chat header, meetup sheet)
+                // pick up the same names + photos without re-fetching.
+                userCachePersistent.warmUpMany(unknownIds)
+                // The Flow collector in [hydrateUserCacheFromPersistent]
+                // will reflect the new rows into [userCache] on its next
+                // emit, but for synchronous remap-below we read directly
+                // from Room so we don't have to await a recomposition.
+                userCachePersistent.getCachedMany(unknownIds).values
+                    .forEach { userCache[it.id] = it }
             }
             // Re-map state with photos pulled from the now-warm cache.
             val updated = _uiState.value.groups.map { gf ->
@@ -748,19 +753,20 @@ class GlobalMapViewModel @Inject constructor(
     }
 
     /**
-     * Fetches user profiles and re-processes current locations to update display names.
-     * Uses [lastRawLocations] to avoid triggering another Firestore read.
+     * Fetches user profiles via the persistent [com.ovi.where.data.cache.UserCache].
+     *
+     * The cache writes to Room, and our [hydrateUserCacheFromPersistent]
+     * collector mirrors Room → in-memory [userCache] reactively. We also
+     * synchronously read from Room here so the immediate
+     * [processLocationUpdates] re-pass below sees the new rows without
+     * waiting for the Flow to emit.
      */
     private suspend fun fetchUsers(userIds: List<String>) {
-        when (val result = getUsersUseCase(userIds)) {
-            is Resource.Success -> {
-                result.data?.forEach { user -> userCache[user.id] = user }
-                // Re-process with cached data — no additional Firestore reads
-                if (lastRawLocations.isNotEmpty()) {
-                    processLocationUpdates(lastRawLocations)
-                }
-            }
-            else -> {}
+        userCachePersistent.warmUpMany(userIds)
+        userCachePersistent.getCachedMany(userIds).values
+            .forEach { userCache[it.id] = it }
+        if (lastRawLocations.isNotEmpty()) {
+            processLocationUpdates(lastRawLocations)
         }
     }
 

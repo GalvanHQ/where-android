@@ -286,7 +286,10 @@ class ConversationRepositoryImpl @Inject constructor(
         firestoreListener = firestore.collection(AppConstants.FIRESTORE_COLLECTION_CONVERSATIONS)
             .whereArrayContains("participantIds", uid)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) return@addSnapshotListener
+                if (error != null) {
+                    Timber.w(error, "Conversation listener error")
+                    return@addSnapshotListener
+                }
                 val entities = snapshot?.documents?.mapNotNull { doc ->
                     try {
                         // Filter out conversations soft-deleted by the current user (Req 1.7, 2.7)

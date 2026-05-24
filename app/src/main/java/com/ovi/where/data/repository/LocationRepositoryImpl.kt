@@ -673,7 +673,11 @@ class LocationRepositoryImpl @Inject constructor(
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Timber.e(error, "activeLocations listener error for uid=$uid")
-                    trySend(emptyList()).isSuccess
+                    // Don't emit empty list on transient errors — that
+                    // would wipe live chips while the network blips. The
+                    // Flow consumer keeps the last good value; Firestore
+                    // will retry the listener internally and re-emit when
+                    // it recovers.
                     return@addSnapshotListener
                 }
 
@@ -793,25 +797,46 @@ class LocationRepositoryImpl @Inject constructor(
                         val docCount = snapshot?.documents?.size ?: 0
                         if (isFromCache && docCount == 0) return@addSnapshotListener
 
-                        val locations = snapshot?.documents?.mapNotNull { doc ->
-                            val location = doc.toObject(SharedLocation::class.java)
-                            if (location != null) {
-                                val now = System.currentTimeMillis()
-                                val stillActive = location.isSharingActive &&
-                                    (location.sharingExpiresAt == 0L ||
-                                     location.sharingExpiresAt == Long.MAX_VALUE ||
-                                     now < location.sharingExpiresAt)
-                                if (stillActive && location.userId != uid) {
-                                    location.copy(id = doc.id, isSharingActive = true, groupId = location.targetId)
-                                } else null
-                            } else null
+                        // Use the manual parser instead of `toObject` —
+                        // Firestore stores Float fields as Double, so
+                        // `toObject(SharedLocation::class.java)` silently
+                        // fails on accuracy/speed/bearing and returns a
+                        // partially-populated row, which is the root cause
+                        // of "Sharing avatar row never shows" reports.
+                        val parsed = snapshot?.documents?.mapNotNull { doc ->
+                            try { parseSharedLocation(doc.id, doc.data) }
+                            catch (e: Exception) {
+                                Timber.w(e, "fallback listener parse failed: ${doc.id}")
+                                null
+                            }
                         } ?: emptyList()
 
-                        // Persist to Room and emit
-                        repositoryScope.launch {
-                            locationDao.insertLocations(locations.map { it.toEntity() })
+                        val now = System.currentTimeMillis()
+                        val (active, inactive) = parsed.partition { location ->
+                            location.isSharingActive &&
+                                (location.sharingExpiresAt == 0L ||
+                                 location.sharingExpiresAt == Long.MAX_VALUE ||
+                                 now < location.sharingExpiresAt) &&
+                                location.userId != uid
                         }
-                        trySend(locations).isSuccess
+
+                        // Persist active rows + reconcile stale Room rows
+                        // (mirrors observeActiveLocations behaviour).
+                        repositoryScope.launch {
+                            if (active.isNotEmpty()) {
+                                locationDao.insertLocations(active.map { it.toEntity() })
+                            }
+                            if (!isFromCache) {
+                                for (loc in inactive) {
+                                    locationDao.deleteByUserAndTarget(loc.userId, loc.groupId)
+                                }
+                                val seenUids = parsed.map { it.userId }.toSet()
+                                val missing = locationDao.getAllActive()
+                                    .filter { it.userId != uid && it.userId !in seenUids }
+                                for (row in missing) locationDao.deleteById(row.id)
+                            }
+                        }
+                        trySend(active).isSuccess
                     }
             }
         }
@@ -958,32 +983,46 @@ class LocationRepositoryImpl @Inject constructor(
                 val docCount = snapshot?.documents?.size ?: 0
                 if (isFromCache && docCount == 0) return@addSnapshotListener
 
-                val locations = snapshot?.documents?.mapNotNull { doc ->
-                    val location = doc.toObject(SharedLocation::class.java)
-                    if (location != null) {
-                        val now = System.currentTimeMillis()
-                        val stillActive = location.isSharingActive &&
-                            (location.sharingExpiresAt == 0L ||
-                             location.sharingExpiresAt == Long.MAX_VALUE ||
-                             now < location.sharingExpiresAt)
-                        if (stillActive && location.userId != uid) {
-                            location.copy(
-                                id = doc.id,
-                                isSharingActive = true,
-                                groupId = location.targetId
-                            )
-                        } else null
-                    } else null
+                // Use the manual parser instead of `toObject` — Firestore
+                // stores Float fields as Double, so `toObject` returns
+                // partial rows. (See observeLocationsWithCacheFallback for
+                // the full rationale.)
+                val parsed = snapshot?.documents?.mapNotNull { doc ->
+                    try { parseSharedLocation(doc.id, doc.data) }
+                    catch (e: Exception) {
+                        Timber.w(e, "fallback listener parse failed: ${doc.id}")
+                        null
+                    }
                 } ?: emptyList()
 
-                // Update the shared cache so the flow emits
+                val now = System.currentTimeMillis()
+                val (active, inactive) = parsed.partition { location ->
+                    location.isSharingActive &&
+                        (location.sharingExpiresAt == 0L ||
+                         location.sharingExpiresAt == Long.MAX_VALUE ||
+                         now < location.sharingExpiresAt) &&
+                        location.userId != uid
+                }
+
+                // Update the shared in-memory cache so the flow emits
                 val updated = mutableMapOf<String, SharedLocation>()
-                locations.forEach { updated[it.userId] = it }
+                active.forEach { updated[it.userId] = it }
                 socketLocationCache.value = updated
 
-                // Persist to Room for offline access
+                // Persist to Room + reconcile stale rows on server snapshots
                 repositoryScope.launch {
-                    locationDao.insertLocations(locations.map { it.toEntity() })
+                    if (active.isNotEmpty()) {
+                        locationDao.insertLocations(active.map { it.toEntity() })
+                    }
+                    if (!isFromCache) {
+                        for (loc in inactive) {
+                            locationDao.deleteByUserAndTarget(loc.userId, loc.groupId)
+                        }
+                        val seenUids = parsed.map { it.userId }.toSet()
+                        val missing = locationDao.getAllActive()
+                            .filter { it.userId != uid && it.userId !in seenUids }
+                        for (row in missing) locationDao.deleteById(row.id)
+                    }
                 }
             }
     }
@@ -1012,14 +1051,22 @@ class LocationRepositoryImpl @Inject constructor(
                 val docCount = snapshot?.documents?.size ?: 0
                 if (isFromCache && docCount == 0) return@addSnapshotListener
 
+                // Use the manual parser — toObject() silently fails on the
+                // Float fields (Firestore stores as Double).
                 val locations = snapshot?.documents?.mapNotNull { doc ->
-                    val location = doc.toObject(SharedLocation::class.java)
-                    if (location != null) {
+                    try {
+                        val location = parseSharedLocation(doc.id, doc.data)
+                            ?: return@mapNotNull null
                         val now = System.currentTimeMillis()
                         val stillActive = location.isSharingActive &&
-                            (location.sharingExpiresAt == 0L || location.sharingExpiresAt == Long.MAX_VALUE || now < location.sharingExpiresAt)
-                        location.copy(id = doc.id, isSharingActive = stillActive)
-                    } else null
+                            (location.sharingExpiresAt == 0L ||
+                             location.sharingExpiresAt == Long.MAX_VALUE ||
+                             now < location.sharingExpiresAt)
+                        location.copy(isSharingActive = stillActive)
+                    } catch (e: Exception) {
+                        Timber.w(e, "observeGroupLocations parse failed: ${doc.id}")
+                        null
+                    }
                 } ?: emptyList()
                 trySend(locations).isSuccess
             }
@@ -1047,13 +1094,21 @@ class LocationRepositoryImpl @Inject constructor(
                     if (snapshot != null && !snapshot.exists() && snapshot.metadata.isFromCache) {
                         return@addSnapshotListener
                     }
-                    val location = snapshot?.toObject(SharedLocation::class.java)
+                    // Use the manual parser — toObject() silently fails on
+                    // accuracy/speed/bearing (Float vs Double).
+                    val location = snapshot?.let {
+                        try { parseSharedLocation(it.id, it.data) }
+                        catch (e: Exception) {
+                            Timber.w(e, "observeDirectLocationShares parse failed: ${it.id}")
+                            null
+                        }
+                    }
                     if (location != null) {
                         val now = System.currentTimeMillis()
                         val stillActive = location.isSharingActive &&
                             (location.sharingExpiresAt == 0L || location.sharingExpiresAt == Long.MAX_VALUE || now < location.sharingExpiresAt)
                         if (stillActive) {
-                            locations[friendId] = location.copy(id = snapshot.id, groupId = "direct:$friendId", isSharingActive = true)
+                            locations[friendId] = location.copy(groupId = "direct:$friendId", isSharingActive = true)
                         } else {
                             locations.remove(friendId)
                         }
@@ -1082,12 +1137,20 @@ class LocationRepositoryImpl @Inject constructor(
                 if (snapshot != null && !snapshot.exists() && snapshot.metadata.isFromCache) {
                     return@addSnapshotListener
                 }
-                val location = snapshot?.toObject(SharedLocation::class.java)
+                // Use the manual parser — toObject() silently fails on
+                // accuracy/speed/bearing (Float vs Double).
+                val location = snapshot?.let {
+                    try { parseSharedLocation(it.id, it.data) }
+                    catch (e: Exception) {
+                        Timber.w(e, "observeUserLocation parse failed: ${it.id}")
+                        null
+                    }
+                }
                 val resolvedLocation = if (location != null) {
                     val now = System.currentTimeMillis()
                     val stillActive = location.isSharingActive &&
                         (location.sharingExpiresAt == 0L || location.sharingExpiresAt == Long.MAX_VALUE || now < location.sharingExpiresAt)
-                    location.copy(id = snapshot.id, isSharingActive = stillActive)
+                    location.copy(isSharingActive = stillActive)
                 } else null
                 trySend(resolvedLocation).isSuccess
             }

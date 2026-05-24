@@ -508,37 +508,39 @@ class ChatsViewModel @Inject constructor(
         if (unresolvedIds.isEmpty()) return
 
         viewModelScope.launch {
-            when (val result = userRepository.getUsers(unresolvedIds)) {
-                is Resource.Success -> {
-                    val now = System.currentTimeMillis()
-                    val statusEntities = mutableListOf<OnlineStatusEntity>()
-                    result.data?.forEach { user ->
-                        participantNames[user.id] = user.displayName
-                        participantPhotos[user.id] = user.photoUrl
-                        if (user.lastSeen > 0L) {
-                            lastSeenByUser[user.id] = user.lastSeen
-                        }
-                        statusEntities += OnlineStatusEntity(
-                            userId = user.id,
-                            isOnline = user.isOnline,
-                            lastUpdatedAt = now,
-                            lastSeen = user.lastSeen
-                        )
-                    }
-                    if (statusEntities.isNotEmpty()) {
-                        // Persist authoritative profile snapshot so offline reopens
-                        // render "Active Xm ago" without a server round-trip.
-                        try {
-                            onlineStatusDao.upsertAll(statusEntities)
-                        } catch (_: Exception) { /* best-effort */ }
-                    }
-                    // Re-apply filter with newly resolved metadata
-                    applySearchFilter()
-                }
-                else -> {
-                    // Silently fail — will retry on next conversation list update
-                }
+            // Route through the persistent UserCache. It writes to Room,
+            // which our hydrateUserCacheFromPersistent() collector mirrors
+            // into the in-memory maps reactively. We also synchronously
+            // pull from Room so we can fold rich fields (lastSeen) into
+            // the OnlineStatusEntity for "Active Xm ago" rendering.
+            userCachePersistent.warmUpMany(unresolvedIds)
+            val resolved = userCachePersistent.getCachedMany(unresolvedIds)
+            if (resolved.isEmpty()) {
+                // Fetch failed entirely — retry on next conversation update.
+                return@launch
             }
+            val now = System.currentTimeMillis()
+            val statusEntities = mutableListOf<OnlineStatusEntity>()
+            resolved.values.forEach { user ->
+                participantNames[user.id] = user.displayName
+                participantPhotos[user.id] = user.photoUrl
+                if (user.lastSeen > 0L) {
+                    lastSeenByUser[user.id] = user.lastSeen
+                }
+                statusEntities += OnlineStatusEntity(
+                    userId = user.id,
+                    isOnline = user.isOnline,
+                    lastUpdatedAt = now,
+                    lastSeen = user.lastSeen
+                )
+            }
+            if (statusEntities.isNotEmpty()) {
+                try {
+                    onlineStatusDao.upsertAll(statusEntities)
+                } catch (_: Exception) { /* best-effort */ }
+            }
+            // Re-apply filter with newly resolved metadata
+            applySearchFilter()
         }
     }
 

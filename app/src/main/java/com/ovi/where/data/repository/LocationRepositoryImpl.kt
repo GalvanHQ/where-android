@@ -186,48 +186,13 @@ class LocationRepositoryImpl @Inject constructor(
     private fun isMoving(speed: Float): Boolean = speed > SPEED_MOVING_THRESHOLD
 
     /**
-     * Safely parses a Firestore document into a SharedLocation.
-     * Handles Firestore's number type coercion (all numbers stored as Double/Long)
-     * which causes toObject() to fail silently with Float fields.
+     * Wrapper preserving the legacy private signature. Delegates to the
+     * canonical [com.ovi.where.data.remote.firestore.SharedLocationFirestoreMapper]
+     * so the parsing rules live in one place — see that file for the
+     * Float-vs-Double rationale and field schema.
      */
-    private fun parseSharedLocation(docId: String, data: Map<String, Any>?): SharedLocation? {
-        if (data == null) return null
-        return try {
-            SharedLocation(
-                id = docId,
-                userId = data["userId"] as? String ?: "",
-                groupId = data["targetId"] as? String ?: data["groupId"] as? String ?: "",
-                latitude = (data["latitude"] as? Number)?.toDouble() ?: 0.0,
-                longitude = (data["longitude"] as? Number)?.toDouble() ?: 0.0,
-                accuracy = (data["accuracy"] as? Number)?.toFloat() ?: 0f,
-                speed = (data["speed"] as? Number)?.toFloat() ?: 0f,
-                bearing = (data["bearing"] as? Number)?.toFloat() ?: 0f,
-                timestamp = (data["timestamp"] as? Number)?.toLong() ?: 0L,
-                isSharingActive = data["isSharingActive"] as? Boolean ?: false,
-                sharingExpiresAt = (data["sharingExpiresAt"] as? Number)?.toLong() ?: 0L,
-                targetType = data["targetType"] as? String ?: "group",
-                targetId = data["targetId"] as? String ?: "",
-                targetIds = (data["targetIds"] as? List<*>)?.filterIsInstance<String>()
-                    ?: (data["targetId"] as? String)?.takeIf { it.isNotEmpty() }?.let { listOf(it) }
-                    ?: emptyList(),
-                targetExpiries = (data["targetExpiries"] as? Map<*, *>)
-                    ?.mapNotNull { (k, v) ->
-                        val key = k as? String ?: return@mapNotNull null
-                        val value = (v as? Number)?.toLong() ?: return@mapNotNull null
-                        key to value
-                    }
-                    ?.toMap()
-                    ?: emptyMap(),
-                visibleTo = (data["visibleTo"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
-                displayName = data["displayName"] as? String ?: "",
-                photoUrl = data["photoUrl"] as? String,
-                sharingStartedAt = (data["sharingStartedAt"] as? Number)?.toLong() ?: 0L
-            )
-        } catch (e: Exception) {
-            Timber.w(e, "parseSharedLocation: failed to parse doc=$docId")
-            null
-        }
-    }
+    private fun parseSharedLocation(docId: String, data: Map<String, Any>?): SharedLocation? =
+        com.ovi.where.data.remote.firestore.SharedLocationFirestoreMapper.fromMap(docId, data)
 
     /**
      * Computes the union of member ids visible across the given target ids.

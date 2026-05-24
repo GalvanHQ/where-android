@@ -132,6 +132,13 @@ sealed class Screen(val route: String) {
     @Serializable
     data object FriendRequests : Screen("friend_requests")
 
+    /**
+     * Manage and unblock previously blocked users. Reached from the
+     * People tab; mirrors the FriendRequests route shape.
+     */
+    @Serializable
+    data object BlockedUsers : Screen("blocked_users")
+
     // ── Search (full-screen) ──────────────────────────────────────────────
 
     @Serializable

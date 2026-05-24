@@ -911,8 +911,19 @@ fun ChatScreen(
             // ── Image size limit error (Requirement 6.7) ──────────────────────
             ImageSizeLimitError(visible = uiState.showImageSizeError)
 
-            // ── Input bar (Messenger-style, Requirements 5.1-5.6) ──────────────
-            ChatInputBar(
+            // ── Composer area ──────────────────────────────────────────────────
+            // When the local user has blocked the other DM party, the
+            // input bar is replaced with a Messenger-style "Unblock to
+            // message" affordance. Group chats and unblocked DMs render
+            // the normal ChatInputBar.
+            if (uiState.isOtherUserBlocked && uiState.conversation?.isGroup == false) {
+                com.ovi.where.presentation.chat.components.BlockedComposerBar(
+                    otherUserName = uiState.conversation?.title,
+                    onUnblock = { viewModel.unblockOtherUserFromChat() }
+                )
+            } else {
+                // ── Input bar (Messenger-style, Requirements 5.1-5.6) ──────────
+                ChatInputBar(
                 text = uiState.inputText,
                 onTextChange = viewModel::onInputChange,
                 onSend = viewModel::sendMessage,
@@ -969,6 +980,7 @@ fun ChatScreen(
                 themeColor = conversationThemeColor,
                 mentionRanges = uiState.mentionRanges
             )
+            }
         }
     }
 

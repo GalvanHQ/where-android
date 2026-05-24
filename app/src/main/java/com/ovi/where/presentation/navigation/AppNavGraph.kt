@@ -400,6 +400,11 @@ fun AppNavGraph(
                             launchSingleTop = true
                         }
                     },
+                    onNavigateToBlockedUsers = {
+                        navController.navigate(Screen.BlockedUsers.route) {
+                            launchSingleTop = true
+                        }
+                    },
                     onNavigateToSearch = {
                         navController.navigate(Screen.Search.createRoute("people")) {
                             launchSingleTop = true
@@ -759,6 +764,12 @@ fun AppNavGraph(
                             launchSingleTop = true
                         }
                     }
+                )
+            }
+
+            composable(Screen.BlockedUsers.route) {
+                com.ovi.where.presentation.people.BlockedUsersScreen(
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
 

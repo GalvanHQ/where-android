@@ -83,6 +83,7 @@ class PeopleViewModel @Inject constructor(
                         .map { it.toFriendUiModel() }
                         .sortedBy { it.displayName.lowercase() },
                     pendingRequestCount = summary.pendingIncomingCount,
+                    blockedCount = summary.blockedCount,
                     isLoading = false,
                     error = null
                 )
@@ -258,6 +259,9 @@ class PeopleViewModel @Inject constructor(
 data class PeopleUiState(
     val friends: List<FriendUiModel> = emptyList(),
     val pendingRequestCount: Int = 0,
+    /** Number of users the local user has blocked. Drives the People-tab
+     *  Blocked entry-point row's count badge. */
+    val blockedCount: Int = 0,
     val isLoading: Boolean = true,
     val error: String? = null
 )

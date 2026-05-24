@@ -458,6 +458,13 @@ class ChatViewModel @Inject constructor(
                         if (otherUid != null) {
                             dmPresenceSubscribed = true
                             subscribeToDmPresence(otherUid)
+                            // Also start the blocked-state observer so the
+                            // chat composer can flip between the input bar
+                            // and the "Unblock to message" affordance
+                            // reactively when the user (un)blocks from any
+                            // surface. Idempotent: collect happens at most
+                            // once per DM open.
+                            observeOtherUserBlockedState(otherUid)
                         }
                     }
 
@@ -3177,6 +3184,52 @@ class ChatViewModel @Inject constructor(
         return finalResult
     }
 
+    /**
+     * Subscribes to the local user's blocked-users subcollection so the
+     * chat composer can flip between the message input bar and the
+     * "Unblock to message" affordance whenever this DM's other party is
+     * (un)blocked from any surface (UserProfile, ConversationInfo,
+     * BlockedUsers).
+     */
+    private fun observeOtherUserBlockedState(otherUserId: String) {
+        viewModelScope.launch {
+            friendshipRepository.observeBlockedUsers().collect { blocks ->
+                val blocked = blocks.any { it.blockedUid == otherUserId }
+                _uiState.value = _uiState.value.copy(isOtherUserBlocked = blocked)
+            }
+        }
+    }
+
+    /**
+     * Unblocks the other DM participant inline from the chat composer.
+     *
+     * The Firestore listener will reconcile [isOtherUserBlocked] back to
+     * `false` once the server confirms, but we also flip optimistically
+     * so the input bar swaps in immediately. Failure path reverts and
+     * surfaces a snackbar.
+     */
+    fun unblockOtherUserFromChat() {
+        val conversation = _uiState.value.conversation ?: return
+        if (conversation.isGroup) return
+        val otherUid = conversation.otherUserId ?: return
+        if (!_uiState.value.isOtherUserBlocked) return
+        // Optimistic
+        _uiState.value = _uiState.value.copy(isOtherUserBlocked = false)
+        viewModelScope.launch {
+            val result = friendshipRepository.unblockUser(otherUid)
+            if (result is Resource.Error) {
+                _uiState.value = _uiState.value.copy(isOtherUserBlocked = true)
+                _snackbarEvent.tryEmit(
+                    SnackbarEvent(message = result.message ?: "Couldn't unblock")
+                )
+            } else {
+                _snackbarEvent.tryEmit(
+                    SnackbarEvent(message = "User unblocked")
+                )
+            }
+        }
+    }
+
     companion object {
         /** Number of messages to load on initial page and each subsequent page. */
         const val INITIAL_PAGE_SIZE = 30
@@ -3358,6 +3411,13 @@ data class ChatUiState(
     // ─── Header State (Task 11.3) ─────────────────────────────────────────────
     /** Whether the other user in a 1:1 conversation is in the caller's friends list (Requirement 8.4). */
     val isOtherUserFriend: Boolean = false,
+    /**
+     * True when the local user has the other DM party in their blocks
+     * subcollection. Drives the chat composer — when true the input bar
+     * is replaced with an "Unblock to message" affordance, mirroring how
+     * Messenger / Instagram handle blocked DMs. Always false for groups.
+     */
+    val isOtherUserBlocked: Boolean = false,
     // ─── Aggressive Local Caching State (Task 2.4) ────────────────────────────
     /** Cached locations from Room, served within 100ms of screen open (Requirement 7.2). */
     val cachedLocations: List<SharedLocation> = emptyList(),

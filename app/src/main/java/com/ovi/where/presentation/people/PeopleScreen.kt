@@ -51,6 +51,7 @@ import com.ovi.where.presentation.people.components.ErrorInfoCard
 import com.ovi.where.presentation.people.components.FriendRow
 import com.ovi.where.presentation.people.components.FriendsSectionHeader
 import com.ovi.where.presentation.people.components.LiveRingAvatar
+import com.ovi.where.presentation.people.components.BlockedInboxCard
 import com.ovi.where.presentation.people.components.PeopleEmptyState
 import com.ovi.where.presentation.people.components.PeopleSkeleton
 import com.ovi.where.presentation.people.components.RequestsInboxCard
@@ -64,6 +65,7 @@ fun PeopleScreen(
     onNavigateToUserProfile: (String) -> Unit = {},
     onNavigateToChat: (String) -> Unit = {},
     onNavigateToFriendRequests: () -> Unit = {},
+    onNavigateToBlockedUsers: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
     viewModel: PeopleViewModel = hiltViewModel()
 ) {
@@ -170,6 +172,30 @@ fun PeopleScreen(
                                     .padding(
                                         horizontal = Dimens.spaceLarge,
                                         vertical = Dimens.spaceMedium
+                                    )
+                            )
+                        }
+                    }
+
+                    // Blocked users entry — only surfaced when the user
+                    // has at least one block. Hidden by default to keep
+                    // the People tab uncluttered for accounts who never
+                    // use it. From inside Conversation Info or User
+                    // Profile the affordance is always reachable.
+                    if (uiState.blockedCount > 0) {
+                        item(key = "blocked_inbox") {
+                            BlockedInboxCard(
+                                count = uiState.blockedCount,
+                                onClick = onNavigateToBlockedUsers,
+                                modifier = Modifier
+                                    .animateItem(
+                                        fadeInSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
+                                        placementSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS),
+                                        fadeOutSpec = tween(LIST_ITEM_ANIMATION_DURATION_MS)
+                                    )
+                                    .padding(
+                                        horizontal = Dimens.spaceLarge,
+                                        vertical = Dimens.spaceSmall
                                     )
                             )
                         }

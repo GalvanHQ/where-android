@@ -16,6 +16,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -61,14 +63,46 @@ class ConversationInfoViewModel @Inject constructor(
      * conversation's other party is added to or removed from the block
      * list — even when the change originated from another surface like
      * the People tab or User Profile screen.
+     *
+     * Implementation note: we **do not** read `_uiState.value.otherUserId`
+     * inside the collect block. That uid is resolved asynchronously by
+     * [loadConversationDetails], so on init we'd race the conversation
+     * load and compute `isBlocked = false` against a still-`null`
+     * otherUserId — and never re-evaluate. Instead we cache every
+     * snapshot's blocked-uid set on the VM and recompute the flag
+     * whenever either side changes (the block listener emits a new set
+     * OR loadConversationDetails resolves the otherUserId).
      */
+    @Volatile
+    private var lastBlockedUids: Set<String> = emptySet()
+
     private fun observeBlockedState() {
         viewModelScope.launch {
-            friendshipRepository.observeBlockedUsers().collect { blocks ->
-                val otherUid = _uiState.value.otherUserId
-                val isBlocked = otherUid != null && blocks.any { it.blockedUid == otherUid }
-                _uiState.update { it.copy(isBlocked = isBlocked) }
-            }
+            friendshipRepository.observeBlockedUsers()
+                .map { blocks -> blocks.map { it.blockedUid }.toSet() }
+                .distinctUntilChanged()
+                .collect { uids ->
+                    lastBlockedUids = uids
+                    val otherUid = _uiState.value.otherUserId
+                    val isBlocked = otherUid != null && otherUid in uids
+                    if (_uiState.value.isBlocked != isBlocked) {
+                        _uiState.update { it.copy(isBlocked = isBlocked) }
+                    }
+                }
+        }
+    }
+
+    /**
+     * Recomputes the blocked flag against the cached uid set. Called
+     * from [loadConversationDetails] every time a fresh `otherUserId`
+     * is resolved so the very first conversation snapshot picks up the
+     * already-known block state instead of waiting for the next
+     * blocked-users emission.
+     */
+    private fun recomputeIsBlocked(otherUid: String?) {
+        val isBlocked = otherUid != null && otherUid in lastBlockedUids
+        if (_uiState.value.isBlocked != isBlocked) {
+            _uiState.update { it.copy(isBlocked = isBlocked) }
         }
     }
 
@@ -120,6 +154,13 @@ class ConversationInfoViewModel @Inject constructor(
 
             // Determine the other user's ID in a direct message
             val otherUserId = conversation.participantIds.firstOrNull { it != uid }
+
+            // Recompute blocked state now that the otherUid is known.
+            // observeBlockedState() may have already received the latest
+            // blocks snapshot before this conversation load completed —
+            // pull from the cached set so the UI flips Block/Unblock
+            // immediately on screen open.
+            recomputeIsBlocked(otherUserId)
 
             // Check mute state
             val isMuted = conversation.mutedBy.contains(uid)

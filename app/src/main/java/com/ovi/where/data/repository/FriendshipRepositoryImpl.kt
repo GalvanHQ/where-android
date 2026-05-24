@@ -5,6 +5,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.constants.AppConstants
+import com.ovi.where.core.firestore.SnapshotSkipPolicy
+import com.ovi.where.core.firestore.observeDoc
+import com.ovi.where.core.firestore.observeQuery
 import com.ovi.where.domain.model.BlockEntry
 import com.ovi.where.domain.model.FriendEntry
 import com.ovi.where.domain.model.Friendship
@@ -18,6 +21,7 @@ import com.ovi.where.domain.repository.FriendshipRepository
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -48,92 +52,71 @@ class FriendshipRepositoryImpl @Inject constructor(
      * Task 4.1 — Single listener on `users/{uid}/friends` ordered by displayName.
      * Emits empty list when unauthenticated. No truncation.
      */
-    override fun observeFriends(): Flow<List<FriendEntry>> = callbackFlow {
-        val uid = currentUid ?: run { trySend(emptyList()); close(); return@callbackFlow }
-        val reg = firestore.collection("users").document(uid).collection("friends")
+    override fun observeFriends(): Flow<List<FriendEntry>> {
+        val uid = currentUid ?: return kotlinx.coroutines.flow.flowOf(emptyList())
+        return firestore.collection("users").document(uid).collection("friends")
             .orderBy("displayName")
-            .addSnapshotListener { snap, err ->
-                if (err != null) { close(err); return@addSnapshotListener }
-                // Cache-snapshot guard: an empty cache snapshot for a user
-                // who has friends doesn't mean they unfriended everyone.
-                // Suppress so the People tab doesn't briefly empty out.
-                if (snap != null && snap.metadata.isFromCache && snap.isEmpty) {
-                    return@addSnapshotListener
-                }
-                trySend(snap?.toObjects(FriendEntry::class.java) ?: emptyList())
-            }
-        awaitClose { reg.remove() }
+            .observeQuery(
+                skipPolicy = SnapshotSkipPolicy.EMPTY_CACHE,
+            ) { snap -> snap.toObjects(FriendEntry::class.java) }
     }
 
     /**
      * Task 4.2 — Single-doc listener on `users/{uid}/inbox/friendRequests`.
      * Emits entries sorted by sentAt descending. Empty list when doc absent.
      */
-    override fun observeIncomingRequests(): Flow<List<RequestEntry>> = callbackFlow {
-        val uid = currentUid ?: run { trySend(emptyList()); close(); return@callbackFlow }
-        val reg = firestore.collection("users").document(uid)
+    override fun observeIncomingRequests(): Flow<List<RequestEntry>> {
+        val uid = currentUid ?: return kotlinx.coroutines.flow.flowOf(emptyList())
+        return firestore.collection("users").document(uid)
             .collection("inbox").document("friendRequests")
-            .addSnapshotListener { snap, err ->
-                if (err != null) { close(err); return@addSnapshotListener }
-                if (snap != null && !snap.exists() && snap.metadata.isFromCache) {
-                    return@addSnapshotListener
-                }
-                val inbox = snap?.toObject(RequestInbox::class.java) ?: RequestInbox()
-                trySend(inbox.entries.values.sortedByDescending { it.sentAt })
+            .observeDoc(
+                skipPolicy = SnapshotSkipPolicy.MISSING_DOC,
+            ) { snap ->
+                val inbox = snap.toObject(RequestInbox::class.java) ?: RequestInbox()
+                inbox.entries.values.sortedByDescending { it.sentAt }
             }
-        awaitClose { reg.remove() }
+            .map { it ?: emptyList() }
     }
 
     /**
      * Task 4.3 — Single-doc listener on `users/{uid}/outbox/friendRequests`.
      */
-    override fun observeOutgoingRequests(): Flow<List<RequestEntry>> = callbackFlow {
-        val uid = currentUid ?: run { trySend(emptyList()); close(); return@callbackFlow }
-        val reg = firestore.collection("users").document(uid)
+    override fun observeOutgoingRequests(): Flow<List<RequestEntry>> {
+        val uid = currentUid ?: return kotlinx.coroutines.flow.flowOf(emptyList())
+        return firestore.collection("users").document(uid)
             .collection("outbox").document("friendRequests")
-            .addSnapshotListener { snap, err ->
-                if (err != null) { close(err); return@addSnapshotListener }
-                if (snap != null && !snap.exists() && snap.metadata.isFromCache) {
-                    return@addSnapshotListener
-                }
-                val outbox = snap?.toObject(RequestInbox::class.java) ?: RequestInbox()
-                trySend(outbox.entries.values.sortedByDescending { it.sentAt })
+            .observeDoc(
+                skipPolicy = SnapshotSkipPolicy.MISSING_DOC,
+            ) { snap ->
+                val outbox = snap.toObject(RequestInbox::class.java) ?: RequestInbox()
+                outbox.entries.values.sortedByDescending { it.sentAt }
             }
-        awaitClose { reg.remove() }
+            .map { it ?: emptyList() }
     }
 
     /**
      * Task 4.4 — Single-doc listener on `users/{uid}/summary/social`.
      * Emits zero-valued SocialSummary when doc absent.
      */
-    override fun observeSocialSummary(): Flow<SocialSummary> = callbackFlow {
-        val uid = currentUid ?: run { trySend(SocialSummary()); close(); return@callbackFlow }
-        val reg = firestore.collection("users").document(uid)
+    override fun observeSocialSummary(): Flow<SocialSummary> {
+        val uid = currentUid ?: return kotlinx.coroutines.flow.flowOf(SocialSummary())
+        return firestore.collection("users").document(uid)
             .collection("summary").document("social")
-            .addSnapshotListener { snap, err ->
-                if (err != null) { close(err); return@addSnapshotListener }
-                if (snap != null && !snap.exists() && snap.metadata.isFromCache) {
-                    return@addSnapshotListener
-                }
-                trySend(snap?.toObject(SocialSummary::class.java) ?: SocialSummary())
-            }
-        awaitClose { reg.remove() }
+            .observeDoc(
+                skipPolicy = SnapshotSkipPolicy.MISSING_DOC,
+            ) { snap -> snap.toObject(SocialSummary::class.java) }
+            .map { it ?: SocialSummary() }
     }
 
     /**
      * Task 4.5 — Subcollection listener on `users/{uid}/blocks`.
      */
-    override fun observeBlockedUsers(): Flow<List<BlockEntry>> = callbackFlow {
-        val uid = currentUid ?: run { trySend(emptyList()); close(); return@callbackFlow }
-        val reg = firestore.collection("users").document(uid).collection("blocks")
-            .addSnapshotListener { snap, err ->
-                if (err != null) { close(err); return@addSnapshotListener }
-                if (snap != null && snap.metadata.isFromCache && snap.isEmpty) {
-                    return@addSnapshotListener
-                }
-                trySend(snap?.toObjects(BlockEntry::class.java) ?: emptyList())
-            }
-        awaitClose { reg.remove() }
+    override fun observeBlockedUsers(): Flow<List<BlockEntry>> {
+        val uid = currentUid ?: return kotlinx.coroutines.flow.flowOf(emptyList())
+        return firestore.collection("users").document(uid).collection("blocks")
+            .observeQuery(
+                skipPolicy = SnapshotSkipPolicy.EMPTY_CACHE,
+            ) { snap -> snap.toObjects(BlockEntry::class.java) }
     }
 
     /**

@@ -6,6 +6,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.constants.AppConstants
+import com.ovi.where.core.firestore.SnapshotSkipPolicy
+import com.ovi.where.core.firestore.observeQuery
 import com.ovi.where.data.local.CacheStalenessChecker
 import com.ovi.where.domain.model.Group
 import com.ovi.where.domain.model.GroupMember
@@ -274,30 +276,13 @@ class GroupRepositoryImpl @Inject constructor(
         Resource.Error(e.message ?: "Failed to set group avatar")
     }
 
-    override fun observeGroupMembers(groupId: String): Flow<List<GroupMember>> = callbackFlow {
-        val listener: ListenerRegistration = firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
+    override fun observeGroupMembers(groupId: String): Flow<List<GroupMember>> {
+        return firestore.collection(AppConstants.FIRESTORE_COLLECTION_GROUPS)
             .document(groupId)
             .collection(AppConstants.FIRESTORE_COLLECTION_MEMBERS)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-
-                // Cache-snapshot guard: an empty cache snapshot doesn't
-                // prove the group is empty (a real group always has at
-                // least one member). Suppress so the meetup sheet's member
-                // avatars don't briefly disappear on cold start.
-                val isFromCache = snapshot?.metadata?.isFromCache == true
-                val members = snapshot?.toObjects(GroupMember::class.java) ?: emptyList()
-                if (isFromCache && members.isEmpty()) {
-                    Timber.d("observeGroupMembers: ignoring empty cache snapshot for %s", groupId)
-                    return@addSnapshotListener
-                }
-
-                trySend(members).isSuccess
-            }
-        awaitClose { listener.remove() }
+            .observeQuery(
+                skipPolicy = SnapshotSkipPolicy.EMPTY_CACHE,
+            ) { snap -> snap.toObjects(GroupMember::class.java) }
     }
 
     override suspend fun addMember(groupId: String, userId: String): Resource<Unit> {

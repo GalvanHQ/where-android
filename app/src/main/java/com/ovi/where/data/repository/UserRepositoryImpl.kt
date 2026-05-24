@@ -2,19 +2,17 @@ package com.ovi.where.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.constants.AppConstants
 import com.ovi.where.data.local.dao.UserCacheDao
 import com.ovi.where.data.local.entity.toCacheEntity
+import com.ovi.where.core.firestore.observeDoc
 import com.ovi.where.domain.model.User
 import com.ovi.where.domain.repository.UserRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -91,28 +89,19 @@ class UserRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun observeUser(userId: String): Flow<User?> = callbackFlow {
-        val listener: ListenerRegistration = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+    override fun observeUser(userId: String): Flow<User?> {
+        return firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
             .document(userId)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) { close(error); return@addSnapshotListener }
-
-                // Cache-snapshot guard: a cache snapshot for a not-yet-
-                // existent doc returns `exists = false` even when the user
-                // *does* exist on the server. Suppress that single null so
-                // downstream UI (profile photos, names) doesn't briefly
-                // show "user not found" on cold start.
-                if (snapshot != null && !snapshot.exists() && snapshot.metadata.isFromCache) {
-                    return@addSnapshotListener
-                }
-                val user = snapshot?.toObject(User::class.java)
+            .observeDoc(
+                skipPolicy = com.ovi.where.core.firestore.SnapshotSkipPolicy.MISSING_DOC,
+            ) { snap ->
+                val user = snap.toObject(User::class.java)
                 // Warm the persistent cache on every fresh read so VMs
                 // and the inbox + meetup sheet have name/photo data
                 // immediately available after process death.
                 if (user != null) warmCache(listOf(user))
-                trySend(user).isSuccess
+                user
             }
-        awaitClose { listener.remove() }
     }
 
     override suspend fun updateUserStatus(isOnline: Boolean): Resource<Unit> {

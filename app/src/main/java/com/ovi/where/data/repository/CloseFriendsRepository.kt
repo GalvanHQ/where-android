@@ -3,10 +3,10 @@ package com.ovi.where.data.repository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
-import kotlinx.coroutines.channels.awaitClose
+import com.ovi.where.core.firestore.observeDoc
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -34,29 +34,18 @@ class CloseFriendsRepository @Inject constructor(
      * Snapshot listener over the close-friends doc. Emits an empty set when
      * unauthenticated or the doc doesn't exist yet.
      */
-    fun observe(): Flow<Set<String>> = callbackFlow {
-        val uid = firebaseAuth.currentUser?.uid
-        if (uid == null) {
-            trySend(emptySet())
-            close()
-            return@callbackFlow
-        }
-        val ref = firestore
+    fun observe(): Flow<Set<String>> {
+        val uid = firebaseAuth.currentUser?.uid ?: return kotlinx.coroutines.flow.flowOf(emptySet())
+        return firestore
             .collection("users").document(uid)
             .collection("preferences").document(DOC_ID)
-        val reg = ref.addSnapshotListener { snap, _ ->
-            // Cache-snapshot guard: a missing-from-cache doc would emit
-            // emptySet() and downstream UI would treat all friends as "not
-            // close", losing the quiet-hours bypass for them. Wait for the
-            // server snapshot before downgrading.
-            if (snap != null && !snap.exists() && snap.metadata.isFromCache) {
-                return@addSnapshotListener
+            .observeDoc(
+                skipPolicy = com.ovi.where.core.firestore.SnapshotSkipPolicy.MISSING_DOC,
+            ) { snap ->
+                @Suppress("UNCHECKED_CAST")
+                (snap.get("members") as? Map<String, *>)?.keys?.toSet().orEmpty()
             }
-            @Suppress("UNCHECKED_CAST")
-            val members = (snap?.get("members") as? Map<String, *>)?.keys?.toSet().orEmpty()
-            trySend(members)
-        }
-        awaitClose { reg.remove() }
+            .map { it ?: emptySet() }
     }
 
     /**

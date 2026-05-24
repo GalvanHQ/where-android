@@ -413,6 +413,27 @@ class ConversationRepositoryImpl @Inject constructor(
                     }
                     conversationDao.upsertAll(mergedEntities)
 
+                    // ── Delete reconcile (server-snapshot only) ──────────────
+                    // Any conversation in Room that's NOT in the snapshot is
+                    // either:
+                    //   - a conversation the user was just removed from
+                    //     (group kicked, left from another device), or
+                    //   - genuinely deleted server-side.
+                    // Either way, we drop the local row so the Chats tab
+                    // and any open chat screen reactively notice the
+                    // change. Cache snapshots can have transient gaps, so
+                    // we only run reconcile on authoritative server snaps.
+                    val isServerSnapshot = snapshot?.metadata?.isFromCache == false
+                    if (isServerSnapshot) {
+                        val freshIds = entities.map { it.id }.toSet()
+                        val localIds = conversationDao.getAllIds()
+                        for (localId in localIds) {
+                            if (localId !in freshIds) {
+                                conversationDao.deleteById(localId)
+                            }
+                        }
+                    }
+
                     // Parse recentMessages from each conversation doc and upsert to messages table.
                     // This gives the client messages for free (0 extra Firestore reads).
                     snapshot?.documents?.forEach { doc ->

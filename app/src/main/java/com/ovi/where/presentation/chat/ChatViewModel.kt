@@ -439,9 +439,27 @@ class ChatViewModel @Inject constructor(
             val uid = currentUserId ?: ""
             var adminObserved = false
             var groupDescriptionLoaded = false
+            // Tracks whether we've ever seen this conversation in a fresh
+            // snapshot. Until we have, an absent conversation is just
+            // "still loading" — only after a positive sighting can we
+            // confidently flip [isLocalUserParticipant] to false on a
+            // subsequent absent emission.
+            var hasObservedConversationOnce = false
             observeConversationsUseCase().collect { conversations ->
                 val conv = conversations.firstOrNull { it.id == conversationId }
                 if (conv != null) {
+                    hasObservedConversationOnce = true
+                    // ── Re-affirm participant status ─────────────────────
+                    // The Firestore listener already filters with
+                    // whereArrayContains("participantIds", uid), so any
+                    // doc reaching us here MUST contain us. Belt-and-
+                    // suspenders: explicitly check, in case Room ever
+                    // emits a stale row from a previous session.
+                    val stillParticipant = uid.isNotBlank() && uid in conv.participantIds
+                    if (_uiState.value.isLocalUserParticipant != stillParticipant) {
+                        _uiState.value = _uiState.value.copy(isLocalUserParticipant = stillParticipant)
+                    }
+
                     // For DIRECT conversations resolve participant metadata so we have
                     // displayName, photo, and lastSeen for the header. Skip if already cached.
                     if (conv.type == ConversationType.DIRECT) {
@@ -510,6 +528,16 @@ class ChatViewModel @Inject constructor(
                     if (uiModel.isGroup && uiModel.groupId != null && !groupDescriptionLoaded) {
                         groupDescriptionLoaded = true
                         loadGroupDescription(uiModel.groupId)
+                    }
+                } else if (hasObservedConversationOnce) {
+                    // We saw this conversation in a previous emission and
+                    // now it's gone — the user was removed (kicked /
+                    // left from another device / conversation deleted
+                    // server-side). Flip the flag so the chat screen
+                    // swaps the composer for the
+                    // "you're not a participant anymore" banner.
+                    if (_uiState.value.isLocalUserParticipant) {
+                        _uiState.value = _uiState.value.copy(isLocalUserParticipant = false)
                     }
                 }
             }
@@ -1106,6 +1134,12 @@ class ChatViewModel @Inject constructor(
         val text = _uiState.value.inputText.trim()
         if (text.isEmpty()) return
         val convId = _uiState.value.conversationId ?: return
+
+        // Defense-in-depth: refuse to send if we know the local user is no
+        // longer a participant. The UI swaps in NotParticipantBanner so
+        // the composer is gone, but this guard catches any stale-state
+        // race (e.g. a queued send dispatched before the UI flipped).
+        if (!_uiState.value.isLocalUserParticipant) return
 
         // Requirement 1.7: Reject sends when offline queue is full (50 messages)
         if (messageRepositoryImpl.offlineQueueSize >= MAX_OFFLINE_QUEUE_SIZE) {
@@ -3446,6 +3480,17 @@ data class ChatUiState(
      * member-count line.
      */
     val groupDescription: String = "",
+    /**
+     * False when the local user is no longer a participant of this
+     * conversation (kicked from a group, removed via admin tools, or
+     * the conversation was deleted server-side). Drives the
+     * "you're not a participant anymore" composer banner that replaces
+     * the message input on the chat screen — matching how WhatsApp /
+     * Telegram surface this state. Defaults to `true` so the banner
+     * doesn't flash before the conversation has loaded for the first
+     * time.
+     */
+    val isLocalUserParticipant: Boolean = true,
     /**
      * True when the local user has the other DM party in their blocks
      * subcollection. Drives the chat composer — when true the input bar

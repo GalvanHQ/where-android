@@ -913,11 +913,20 @@ fun ChatScreen(
             ImageSizeLimitError(visible = uiState.showImageSizeError)
 
             // ── Composer area ──────────────────────────────────────────────────
-            // When the local user has blocked the other DM party, the
-            // input bar is replaced with a Messenger-style "Unblock to
-            // message" affordance. Group chats and unblocked DMs render
-            // the normal ChatInputBar.
-            if (uiState.isOtherUserBlocked && uiState.conversation?.isGroup == false) {
+            // Three states, in priority order:
+            //   1. Not a participant anymore (kicked / left from another
+            //      device / conversation deleted). Show the
+            //      [NotParticipantBanner] with a Back affordance.
+            //      History stays visible above.
+            //   2. DM with a blocked other party. Show the
+            //      [BlockedComposerBar] with the Unblock action.
+            //   3. Default: render the normal [ChatInputBar].
+            if (!uiState.isLocalUserParticipant) {
+                com.ovi.where.presentation.chat.components.NotParticipantBanner(
+                    isGroup = uiState.conversation?.isGroup == true,
+                    onBack = onNavigateBack
+                )
+            } else if (uiState.isOtherUserBlocked && uiState.conversation?.isGroup == false) {
                 com.ovi.where.presentation.chat.components.BlockedComposerBar(
                     otherUserName = uiState.conversation?.title,
                     onUnblock = {

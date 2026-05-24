@@ -65,6 +65,17 @@ async function handleMembershipChange(
   const left = [...beforeIds].filter((id) => !afterIds.has(id));
   if (joined.length === 0 && left.length === 0) return;
 
+  // ── Sync conversation.participantIds with the group's memberIds ────────
+  // Without this the conversation doc stays out of sync after a remove /
+  // leave: the user keeps appearing in the chat (Chats tab, FCM fan-out
+  // recipients) and the WS server's auth check at connect time still
+  // accepts them — so a removed member can keep sending messages until
+  // they next reconnect. Authoritative server-side write through Admin
+  // SDK so clients can't drift this.
+  if (joined.length > 0 || left.length > 0) {
+    await syncConversationParticipants(groupId, memberIds, joined, left);
+  }
+
   for (const newMemberId of joined) {
     const recipients = memberIds.filter((id) => id !== newMemberId);
     if (recipients.length === 0) continue;
@@ -87,6 +98,58 @@ async function handleMembershipChange(
       body: "Tap to view the group",
       extra: { groupId, userId: oldMemberId, userName },
     });
+  }
+}
+
+/**
+ * Mirror the group's `memberIds` into every group-typed conversation
+ * that references this group. We do it as a single set() on
+ * `participantIds` rather than two arrayUnion / arrayRemove updates so
+ * the doc converges to exactly the group's current membership without
+ * race windows.
+ *
+ * Also strips the leavers from `unreadCounts`, `mutedBy`, `mutedUntil`,
+ * `pinnedBy`, and `nicknames` keyed on the leaver's uid — the
+ * conversation no longer concerns them, and leaving stale entries
+ * costs storage + can leak names into header counters.
+ *
+ * Idempotent: if no conversation is found (shouldn't happen for a real
+ * group), we no-op silently.
+ */
+async function syncConversationParticipants(
+  groupId: string,
+  memberIds: string[],
+  _joined: string[],
+  left: string[]
+) {
+  const db = admin.firestore();
+  try {
+    const snapshot = await db
+      .collection("conversations")
+      .where("type", "==", "group")
+      .where("groupId", "==", groupId)
+      .get();
+    if (snapshot.empty) return;
+
+    const batch = db.batch();
+    for (const doc of snapshot.docs) {
+      const update: Record<string, unknown> = {
+        participantIds: memberIds,
+      };
+      if (left.length > 0) {
+        for (const uid of left) {
+          update[`unreadCounts.${uid}`] = admin.firestore.FieldValue.delete();
+          update[`mutedUntil.${uid}`] = admin.firestore.FieldValue.delete();
+          update[`nicknames.${uid}`] = admin.firestore.FieldValue.delete();
+        }
+        update["mutedBy"] = admin.firestore.FieldValue.arrayRemove(...left);
+        update["pinnedBy"] = admin.firestore.FieldValue.arrayRemove(...left);
+      }
+      batch.update(doc.ref, update);
+    }
+    await batch.commit();
+  } catch (err) {
+    console.error("Failed to sync conversation.participantIds for group", groupId, err);
   }
 }
 

@@ -102,8 +102,50 @@ const initializeSockets = (io) => {
             }).catch((err) => console.error('participant check failed', err));
         }
 
+        /**
+         * Per-frame participant guard.
+         *
+         * The connect-time check above only runs once when the socket
+         * opens. If the user is removed from a group AFTER they've
+         * connected (admin kicks them, or they leave from another
+         * device), their socket stays alive — and they can keep
+         * sending messages until the next reconnect.
+         *
+         * To close that hole we re-check `conversation.participantIds`
+         * on every incoming message frame. The doc read is one Firestore
+         * lookup per frame, but it's the cheapest auth gate available
+         * here; any heavier per-frame work would need a Redis/local
+         * cache layer. The cost is acceptable for a chat workload.
+         *
+         * Returns true on allow, false on deny (and disconnects the
+         * socket so the client doesn't keep retrying invalid frames).
+         */
+        async function ensureStillParticipant() {
+            if (!conversationId) return false;
+            try {
+                const doc = await db.collection('conversations').doc(conversationId).get();
+                if (!doc.exists) {
+                    socket.disconnect();
+                    return false;
+                }
+                const ids = doc.data().participantIds || [];
+                if (!ids.includes(uid)) {
+                    // No longer a participant — likely removed from a
+                    // group or left themselves on another device.
+                    socket.emit('error', { message: 'You are no longer a participant of this conversation.' });
+                    socket.disconnect();
+                    return false;
+                }
+                return true;
+            } catch (err) {
+                console.error('per-frame participant check failed', err);
+                return false;
+            }
+        }
+
         socket.on('message', async (data) => {
             if (!conversationId) return;
+            if (!(await ensureStillParticipant())) return;
             try {
                 const { tempId, text, replyToId, replyToText, replyToSenderName, mentionedUserIds } = data;
                 if (!text || text.trim() === '') return;
@@ -150,6 +192,7 @@ const initializeSockets = (io) => {
 
         socket.on('image_message', async (data) => {
             if (!conversationId) return;
+            if (!(await ensureStillParticipant())) return;
             try {
                 const { tempId, imageUrl } = data;
                 if (!imageUrl) return;
@@ -185,6 +228,7 @@ const initializeSockets = (io) => {
 
         socket.on('location_message', async (data) => {
             if (!conversationId) return;
+            if (!(await ensureStillParticipant())) return;
             try {
                 const { tempId, latitude, longitude } = data;
 
@@ -220,6 +264,7 @@ const initializeSockets = (io) => {
 
         socket.on('voice_message', async (data) => {
             if (!conversationId) return;
+            if (!(await ensureStillParticipant())) return;
             try {
                 const { tempId, voiceUrl, durationMs } = data;
                 if (!voiceUrl) return;

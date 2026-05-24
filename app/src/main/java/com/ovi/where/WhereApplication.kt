@@ -13,7 +13,9 @@ import com.ovi.where.data.sync.BackgroundSyncLifecycleObserver
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import timber.log.Timber
@@ -82,31 +84,120 @@ class WhereApplication : Application() {
     }
 
     /**
-     * Sets `isOnline = true` when the app foregrounds and `isOnline = false` when
-     * it fully backgrounds (all Activities stopped). Uses `onStart`/`onStop` on the
-     * *process* lifecycle so the state is accurate even across Activity recreations.
+     * Tracks whether the user is currently in foreground use vs idle.
+     *
+     * Goal: write to Firestore as little as possible while still keeping
+     * the green dot in friends' UIs accurate.
+     *
+     * Three guardrails layered together kill the "every screen-off, every
+     * screen-on, every shade peek" write storm the previous implementation
+     * suffered from:
+     *
+     *   1. **No-op de-dupe**. We track the last-pushed value and skip the
+     *      write when the desired state matches what's already on the
+     *      server doc. Prevents redundant `true` → `true` writes during
+     *      Activity recreations or notification glances that already saw
+     *      a true write recently.
+     *
+     *   2. **Offline debounce**. `onStop` doesn't write `false` immediately.
+     *      It schedules a coroutine that waits [OFFLINE_DEBOUNCE_MS] before
+     *      writing. If the user comes back inside that window (most "the
+     *      screen turned off for a few seconds" cases), the pending write
+     *      is cancelled and we never touch Firestore. WhatsApp / Messenger
+     *      use a similar grace period for the same reason.
+     *
+     *   3. **Heartbeat throttle**. `lastSeen` is bumped at most every
+     *      [HEARTBEAT_THROTTLE_MS] while online, so a user who keeps the
+     *      app foregrounded for hours doesn't generate a write every time
+     *      the lifecycle recomposes.
      */
     inner class OnlineStatusObserver : DefaultLifecycleObserver {
-        override fun onStart(owner: LifecycleOwner) = setOnlineStatus(true)
-        override fun onStop(owner: LifecycleOwner)  = setOnlineStatus(false)
+        override fun onStart(owner: LifecycleOwner) {
+            // Cancel a pending offline write — user came back inside the
+            // grace window. Either skip the online write entirely (state
+            // already true on the server) or push it through.
+            pendingOfflineJob?.cancel()
+            pendingOfflineJob = null
+            scheduleOnlineWrite()
+        }
+
+        override fun onStop(owner: LifecycleOwner) {
+            scheduleOfflineWrite()
+        }
     }
 
-    private fun setOnlineStatus(isOnline: Boolean) {
-        appScope.launch {
-            try {
-                val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
-                FirebaseFirestore.getInstance()
-                    .collection(AppConstants.FIRESTORE_COLLECTION_USERS)
-                    .document(uid)
-                    .update(
-                        "isOnline", isOnline,
-                        "lastSeen", System.currentTimeMillis()
-                    )
-                    .await()
-            } catch (e: Exception) {
-                Timber.w(e, "Failed to update online status")
-            }
+    /**
+     * Scheduling helper for the foregrounded path. Honors the heartbeat
+     * throttle so we don't write on every Activity recreation.
+     */
+    private fun scheduleOnlineWrite() {
+        val now = System.currentTimeMillis()
+        // Already known online and the last write is still fresh — skip
+        // the round trip entirely. Friends' UIs already show the green
+        // dot, and `lastSeen` will be re-bumped on the next foreground
+        // entry after the throttle expires.
+        if (lastPushedOnline == true && now - lastOnlineWriteAt < HEARTBEAT_THROTTLE_MS) {
+            return
         }
+        appScope.launch { writeOnlineStatus(true) }
+    }
+
+    /**
+     * Scheduling helper for the backgrounded path. Defers the actual
+     * write so transient backgrounding (screen off for a few seconds,
+     * notification shade peek) doesn't generate a Firestore write.
+     */
+    private fun scheduleOfflineWrite() {
+        // Already offline on the server — skip.
+        if (lastPushedOnline == false) return
+        pendingOfflineJob?.cancel()
+        pendingOfflineJob = appScope.launch {
+            delay(OFFLINE_DEBOUNCE_MS)
+            writeOnlineStatus(false)
+        }
+    }
+
+    private suspend fun writeOnlineStatus(isOnline: Boolean) {
+        try {
+            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+            FirebaseFirestore.getInstance()
+                .collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                .document(uid)
+                .update(
+                    "isOnline", isOnline,
+                    "lastSeen", System.currentTimeMillis()
+                )
+                .await()
+            lastPushedOnline = isOnline
+            if (isOnline) lastOnlineWriteAt = System.currentTimeMillis()
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to update online status")
+        }
+    }
+
+    @Volatile
+    private var lastPushedOnline: Boolean? = null
+
+    @Volatile
+    private var lastOnlineWriteAt: Long = 0L
+
+    @Volatile
+    private var pendingOfflineJob: Job? = null
+
+    private companion object {
+        /**
+         * How long we wait before writing `isOnline = false` after the
+         * process backgrounds. Covers screen-off, notification shade,
+         * brief tab-outs without flapping the friends' UIs.
+         */
+        private const val OFFLINE_DEBOUNCE_MS = 15_000L
+
+        /**
+         * Minimum time between consecutive `isOnline = true` writes
+         * while the user is active. Friends still see "online" without
+         * us paying for a write per Activity restart / cold app open.
+         */
+        private const val HEARTBEAT_THROTTLE_MS = 30_000L
     }
 
     private fun fetchAndSaveFcmToken() {

@@ -81,6 +81,21 @@ internal val BottomTabRoutes = setOf(
 )
 
 /**
+ * Routes shown before the user is authenticated / has a complete
+ * profile. The persistent map backdrop is hidden on these so we don't
+ * leak chrome from the post-auth experience into onboarding/login.
+ */
+private val PreAuthRoutes = setOf(
+    Screen.Gatekeeper.route,
+    Screen.Onboarding.route,
+    Screen.Login.route,
+    Screen.SignUp.route,
+    Screen.ForgotPassword.route,
+    Screen.EmailVerification.route,
+    Screen.CompleteProfile.route
+)
+
+/**
  * True when both endpoints of a navigation are tab routes — i.e. the user is
  * switching between bottom tabs. Tabs are siblings (not a stack), so a quick
  * cross-fade is the right feel; the slide animation is reserved for actual
@@ -137,11 +152,89 @@ fun AppNavGraph(
     val totalNavBarHeight = MapNavBarHeight + systemBottomInset
     val nonMapContentPadding = PaddingValues(bottom = totalNavBarHeight)
 
+    // ── Persistent map backdrop ─────────────────────────────────────────────
+    // GlobalMapScreen is hoisted out of the NavHost so the underlying
+    // GoogleMap (a native MapView with its own GL surface and tile cache)
+    // never gets destroyed and re-created on every tab switch. Without
+    // this, navigating Map → Chats → Map flashes a blank/white frame for
+    // ~250 ms while the new MapView spins up its renderer.
+    //
+    // Layering (back to front):
+    //   1. background color
+    //   2. GlobalMapScreen — always composed once the user is past auth.
+    //      Its `isMapTabActive` flag mirrors the current route so it can
+    //      stop emitting "map foregrounded" signals (FCM suppression,
+    //      camera autozooms) when the user is on another tab.
+    //   3. NavHost — covers the map with each non-map destination's
+    //      solid background. The MapTab destination renders an empty
+    //      Spacer so the map below shows through.
+    //   4. Bottom bar overlay.
+    //
+    // First visit to MapTab still pays the one-time MapView init cost
+    // (unavoidable cold-start). Every subsequent tab switch is flash-free.
+    val isMapTabActive = currentRoute == Screen.MapTab.route
+    val mapBackdropVisible = currentRoute != null && currentRoute !in PreAuthRoutes
+
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        // ── Persistent map backdrop ───────────────────────────────────────────
+        // Always composed once the user is post-auth. When the user is
+        // not on the map tab, the NavHost above paints a solid background
+        // which covers it. Switching back to the map tab simply removes
+        // that cover — the GoogleMap stays warm in memory (matches the
+        // Google Maps app pattern: no re-init, no GL surface flash).
+        if (mapBackdropVisible) {
+            GlobalMapScreen(
+                isActiveTab = isMapTabActive,
+                onNavigateToChat = { convId ->
+                    navController.navigate(Screen.Chat.createRoute(convId)) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToUserProfile = { userId ->
+                    navController.navigate(Screen.UserProfile.createRoute(userId)) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToCreateGroup = {
+                    navController.navigate(Screen.CreateGroup.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToJoinGroup = {
+                    navController.navigate(Screen.JoinGroup.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToAddFriends = {
+                    navController.navigate(Screen.Search.createRoute("people")) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToNotifications = {
+                    navController.navigate(Screen.Notifications.route) {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
         NavHost(
             navController    = navController,
             startDestination = startDestination,
-            modifier         = Modifier.fillMaxSize(),
+            modifier         = Modifier
+                .fillMaxSize()
+                // On the map tab the NavHost is transparent so the
+                // persistent map backdrop above shows through. On every
+                // other destination the NavHost paints a solid theme
+                // background, fully covering the map. This is what makes
+                // the persistent backdrop pattern work without leaks.
+                .then(
+                    if (isMapTabActive) {
+                        Modifier
+                    } else {
+                        Modifier.background(MaterialTheme.colorScheme.background)
+                    }
+                ),
             enterTransition = {
                 if (isTabSwitch(initialState.destination.route, targetState.destination.route)) {
                     // Tab ↔ tab: tabs are siblings, not a stack — a quick fade
@@ -322,42 +415,15 @@ fun AppNavGraph(
             // preservation for free.
 
             composable(Screen.MapTab.route) {
-                // Note: Permission prompts (notifications, location, background
-                // location, battery optimization) are now consolidated into the
-                // first-run [PermissionOnboardingSheet] inside [GlobalMapScreen].
-                // This avoids the previous chain of two stacked AlertDialogs that
-                // missed background location and battery opt entirely.
-                GlobalMapScreen(
-                    onNavigateToChat = { convId ->
-                        navController.navigate(Screen.Chat.createRoute(convId)) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateToUserProfile = { userId ->
-                        navController.navigate(Screen.UserProfile.createRoute(userId)) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateToCreateGroup = {
-                        navController.navigate(Screen.CreateGroup.route) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateToJoinGroup = {
-                        navController.navigate(Screen.JoinGroup.route) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateToAddFriends = {
-                        navController.navigate(Screen.Search.createRoute("people")) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateToNotifications = {
-                        navController.navigate(Screen.Notifications.route) {
-                            launchSingleTop = true
-                        }
-                    }
+                // Empty placeholder — the actual GlobalMapScreen lives
+                // outside the NavHost as a persistent backdrop (see the
+                // surrounding Box). This destination exists only so the
+                // bottom bar's selected-state derivation, deep-link
+                // routing, and back-stack restoration logic continue to
+                // see a "real" Map route. Rendering a transparent
+                // Spacer lets the persistent map below show through.
+                androidx.compose.foundation.layout.Spacer(
+                    modifier = Modifier.fillMaxSize()
                 )
             }
 

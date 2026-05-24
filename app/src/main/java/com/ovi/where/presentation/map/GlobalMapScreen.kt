@@ -176,6 +176,21 @@ fun GlobalMapScreen(
     onNavigateToJoinGroup: () -> Unit = {},
     onNavigateToAddFriends: () -> Unit = {},
     onNavigateToNotifications: () -> Unit = {},
+    /**
+     * True when the Map tab is the currently selected destination.
+     *
+     * `GlobalMapScreen` is rendered as a persistent backdrop in
+     * [com.ovi.where.presentation.navigation.AppNavGraph] so the
+     * underlying `GoogleMap` stays warm across tab switches and never
+     * flashes a blank frame on re-entry. When this flag is `false` the
+     * screen suppresses its chrome (chips, FABs, BottomSheet, dialogs)
+     * so it can't bleed through to whatever tab the user is actually
+     * viewing — only the map itself stays composed.
+     *
+     * Defaults to `true` for callers (tests / previews) that don't yet
+     * use the persistent-backdrop pattern.
+     */
+    isActiveTab: Boolean = true,
     viewModel: GlobalMapViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -188,9 +203,13 @@ fun GlobalMapScreen(
     // user already sees live-location and meetup events on screen, so the
     // FCM service drops their system-tray pushes. The inbox still gets
     // populated so taps from notifications shade after backgrounding work.
-    androidx.compose.runtime.DisposableEffect(Unit) {
+    //
+    // Tied to [isActiveTab] now (not just composition) because the screen
+    // stays composed as a persistent backdrop across tab switches. We
+    // only want push-suppression while the user is *looking* at the map.
+    androidx.compose.runtime.DisposableEffect(isActiveTab) {
         val tracker = context.activeMapTracker()
-        tracker.setMapVisible(true)
+        tracker.setMapVisible(isActiveTab)
         onDispose { tracker.setMapVisible(false) }
     }
 

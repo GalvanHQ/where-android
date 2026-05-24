@@ -43,7 +43,8 @@
             android:exported="true"
             android:label="@string/app_name"
             android:launchMode="singleTop"
-            android:theme="@style/Theme.Where.Splash">
+            android:theme="@style/Theme.Where.Splash"
+            android:windowSoftInputMode="adjustResize">
 
             <!-- Launcher intent -->
             <intent-filter>

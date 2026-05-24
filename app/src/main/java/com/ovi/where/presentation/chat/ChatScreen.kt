@@ -490,6 +490,12 @@ fun ChatScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                // imePadding() at the Column level lets the message list
+                // shrink and the composer rise with the keyboard, while
+                // the Scaffold's topBar stays anchored to the top. Without
+                // it, the system falls back to adjustPan and shoves the
+                // entire window up — including the chat header.
+                .imePadding()
                 .navigationBarsPadding()
         ) {
             // ── No Internet Connection banner ─────────────────────────────────

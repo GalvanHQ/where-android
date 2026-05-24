@@ -147,7 +147,6 @@ fun ConversationInfoScreen(
             else -> {
                 ConversationInfoContent(
                     uiState = uiState,
-                    currentUserId = viewModel.currentUserId ?: "",
                     onToggleMute = { viewModel.toggleMute() },
                     onMuteFor = { option -> viewModel.muteFor(option) },
                     onUpdateThemeColor = { viewModel.updateThemeColor(it) },
@@ -170,7 +169,6 @@ fun ConversationInfoScreen(
 @Composable
 internal fun ConversationInfoContent(
     uiState: ConversationInfoUiState,
-    currentUserId: String = "",
     onToggleMute: () -> Unit,
     onMuteFor: (com.ovi.where.domain.model.MuteOption) -> Unit = {},
     onUpdateThemeColor: (String?) -> Unit = {},

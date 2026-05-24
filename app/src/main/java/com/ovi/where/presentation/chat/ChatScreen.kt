@@ -919,7 +919,18 @@ fun ChatScreen(
             if (uiState.isOtherUserBlocked && uiState.conversation?.isGroup == false) {
                 com.ovi.where.presentation.chat.components.BlockedComposerBar(
                     otherUserName = uiState.conversation?.title,
-                    onUnblock = { viewModel.unblockOtherUserFromChat() }
+                    onUnblock = {
+                        viewModel.unblockOtherUserFromChat()
+                        // Match the project pattern (ChatScreen uses
+                        // context.showToast for transient feedback) and
+                        // give the user immediate confirmation. The VM
+                        // also emits a SnackbarEvent for surfaces that
+                        // listen to that channel.
+                        val name = uiState.conversation?.title
+                            ?.takeIf { it.isNotBlank() }
+                            ?: "User"
+                        context.showToast("$name unblocked")
+                    }
                 )
             } else {
                 // ── Input bar (Messenger-style, Requirements 5.1-5.6) ──────────

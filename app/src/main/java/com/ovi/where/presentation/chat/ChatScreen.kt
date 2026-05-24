@@ -983,6 +983,7 @@ fun ChatScreen(
         locations = meetupMapLocations,
         meetupDestination = uiState.meetupDestination,
         isSharing = uiState.isLiveLocationSharingActive,
+        isHostingMeetup = uiState.isHostingMeetup,
         sharingTimeRemaining = uiState.liveLocationTimeRemaining,
         selectedDurationMinutes = uiState.selectedDurationMinutes,
         onDurationSelected = viewModel::onDurationSelected,
@@ -1003,6 +1004,19 @@ fun ChatScreen(
             } else {
                 // Direct chat — there's no group-scoped map, so open the
                 // global map (Map bottom tab) where this friend's pin lives.
+                onNavigateToGlobalMap()
+            }
+        },
+        onOpenMeetupPlaceCard = {
+            // Hand off to the map's rich place-card sheet (RSVP, ETA,
+            // directions). The VM dismisses this sheet and publishes to
+            // the singleton bus; we route the user to the map so the
+            // GlobalMapViewModel can pick up the request.
+            viewModel.requestOpenMeetupPlaceCard()
+            val groupId = uiState.conversation?.groupId
+            if (groupId != null) {
+                onNavigateToGroupMap(groupId)
+            } else {
                 onNavigateToGlobalMap()
             }
         },

@@ -149,7 +149,8 @@ class GlobalMapViewModel @Inject constructor(
     private val getMeetupRouteUseCase: com.ovi.where.domain.usecase.location.GetMeetupRouteUseCase,
     private val conversationRepository: ConversationRepository,
     private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter,
-    private val userCachePersistent: com.ovi.where.data.cache.UserCache
+    private val userCachePersistent: com.ovi.where.data.cache.UserCache,
+    private val meetupPlaceCardEventBus: com.ovi.where.core.event.MeetupPlaceCardEventBus
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(GlobalMapUiState())
@@ -225,6 +226,7 @@ class GlobalMapViewModel @Inject constructor(
         autoLocateOnLaunch()
         restoreSharingState()
         observeRepoSharingState()
+        observeMeetupPlaceCardRequests()
     }
 
     /**
@@ -920,11 +922,18 @@ class GlobalMapViewModel @Inject constructor(
             .filter { it in activeKeys }
             .toSet()
 
+        val uid = currentUserId
+        val hostedGroupIds = if (uid.isNullOrBlank()) emptySet() else activeByGroup
+            .filter { (_, dest) -> dest.setBy == uid }
+            .keys
+            .toSet()
+
         _uiState.value = _uiState.value.copy(
             meetupDestinationsByGroup = activeByGroup,
             meetupDestination = canonical?.value,
             meetupDestinationGroupId = canonical?.key,
-            arrivedDestinationKeys = prunedArrivalKeys
+            arrivedDestinationKeys = prunedArrivalKeys,
+            hostedMeetupGroupIds = hostedGroupIds
         )
         recomputeDestinationMetrics()
         if (_uiState.value.hasMyLocation) {
@@ -2008,6 +2017,40 @@ class GlobalMapViewModel @Inject constructor(
     fun stopSharing() {
         if (!_uiState.value.isSharing) return
         viewModelScope.launch {
+            // Honor the host-can-only-clear rule. If the user hosts any
+            // active meetups, "Stop all" must skip those targets and tell
+            // the user how to actually end them. We stop only the non-
+            // hosted-meetup targets one-by-one. If everything left is
+            // hosted, this is a no-op with a snackbar.
+            val state = _uiState.value
+            val hosted = state.hostedMeetupGroupIds
+            if (hosted.isNotEmpty()) {
+                val nonHostedTargets = state.sharingTargetIds.filter { it !in hosted }
+                if (nonHostedTargets.isEmpty()) {
+                    _uiEvent.send(
+                        UiEvent.ShowSnackbar(
+                            UiText.DynamicString(
+                                "You're hosting a meetup. Clear it from the meetup card to stop sharing."
+                            )
+                        )
+                    )
+                    return@launch
+                }
+                // Stop each non-hosted target individually so hosted shares survive.
+                nonHostedTargets.forEach { targetId ->
+                    stopLocationSharingUseCase(targetId)
+                }
+                // Refresh ui state from repo's active sharing flow (handled by
+                // observeRepoSharingState). Surface a partial-stop snackbar.
+                _uiEvent.send(
+                    UiEvent.ShowSnackbar(
+                        UiText.DynamicString(
+                            "Stopped other shares. Your hosted meetup is still active."
+                        )
+                    )
+                )
+                return@launch
+            }
             when (stopLocationSharingUseCase()) {
                 is Resource.Success -> {
                     countdownJob?.cancel()
@@ -2031,6 +2074,21 @@ class GlobalMapViewModel @Inject constructor(
 
     /** Removes one target from the active sharing session. */
     fun removeSharingTarget(targetId: String) {
+        // Hosts cannot stop their own meetup's auto-share via the per-row
+        // stop button. Funnel them to the place-card sheet's "Clear meetup"
+        // action so the destination is cleared cleanly for everyone.
+        if (targetId in _uiState.value.hostedMeetupGroupIds) {
+            viewModelScope.launch {
+                _uiEvent.send(
+                    UiEvent.ShowSnackbar(
+                        UiText.DynamicString(
+                            "You're hosting this meetup. Clear it to stop sharing."
+                        )
+                    )
+                )
+            }
+            return
+        }
         viewModelScope.launch {
             when (stopLocationSharingUseCase(targetId)) {
                 is Resource.Success -> {
@@ -2124,6 +2182,47 @@ class GlobalMapViewModel @Inject constructor(
 
     fun dismissMeetupPlaceCard() {
         _uiState.value = _uiState.value.copy(showMeetupPlaceCard = false)
+    }
+
+    /**
+     * Listens for cross-screen requests to open the place-card sheet.
+     * Today this is fired when the user taps "Meet at …" inside the chat
+     * screen's [com.ovi.where.presentation.chat.components.LiveMeetupSheet]
+     * — the chat sheet dismisses and the user is dropped on the Map tab,
+     * where this consumer flips the place-card sheet open as soon as the
+     * map's destination listener has resolved a valid coordinate.
+     *
+     * The bus is a monotonic tick-counter [StateFlow]; we drop the seed
+     * value of `0L` (the bus has never been requested) and only react to
+     * subsequent ticks. We also wait for [MeetupDestination.hasValidLocation]
+     * to flip true to avoid opening an empty sheet when this VM hasn't
+     * resolved its destination yet (the user just switched tabs).
+     */
+    private fun observeMeetupPlaceCardRequests() {
+        viewModelScope.launch {
+            var lastHandled = 0L
+            meetupPlaceCardEventBus.requestTick.collect { tick ->
+                if (tick == 0L || tick == lastHandled) return@collect
+                lastHandled = tick
+                // Wait up to ~3 seconds for the destination to resolve. The
+                // observer for `meetupDestination` is started inside
+                // `loadGroupsAndStartObserving` and will populate
+                // _uiState.meetupDestination once the user's group with a
+                // pinned destination is reachable.
+                val deadline = System.currentTimeMillis() + 3_000L
+                while (System.currentTimeMillis() < deadline) {
+                    val dest = _uiState.value.meetupDestination
+                    if (dest != null && dest.hasValidLocation) {
+                        _uiState.value = _uiState.value.copy(showMeetupPlaceCard = true)
+                        return@collect
+                    }
+                    delay(80)
+                }
+                // Still nothing? Surface a snackbar so the user knows the
+                // pill click was received but the destination's offline.
+                _uiEvent.send(UiEvent.ShowSnackbar(UiText.DynamicString("Meetup destination not available yet")))
+            }
+        }
     }
 
     /**
@@ -2425,6 +2524,15 @@ data class GlobalMapUiState(
      * concurrent meetups across different groups; ownership is per-group.
      */
     val meetupOwnedShareGroupIds: Set<String> = emptySet(),
+
+    /**
+     * Subset of [meetupDestinationsByGroup] keys where the local user is the
+     * creator (`destination.setBy == currentUserId`) and the destination is
+     * still active. Used to gate the per-target stop button on the "My
+     * shares" tab: a host should never accidentally stop their own meetup's
+     * share — only "Clear meetup" (from the place-card sheet) should end it.
+     */
+    val hostedMeetupGroupIds: Set<String> = emptySet(),
 
     // ── In-app meetup navigation overlay ─────────────────────────────────────
     /**

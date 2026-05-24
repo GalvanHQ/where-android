@@ -111,6 +111,7 @@ class ChatViewModel @Inject constructor(
     private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter,
     private val observeMeetupDestinationUseCase: com.ovi.where.domain.usecase.location.ObserveMeetupDestinationUseCase,
     private val userCachePersistent: com.ovi.where.data.cache.UserCache,
+    private val meetupPlaceCardEventBus: com.ovi.where.core.event.MeetupPlaceCardEventBus,
 ) : AndroidViewModel(application) {
 
     /**
@@ -411,11 +412,24 @@ class ChatViewModel @Inject constructor(
      * Subscribes to the active meetup destination for a group conversation.
      * Result drives the in-chat live meetup sheet's "Meet at" pill and the
      * destination pin on the embedded map preview.
+     *
+     * Also derives [ChatUiState.isHostingMeetup] — true iff the local user
+     * set the destination and it's still active. This gates the stop-share
+     * button: hosts can only end their share by clearing the meetup
+     * (handed off to [com.ovi.where.presentation.map.components.MeetupPlaceCardSheet]).
      */
     private fun observeMeetupDestination(groupId: String) {
         viewModelScope.launch {
             observeMeetupDestinationUseCase(groupId).collect { destination ->
-                _uiState.value = _uiState.value.copy(meetupDestination = destination)
+                val uid = currentUserId
+                val hosting = destination != null &&
+                    destination.isActive &&
+                    !destination.setBy.isNullOrBlank() &&
+                    destination.setBy == uid
+                _uiState.value = _uiState.value.copy(
+                    meetupDestination = destination,
+                    isHostingMeetup = hosting
+                )
             }
         }
     }
@@ -1457,6 +1471,35 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
+     * Handoff to the map screen's place-card sheet.
+     *
+     * Called when the user taps the "Meet at …" pill inside the live
+     * sharing bottom sheet. The pill is informational on this surface —
+     * destination details, ETA, RSVP, and directions all live on the map
+     * screen's
+     * [com.ovi.where.presentation.map.components.MeetupPlaceCardSheet].
+     *
+     * 1. Dismiss this sheet (so the chat doesn't have a sheet stuck on
+     *    top of the back stack when the user returns).
+     * 2. Publish a request to the singleton
+     *    [com.ovi.where.core.event.MeetupPlaceCardEventBus] which
+     *    [com.ovi.where.presentation.map.GlobalMapViewModel] consumes — it
+     *    flips the place-card sheet open as soon as the destination is
+     *    resolved on the map side.
+     *
+     * The screen-level navigation (switching to the Map tab) is the
+     * caller's responsibility because routing belongs to the screen, not
+     * the VM.
+     */
+    fun requestOpenMeetupPlaceCard() {
+        _uiState.value = _uiState.value.copy(showLiveMeetupSheet = false)
+        if (!_uiState.value.isLiveLocationSharingActive) {
+            stopMyLocationStream()
+        }
+        meetupPlaceCardEventBus.requestOpen()
+    }
+
+    /**
      * Starts live location sharing from the live meetup sheet using the currently
      * selected duration. Requests permission if needed; otherwise begins sharing
      * and closes the sheet on success.
@@ -1621,6 +1664,21 @@ class ChatViewModel @Inject constructor(
     fun stopLiveLocationSharing() {
         val conversation = _uiState.value.conversation ?: return
         val targetId = conversation.groupId ?: "direct:${conversation.otherUserId}"
+
+        // If the user is hosting an active meetup on this conversation,
+        // refuse to stop the share. The host must clear the meetup
+        // explicitly via the place-card sheet — stopping the share here
+        // would orphan everyone else on the meetup with no host pin.
+        if (_uiState.value.isHostingMeetup) {
+            viewModelScope.launch {
+                _snackbarEvent.emit(
+                    SnackbarEvent(
+                        message = "You're hosting this meetup. Clear it to stop sharing."
+                    )
+                )
+            }
+            return
+        }
 
         viewModelScope.launch {
             // Remove this conversation's target from the active session.
@@ -3399,7 +3457,15 @@ data class ChatUiState(
     /** Whether the live meetup bottom sheet (map + duration picker) is visible. */
     val showLiveMeetupSheet: Boolean = false,
     /** Active meetup destination for this group (null for direct chats / no destination set). */
-    val meetupDestination: com.ovi.where.domain.model.MeetupDestination? = null
+    val meetupDestination: com.ovi.where.domain.model.MeetupDestination? = null,
+    /**
+     * True when the local user is the host of the active meetup
+     * destination on this conversation's group. Hosts cannot end their
+     * own location share with the chat sheet's stop button — that would
+     * orphan the rest of the group on a meetup with no host pin. The
+     * sheet redirects them to the place-card sheet's "Clear meetup".
+     */
+    val isHostingMeetup: Boolean = false
 )
 
 /**

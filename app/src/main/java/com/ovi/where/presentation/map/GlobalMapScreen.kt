@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
@@ -516,6 +517,7 @@ fun GlobalMapScreen(
                         sharingTargetIds = uiState.sharingTargetIds,
                         sharingTargetExpiries = uiState.sharingTargetExpiries,
                         meetupOwnedShareGroupIds = uiState.meetupOwnedShareGroupIds,
+                        hostedMeetupGroupIds = uiState.hostedMeetupGroupIds,
                         groups = uiState.groups,
                         directTargets = uiState.directTargets,
                         bottomReservedSpace = totalNavBarHeight,
@@ -566,6 +568,9 @@ fun GlobalMapScreen(
                         },
                         onStopAll = {
                             viewModel.stopSharing()
+                        },
+                        onOpenMeetupCard = {
+                            viewModel.openMeetupPlaceCard()
                         }
                     )
                 }
@@ -1588,6 +1593,7 @@ private fun HomeSheetContent(
     sharingTargetIds: List<String>,
     sharingTargetExpiries: Map<String, Long>,
     meetupOwnedShareGroupIds: Set<String>,
+    hostedMeetupGroupIds: Set<String>,
     groups: List<GroupFilter>,
     directTargets: List<GroupFilter>,
     bottomReservedSpace: androidx.compose.ui.unit.Dp,
@@ -1595,7 +1601,8 @@ private fun HomeSheetContent(
     onShowOnMap: (FriendLocationUiModel) -> Unit,
     onAddShare: () -> Unit,
     onStopOne: (String) -> Unit,
-    onStopAll: () -> Unit
+    onStopAll: () -> Unit,
+    onOpenMeetupCard: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -1658,12 +1665,14 @@ private fun HomeSheetContent(
                     sharingTargetIds = sharingTargetIds,
                     sharingTargetExpiries = sharingTargetExpiries,
                     meetupOwnedShareGroupIds = meetupOwnedShareGroupIds,
+                    hostedMeetupGroupIds = hostedMeetupGroupIds,
                     groups = groups,
                     directTargets = directTargets,
                     bottomReservedSpace = bottomReservedSpace,
                     onAddShare = onAddShare,
                     onStopOne = onStopOne,
-                    onStopAll = onStopAll
+                    onStopAll = onStopAll,
+                    onOpenMeetupCard = onOpenMeetupCard
                 )
             }
         }
@@ -1805,12 +1814,14 @@ private fun MySharesTabContent(
     sharingTargetIds: List<String>,
     sharingTargetExpiries: Map<String, Long>,
     meetupOwnedShareGroupIds: Set<String>,
+    hostedMeetupGroupIds: Set<String>,
     groups: List<GroupFilter>,
     directTargets: List<GroupFilter>,
     bottomReservedSpace: androidx.compose.ui.unit.Dp,
     onAddShare: () -> Unit,
     onStopOne: (String) -> Unit,
-    onStopAll: () -> Unit
+    onStopAll: () -> Unit,
+    onOpenMeetupCard: () -> Unit
 ) {
     val allTargets = (directTargets + groups).associateBy { it.id }
     val active = sharingTargetIds.mapNotNull { id ->
@@ -1897,7 +1908,9 @@ private fun MySharesTabContent(
                     target = target,
                     expiry = sharingTargetExpiries[target.id],
                     isMeetupShare = target.id in meetupOwnedShareGroupIds,
-                    onStop = { onStopOne(target.id) }
+                    isHostedMeetup = target.id in hostedMeetupGroupIds,
+                    onStop = { onStopOne(target.id) },
+                    onOpenMeetupCard = onOpenMeetupCard
                 )
             }
         }
@@ -2663,7 +2676,9 @@ private fun ActiveShareRow(
     target: GroupFilter,
     expiry: Long?,
     isMeetupShare: Boolean = false,
-    onStop: () -> Unit
+    isHostedMeetup: Boolean = false,
+    onStop: () -> Unit,
+    onOpenMeetupCard: () -> Unit = {}
 ) {
     Surface(
         shape = RoundedCornerShape(14.dp),
@@ -2692,33 +2707,57 @@ private fun ActiveShareRow(
                     // Meetup-owned shares auto-stop on arrival; the timer is
                     // only a safety ceiling. Show the lifecycle, not the
                     // raw timer, so users understand it'll end on its own.
-                    val timerLabel = if (isMeetupShare) {
-                        "Until you arrive"
-                    } else {
-                        formatExpiryLabel(expiry)
+                    val timerLabel = when {
+                        isHostedMeetup -> "Hosting · clear meetup to stop"
+                        isMeetupShare -> "Until you arrive"
+                        else -> formatExpiryLabel(expiry)
                     }
                     Text(
                         text = "$typeLabel • $timerLabel",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.tertiary,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
-            // Per-recipient stop button
-            Surface(
-                onClick = onStop,
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.size(40.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Rounded.Stop,
-                        contentDescription = "Stop sharing with ${target.name}",
-                        modifier = Modifier.size(18.dp)
-                    )
+            // Per-recipient action: hosts get a flag (open place-card to
+            // clear meetup) instead of a stop button — they can't end the
+            // share with a single tap because that would orphan everyone
+            // else's meetup. Tapping the flag opens the place-card sheet
+            // where "Clear meetup" lives.
+            if (isHostedMeetup) {
+                Surface(
+                    onClick = onOpenMeetupCard,
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Filled.Flag,
+                            contentDescription = "Open meetup card to clear meetup",
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            } else {
+                Surface(
+                    onClick = onStop,
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Rounded.Stop,
+                            contentDescription = "Stop sharing with ${target.name}",
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
         }

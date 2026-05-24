@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -78,13 +79,33 @@ import com.ovi.where.presentation.map.components.avatarColorForUser
 import com.ovi.where.presentation.map.components.fanOutOverlappingMarkers
 
 /**
- * Live meetup bottom sheet — a half-screen map showing everyone in this
- * conversation who is currently sharing their live location, plus a duration
- * picker and a primary action button (Share / Stop).
+ * Live location-sharing bottom sheet for a single conversation.
  *
- * Mirrors the share-target sheet on the global map screen but scoped to a
- * single conversation, so the user can quickly join the meetup without
- * leaving the chat.
+ * **Purpose**: this sheet is about *sharing your live location* with the
+ * people in this chat. It is intentionally distinct from the map screen's
+ * [com.ovi.where.presentation.map.components.MeetupPlaceCardSheet] which is
+ * about *coordinating arrival* at a destination (RSVP, ETA, directions).
+ *
+ * Layout, top to bottom:
+ *  1. Title row — "Share Live Location" + subtitle showing how many people
+ *     are currently sharing in this chat.
+ *  2. Mini map preview (220 dp) — every active sharer's pin plus, if the
+ *     conversation's group has a meetup destination, a flag pin for the
+ *     destination too.
+ *  3. **Tappable** "Meet at …" pill — when a destination exists, opens the
+ *     full place-card sheet on the Map tab via [onOpenMeetupPlaceCard]. This
+ *     is the bridge between the two surfaces: chat sheet stays focused on
+ *     "share with this chat", and the place-card sheet stays focused on
+ *     "where we're going".
+ *  4. Duration picker (15m / 1h / 4h / ∞) — only when the user isn't
+ *     already sharing.
+ *  5. Primary action — "Share my location" or "Stop sharing".
+ *
+ * @param onOpenMeetupPlaceCard Callback fired when the user taps the
+ *   "Meet at …" pill. The host should dismiss this sheet and route the
+ *   user to the map screen with a request to open the place-card sheet
+ *   (see [com.ovi.where.core.event.MeetupPlaceCardEventBus]). Pass `{}` to
+ *   disable the affordance and render the pill as informational only.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,12 +115,14 @@ fun LiveMeetupSheet(
     locations: List<SharedLocation>,
     meetupDestination: com.ovi.where.domain.model.MeetupDestination? = null,
     isSharing: Boolean,
+    isHostingMeetup: Boolean = false,
     sharingTimeRemaining: String?,
     selectedDurationMinutes: Long,
     onDurationSelected: (Long) -> Unit,
     onStartSharing: () -> Unit,
     onStopSharing: () -> Unit,
     onOpenFullMap: () -> Unit,
+    onOpenMeetupPlaceCard: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     if (!visible) return
@@ -127,7 +150,7 @@ fun LiveMeetupSheet(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Let's Meetup",
+                        text = "Share Live Location",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -179,31 +202,51 @@ fun LiveMeetupSheet(
 
             Spacer(Modifier.height(16.dp))
 
-            // ── Meet at pill ─────────────────────────────────────────────
+            // ── Meet at pill (handoff to map place-card sheet) ───────────
+            // Sits between the map preview and the duration picker so users
+            // see "I'm sharing here, and we're going there" as a single
+            // glanceable block. Tappable: invokes [onOpenMeetupPlaceCard]
+            // which dismisses this sheet, switches to the Map tab, and
+            // opens the rich place-card sheet with RSVP / ETA / directions.
             if (meetupDestination != null && meetupDestination.isActive && meetupDestination.hasValidLocation) {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    onClick = onOpenMeetupPlaceCard,
+                    shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Flag,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = "Meet at: ${meetupDestination.name.ifBlank { "Meetup point" }}",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                        Spacer(Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Meet at: ${meetupDestination.name.ifBlank { "Meetup point" }}",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "Tap for details, ETA, and directions",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Rounded.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                 }
@@ -347,7 +390,38 @@ fun LiveMeetupSheet(
             }
 
             // ── Primary action button ────────────────────────────────────
-            if (isSharing) {
+            // When the user is hosting an active meetup, the stop button is
+            // replaced with a "Clear meetup to stop" handoff. Hosts must
+            // clear the meetup explicitly via the place-card sheet so the
+            // rest of the group isn't orphaned without a host pin.
+            if (isSharing && isHostingMeetup) {
+                Button(
+                    onClick = onOpenMeetupPlaceCard,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Icon(Icons.Filled.Flag, null, Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Clear meetup to stop",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "You're the host. Stopping is only possible by clearing the meetup so everyone knows it's over.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+            } else if (isSharing) {
                 Button(
                     onClick = onStopSharing,
                     modifier = Modifier

@@ -60,10 +60,12 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import timber.log.Timber
 import kotlinx.coroutines.withTimeout
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -2795,7 +2797,15 @@ class ChatViewModel @Inject constructor(
      */
     fun observeAdminStatus(groupId: String) {
         viewModelScope.launch {
-            groupRepository.observeGroupMembers(groupId).collect { members ->
+            groupRepository.observeGroupMembers(groupId)
+                // PERMISSION_DENIED on a hardened-rules deploy means the
+                // user is no longer a group member. The conversation
+                // listener flips `isLocalUserParticipant` separately —
+                // here we just stop emitting and never crash the screen.
+                .catch { e ->
+                    Timber.w(e, "observeGroupMembers (admin status) failed; ignoring")
+                }
+                .collect { members ->
                 val uid = currentUserId ?: return@collect
                 val currentMember = members.firstOrNull { it.userId == uid }
                 val isAdmin = currentMember?.role == MemberRole.ADMIN
@@ -2942,7 +2952,14 @@ class ChatViewModel @Inject constructor(
      */
     fun observeGroupMembersForMentions(groupId: String) {
         viewModelScope.launch {
-            groupRepository.observeGroupMembers(groupId).collect { members ->
+            groupRepository.observeGroupMembers(groupId)
+                .catch { e ->
+                    // Same rationale as observeAdminStatus — PERMISSION_DENIED
+                    // means we're no longer in this group; the conversation
+                    // listener handles the user-visible state. Don't crash.
+                    Timber.w(e, "observeGroupMembers (mentions) failed; ignoring")
+                }
+                .collect { members ->
                 totalGroupSize = members.size
                 // Resolve display names for all members
                 val userIds = members.map { it.userId }

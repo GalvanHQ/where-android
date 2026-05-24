@@ -1,6 +1,7 @@
 package com.ovi.where.core.firestore
 
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
@@ -79,8 +80,24 @@ inline fun <T> Query.observeQuery(
 ): Flow<T> = callbackFlow {
     val reg: ListenerRegistration = addSnapshotListener { snapshot, error ->
         if (error != null) {
-            Timber.w(error, "observeQuery error")
-            close(error)
+            // PERMISSION_DENIED is the server's way of saying "you can no
+            // longer read this query" — typically because the user was
+            // removed from the group / conversation that gates the read.
+            // We close the Flow *cleanly* (no error) so that consumers
+            // observe a normal completion. The repository / VM that owns
+            // the conversation listener will pick up the membership change
+            // separately and swap the screen to NotParticipantBanner.
+            //
+            // Crashing the app on a legitimate authorization signal is
+            // never the right behaviour — see the post-mortem for the
+            // hardened-rules rollout.
+            if (error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                Timber.i("observeQuery permission denied — closing cleanly")
+                close()
+            } else {
+                Timber.w(error, "observeQuery error")
+                close(error)
+            }
             return@addSnapshotListener
         }
         if (snapshot == null) return@addSnapshotListener
@@ -108,8 +125,16 @@ inline fun <T> com.google.firebase.firestore.DocumentReference.observeDoc(
 ): Flow<T?> = callbackFlow {
     val reg: ListenerRegistration = addSnapshotListener { snapshot, error ->
         if (error != null) {
-            Timber.w(error, "observeDoc error")
-            close(error)
+            // See observeQuery for rationale — PERMISSION_DENIED on a
+            // single-doc listener means the caller no longer has read
+            // access; close cleanly rather than crashing.
+            if (error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                Timber.i("observeDoc permission denied — closing cleanly")
+                close()
+            } else {
+                Timber.w(error, "observeDoc error")
+                close(error)
+            }
             return@addSnapshotListener
         }
         if (snapshot == null) return@addSnapshotListener

@@ -574,6 +574,7 @@ private fun SearchResultRow(
             Text(
                 text = user.displayName,
                 style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -676,6 +677,7 @@ private fun ChatSearchResultRow(
             Text(
                 text = conversation.title,
                 style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

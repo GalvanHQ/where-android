@@ -101,10 +101,14 @@ class NotificationRepository @Inject constructor(
                 // live-location start/stop, meetup cleared, location
                 // updates, GENERAL). Purge them once on a server snapshot
                 // so every account's inbox doc converges to important-only.
+                //
+                // Type normalization: server stores the FCM lowercase
+                // string ("friend_request"), client enum is UPPER_SNAKE_CASE
+                // ("FRIEND_REQUEST"). [resolveStoredType] handles both
+                // shapes so we don't accidentally classify a valid
+                // friend-request row as legacy and purge it server-side.
                 val legacyEntryIdsToPurge = entriesMap.values.mapNotNull { entry ->
-                    val type = (entry["type"] as? String).orEmpty()
-                    val parsedType = runCatching { NotificationType.valueOf(type) }
-                        .getOrDefault(NotificationType.GENERAL)
+                    val parsedType = resolveStoredType(entry["type"] as? String)
                     val id = entry["id"] as? String
                     if (!parsedType.isInboxImportant && !id.isNullOrBlank()) id else null
                 }
@@ -120,11 +124,7 @@ class NotificationRepository @Inject constructor(
                     // already exist on the server doc — older builds did
                     // persist them and we don't want them resurrecting
                     // after an account swap or reinstall.
-                    .filter {
-                        val t = runCatching { NotificationType.valueOf(it.type) }
-                            .getOrDefault(NotificationType.GENERAL)
-                        t.isInboxImportant
-                    }
+                    .filter { resolveStoredType(it.type).isInboxImportant }
                 val freshIds = parsed.map { it.id }.toSet()
 
                 // ── Cache-snapshot guard ──
@@ -342,9 +342,17 @@ class NotificationRepository @Inject constructor(
     private fun Map<String, Any?>.toEntity(): NotificationEntity {
         val id = (this["id"] as? String).orEmpty()
         require(id.isNotBlank()) { "inbox entry missing id" }
+        // Normalize type to the enum name so Room rows are consistent
+        // regardless of which producer wrote the source entry. The Cloud
+        // Function writes lowercase FCM strings ("friend_request"); the
+        // local FCM fast-path writes UPPER_SNAKE_CASE ("FRIEND_REQUEST").
+        // Storing both shapes side-by-side made `NotificationType.valueOf`
+        // throw on the lowercase one, silently classifying real friend
+        // requests as GENERAL and routing them to the legacy purge path.
+        val storedType = resolveStoredType(this["type"] as? String).name
         return NotificationEntity(
             id = id,
-            type = (this["type"] as? String) ?: NotificationType.GENERAL.name,
+            type = storedType,
             title = (this["title"] as? String).orEmpty(),
             body = (this["body"] as? String).orEmpty(),
             timestamp = (this["timestamp"] as? Number)?.toLong() ?: 0L,
@@ -355,6 +363,26 @@ class NotificationRepository @Inject constructor(
             userId = this["userId"] as? String,
             destinationName = this["destinationName"] as? String
         )
+    }
+
+    /**
+     * Maps a stored `type` string to a [NotificationType], handling both
+     * representations the doc can hold:
+     *   • FCM lowercase ("friend_request") — Cloud Functions producer.
+     *   • Enum UPPER_SNAKE_CASE ("FRIEND_REQUEST") — local FCM fast path
+     *     and any pre-cutover client write.
+     *
+     * Defaults to [NotificationType.GENERAL] when neither shape resolves,
+     * which routes legacy / unknown rows into the purge path correctly.
+     */
+    private fun resolveStoredType(raw: String?): NotificationType {
+        if (raw.isNullOrBlank()) return NotificationType.GENERAL
+        // Try the enum-name path first — faster and matches the local
+        // FCM service's writes.
+        runCatching { return NotificationType.valueOf(raw) }
+        // Fall back to the FCM-string mapper, which handles
+        // "friend_request" / "friend_accepted" / etc.
+        return NotificationType.fromFcmType(raw)
     }
 
     @Volatile

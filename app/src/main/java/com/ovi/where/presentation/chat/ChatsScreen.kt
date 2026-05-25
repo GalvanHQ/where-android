@@ -4,7 +4,6 @@ import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,15 +22,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AlertDialog
@@ -59,7 +53,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -73,7 +66,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.ovi.where.R
 import com.ovi.where.core.constants.AppConstants.PULL_TO_REFRESH_TIMEOUT_MS
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.domain.model.MessageStatus
 import com.ovi.where.presentation.chat.components.ConversationAvatar
 import com.ovi.where.presentation.chat.components.UnreadBadge
 import com.ovi.where.presentation.common.LIST_ITEM_ANIMATION_DURATION_MS
@@ -550,54 +542,6 @@ internal fun ConversationRow(
         if (hasUnread) {
             Spacer(Modifier.width(8.dp))
             UnreadBadge(count = conversation.unreadCount)
-        }
-    }
-}
-
-// ── Message Status Icon for Conversation List (Req 24.2) ────────────────────────
-
-@Composable
-private fun ConversationMessageStatusIcon(status: MessageStatus) {
-    when (status) {
-        MessageStatus.SENT -> {
-            Icon(
-                imageVector = Icons.Filled.Check,
-                contentDescription = "Message sent",
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        MessageStatus.DELIVERED -> {
-            Icon(
-                imageVector = Icons.Filled.DoneAll,
-                contentDescription = "Message delivered",
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        MessageStatus.READ -> {
-            Icon(
-                imageVector = Icons.Filled.DoneAll,
-                contentDescription = "Message read",
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-        }
-        MessageStatus.FAILED -> {
-            Icon(
-                imageVector = Icons.Default.Error,
-                contentDescription = "Message failed",
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.error
-            )
-        }
-        MessageStatus.PENDING -> {
-            Icon(
-                imageVector = Icons.Filled.Schedule,
-                contentDescription = "Message pending",
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.ovi.where.presentation.notification
 
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,10 +45,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -458,13 +462,13 @@ private fun EmptyState(title: String, body: String, modifier: Modifier = Modifie
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            imageVector = Icons.Outlined.NotificationsNone,
+        Image(
+            painter = painterResource(id = R.drawable.bell),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-            modifier = Modifier.size(40.dp)
+            modifier = Modifier.size(140.dp).alpha(0.9f),
+            contentScale = ContentScale.Fit
         )
-        Spacer(modifier = Modifier.height(Dimens.spaceLarge))
+        Spacer(Modifier.height(Dimens.spaceLarge))
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,

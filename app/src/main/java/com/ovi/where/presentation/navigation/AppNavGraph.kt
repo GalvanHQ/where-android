@@ -661,14 +661,12 @@ fun AppNavGraph(
                         }
                     },
                     onNavigateToGroupMap = { groupId ->
-                        navController.navigate(Screen.GroupMap.createRoute(groupId)) {
-                            launchSingleTop = true
-                        }
+                        // Map is the home — pop back to it instead of
+                        // pushing a fresh map on top of chat. Stack
+                        // becomes `[MapTab]`, back exits the app.
+                        navController.navigateToTab(Screen.MapTab.route)
                     },
                     onNavigateToGlobalMap = {
-                        // Single-NavController win: just navigate to the Map
-                        // tab. popUpTo + saveState/restoreState gives us tab
-                        // state preservation and a clean back stack.
                         navController.navigateToTab(Screen.MapTab.route)
                     },
                     onNavigateToConversationInfo = { convId ->
@@ -799,9 +797,11 @@ fun AppNavGraph(
                         navController.popBackStack()
                     },
                     onNavigateToGroupMap = {
-                        navController.navigate(Screen.GroupMap.createRoute(groupId)) {
-                            launchSingleTop = true
-                        }
+                        // Map is the persistent home — pop back to it
+                        // (saveState preserves any chain of group-info
+                        // screens we leave behind). Back from MapTab
+                        // exits, matching the rest of the app.
+                        navController.navigateToTab(Screen.MapTab.route)
                     }
                 )
             }
@@ -873,7 +873,16 @@ fun AppNavGraph(
             composable(Screen.CreateGroup.route) {
                 CreateGroupScreen(
                     onNavigateBack  = { navController.popBackStack() },
-                    onGroupCreated  = { navController.popBackStack() }
+                    // After "Open Group Chat", land in the chat for the new
+                    // group and drop the create flow off the back stack so
+                    // back from chat returns to where the user started
+                    // (People / Map), not the success card.
+                    onGroupCreated  = { conversationId ->
+                        navController.navigate(Screen.Chat.createRoute(conversationId)) {
+                            popUpTo(Screen.CreateGroup.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
 
@@ -937,9 +946,34 @@ fun AppNavGraph(
  * `saveState = true` + `restoreState = true`, Compose Navigation handles
  * tab state preservation (scroll position, ViewModel state) automatically.
  */
+/**
+ * Navigates to a top-level destination keeping **MapTab as the persistent
+ * root** of the back stack. Any tab nav (or any nav that wants to "go home
+ * to the map") unwinds to MapTab and pushes the target on top of it.
+ *
+ * Mental model: the map is the home. Back from anywhere should unwind
+ * toward the map; back from the map exits the app. This pairs with the
+ * persistent map backdrop (TASK 11) — the map is always alive underneath
+ * the NavHost, and the back stack mirrors that by always pinning MapTab
+ * at the bottom.
+ *
+ * Behaviour by case:
+ *  • Already on MapTab, calling with MapTab → no-op (singleTop).
+ *  • On AnyTab/Screen, calling with MapTab → pops everything above MapTab,
+ *    leaving stack `[MapTab]`. Back from MapTab exits.
+ *  • On MapTab, calling with ChatsTab → pushes ChatsTab. Stack
+ *    `[MapTab, ChatsTab]`. Back returns to MapTab.
+ *  • On `[MapTab, ChatsTab, Chat]`, calling with PeopleTab → pops above
+ *    MapTab (saveState saves ChatsTab+Chat), pushes PeopleTab.
+ *    Stack `[MapTab, PeopleTab]`. Back returns to MapTab.
+ *
+ * `saveState` + `restoreState` preserve scroll / VM state for tabs we've
+ * popped, so re-tapping ChatsTab restores its previous state instead of
+ * cold-starting it.
+ */
 internal fun NavHostController.navigateToTab(route: String) {
     navigate(route) {
-        popUpTo(graph.findStartDestination().id) {
+        popUpTo(Screen.MapTab.route) {
             saveState = true
         }
         launchSingleTop = true

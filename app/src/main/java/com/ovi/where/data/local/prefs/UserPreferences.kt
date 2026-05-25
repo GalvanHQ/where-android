@@ -192,4 +192,44 @@ class UserPreferences @Inject constructor(
             preferences.clear()
         }
     }
+
+    /**
+     * Clears every user-scoped key while preserving device-level UI
+     * state. Use this on sign out and on "Clear cache" — anywhere we
+     * want to wipe the previous account without resetting first-run
+     * UX (permission onboarding, location-off coachmark, etc.).
+     *
+     * Device-level keys we deliberately keep:
+     *  • [Keys.PERMISSION_ONBOARDING_SHOWN] — permissions are per-install,
+     *    not per-account. Resetting this would re-show the onboarding
+     *    sheet (and trigger system permission prompts) immediately on
+     *    sign out, on top of the auth screen. That was the reported bug.
+     *  • [Keys.LOCATION_OFF_DIALOG_SHOWN] — same reasoning, device-level.
+     *  • [Keys.BATTERY_SAVER_MODE] — a device preference the user set
+     *    intentionally; should survive account swaps.
+     *
+     * Everything else is user-scoped: USER_ID, USER_NAME, IS_LOGGED_IN,
+     * sharing session, last share target, last known GPS, onboarding
+     * complete (the welcome screens), location sharing toggle.
+     */
+    suspend fun clearUserScoped() {
+        dataStore.edit { preferences ->
+            // Copy the device-level values we want to keep.
+            val keepPermissionOnboarding = preferences[Keys.PERMISSION_ONBOARDING_SHOWN]
+            val keepLocationOffDialog = preferences[Keys.LOCATION_OFF_DIALOG_SHOWN]
+            val keepBatterySaver = preferences[Keys.BATTERY_SAVER_MODE]
+
+            preferences.clear()
+
+            if (keepPermissionOnboarding != null) {
+                preferences[Keys.PERMISSION_ONBOARDING_SHOWN] = keepPermissionOnboarding
+            }
+            if (keepLocationOffDialog != null) {
+                preferences[Keys.LOCATION_OFF_DIALOG_SHOWN] = keepLocationOffDialog
+            }
+            if (keepBatterySaver != null) {
+                preferences[Keys.BATTERY_SAVER_MODE] = keepBatterySaver
+            }
+        }
+    }
 }

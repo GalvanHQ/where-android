@@ -83,24 +83,25 @@ class SettingsViewModel @Inject constructor(
             }
         }
 
-        // ── DataStore (UserPreferences) ──────────────────────────────────
+        // ── DataStore (UserPreferences) — user-scoped only ───────────────
         // Holds user_id, last GPS, sharing session, last share target,
         // onboarding flags, etc. Without this the next account would
         // inherit the previous user's seeded camera position and
         // half-finished sharing session metadata.
-        runCatching { userPreferences.clearAll() }
+        //
+        // We deliberately preserve device-level UI flags (permission
+        // onboarding shown, location-off dialog shown, battery saver).
+        // Those are per-install, not per-account. Wiping them caused
+        // the permission onboarding sheet to pop up immediately after
+        // sign out, on top of the auth screen — see clearUserScoped().
+        runCatching { userPreferences.clearUserScoped() }
 
-        // ── Legacy SharedPreferences ─────────────────────────────────────
-        // notification_permission_prefs tracks "have we asked the user
-        // about post-notification permission yet" — reset so the next
-        // account gets a fresh prompt experience.
-        runCatching {
-            context
-                .getSharedPreferences("notification_permission_prefs", Context.MODE_PRIVATE)
-                .edit()
-                .clear()
-                .apply()
-        }
+        // NOTE: notification_permission_prefs (legacy SharedPreferences)
+        // is intentionally NOT cleared here. It tracks "have we asked
+        // for POST_NOTIFICATIONS once on this install" — also a
+        // device-level concern. Resetting it would re-prompt every user
+        // who signs in on a previously-signed-out device, which is
+        // jarring and not what other messengers do.
 
         // ── Launcher conversation shortcuts ──────────────────────────────
         // Per-conversation long-lived shortcuts surface in the system

@@ -1,7 +1,5 @@
 package com.ovi.where.presentation.settings
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,8 +12,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Policy
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -28,14 +26,10 @@ import com.ovi.where.presentation.common.WhereTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ovi.where.BuildConfig
 import com.ovi.where.core.theme.Dimens
-
-private const val TERMS_URL = "https://whereapp.com/terms"
-private const val PRIVACY_URL = "https://whereapp.com/privacy"
 
 private data class LicenseEntry(
     val name: String,
@@ -62,17 +56,19 @@ private val OPEN_SOURCE_LICENSES = listOf(
 
 /**
  * About screen displaying app version info, open-source licenses,
- * and links to Terms of Service and Privacy Policy.
+ * and links to Terms of Service and Privacy Policy. The legal pages live
+ * in-app at [TermsOfServiceScreen] and [PrivacyPolicyScreen] (no public
+ * domain yet, so we don't punt to the browser).
  *
  * Requirements: 8.10
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToTerms: () -> Unit = {},
+    onNavigateToPrivacyPolicy: () -> Unit = {},
 ) {
-    val context = LocalContext.current
-
     Scaffold(
         topBar = {
             WhereTopAppBar(
@@ -147,10 +143,7 @@ fun AboutScreen(
                     LegalLinkRow(
                         icon = Icons.Outlined.Description,
                         title = "Terms of Service",
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(TERMS_URL))
-                            context.startActivity(intent)
-                        }
+                        onClick = onNavigateToTerms
                     )
                     HorizontalDivider(
                         modifier = Modifier.padding(start = 56.dp),
@@ -160,10 +153,7 @@ fun AboutScreen(
                     LegalLinkRow(
                         icon = Icons.Outlined.Policy,
                         title = "Privacy Policy",
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_URL))
-                            context.startActivity(intent)
-                        }
+                        onClick = onNavigateToPrivacyPolicy
                     )
                 }
             }
@@ -256,8 +246,8 @@ private fun LegalLinkRow(
             modifier = Modifier.weight(1f)
         )
         Icon(
-            imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
-            contentDescription = "Opens in browser",
+            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
         )
     }

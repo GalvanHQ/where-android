@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
@@ -69,6 +70,7 @@ fun SettingsScreen(
     onNavigateToPrivacy: () -> Unit = {},
     onNavigateToHelp: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
+    onNavigateToDevelopers: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -218,6 +220,13 @@ fun SettingsScreen(
                         title = "About Where",
                         subtitle = "Version, licenses",
                         onClick = onNavigateToAbout
+                    )
+                    SettingsDivider()
+                    SettingsRow(
+                        icon = Icons.Outlined.Code,
+                        title = "Developers",
+                        subtitle = "The team behind Where",
+                        onClick = onNavigateToDevelopers
                     )
                 }
             }

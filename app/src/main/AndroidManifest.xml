@@ -26,6 +26,34 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!--
+        Package visibility (Android 11+).
+        Without these <queries>, setPackage(...) on an Intent silently
+        fails to resolve to apps we don't have implicit visibility into,
+        so the deeplink fallback in DevelopersScreen would always run.
+        We declare:
+          • Three named packages — Facebook, LinkedIn, GitHub — so the
+            "Open in native app" handoff on the Developers screen lands
+            in the user's installed client when present.
+          • A web ACTION_VIEW intent so the browser fallback resolves.
+          • A mailto ACTION_SENDTO intent so we can detect Gmail / system
+            email clients for the developer "Email" action.
+    -->
+    <queries>
+        <package android:name="com.facebook.katana" />
+        <package android:name="com.linkedin.android" />
+        <package android:name="com.github.android" />
+        <package android:name="com.google.android.gm" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+    </queries>
+
     <application
         android:name=".WhereApplication"
         android:allowBackup="false"

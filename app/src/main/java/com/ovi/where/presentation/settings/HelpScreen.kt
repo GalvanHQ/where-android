@@ -39,7 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ovi.where.core.theme.Dimens
 
-private const val SUPPORT_EMAIL = "support@whereapp.com"
+private const val SUPPORT_EMAIL = "ismamhasanovi@gmail.com"
 
 private data class FaqEntry(
     val question: String,

@@ -63,11 +63,14 @@ import com.ovi.where.presentation.search.SearchScreen
 import com.ovi.where.presentation.settings.AboutScreen
 import com.ovi.where.presentation.settings.AppearanceScreen
 import com.ovi.where.presentation.settings.DataStorageScreen
+import com.ovi.where.presentation.settings.DevelopersScreen
 import com.ovi.where.presentation.settings.HelpScreen
 import com.ovi.where.presentation.settings.NotificationPreferencesScreen
+import com.ovi.where.presentation.settings.PrivacyPolicyScreen
 import com.ovi.where.presentation.settings.PrivacyScreen
 import com.ovi.where.presentation.settings.SecurityScreen
 import com.ovi.where.presentation.settings.SettingsScreen
+import com.ovi.where.presentation.settings.TermsOfServiceScreen
 
 private const val NAV_ANIM_DURATION = 300
 private const val TAB_FADE_DURATION = 180
@@ -589,6 +592,11 @@ fun AppNavGraph(
                         navController.navigate(Screen.About.route) {
                             launchSingleTop = true
                         }
+                    },
+                    onNavigateToDevelopers = {
+                        navController.navigate(Screen.Developers.route) {
+                            launchSingleTop = true
+                        }
                     }
                 )
             }
@@ -620,7 +628,31 @@ fun AppNavGraph(
                 HelpScreen(onNavigateBack = { navController.popBackStack() })
             }
             composable(Screen.About.route) {
-                AboutScreen(onNavigateBack = { navController.popBackStack() })
+                AboutScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToTerms = {
+                        navController.navigate(Screen.TermsOfService.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToPrivacyPolicy = {
+                        navController.navigate(Screen.PrivacyPolicy.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
+
+            composable(Screen.TermsOfService.route) {
+                TermsOfServiceScreen(onNavigateBack = { navController.popBackStack() })
+            }
+
+            composable(Screen.PrivacyPolicy.route) {
+                PrivacyPolicyScreen(onNavigateBack = { navController.popBackStack() })
+            }
+
+            composable(Screen.Developers.route) {
+                DevelopersScreen(onNavigateBack = { navController.popBackStack() })
             }
 
             composable(Screen.Notifications.route) {

@@ -88,6 +88,15 @@ sealed class Screen(val route: String) {
     data object About : Screen("about")
 
     @Serializable
+    data object Developers : Screen("developers")
+
+    @Serializable
+    data object TermsOfService : Screen("terms_of_service")
+
+    @Serializable
+    data object PrivacyPolicy : Screen("privacy_policy")
+
+    @Serializable
     data object Notifications : Screen("notifications")
 
     @Serializable

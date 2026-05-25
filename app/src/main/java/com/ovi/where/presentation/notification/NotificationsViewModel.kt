@@ -2,21 +2,19 @@ package com.ovi.where.presentation.notification
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ovi.where.core.common.Resource
 import com.ovi.where.core.constants.AppConstants.STATE_FLOW_SUBSCRIBE_TIMEOUT_MS
 import com.ovi.where.core.notification.NotificationType
+import com.ovi.where.data.local.dao.UserCacheDao
 import com.ovi.where.data.local.entity.NotificationEntity
 import com.ovi.where.data.repository.NotificationRepository
 import com.ovi.where.domain.repository.FriendshipRepository
-import com.ovi.where.domain.repository.UserRepository
-import com.ovi.where.core.common.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -24,60 +22,56 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
- * Backs [NotificationsScreen]. Reads from [NotificationRepository] for the
- * inbox stream, exposes a one-shot navigation event when the user taps a
- * notification, and provides actions to mark/clear/delete entries.
+ * Backs [NotificationsScreen].
  *
- * Tap behaviour: a tap marks the row read AND emits the deep-link route
- * already resolved at receive time. The screen forwards that route to
- * [com.ovi.where.DeepLinkManager], which hands it to [AppNavGraph] via
- * the same path FCM uses when the app is killed — so taps from the inbox
- * and taps from the system tray converge on the same code path.
+ * Scope is intentionally tiny — the inbox now persists only friend
+ * events (request received / accepted), the Facebook model. Notifications
+ * are NOT clickable rows: the only interactions are inline Accept /
+ * Decline on a request and swipe-to-dismiss. No deep-link plumbing, no
+ * pendingNavigation event, no markAsRead-on-tap write.
  *
- * Filter chips: the screen lets users narrow to Requests / Meetups.
- * The chip state is held here (not in screen-local state) so it survives
- * config changes and so we can drive section bucketing off the same
- * filtered list.
+ * Read-state tracking still exists at the data layer so the bell badge
+ * can drop to zero when the user opens the screen (we issue a single
+ * `markAllAsRead` once on first composition — see screen). One write per
+ * inbox visit, regardless of how many rows.
  *
- * Avatar resolution: friend-related rows show the actor's profile photo
- * when we can resolve it. We lazily fetch each unique `userId` once and
- * cache the result in [_avatarCache]. The cache lives for the VM
- * lifecycle — no back-pressure issue since notification volume is low
- * (the inbox is the curated "important only" surface).
+ * Avatars are lazily fetched per unique `userId` and cached in
+ * [_avatarCache]. The cache lives for the VM lifecycle — fine because
+ * notification volume is low (curated surface) and the same user often
+ * appears across multiple rows (request, then accepted later).
  */
 @HiltViewModel
 class NotificationsViewModel @Inject constructor(
     private val repository: NotificationRepository,
     private val friendshipRepository: FriendshipRepository,
-    private val userRepository: UserRepository,
+    private val userCacheDao: UserCacheDao,
 ) : ViewModel() {
 
-    private val filter = MutableStateFlow(NotificationFilter.ALL)
-
     // userId -> photoUrl (nullable). null means "tried & none / failed".
-    // We mark "in flight" by absence from the map.
     private val _avatarCache = MutableStateFlow<Map<String, String?>>(emptyMap())
     private val resolvingAvatars = mutableSetOf<String>()
 
     /**
-     * Per-row inline action state — keyed by entry id. Used to disable the
-     * Accept/Decline buttons on a friend-request row while the callable is
-     * in flight, and to drop the row optimistically once accepted/declined.
+     * Per-row inline action state — keyed by entry id. Drives the
+     * Accept/Decline button enabled/spinner state on a request row.
      */
     private val _actionState = MutableStateFlow<Map<String, RequestActionState>>(emptyMap())
 
     val uiState: StateFlow<NotificationsUiState> = combine(
         repository.observeAll(),
-        filter,
         _avatarCache,
         _actionState,
-    ) { entries, currentFilter, avatars, actions ->
+    ) { entries, avatars, actions ->
         val visible = entries
             .asSequence()
+            // Defensive client-side filter for legacy entries — the server
+            // already stops persisting non-friend types (see notify.ts),
+            // and the repository listener strips them too. This is the
+            // last line of defence so a stray row never reaches the UI.
             .filter { entry ->
                 val type = runCatching { NotificationType.valueOf(entry.type) }
                     .getOrDefault(NotificationType.GENERAL)
-                currentFilter.matches(type)
+                type.isInboxImportant
             }
             .map { it.toUiModel(avatars[it.userId], actions[it.id]) }
             .toList()
@@ -85,8 +79,6 @@ class NotificationsViewModel @Inject constructor(
         NotificationsUiState(
             sections = bucketByTime(visible),
             isLoading = false,
-            filter = currentFilter,
-            totalCount = entries.size,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -98,12 +90,8 @@ class NotificationsViewModel @Inject constructor(
     val unreadCount: StateFlow<Int> = repository.observeUnreadCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STATE_FLOW_SUBSCRIBE_TIMEOUT_MS), 0)
 
-    private val _pendingNavigation = MutableStateFlow<String?>(null)
-    val pendingNavigation: StateFlow<String?> = _pendingNavigation.asStateFlow()
-
     init {
-        // Kick off avatar resolution as new entries arrive. We don't wait
-        // on this Flow — the StateFlow above already includes the cache.
+        // Kick off avatar resolution as new entries arrive.
         viewModelScope.launch {
             repository.observeAll().collect { entries ->
                 val needed = entries
@@ -114,66 +102,13 @@ class NotificationsViewModel @Inject constructor(
         }
     }
 
-    fun onFilterSelected(next: NotificationFilter) {
-        filter.value = next
-    }
-
     /**
-     * Marks a notification read and emits a deep-link route for the screen
-     * to consume. If the persisted entry has no route (legacy data, or the
-     * producer didn't have enough context to compute one), we re-resolve it
-     * from the type + ids the entry carries — this keeps the in-app inbox
-     * tap-target source-of-truth in one place. Worst case (truly nothing to
-     * navigate to) we fall back to opening the inbox itself, which is still
-     * better than the previous silent no-op behavior.
+     * Marks every unread row read in a single Firestore write. Called
+     * once per screen-open from the screen's [androidx.compose.runtime.LaunchedEffect].
+     * One write covers any number of rows (dotted-path map update under
+     * the hood). No per-row writes anywhere else.
      */
-    fun onNotificationClick(item: NotificationUiModel) {
-        viewModelScope.launch { repository.markAsRead(item.id) }
-        val route = item.deepLinkRoute?.takeIf { it.isNotBlank() }
-            ?: resolveFallbackRoute(item)
-        _pendingNavigation.value = route
-    }
-
-    /**
-     * Recomputes a deep-link route from the entry's type + denormalized ids
-     * when the persisted `deepLinkRoute` is missing. Mirrors the resolver
-     * in [com.ovi.where.core.notification.NotificationHelper.resolveDeepLinkRoute]
-     * — same canonical mapping, just keyed off the [NotificationUiModel].
-     */
-    private fun resolveFallbackRoute(item: NotificationUiModel): String =
-        when (item.type) {
-            NotificationType.NEW_MESSAGE,
-            NotificationType.MENTION ->
-                item.conversationId?.let { "chat/$it" } ?: "notifications"
-
-            NotificationType.FRIEND_REQUEST -> "friend_requests"
-            NotificationType.FRIEND_ACCEPTED ->
-                item.userId?.let { "user_profile/$it" } ?: "notifications"
-
-            NotificationType.MEMBER_JOINED,
-            NotificationType.MEMBER_LEFT ->
-                item.groupId?.let { "group_info/$it" } ?: "notifications"
-
-            NotificationType.LOCATION_UPDATE,
-            NotificationType.LIVE_LOCATION_STARTED,
-            NotificationType.LIVE_LOCATION_STOPPED ->
-                item.groupId?.let { "group_map/$it" }
-                    ?: item.conversationId?.let { "chat/$it" }
-                    ?: "tab_map"
-
-            NotificationType.MEETUP_DESTINATION_SET,
-            NotificationType.MEETUP_DESTINATION_CLEARED,
-            NotificationType.MEETUP_MEMBER_ARRIVED ->
-                item.groupId?.let { "group_map/$it" } ?: "notifications"
-
-            NotificationType.GENERAL -> "notifications"
-        }
-
-    fun onNavigationConsumed() {
-        _pendingNavigation.value = null
-    }
-
-    fun onMarkAllRead() {
+    fun onScreenOpened() {
         viewModelScope.launch { repository.markAllAsRead() }
     }
 
@@ -186,9 +121,10 @@ class NotificationsViewModel @Inject constructor(
     }
 
     /**
-     * Inline accept on a FRIEND_REQUEST row. Calls the callable, marks
-     * the entry read, and removes it from the inbox doc so the row
-     * disappears. If the call fails the row stays so the user can retry.
+     * Inline accept on a FRIEND_REQUEST row. Calls the friendship callable,
+     * then drops the entry locally so the row vanishes. The accepted-side
+     * notification (FRIEND_ACCEPTED) flows through the normal FCM path
+     * and lands in the *requester's* inbox a moment later.
      */
     fun onAcceptFriendRequest(item: NotificationUiModel) {
         val requesterId = item.userId ?: return
@@ -197,7 +133,6 @@ class NotificationsViewModel @Inject constructor(
         viewModelScope.launch {
             val result = friendshipRepository.acceptFriendRequest(requesterId)
             if (result is Resource.Success) {
-                repository.markAsRead(item.id)
                 repository.delete(item.id)
                 clearAction(item.id)
             } else {
@@ -206,10 +141,6 @@ class NotificationsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Inline decline. Same flow as accept — once the callable resolves
-     * we drop the entry from the inbox so the row disappears.
-     */
     fun onDeclineFriendRequest(item: NotificationUiModel) {
         val requesterId = item.userId ?: return
         if (_actionState.value[item.id] == RequestActionState.InFlight) return
@@ -217,7 +148,6 @@ class NotificationsViewModel @Inject constructor(
         viewModelScope.launch {
             val result = friendshipRepository.declineFriendRequest(requesterId)
             if (result is Resource.Success) {
-                repository.markAsRead(item.id)
                 repository.delete(item.id)
                 clearAction(item.id)
             } else {
@@ -235,20 +165,22 @@ class NotificationsViewModel @Inject constructor(
     }
 
     /**
-     * Lazy avatar fetch. Only one in-flight request per uid; on success we
-     * publish the photoUrl (may be null) so [uiState] re-emits with it.
+     * Lazy avatar fetch — Room-only. We read from [userCacheDao] which is
+     * warmed by the rest of the app (friends list listener, conversation
+     * listener, profile reads, etc.). If the row is missing we just give
+     * up and let the type-icon fallback render — far cheaper than firing
+     * a Firestore read per inbox row.
+     *
+     * Cost: one Room SELECT per unique uid the first time we see it,
+     * cached in [_avatarCache] for the VM lifetime. Zero network calls,
+     * zero Firestore reads, zero callable invocations.
      */
     private fun resolveAvatar(uid: String) {
         if (_avatarCache.value.containsKey(uid)) return
         if (!resolvingAvatars.add(uid)) return
         viewModelScope.launch {
             val photo = withContext(Dispatchers.IO) {
-                runCatching {
-                    when (val r = userRepository.getUser(uid)) {
-                        is Resource.Success -> r.data?.photoUrl
-                        else -> null
-                    }
-                }.getOrNull()
+                runCatching { userCacheDao.get(uid)?.photoUrl }.getOrNull()
             }
             _avatarCache.update { it + (uid to photo) }
         }
@@ -288,21 +220,6 @@ class NotificationsViewModel @Inject constructor(
     }
 }
 
-/** Filter chips displayed at the top of the inbox screen. */
-enum class NotificationFilter {
-    ALL,
-    REQUESTS,
-    MEETUPS;
-
-    fun matches(type: NotificationType): Boolean = when (this) {
-        ALL -> true
-        REQUESTS -> type == NotificationType.FRIEND_REQUEST || type == NotificationType.FRIEND_ACCEPTED
-        MEETUPS -> type == NotificationType.MEETUP_DESTINATION_SET ||
-            type == NotificationType.MEETUP_DESTINATION_CLEARED ||
-            type == NotificationType.MEETUP_MEMBER_ARRIVED
-    }
-}
-
 /** Time-bucket id used by section headers. */
 enum class SectionId { TODAY, THIS_WEEK, EARLIER }
 
@@ -317,14 +234,9 @@ enum class RequestActionState { Idle, InFlight }
 data class NotificationsUiState(
     val sections: List<NotificationSection> = emptyList(),
     val isLoading: Boolean = false,
-    val filter: NotificationFilter = NotificationFilter.ALL,
-    val totalCount: Int = 0,
 ) {
     val items: List<NotificationUiModel> get() = sections.flatMap { it.items }
     val isEmpty: Boolean get() = !isLoading && sections.isEmpty()
-    /** True when the inbox itself has rows but the filter hides them all. */
-    val isFilteredEmpty: Boolean get() = !isLoading && sections.isEmpty() && totalCount > 0
-    val unreadCount: Int get() = items.count { !it.isRead }
 }
 
 data class NotificationUiModel(
@@ -334,11 +246,6 @@ data class NotificationUiModel(
     val body: String,
     val timestamp: Long,
     val isRead: Boolean,
-    val deepLinkRoute: String?,
-    /** Denormalized ids from the inbox doc — used as a fallback when
-     *  [deepLinkRoute] is missing so a tap still navigates somewhere. */
-    val conversationId: String? = null,
-    val groupId: String? = null,
     val userId: String? = null,
     /** Avatar url for [userId] (when resolvable). null = no avatar / unresolved. */
     val avatarUrl: String? = null,
@@ -360,9 +267,6 @@ internal fun NotificationEntity.toUiModel(
         body = body,
         timestamp = timestamp,
         isRead = isRead,
-        deepLinkRoute = deepLinkRoute,
-        conversationId = conversationId,
-        groupId = groupId,
         userId = userId,
         avatarUrl = avatarUrl,
         actionState = actionState ?: RequestActionState.Idle,

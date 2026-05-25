@@ -43,34 +43,38 @@ enum class NotificationType {
     /**
      * Whether this type is worth persisting into the in-app inbox.
      *
-     * Most apps in this category (WhatsApp, Telegram, Messenger) keep the
-     * in-app notifications surface for *high-signal, action-required, or
-     * one-shot* events and let the system tray + the relevant primary tab
-     * carry the noisy ephemeral stuff.
+     * Curated tight to the **Facebook model** plus one meetup signal:
+     * only friend-shaped events and the moment-of-truth meetup arrival
+     * earn an inbox row. Everything else is either visible elsewhere
+     * in the product (Chats tab, the map itself) or ephemeral enough
+     * that persisting it would just burn Firestore writes.
      *
-     * Concretely:
-     *  • **Friend requests / accepted** — action-required, one-shot.
-     *  • **Meetup destination set** — group coordination signal, one per session.
-     *  • **Meetup member arrived** — high-signal moment.
+     * Concrete keep-list:
+     *  • [FRIEND_REQUEST]        — action-required, one-shot, social.
+     *  • [FRIEND_ACCEPTED]       — confirmation, social signal.
+     *  • [MEETUP_MEMBER_ARRIVED] — high-signal "made it" moment that the
+     *    user often misses on the live map (phone in pocket, app
+     *    backgrounded). Persisting it lets people scroll back later.
      *
-     * Everything else (chat messages, member join/leave, live location
-     * start/stop/update, meetup cleared, GENERAL) is intentionally excluded:
-     *  • *Chat messages and mentions* live on the Chats tab.
-     *  • *Live location* events are visible on the map in real time.
-     *  • *Member join/leave* is a low-action, high-frequency social event.
-     *  • *Meetup cleared* is paired with *set*, so seeing both is redundant.
-     *  • *Location update* fires per GPS tick — would dominate the inbox.
+     * Everything else returns false:
+     *  • Chat / mention → Chats tab + system tray.
+     *  • Member join/left → low-action group churn.
+     *  • Live location start/stop/update → visible on the map in real time.
+     *  • Meetup set/cleared → the meetup card on the map and the chat
+     *    sheet are the canonical surface; an inbox row about a meetup
+     *    someone already saw two seconds earlier is just noise.
+     *  • GENERAL → catch-all, almost always low-signal.
      *
      * The system tray push is **independent** from this flag — those still
      * fire normally (subject to user channel preferences). Only the
      * persisted inbox row is suppressed for non-important types, which
-     * also saves Firestore writes server-side (see `notify.ts`).
+     * directly cuts our Firestore write cost (the inbox doc is the
+     * highest-frequency write per recipient — see `notify.ts`).
      */
     val isInboxImportant: Boolean
         get() = when (this) {
             FRIEND_REQUEST,
             FRIEND_ACCEPTED,
-            MEETUP_DESTINATION_SET,
             MEETUP_MEMBER_ARRIVED -> true
 
             NEW_MESSAGE,
@@ -80,6 +84,7 @@ enum class NotificationType {
             LOCATION_UPDATE,
             LIVE_LOCATION_STARTED,
             LIVE_LOCATION_STOPPED,
+            MEETUP_DESTINATION_SET,
             MEETUP_DESTINATION_CLEARED,
             GENERAL -> false
         }

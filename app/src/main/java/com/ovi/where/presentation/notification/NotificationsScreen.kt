@@ -1,9 +1,7 @@
 package com.ovi.where.presentation.notification
 
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,19 +19,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Chat
-import androidx.compose.material.icons.outlined.AlternateEmail
-import androidx.compose.material.icons.outlined.FlagCircle
-import androidx.compose.material.icons.outlined.GroupRemove
-import androidx.compose.material.icons.outlined.LocationOff
-import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.rounded.Flag
-import androidx.compose.material.icons.rounded.GroupAdd
 import androidx.compose.material.icons.rounded.Handshake
 import androidx.compose.material.icons.rounded.PersonAdd
-import androidx.compose.material.icons.rounded.ShareLocation
 import androidx.compose.material.icons.rounded.WhereToVote
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -55,13 +44,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -71,9 +57,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
-import com.ovi.where.DeepLinkManager
 import com.ovi.where.R
-import com.ovi.where.core.links.LinkText
 import com.ovi.where.core.notification.NotificationType
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.presentation.common.WhereTopAppBar
@@ -81,22 +65,25 @@ import java.text.DateFormat
 import java.util.Date
 
 /**
- * In-app notification inbox.
+ * In-app notification inbox — Facebook model.
  *
- * Curated to high-signal, action-required events:
- *  • Friend requests and accepted requests (with inline Accept / Decline)
- *  • Meetup destination set
- *  • Meetup member arrived
+ * Persists only friend-shaped events (request received / accepted). Every
+ * other notification type is delivered via the system tray and lives on
+ * its native surface (Chats tab, the map, the meetup card) — they're not
+ * mirrored here. Saves a Firestore inbox write per recipient per non-
+ * friend event.
  *
- * Non-important events (chat, member join/leave, live-location start/stop,
- * location updates, meetup cleared, GENERAL) aren't persisted — they live
- * elsewhere in the product (Chats tab, the map). See
- * [NotificationType.isInboxImportant].
+ * Rows are NOT clickable. The only interactions are:
+ *  • Inline Accept / Decline on a FRIEND_REQUEST row.
+ *  • Swipe-to-dismiss on any row.
  *
- * Visual language is flat to match the rest of the app: no per-row cards
- * or filled containers, just padded rows on the scaffold surface — same
- * pattern as Friend Requests and Chats. Unread is a single primary dot
- * on the right; the row title weight does the rest of the lifting.
+ * Read state: a single [NotificationsViewModel.onScreenOpened] call on
+ * first composition flips every unread row read in one batched Firestore
+ * write. No per-row markAsRead writes anywhere — opening the screen is
+ * the read-receipt.
+ *
+ * Visual language is flat: no per-row cards, no filled containers, just
+ * padded rows on the surface. Matches Friend Requests / Chats.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,16 +92,10 @@ fun NotificationsScreen(
     viewModel: NotificationsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val pendingNavigation by viewModel.pendingNavigation.collectAsState()
 
-    // Forward tap-to-navigate via the existing deep-link plumbing so the
-    // navigation logic stays in AppNavGraph (same path used by FCM taps).
-    LaunchedEffect(pendingNavigation) {
-        val route = pendingNavigation ?: return@LaunchedEffect
-        DeepLinkManager.pending = route
-        viewModel.onNavigationConsumed()
-        onNavigateBack()
-    }
+    // Single batched markAllAsRead per screen open. The dotted-path update
+    // is one Firestore write regardless of how many rows are unread.
+    LaunchedEffect(Unit) { viewModel.onScreenOpened() }
 
     Scaffold(
         topBar = {
@@ -122,11 +103,7 @@ fun NotificationsScreen(
                 title = stringResource(R.string.notifications_title),
                 onNavigateBack = onNavigateBack,
                 actions = {
-                    if (uiState.items.any { !it.isRead }) {
-                        TextButton(onClick = viewModel::onMarkAllRead) {
-                            Text(stringResource(R.string.notifications_mark_all_read))
-                        }
-                    } else if (uiState.totalCount > 0) {
+                    if (uiState.items.isNotEmpty()) {
                         TextButton(onClick = viewModel::onClearAll) {
                             Text(stringResource(R.string.notifications_clear_all))
                         }
@@ -137,18 +114,8 @@ fun NotificationsScreen(
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            FilterRow(
-                selected = uiState.filter,
-                onSelect = viewModel::onFilterSelected,
-            )
-
             when {
                 uiState.isLoading -> Box(Modifier.fillMaxSize())
-                uiState.isFilteredEmpty -> EmptyState(
-                    title = stringResource(R.string.notifications_empty_filter_title),
-                    body = stringResource(R.string.notifications_empty_filter_body),
-                    modifier = Modifier.fillMaxSize(),
-                )
                 uiState.isEmpty -> EmptyState(
                     title = stringResource(R.string.notifications_empty_title),
                     body = stringResource(R.string.notifications_empty_body),
@@ -163,7 +130,6 @@ fun NotificationsScreen(
                         items(section.items, key = { it.id }) { item ->
                             DismissibleNotificationRow(
                                 item = item,
-                                onClick = { viewModel.onNotificationClick(item) },
                                 onDismiss = { viewModel.onDelete(item.id) },
                                 onAccept = { viewModel.onAcceptFriendRequest(item) },
                                 onDecline = { viewModel.onDeclineFriendRequest(item) },
@@ -178,71 +144,6 @@ fun NotificationsScreen(
                 }
             }
         }
-    }
-}
-
-// ── Filter pills ────────────────────────────────────────────────────────────
-//
-// Lightweight underline-style pills, not Material FilterChips. The default
-// FilterChip has heavy borders and a chip outline that fights with our flat
-// list rows. A simple text + thin underline reads cleaner and matches the
-// tab feel the rest of the app uses.
-
-@Composable
-private fun FilterRow(
-    selected: NotificationFilter,
-    onSelect: (NotificationFilter) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium),
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceLarge),
-    ) {
-        NotificationFilter.values().forEach { filter ->
-            val label = when (filter) {
-                NotificationFilter.ALL -> stringResource(R.string.notifications_filter_all)
-                NotificationFilter.REQUESTS -> stringResource(R.string.notifications_filter_requests)
-                NotificationFilter.MEETUPS -> stringResource(R.string.notifications_filter_meetups)
-            }
-            FilterPill(
-                label = label,
-                selected = selected == filter,
-                onClick = { onSelect(filter) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun FilterPill(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val container = if (selected) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-    } else {
-        Color.Transparent
-    }
-    val textColor = if (selected) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(Dimens.cornerRound))
-            .background(container)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            color = textColor,
-        )
     }
 }
 
@@ -284,15 +185,13 @@ private fun SectionHeader(id: SectionId, count: Int) {
 // ── Row + swipe wrapper ─────────────────────────────────────────────────────
 
 /**
- * Swipe-to-dismiss wrapper. Forwards to [onDismiss] once a swipe settles
- * past either threshold. The reveal background is intentionally subtle —
- * a flat surface tint, no error red — to keep the screen calm.
+ * Swipe-to-dismiss wrapper. Rows are non-clickable — the only gesture is
+ * swipe to dismiss. Inline Accept / Decline live inside the row itself.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DismissibleNotificationRow(
     item: NotificationUiModel,
-    onClick: () -> Unit,
     onDismiss: () -> Unit,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
@@ -332,7 +231,6 @@ private fun DismissibleNotificationRow(
     ) {
         NotificationRow(
             item = item,
-            onClick = onClick,
             onAccept = onAccept,
             onDecline = onDecline,
         )
@@ -342,21 +240,18 @@ private fun DismissibleNotificationRow(
 @Composable
 private fun NotificationRow(
     item: NotificationUiModel,
-    onClick: () -> Unit,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
 ) {
     // Unread state is signalled by:
     //  • a 6dp primary dot on the right
     //  • SemiBold title (vs Normal when read)
-    // No background tint — keeps the list flat and brand-clean.
     val titleWeight = if (item.isRead) FontWeight.Normal else FontWeight.SemiBold
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .clickable(onClick = onClick)
             .padding(horizontal = Dimens.spaceLarge, vertical = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.Top) {
@@ -375,7 +270,7 @@ private fun NotificationRow(
                 )
                 if (item.body.isNotBlank()) {
                     Spacer(modifier = Modifier.height(2.dp))
-                    LinkText(
+                    Text(
                         text = item.body,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -402,12 +297,12 @@ private fun NotificationRow(
             }
         }
 
-        // Inline Accept / Decline for incoming friend requests. Same
-        // sizing as Friend Requests screen so the two surfaces feel
-        // identical when this row matches a request there.
+        // Inline Accept / Decline for incoming friend requests. Only
+        // surface for the *receiver* of a request, not for the
+        // accepted-confirmation row (which is informational only).
         if (item.type == NotificationType.FRIEND_REQUEST && item.userId != null) {
             Spacer(modifier = Modifier.height(10.dp))
-            // Indent under the avatar so the buttons line up with the text.
+            // Indent under the avatar so the buttons line up with the title.
             Row(modifier = Modifier.padding(start = 52.dp)) {
                 FriendRequestActions(
                     inFlight = item.actionState == RequestActionState.InFlight,
@@ -471,14 +366,7 @@ private fun FriendRequestActions(
 
 @Composable
 private fun LeadingVisual(item: NotificationUiModel) {
-    // Friend-related rows show the user's avatar when we can resolve it.
-    // Other types use a colored icon bubble keyed by type.
-    val showAvatar = (item.type == NotificationType.FRIEND_REQUEST ||
-        item.type == NotificationType.FRIEND_ACCEPTED ||
-        item.type == NotificationType.MEETUP_MEMBER_ARRIVED) &&
-        !item.avatarUrl.isNullOrBlank()
-
-    if (showAvatar) {
+    if (!item.avatarUrl.isNullOrBlank()) {
         AvatarBubble(photoUrl = item.avatarUrl)
     } else {
         TypeIconBubble(type = item.type)
@@ -524,12 +412,9 @@ private fun AvatarBubble(photoUrl: String?) {
 
 @Composable
 private fun TypeIconBubble(type: NotificationType) {
-    // Each type maps to its own icon AND its own accent so rows scan
-    // distinctly down the list. Friend-related rows lean primary; meetup
-    // uses tertiary (matching the meetup pin / chip language used on the
-    // map and chat screens); membership uses secondary; live-location
-    // uses primary; and "stopped"-style states use the muted onSurface
-    // tint so they read calmer than their "started" counterparts.
+    // Only friend types and meetup-arrival are persisted; everything
+    // else is filtered out upstream. Keep the fallback for legacy entries
+    // that may still be mid-purge in the canonical doc.
     val (icon, tint) = when (type) {
         NotificationType.FRIEND_REQUEST ->
             Icons.Rounded.PersonAdd to MaterialTheme.colorScheme.primary
@@ -537,37 +422,10 @@ private fun TypeIconBubble(type: NotificationType) {
         NotificationType.FRIEND_ACCEPTED ->
             Icons.Rounded.Handshake to MaterialTheme.colorScheme.primary
 
-        NotificationType.MEMBER_JOINED ->
-            Icons.Rounded.GroupAdd to MaterialTheme.colorScheme.secondary
-
-        NotificationType.MEMBER_LEFT ->
-            Icons.Outlined.GroupRemove to MaterialTheme.colorScheme.onSurfaceVariant
-
-        NotificationType.LIVE_LOCATION_STARTED ->
-            Icons.Rounded.ShareLocation to MaterialTheme.colorScheme.primary
-
-        NotificationType.LIVE_LOCATION_STOPPED ->
-            Icons.Outlined.LocationOff to MaterialTheme.colorScheme.onSurfaceVariant
-
-        NotificationType.LOCATION_UPDATE ->
-            Icons.Outlined.MyLocation to MaterialTheme.colorScheme.primary
-
-        NotificationType.MEETUP_DESTINATION_SET ->
-            Icons.Rounded.Flag to MaterialTheme.colorScheme.tertiary
-
-        NotificationType.MEETUP_DESTINATION_CLEARED ->
-            Icons.Outlined.FlagCircle to MaterialTheme.colorScheme.onSurfaceVariant
-
         NotificationType.MEETUP_MEMBER_ARRIVED ->
             Icons.Rounded.WhereToVote to MaterialTheme.colorScheme.tertiary
 
-        NotificationType.NEW_MESSAGE ->
-            Icons.AutoMirrored.Outlined.Chat to MaterialTheme.colorScheme.primary
-
-        NotificationType.MENTION ->
-            Icons.Outlined.AlternateEmail to MaterialTheme.colorScheme.primary
-
-        NotificationType.GENERAL ->
+        else ->
             Icons.Outlined.NotificationsNone to MaterialTheme.colorScheme.onSurfaceVariant
     }
     IconBubbleInner(icon = icon, tint = tint)
@@ -600,11 +458,11 @@ private fun EmptyState(title: String, body: String, modifier: Modifier = Modifie
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.bell),
+        Icon(
+            imageVector = Icons.Outlined.NotificationsNone,
             contentDescription = null,
-            modifier = Modifier.size(140.dp).alpha(0.9f),
-            contentScale = ContentScale.Fit
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            modifier = Modifier.size(40.dp)
         )
         Spacer(modifier = Modifier.height(Dimens.spaceLarge))
         Text(
@@ -614,11 +472,11 @@ private fun EmptyState(title: String, body: String, modifier: Modifier = Modifie
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
-        Spacer(modifier = Modifier.height(Dimens.spaceMedium))
+        Spacer(modifier = Modifier.height(Dimens.spaceSmall))
         Text(
             text = body,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
     }
@@ -626,11 +484,6 @@ private fun EmptyState(title: String, body: String, modifier: Modifier = Modifie
 
 // ── Time formatting ─────────────────────────────────────────────────────────
 
-/**
- * Lightweight relative formatter. We keep it inline here rather than reuse
- * the chat formatter — the inbox cares about coarser buckets (just now, 5m,
- * 2h, Apr 12) where exact second-level precision isn't needed.
- */
 private fun formatRelative(timestamp: Long): String {
     val now = System.currentTimeMillis()
     val deltaMs = now - timestamp

@@ -145,10 +145,18 @@ class NotificationRepository @Inject constructor(
                 val isFromCache = snap.metadata.isFromCache
 
                 syncScope.launch {
+                    // Diff against current Room state so we only upsert
+                    // rows that actually changed. Without this, every
+                    // snapshot (cache + server) would re-INSERT every
+                    // entry, causing redundant Flow emissions on the bound
+                    // observers (uiState in NotificationsViewModel + the
+                    // bell badge in MainScaffold). Inbox is capped at 200
+                    // entries so the snapshot read is constant-time.
+                    val current = notificationDao.snapshotAll().associateBy { it.id }
+
                     if (!isFromCache) {
                         // Authoritative server snapshot — Room mirrors the doc.
-                        val localIds = notificationDao.observeAllIds()
-                        for (localId in localIds) {
+                        for (localId in current.keys) {
                             if (localId !in freshIds) notificationDao.delete(localId)
                         }
                         // One-shot purge of legacy non-important entries
@@ -158,10 +166,14 @@ class NotificationRepository @Inject constructor(
                             purgeLegacyEntries(uid, legacyEntryIdsToPurge)
                         }
                     }
-                    // Always upsert what we received — cache snapshots are
-                    // valid for *adding* known-good entries to Room, just
-                    // not for proving anything's gone.
-                    parsed.forEach { notificationDao.insert(it) }
+                    // Upsert only the rows that actually changed. Cache
+                    // snapshots are valid for *adding* known-good entries
+                    // to Room, just not for proving anything's gone — but
+                    // even then we skip rows that are byte-equal to the
+                    // current cache to avoid the no-op Room write.
+                    for (entry in parsed) {
+                        if (current[entry.id] != entry) notificationDao.insert(entry)
+                    }
                 }
             }
     }
@@ -209,29 +221,6 @@ class NotificationRepository @Inject constructor(
                 destinationName = data.destinationName
             )
         )
-    }
-
-    /**
-     * Marks one entry as read.
-     *
-     * Cost: a single field update via dotted path — no transaction, no map
-     * rewrite. Two devices flagging different entries simultaneously
-     * succeed independently because the writes touch different fields.
-     */
-    suspend fun markAsRead(id: String) {
-        notificationDao.markAsRead(id)
-        val uid = firebaseAuth.currentUser?.uid ?: return
-        try {
-            firestore.document(inboxPath(uid)).update(
-                mapOf(
-                    "entries.$id.isRead" to true,
-                    "entries.$id.readAt" to System.currentTimeMillis(),
-                    "updatedAt" to System.currentTimeMillis()
-                )
-            ).await()
-        } catch (e: Exception) {
-            Timber.w(e, "markAsRead failed for $id")
-        }
     }
 
     /**

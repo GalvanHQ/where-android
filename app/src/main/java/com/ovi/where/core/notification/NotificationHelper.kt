@@ -8,19 +8,28 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
 import android.os.Build
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import com.ovi.where.MainActivity
 import com.ovi.where.R
+import com.ovi.where.core.notification.NotificationHelper.Companion.CHANNEL_DEFINITIONS
+import com.ovi.where.core.notification.NotificationHelper.Companion.SUMMARY_THRESHOLD
+import com.ovi.where.data.repository.ChannelSoundConfig
 import com.ovi.where.data.repository.NotificationPreferencesRepository
+import com.ovi.where.data.repository.NotificationSoundPreferencesRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
-import androidx.core.net.toUri
 
 /**
  * Centralized notification helper.
@@ -49,6 +58,7 @@ import androidx.core.net.toUri
 class NotificationHelper @Inject constructor(
     @ApplicationContext private val context: Context,
     private val preferencesRepository: NotificationPreferencesRepository,
+    private val soundPreferencesRepository: NotificationSoundPreferencesRepository,
     private val activeConversationTracker: ActiveConversationTracker,
     private val activeMapTracker: ActiveMapTracker,
     private val chatNotificationStyler: ChatNotificationStyler,
@@ -63,70 +73,127 @@ class NotificationHelper @Inject constructor(
     /** Active conversations with on-screen pushes — drives summary creation. */
     private val activeConversationIds: MutableSet<String> = mutableSetOf()
 
+    /**
+     * Cached map of base channel id → currently-active versioned channel id.
+     * Refreshed on every [createChannels] call. The send path uses this so
+     * a single channel-version bump from the settings UI propagates to the
+     * very next notification without us re-reading DataStore on the hot path.
+     */
+    @Volatile
+    private var activeChannelMap: Map<String, String> = BASE_CHANNEL_IDS.associateWith { it }
+
+    private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
     init {
-        createChannels()
+        // Channel creation must read DataStore for sound configs. We do
+        // it on a background coroutine to avoid blocking process start,
+        // and re-create on every preference change so the user's chosen
+        // ringtone takes effect on the next notification.
+        ioScope.launch { createChannels() }
     }
 
     // ── Channel creation ──────────────────────────────────────────────────
 
     /**
-     * Creates every channel the app uses. Safe to call multiple times — the
-     * system de-duplicates by channel id.
+     * Creates every channel the app uses, applying the user's saved
+     * sound preferences via channel versioning.
+     *
+     * Channel versioning trick:
+     * On Android O+, `NotificationChannel.setSound(...)` is **immutable
+     * after the first time the channel is created** — the system locks
+     * the field so apps can't fight per-channel user customizations. To
+     * honour a sound change we delete the old channel and create a new
+     * one under a versioned id (`messages_v3`, `meetup_v1`, ...). The
+     * versioned id is what we pass to `NotificationCompat.Builder`; the
+     * base id (`messages`, `meetup`, ...) is what we display in the UI
+     * and use for preference keys.
+     *
+     * Safe to call multiple times. Pre-O devices skip channel creation
+     * entirely (no-op).
      */
-    fun createChannels() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+    suspend fun createChannels() {
+        val configs = soundPreferencesRepository.snapshot()
+        val configByBase = configs.associateBy { it.baseChannelId }
 
-        val channels = listOf(
-            NotificationChannel(
-                CHANNEL_MESSAGES,
-                context.getString(R.string.notification_channel_messages),
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = context.getString(R.string.notification_channel_messages_desc)
-                enableVibration(true)
-                enableLights(true)
-            },
-            NotificationChannel(
-                CHANNEL_SOCIAL,
-                context.getString(R.string.notification_channel_social),
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = context.getString(R.string.notification_channel_social_desc)
-            },
-            NotificationChannel(
-                CHANNEL_LOCATION_UPDATES,
-                context.getString(R.string.notification_channel_location_updates),
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = context.getString(R.string.notification_channel_location_updates_desc)
-            },
-            NotificationChannel(
-                CHANNEL_GROUP_ACTIVITY,
-                context.getString(R.string.notification_channel_group_activity),
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = context.getString(R.string.notification_channel_group_activity_desc)
-            },
-            NotificationChannel(
-                CHANNEL_MEETUP,
-                context.getString(R.string.notification_channel_meetup),
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = context.getString(R.string.notification_channel_meetup_desc)
-                enableVibration(true)
-            },
-            NotificationChannel(
-                CHANNEL_GENERAL,
-                context.getString(R.string.notification_channel_general),
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = context.getString(R.string.notification_channel_general_desc)
-            }
-        )
+        // Build the new active map first so the send path sees a
+        // consistent view at all times.
+        activeChannelMap = BASE_CHANNEL_IDS.associateWith { base ->
+            configByBase[base]?.versionedChannelId ?: base
+        }
 
         val systemManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        // Delete stale versioned channels (any channel that starts with
+        // a base id and isn't the current active one). This keeps the
+        // system-settings list clean as users hop between sounds.
+        val activeIds = activeChannelMap.values.toSet()
+        systemManager.notificationChannels
+            .filter { ch ->
+                BASE_CHANNEL_IDS.any { base ->
+                    ch.id == base || ch.id.startsWith("${base}_v")
+                } && ch.id !in activeIds
+            }
+            .forEach { stale ->
+                runCatching { systemManager.deleteNotificationChannel(stale.id) }
+            }
+
+        val channels = BASE_CHANNEL_IDS.map { baseId ->
+            val config = configByBase[baseId] ?: ChannelSoundConfig(
+                baseChannelId = baseId,
+                sound = NotificationSound.defaultFor(baseId),
+                version = 0
+            )
+            buildChannel(baseId, config)
+        }
         systemManager.createNotificationChannels(channels)
+    }
+
+    /**
+     * Builds a single [NotificationChannel] for a base channel id, using
+     * the importance / vibration profile baked into [CHANNEL_DEFINITIONS].
+     */
+    private fun buildChannel(baseId: String, config: ChannelSoundConfig): NotificationChannel {
+        val def = CHANNEL_DEFINITIONS.firstOrNull { it.id == baseId }
+            ?: ChannelDefinition(
+                id = baseId,
+                nameRes = R.string.notification_channel_general,
+                descRes = R.string.notification_channel_general_desc,
+                importance = NotificationManager.IMPORTANCE_DEFAULT,
+                vibrate = false,
+                lights = false
+            )
+        return NotificationChannel(
+            config.versionedChannelId,
+            context.getString(def.nameRes),
+            def.importance
+        ).apply {
+            description = context.getString(def.descRes)
+            enableVibration(def.vibrate)
+            enableLights(def.lights)
+
+            val soundUri = config.sound.resolveUri(context)
+            if (soundUri != null) {
+                val attrs = AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .build()
+                setSound(soundUri, attrs)
+            } else {
+                // Silent: must be explicitly null + null attrs, otherwise
+                // Android falls back to the default ringtone.
+                setSound(null, null)
+            }
+        }
+    }
+
+    /**
+     * Triggers a channel rebuild after a sound preference change. Returns
+     * a cold suspension so the caller can `await` if it cares (the
+     * settings VM doesn't — fire-and-forget).
+     */
+    suspend fun rebuildChannels() {
+        createChannels()
     }
 
     // ── High-level entry point ─────────────────────────────────────────────
@@ -143,7 +210,11 @@ class NotificationHelper @Inject constructor(
      */
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     suspend fun postForType(type: NotificationType, data: NotificationData): Boolean {
-        val channelId = resolveChannelForType(type)
+        val baseChannelId = resolveChannelForType(type)
+        // Versioned channel id — what the system actually knows about.
+        // Falls back to the base id if the active map doesn't have an
+        // entry yet (channel creation hasn't completed on a cold start).
+        val channelId = activeChannelMap[baseChannelId] ?: baseChannelId
 
         if (!canPostNotifications()) {
             Timber.w("POST_NOTIFICATIONS permission not granted - dropping $type")
@@ -157,8 +228,8 @@ class NotificationHelper @Inject constructor(
             Timber.i("Channel '$channelId' disabled at the system level - dropping $type")
             return false
         }
-        if (!preferencesRepository.isChannelEnabledSync(channelId)) {
-            Timber.i("Channel '$channelId' disabled - suppressing $type")
+        if (!preferencesRepository.isChannelEnabledSync(baseChannelId)) {
+            Timber.i("Channel '$baseChannelId' disabled - suppressing $type")
             return false
         }
         if (shouldSuppressInForeground(type, data)) {
@@ -460,6 +531,7 @@ class NotificationHelper @Inject constructor(
      * distinct conversations crosses the [SUMMARY_THRESHOLD], a summary
      * notification is posted on the messages channel.
      */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     private fun rememberActiveConversation(conversationId: String) {
         activeConversationIds.add(conversationId)
         if (activeConversationIds.size >= SUMMARY_THRESHOLD) {
@@ -475,7 +547,8 @@ class NotificationHelper @Inject constructor(
     private fun postSummaryNotification() {
         if (!canPostNotifications()) return
         val summaryText = "${activeConversationIds.size} conversations"
-        val summary = NotificationCompat.Builder(context, CHANNEL_MESSAGES)
+        val messagesChannelId = activeChannelMap[CHANNEL_MESSAGES] ?: CHANNEL_MESSAGES
+        val summary = NotificationCompat.Builder(context, messagesChannelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.app_name))
             .setContentText(summaryText)
@@ -599,7 +672,6 @@ class NotificationHelper @Inject constructor(
      * Pre-O devices don't have channels; always returns true.
      */
     private fun isChannelEnabledOnSystem(channelId: String): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
         val systemManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channel = systemManager.getNotificationChannel(channelId) ?: return true
@@ -643,5 +715,88 @@ class NotificationHelper @Inject constructor(
         const val GROUP_KEY_MESSAGES = "com.ovi.where.GROUP_MESSAGES"
         const val SUMMARY_NOTIFICATION_ID = 9999
         const val SUMMARY_THRESHOLD = 2
+
+        /**
+         * Stable list of every base channel the app owns. Iteration order
+         * is the order channels appear in the system Settings → Notifications
+         * UI on most launchers, so it doubles as a UI ordering hint.
+         */
+        val BASE_CHANNEL_IDS = listOf(
+            CHANNEL_MESSAGES,
+            CHANNEL_SOCIAL,
+            CHANNEL_LOCATION_UPDATES,
+            CHANNEL_GROUP_ACTIVITY,
+            CHANNEL_MEETUP,
+            CHANNEL_GENERAL,
+        )
+
+        /**
+         * Per-channel metadata used by [buildChannel]. Keeping these in a
+         * single table avoids duplicating string-resource refs and makes
+         * adding a new channel a one-line change.
+         */
+        internal val CHANNEL_DEFINITIONS = listOf(
+            ChannelDefinition(
+                id = CHANNEL_MESSAGES,
+                nameRes = R.string.notification_channel_messages,
+                descRes = R.string.notification_channel_messages_desc,
+                importance = NotificationManager.IMPORTANCE_HIGH,
+                vibrate = true,
+                lights = true
+            ),
+            ChannelDefinition(
+                id = CHANNEL_SOCIAL,
+                nameRes = R.string.notification_channel_social,
+                descRes = R.string.notification_channel_social_desc,
+                importance = NotificationManager.IMPORTANCE_DEFAULT,
+                vibrate = false,
+                lights = false
+            ),
+            ChannelDefinition(
+                id = CHANNEL_LOCATION_UPDATES,
+                nameRes = R.string.notification_channel_location_updates,
+                descRes = R.string.notification_channel_location_updates_desc,
+                importance = NotificationManager.IMPORTANCE_HIGH,
+                vibrate = false,
+                lights = false
+            ),
+            ChannelDefinition(
+                id = CHANNEL_GROUP_ACTIVITY,
+                nameRes = R.string.notification_channel_group_activity,
+                descRes = R.string.notification_channel_group_activity_desc,
+                importance = NotificationManager.IMPORTANCE_DEFAULT,
+                vibrate = false,
+                lights = false
+            ),
+            ChannelDefinition(
+                id = CHANNEL_MEETUP,
+                nameRes = R.string.notification_channel_meetup,
+                descRes = R.string.notification_channel_meetup_desc,
+                importance = NotificationManager.IMPORTANCE_HIGH,
+                vibrate = true,
+                lights = true
+            ),
+            ChannelDefinition(
+                id = CHANNEL_GENERAL,
+                nameRes = R.string.notification_channel_general,
+                descRes = R.string.notification_channel_general_desc,
+                importance = NotificationManager.IMPORTANCE_DEFAULT,
+                vibrate = false,
+                lights = false
+            ),
+        )
     }
 }
+
+/**
+ * Static per-channel metadata. Only used inside [NotificationHelper] to
+ * build the `NotificationChannel` objects on Android O+.
+ */
+internal data class ChannelDefinition(
+    val id: String,
+    @androidx.annotation.StringRes val nameRes: Int,
+    @androidx.annotation.StringRes val descRes: Int,
+    val importance: Int,
+    val vibrate: Boolean,
+    val lights: Boolean,
+)

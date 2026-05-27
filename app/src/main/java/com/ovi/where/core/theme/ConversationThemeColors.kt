@@ -25,15 +25,17 @@ object ConversationThemeColors {
      * directly. The first entry is the default — keep [DEFAULT] in sync if
      * you reorder.
      *
-     * Naming follows the brand's sunset language so the labels hint at
-     * the visual register (brighter / warmer / cooler) rather than
-     * abstract hue names.
+     * Naming follows the brand's gradient language: indigo violet at the
+     * top, drifting through violet / magenta / coral / orange (the full
+     * where_logo_v2 sunburst) and finishing with two cool earth tones for
+     * users who want to mute the chat chrome.
      */
     val OPTIONS: List<Pair<String, String>> = listOf(
-        "#C2298A" to "Magenta",   // brand primary — default
-        "#7E57C2" to "Violet",    // brand secondary
-        "#E85A1F" to "Sunset",    // brand tertiary
-        "#FF610B" to "Tangerine", // bottom of the gradient
+        "#6E60CF" to "Indigo",    // brand primary — default
+        "#5B538D" to "Slate",     // brand secondary
+        "#A53D00" to "Sunset",    // brand tertiary
+        "#C2298A" to "Magenta",   // mid-gradient accent
+        "#FF610B" to "Tangerine", // bottom-of-gradient accent
         "#1976D2" to "Azure",
         "#006E2C" to "Forest",
         "#006878" to "Teal",
@@ -53,7 +55,7 @@ object ConversationThemeColors {
      * Mirrors `DEFAULT_THEME_COLOR` in `server/src/constants.js` —
      * change in lockstep if the brand palette shifts.
      */
-    const val DEFAULT: String = "#C2298A"
+    const val DEFAULT: String = "#6E60CF"
 
     /**
      * Default emoji shortcut used as the per-conversation quick reaction

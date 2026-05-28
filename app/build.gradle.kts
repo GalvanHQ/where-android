@@ -687,7 +687,6 @@ dependencies {
     implementation(libs.firebase.storage)
     implementation(libs.firebase.functions)
     implementation(libs.firebase.config)
-    // TODO: Re-enable after fixing build ID issue
     implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.analytics)
 

@@ -17,7 +17,7 @@ const MAX_INBOX_ENTRIES = 200;
 
 /** Default branding emitted at conversation creation. Mirrors the Android
  *  `ConversationThemeColors.DEFAULT` / `DEFAULT_EMOJI_SHORTCUT`. */
-const DEFAULT_THEME_COLOR = '#6E60CF';
+const DEFAULT_THEME_COLOR = '#F9DF4D';
 const DEFAULT_EMOJI_SHORTCUT = '👍';
 
 module.exports = {

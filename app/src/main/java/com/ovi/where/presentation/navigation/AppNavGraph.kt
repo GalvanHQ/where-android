@@ -32,7 +32,6 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.navArgument
 import com.ovi.where.DeepLinkManager
 import com.ovi.where.core.crash.ActiveScreenTracker
@@ -792,7 +791,6 @@ fun AppNavGraph(
             ) { back ->
                 val groupId = back.arguments?.getString("groupId") ?: return@composable
                 com.ovi.where.presentation.group.GroupNicknamesScreen(
-                    groupId = groupId,
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

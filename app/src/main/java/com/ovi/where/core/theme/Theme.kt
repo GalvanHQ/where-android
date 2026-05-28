@@ -19,14 +19,20 @@ import com.ovi.where.core.utils.LocalReducedMotion
 import com.ovi.where.core.utils.rememberReducedMotion
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Material 3 colour schemes — derived from the where_logo_v2 gradient.
+//  Material 3 colour schemes — derived from the where_logo_v5 yellow
+//  speech-bubble on black. Both schemes follow the M3 reference token
+//  mapping, with one deliberate exception for dark mode primary:
 //
-//  Both schemes follow the M3 reference token mapping exactly:
+//    Light:  primary = P40 (deep gold), onPrimary = P100,
+//            primaryContainer = P90, onPrimaryContainer = P10
 //
-//    Light:  primary = T40, onPrimary = T100, primaryContainer = T90,
-//            onPrimaryContainer = T10
-//    Dark:   primary = T80, onPrimary = T20,  primaryContainer = T30,
-//            onPrimaryContainer = T90
+//    Dark:   primary = P80 (BRAND yellow), onPrimary = P10 (deep brown),
+//            primaryContainer = P30, onPrimaryContainer = P90
+//
+//  The dark scheme uses the literal logo yellow as the primary because
+//  on a near-black canvas it reads with the same punch the logo has —
+//  light mode pulls back to a deep gold so onPrimary white still
+//  passes AA on buttons and FABs.
 //
 //  Surfaces use the M3 elevation roles (containerLowest → containerHighest)
 //  rather than ad-hoc greys, so cards, sheets, and rails all read at the
@@ -34,7 +40,7 @@ import com.ovi.where.core.utils.rememberReducedMotion
 // ─────────────────────────────────────────────────────────────────────────────
 
 private val LightColorScheme = lightColorScheme(
-    // Primary
+    // Primary — deep gold so onPrimary white passes AA on buttons/FABs.
     primary                 = Primary40,
     onPrimary               = Primary100,
     primaryContainer        = Primary90,
@@ -46,7 +52,7 @@ private val LightColorScheme = lightColorScheme(
     secondaryContainer      = Secondary90,
     onSecondaryContainer    = Secondary10,
 
-    // Tertiary
+    // Tertiary (deep teal)
     tertiary                = Tertiary40,
     onTertiary              = Tertiary100,
     tertiaryContainer       = Tertiary90,
@@ -69,8 +75,9 @@ private val LightColorScheme = lightColorScheme(
     // Surface tonal elevations (M3 spec). surfaceTint is set to the
     //  surface itself rather than primary — M3's default tint behaviour
     //  layers a translucent primary over every elevated surface, which
-    //  on our hot pink primary turns bottom bars and sheets into a pink
-    //  wash. We keep the brand pink reserved for actual brand affordances.
+    //  on yellow primary turns bottom bars and sheets into a sickly
+    //  cream wash. We keep the brand yellow reserved for actual brand
+    //  affordances.
     surfaceTint             = Neutral98,
     surfaceBright           = Neutral98,
     surfaceDim              = Neutral87,
@@ -84,7 +91,8 @@ private val LightColorScheme = lightColorScheme(
     outline                 = NeutralVar50,
     outlineVariant          = NeutralVar80,
 
-    // Inverse / scrim
+    // Inverse / scrim — inversePrimary is the brand yellow so the
+    //  light-on-dark snackbar action matches the dark-mode primary.
     inverseSurface          = Neutral20,
     inverseOnSurface        = Neutral95,
     inversePrimary          = Primary80,
@@ -92,13 +100,12 @@ private val LightColorScheme = lightColorScheme(
 )
 
 private val DarkColorScheme = darkColorScheme(
-    // Primary — kept identical to light mode so the brand magenta is the
-    // single, recognisable "Where pink" wherever it appears (buttons,
-    // FABs, links, focus rings). Primary40 stays AA on both white and
-    // dark surfaces (5.6:1 vs ~5.4:1) so onPrimary = Primary100 (white)
-    // works in either scheme.
-    primary                 = Primary40,
-    onPrimary               = Primary100,
+    // Primary — the literal logo yellow (#F9DF4D = Primary80). On a
+    // near-black canvas this reads with the same punch the logo has,
+    // and contrast against onPrimary deep brown is 13.4:1 (AAA). White
+    // text on yellow buttons does NOT work, so onPrimary is Primary10.
+    primary                 = Primary80,
+    onPrimary               = Primary10,
     primaryContainer        = Primary30,
     onPrimaryContainer      = Primary90,
 
@@ -108,7 +115,7 @@ private val DarkColorScheme = darkColorScheme(
     secondaryContainer      = Secondary30,
     onSecondaryContainer    = Secondary90,
 
-    // Tertiary
+    // Tertiary (lifted teal)
     tertiary                = Tertiary80,
     onTertiary              = Tertiary20,
     tertiaryContainer       = Tertiary30,
@@ -120,9 +127,11 @@ private val DarkColorScheme = darkColorScheme(
     errorContainer          = Error30,
     onErrorContainer        = Error90,
 
-    // Background / surface — sits one tone higher than pure black so the
-    // status bar isn't a hole on OLED, while still feeling deep + premium.
-    background              = Neutral6,
+    // Background / surface — the logo sits on pure black, so dark mode
+    // pulls toward true black at the lowest elevation while keeping
+    // surface itself one step up from black so the status bar isn't a
+    // hole on OLED. The brand yellow gets maximum pop against this.
+    background              = Neutral4,
     onBackground            = Neutral90,
     surface                 = Neutral6,
     onSurface               = Neutral90,
@@ -130,11 +139,12 @@ private val DarkColorScheme = darkColorScheme(
     onSurfaceVariant        = NeutralVar80,
 
     // Surface tonal elevations (M3 dark spec). surfaceTint = surface so
-    //  elevation overlays are pure tonal lift, not a pink wash.
+    //  elevation overlays are pure tonal lift, not a yellow wash.
+    //  containerLowest drops to true black to mirror the logo backdrop.
     surfaceTint             = Neutral6,
     surfaceBright           = Neutral24,
-    surfaceDim              = Neutral6,
-    surfaceContainerLowest  = Neutral4,
+    surfaceDim              = Neutral4,
+    surfaceContainerLowest  = Neutral0,
     surfaceContainerLow     = Neutral10,
     surfaceContainer        = Neutral12,
     surfaceContainerHigh    = Neutral17,
@@ -144,8 +154,8 @@ private val DarkColorScheme = darkColorScheme(
     outline                 = NeutralVar60,
     outlineVariant          = NeutralVar30,
 
-    // Inverse / scrim — inversePrimary stays on the brand magenta so the
-    // light-on-dark "snackbar action" colour matches the rest of the app.
+    // Inverse / scrim — inversePrimary uses Primary40 (deep gold) so the
+    //  dark-on-light snackbar action stays AA against an inverted surface.
     inverseSurface          = Neutral90,
     inverseOnSurface        = Neutral20,
     inversePrimary          = Primary40,

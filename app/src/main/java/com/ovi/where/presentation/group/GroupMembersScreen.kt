@@ -58,7 +58,6 @@ fun GroupMembersScreen(
     viewModel: GroupInfoViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
     val currentUserId = viewModel.currentUserId
 
     Scaffold(

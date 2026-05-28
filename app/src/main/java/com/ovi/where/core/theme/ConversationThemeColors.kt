@@ -9,10 +9,12 @@ package com.ovi.where.core.theme
  * This object is now the single source of truth for both Android pickers
  * and the repository default.
  *
- * The palette deliberately starts with the brand magenta so every new
- * conversation opens on-message; the rest of the palette spans the full
- * brand sunset gradient (purple → pink → orange) plus a few neutral
- * accents so users have meaningful choice without leaving the brand.
+ * The palette deliberately starts with the brand yellow so every new
+ * conversation opens on-message; the rest of the palette mirrors the
+ * accent vocabulary used by [AvatarColors] (gold, teal, azure, magenta,
+ * forest, violet, sienna) plus a couple of warm sunset stops drawn from
+ * [BrandGradient] so users have meaningful choice without leaving the
+ * brand system.
  *
  * The server (`server/src/routes/conversations.js`) still inlines the
  * default hex separately — it can't import Kotlin — but that's the only
@@ -25,21 +27,22 @@ object ConversationThemeColors {
      * directly. The first entry is the default — keep [DEFAULT] in sync if
      * you reorder.
      *
-     * Naming follows the brand's gradient language: indigo violet at the
-     * top, drifting through violet / magenta / coral / orange (the full
-     * where_logo_v2 sunburst) and finishing with two cool earth tones for
-     * users who want to mute the chat chrome.
+     * Hexes are picked so the chat chrome (send button, your bubble,
+     * accent strokes) reads with enough contrast against both light and
+     * dark surfaces. Pure brand yellow leads because that's the colour
+     * users associate with the app; the rest of the row gives them a
+     * curated set of accents from the same palette.
      */
     val OPTIONS: List<Pair<String, String>> = listOf(
-        "#6E60CF" to "Indigo",    // brand primary — default
-        "#5B538D" to "Slate",     // brand secondary
-        "#A53D00" to "Sunset",    // brand tertiary
-        "#C2298A" to "Magenta",   // mid-gradient accent
-        "#FF610B" to "Tangerine", // bottom-of-gradient accent
-        "#1976D2" to "Azure",
-        "#006E2C" to "Forest",
-        "#006878" to "Teal",
-        "#8B4513" to "Sienna",
+        "#F9DF4D" to "Canary",    // brand yellow — default
+        "#BD9300" to "Gold",      // deep gold (Primary60)
+        "#DD6500" to "Tangerine", // BrandGradient warm orange
+        "#006B69" to "Teal",      // brand tertiary
+        "#2D6CDF" to "Azure",
+        "#C4407A" to "Magenta",
+        "#007A38" to "Forest",
+        "#6B5BB8" to "Violet",
+        "#B23B23" to "Sienna",
     )
 
     /**
@@ -55,7 +58,7 @@ object ConversationThemeColors {
      * Mirrors `DEFAULT_THEME_COLOR` in `server/src/constants.js` —
      * change in lockstep if the brand palette shifts.
      */
-    const val DEFAULT: String = "#6E60CF"
+    const val DEFAULT: String = "#F9DF4D"
 
     /**
      * Default emoji shortcut used as the per-conversation quick reaction

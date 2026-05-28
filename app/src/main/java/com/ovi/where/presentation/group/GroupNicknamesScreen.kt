@@ -45,7 +45,6 @@ import com.ovi.where.presentation.model.GroupMemberUiModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GroupNicknamesScreen(
-    groupId: String,
     onNavigateBack: () -> Unit,
     viewModel: GroupInfoViewModel = hiltViewModel()
 ) {

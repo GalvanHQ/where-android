@@ -2,19 +2,25 @@
 <resources>
     <!--
         App colours are defined in core/theme/Color.kt and managed entirely
-        by MaterialTheme. The single XML colour below is needed by
-        Theme.SplashScreen, which can't read Compose values.
+        by MaterialTheme. The XML colours below are needed by surfaces
+        that can't read Compose values:
+          - Theme.SplashScreen
+          - Legacy widgets / RemoteViews
+          - Notification accents
 
         splash_background — matches LightColorScheme.background (Neutral98).
-        The android:colorBackground in themes.xml provides the dark-mode
-        counterpart, so users on a dark system don't get a flash of light
-        before Compose paints.
+        splash_background_dark — matches DarkColorScheme.background (Neutral4).
     -->
     <color name="splash_background">#FFFAFAFA</color>
-    <color name="splash_background_dark">#FF121212</color>
+    <color name="splash_background_dark">#FF0D0D0D</color>
 
-    <!-- Brand indigo violet (#6E60CF) — used as the splash icon tint and
-         as a fallback accent in places that can't reference Compose
-         colors (legacy widgets, RemoteViews). -->
-    <color name="brand_primary">#FF6E60CF</color>
+    <!-- Brand yellow (#F9DF4D) — the logo bubble. Used as the splash
+         icon tint and as a fallback accent in places that can't
+         reference Compose colors. Matches Primary80 / BrandYellow. -->
+    <color name="brand_primary">#FFF9DF4D</color>
+
+    <!-- Deep gold variant (Primary40) — for any surface that needs the
+         brand on a *light* background where contrast matters
+         (notification icons on white, monochrome legacy widgets). -->
+    <color name="brand_primary_dark">#FF7E5C00</color>
 </resources>

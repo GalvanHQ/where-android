@@ -508,10 +508,10 @@ fun WhereTopAppBar(
         actions = { actions() },
         scrollBehavior = scrollBehavior,
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor              = MaterialTheme.colorScheme.surface,
-            titleContentColor           = MaterialTheme.colorScheme.onSurface,
-            navigationIconContentColor  = MaterialTheme.colorScheme.onSurface,
-            actionIconContentColor      = MaterialTheme.colorScheme.onSurfaceVariant
+            containerColor              = MaterialTheme.colorScheme.background,
+            titleContentColor           = MaterialTheme.colorScheme.onBackground,
+            navigationIconContentColor  = MaterialTheme.colorScheme.onBackground,
+            actionIconContentColor      = MaterialTheme.colorScheme.onBackground
         )
     )
 }

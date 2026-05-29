@@ -37,37 +37,37 @@ enum class NotificationSound(
         id = "where_chat",
         rawRes = R.raw.where_chat,
         displayName = "Where Chat",
-        description = "Bright two-note ping for new messages"
+        description = "The warm Where signature — a friendly mallet rise"
     ),
     Mention(
         id = "where_mention",
         rawRes = R.raw.where_mention,
         displayName = "Where Mention",
-        description = "Layered chime — designed to grab attention"
+        description = "The signature plus a bright answering note for @mentions"
     ),
     Friend(
         id = "where_friend",
         rawRes = R.raw.where_friend,
         displayName = "Where Friend",
-        description = "Soft major-third chord for friend activity"
+        description = "Warm major arpeggio for friend activity"
     ),
     Meetup(
         id = "where_meetup",
         rawRes = R.raw.where_meetup,
         displayName = "Where Meetup",
-        description = "Ascending arpeggio for meetup events and arrivals"
+        description = "Celebratory ascending run for meetups and arrivals"
     ),
     Location(
         id = "where_location",
         rawRes = R.raw.where_location,
         displayName = "Where Location",
-        description = "Quiet pulse for live-location updates"
+        description = "A soft water-drop for live-location updates"
     ),
     General(
         id = "where_general",
         rawRes = R.raw.where_general,
         displayName = "Where General",
-        description = "Classic two-note ping"
+        description = "A single warm note — the signature's tail"
     ),
     Silent(
         id = "silent",

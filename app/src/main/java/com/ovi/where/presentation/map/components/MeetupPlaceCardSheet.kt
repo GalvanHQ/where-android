@@ -142,19 +142,19 @@ fun MeetupPlaceCardSheet(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(Dimens.iconSizeXLarge)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                        .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.14f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Flag,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(Dimens.spaceMedium))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = if (!groupName.isNullOrBlank()) {
@@ -162,17 +162,17 @@ fun MeetupPlaceCardSheet(
                         } else {
                             "MEETUP POINT"
                         },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 1.2.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = destination.name.ifBlank { "Meetup point" },
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
@@ -180,7 +180,7 @@ fun MeetupPlaceCardSheet(
                     if (destination.address.isNotBlank()) {
                         Text(
                             text = destination.address,
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -256,15 +256,15 @@ fun MeetupPlaceCardSheet(
                     onClick = onShowOnMap,
                     modifier = Modifier
                         .weight(1f)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(16.dp),
+                        .height(Dimens.buttonHeight),
+                    shape = RoundedCornerShape(Dimens.cornerMedium),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                         contentColor = MaterialTheme.colorScheme.onSurface
                     )
                 ) {
-                    Icon(imageVector = ImageVector.vectorResource(id = R.drawable.map), null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
+                    Icon(imageVector = ImageVector.vectorResource(id = R.drawable.map), null, Modifier.size(Dimens.iconSizeSmall))
+                    Spacer(Modifier.width(Dimens.spaceMedium))
                     Text(
                         "Show on map",
                         style = MaterialTheme.typography.titleSmall,
@@ -275,18 +275,18 @@ fun MeetupPlaceCardSheet(
                     onClick = onGetDirections,
                     modifier = Modifier
                         .weight(1f)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(16.dp),
+                        .height(Dimens.buttonHeight),
+                    shape = RoundedCornerShape(Dimens.cornerMedium),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
-                    Icon(Icons.Rounded.DirectionsCar, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
+                    Icon(Icons.Rounded.DirectionsCar, null, Modifier.size(Dimens.iconSizeSmall))
+                    Spacer(Modifier.width(Dimens.spaceMedium))
                     Text(
                         "Directions",
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.ExtraBold
                     )
                 }
             }
@@ -312,8 +312,8 @@ fun MeetupPlaceCardSheet(
                         onClick = if (isCreator) onClear else onCantMakeIt,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(16.dp),
+                            .height(Dimens.buttonHeightSmall),
+                        shape = RoundedCornerShape(Dimens.cornerMedium),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                             contentColor = MaterialTheme.colorScheme.error
@@ -322,9 +322,9 @@ fun MeetupPlaceCardSheet(
                         Icon(
                             imageVector = if (isCreator) Icons.Rounded.Delete else Icons.Rounded.Block,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(Dimens.iconSizeSmall)
                         )
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(Dimens.spaceMedium))
                         Text(
                             if (isCreator) "Clear meetup" else "I can't make it",
                             style = MaterialTheme.typography.titleSmall,
@@ -349,13 +349,13 @@ private fun ParticipantsSection(participants: List<MeetupParticipantUiModel>) {
     Column {
         Text(
             text = "PARTICIPANTS · ${participants.size}",
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 1.2.sp,
             modifier = Modifier.padding(horizontal = Dimens.spaceLarge + 4.dp)
         )
-        Spacer(Modifier.height(Dimens.spaceSmall))
+        Spacer(Modifier.height(Dimens.spaceMedium))
         // Cap the list height so it doesn't dominate the sheet on big groups.
         val listHeight = (participants.size.coerceAtMost(5) * 64).dp
         LazyColumn(
@@ -363,7 +363,7 @@ private fun ParticipantsSection(participants: List<MeetupParticipantUiModel>) {
                 .fillMaxWidth()
                 .heightIn(min = 0.dp, max = listHeight)
                 .padding(horizontal = Dimens.spaceLarge),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
         ) {
             items(participants, key = { it.userId }) { participant ->
                 ParticipantRow(participant = participant)
@@ -376,20 +376,20 @@ private fun ParticipantsSection(participants: List<MeetupParticipantUiModel>) {
 private fun ParticipantRow(participant: MeetupParticipantUiModel) {
     val context = LocalContext.current
     Surface(
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(Dimens.cornerLarge),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = Dimens.spaceMedium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Avatar with subtle de-saturation when inactive
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(Dimens.iconSizeXLarge)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 if (!participant.photoUrl.isNullOrBlank()) {
@@ -416,34 +416,34 @@ private fun ParticipantRow(participant: MeetupParticipantUiModel) {
                     Icon(
                         imageVector = Icons.Rounded.Person,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
                 }
             }
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(Dimens.spaceMedium))
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = if (participant.isYou) "You" else participant.displayName,
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     if (participant.isCreator) {
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(Dimens.spaceMedium))
                         Surface(
                             shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f)
                         ) {
                             Text(
                                 text = "Host",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.tertiary,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = 2.dp)
                             )
                         }
                     }
@@ -532,7 +532,7 @@ private fun HeroMap(
 
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(Dimens.cornerLarge),
         tonalElevation = 1.dp,
         border = BorderStroke(
             width = 0.5.dp,
@@ -542,7 +542,7 @@ private fun HeroMap(
         GoogleMap(
             modifier = Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(20.dp)),
+                .clip(RoundedCornerShape(Dimens.cornerLarge)),
             cameraPositionState = cameraPositionState,
             mapColorScheme = ComposeMapColorScheme.FOLLOW_SYSTEM,
             properties = MapProperties(mapType = MapType.NORMAL, isMyLocationEnabled = false),
@@ -578,39 +578,39 @@ private fun MetricCard(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(Dimens.cornerLarge),
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = Dimens.spaceMedium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                    .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.size(16.dp)
                 )
             }
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(Dimens.spaceMedium))
             Column {
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.SemiBold
                 )
                 Text(
                     text = value,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
@@ -637,37 +637,37 @@ private fun YourStatusCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = Dimens.spaceLarge)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(Dimens.cornerLarge))
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(Dimens.cornerLarge),
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = Dimens.spaceMedium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                    .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Edit,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.size(18.dp)
                 )
             }
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(Dimens.spaceMedium))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "YOUR STATUS",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.2.sp
                 )
                 Text(
                     text = if (note.isBlank()) "Tap to set a custom status" else note,

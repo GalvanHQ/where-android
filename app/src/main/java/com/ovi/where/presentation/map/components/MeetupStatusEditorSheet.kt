@@ -108,30 +108,30 @@ fun MeetupStatusEditorSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(Dimens.iconSizeXLarge)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                        .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.14f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Edit,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(Dimens.spaceMedium))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "YOUR MEETUP STATUS",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 1.2.sp
                     )
                     Text(
                         text = "Let the group know what's happening",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -167,18 +167,18 @@ fun MeetupStatusEditorSheet(
             )
 
             // ── Suggested chips ──────────────────────────────────────────
-            Spacer(Modifier.height(Dimens.spaceMedium))
+            Spacer(Modifier.height(Dimens.spaceLarge))
             Text(
                 text = "QUICK PICKS",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.2.sp
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Dimens.spaceMedium))
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
             ) {
                 SUGGESTED_NOTES.forEach { phrase ->
                     SuggestionChip(
@@ -199,7 +199,7 @@ fun MeetupStatusEditorSheet(
                 if (initialNote.isNotBlank()) {
                     TextButton(
                         onClick = onClear,
-                        modifier = Modifier.height(52.dp)
+                        modifier = Modifier.height(Dimens.buttonHeight)
                     ) {
                         Text(
                             "Clear",
@@ -214,9 +214,9 @@ fun MeetupStatusEditorSheet(
                     },
                     modifier = Modifier
                         .weight(1f)
-                        .height(52.dp),
+                        .height(Dimens.buttonHeight),
                     enabled = draft.trim() != initialNote.trim(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(Dimens.cornerMedium),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     )
@@ -224,7 +224,7 @@ fun MeetupStatusEditorSheet(
                     Text(
                         if (draft.isBlank()) "Save (no status)" else "Save",
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.ExtraBold
                     )
                 }
             }
@@ -244,19 +244,22 @@ private fun SuggestionChip(
             .clip(RoundedCornerShape(50))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(50),
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+        color = if (selected) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f)
         else MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = if (selected) androidx.compose.foundation.BorderStroke(
+            1.dp, MaterialTheme.colorScheme.tertiary
+        ) else null,
         tonalElevation = if (selected) 0.dp else 1.dp
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (selected) MaterialTheme.colorScheme.primary
+            style = MaterialTheme.typography.labelLarge,
+            color = if (selected) MaterialTheme.colorScheme.tertiary
             else MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+            modifier = Modifier.padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceMedium)
         )
     }
 }

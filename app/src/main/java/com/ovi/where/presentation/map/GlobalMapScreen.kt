@@ -53,7 +53,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -63,6 +62,7 @@ import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Schedule
@@ -148,6 +148,7 @@ import com.ovi.where.R
 import com.ovi.where.core.notification.activeMapTracker
 import com.ovi.where.core.theme.AvatarColors
 import com.ovi.where.core.theme.Dimens
+import com.ovi.where.core.theme.LocationActive
 import com.ovi.where.core.utils.LocationUtils
 import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.map.components.DestinationPinMarker
@@ -842,10 +843,11 @@ fun GlobalMapScreen(
                         // scroll horizontally rather than clipping the
                         // notification chip off the right edge.
                         .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Group filter chip — same chip language as the meetup chip.
+                    // Group filter chip — white pill, soft shadow, no border,
+                    // bare leading glyph + bold label + dropdown chevron.
                     Surface(
                         modifier = Modifier
                             .height(40.dp)
@@ -853,42 +855,48 @@ fun GlobalMapScreen(
                             .clickable { viewModel.showGroupPicker(true) },
                         shape = RoundedCornerShape(50),
                         color = MaterialTheme.colorScheme.surface,
-                        shadowElevation = 2.dp,
-                        tonalElevation = 2.dp,
-                        border = androidx.compose.foundation.BorderStroke(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        shadowElevation = 8.dp,
+                        tonalElevation = 1.dp
                     ) {
                         Row(
-                            modifier = Modifier.padding(start = 6.dp, end = 10.dp),
+                            modifier = Modifier.padding(start = 12.dp, end = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Compact 28dp avatar — matches the meetup chip's
-                            // active-state inset bubble for visual rhythm.
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                FilterPillAvatar(filter = uiState.activeGroupFilter)
+                            val activeFilter = uiState.activeGroupFilter
+                            if (activeFilter == null) {
+                                // Default "All Friends" — bare warm people glyph.
+                                Icon(
+                                    imageVector = ImageVector.vectorResource(id = R.drawable.people_outlined),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            } else {
+                                // Specific group / friend — show their avatar.
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    FilterPillAvatar(filter = activeFilter)
+                                }
                             }
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = uiState.activeGroupFilter?.name ?: "All Friends",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
+                                text = activeFilter?.name ?: "All Friends",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.widthIn(max = 110.dp)
                             )
-                            Spacer(Modifier.width(4.dp))
                             Icon(
-                                Icons.Default.ArrowDropDown,
-                                null,
-                                modifier = Modifier.size(18.dp),
+                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -965,10 +973,11 @@ fun GlobalMapScreen(
                                 modifier = Modifier.size(Dimens.iconSizeMedium),
                                 tint = MaterialTheme.colorScheme.onErrorContainer
                             )
-                            Spacer(Modifier.width(Dimens.spaceSmall))
+                            Spacer(Modifier.width(Dimens.spaceMedium))
                             Text(
                                 text = "Location is turned off",
-                                style = MaterialTheme.typography.labelSmall,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onErrorContainer,
                                 modifier = Modifier.weight(1f)
                             )
@@ -977,7 +986,8 @@ fun GlobalMapScreen(
                             }) {
                                 Text(
                                     text = "Enable",
-                                    style = MaterialTheme.typography.labelSmall,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.ExtraBold,
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
@@ -1059,7 +1069,7 @@ fun GlobalMapScreen(
                             )
                         },
                         containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
                         shape = CircleShape,
                         elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(
                             defaultElevation = 6.dp,
@@ -1376,7 +1386,7 @@ fun GlobalMapScreen(
                 Text(
                     text = "You",
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.ExtraBold
                 )
 
                 Spacer(Modifier.height(Dimens.spaceSmall))
@@ -1396,7 +1406,7 @@ fun GlobalMapScreen(
                 if (uiState.isSharing) {
                     Surface(
                         shape = MaterialTheme.shapes.small,
-                        color = MaterialTheme.colorScheme.tertiaryContainer
+                        color = LocationActive.copy(alpha = 0.14f)
                     ) {
                         Row(
                             modifier = Modifier.padding(
@@ -1410,7 +1420,8 @@ fun GlobalMapScreen(
                             Text(
                                 text = "Sharing live",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                                fontWeight = FontWeight.SemiBold,
+                                color = LocationActive
                             )
                         }
                     }
@@ -1602,13 +1613,14 @@ private fun SheetBackButton(onClick: () -> Unit) {
         onClick = onClick,
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier.size(40.dp)
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.size(Dimens.iconSizeXLarge)
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(Dimens.iconSizeSmall),
                 tint = MaterialTheme.colorScheme.onSurface
             )
         }
@@ -1649,21 +1661,27 @@ private fun HomeSheetContent(
             .padding(bottom = 24.dp)
             .heightIn(min = 160.dp, max = 660.dp)
     ) {
-        // ── Two-pill toggle ───────────────────────────────────────────────────
+        // ── Segmented toggle ──────────────────────────────────────────────────
+        // Both tabs live inside a single pale track pill. The selected
+        // segment fills with brand gold and lifts on a soft shadow; the
+        // other stays transparent so the track shows through.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceSmall)
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                .padding(Dimens.spaceSmall),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
         ) {
-            HomeTabPill(
+            HomeTabSegment(
                 label = "Friends sharing",
                 count = friends.size,
                 selected = homeTab == MapHomeTab.Friends,
                 modifier = Modifier.weight(1f),
                 onClick = { onTabChange(MapHomeTab.Friends) }
             )
-            HomeTabPill(
+            HomeTabSegment(
                 label = "My shares",
                 count = sharingTargetIds.size,
                 selected = homeTab == MapHomeTab.MyShares,
@@ -1673,7 +1691,7 @@ private fun HomeSheetContent(
             )
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(Dimens.spaceMedium))
 
         AnimatedContent(
             targetState = homeTab,
@@ -1719,8 +1737,14 @@ private fun HomeSheetContent(
     }
 }
 
+/**
+ * One segment of the home segmented control. Selected = filled brand gold
+ * on a soft shadow; unselected = transparent so the pale track shows
+ * through. A bold label carries it; "My shares" gets a live dot when the
+ * user is actively sharing.
+ */
 @Composable
-private fun HomeTabPill(
+private fun HomeTabSegment(
     label: String,
     count: Int,
     selected: Boolean,
@@ -1730,49 +1754,76 @@ private fun HomeTabPill(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(50),
+        color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimary
-        else MaterialTheme.colorScheme.onSurface,
-        modifier = modifier.height(40.dp)
+        else MaterialTheme.colorScheme.onSurfaceVariant,
+        shadowElevation = if (selected) 3.dp else 0.dp,
+        modifier = modifier.height(38.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp),
+                .padding(horizontal = Dimens.spaceMedium),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
             if (showLiveDot) {
                 SharingPulseDot()
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(Dimens.spaceSmall))
             }
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false)
             )
             if (count > 0) {
-                Spacer(Modifier.width(6.dp))
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (selected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.22f)
-                    else MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = if (selected) MaterialTheme.colorScheme.onPrimary
-                    else MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
-                    Text(
-                        text = "$count",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
-                    )
-                }
+                Spacer(Modifier.width(Dimens.spaceSmall))
+                Text(
+                    text = "$count",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (selected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f)
+                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                )
             }
+        }
+    }
+}
+
+/**
+ * Strong, consistent section header for the map sheet. A short ExtraBold
+ * title carries the hierarchy; an optional caption gives quiet context.
+ * Replaces the old weak full-sentence titleSmall headers so the sheet
+ * reads with a clear type rhythm instead of flat body text.
+ */
+@Composable
+private fun MapSectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    caption: String? = null
+) {
+    Column(
+        modifier = modifier.padding(
+            horizontal = Dimens.spaceXLarge,
+            vertical = Dimens.spaceSmall
+        )
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.ExtraBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        if (!caption.isNullOrBlank()) {
+            Text(
+                text = caption,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -1802,38 +1853,35 @@ private fun FriendsTabContent(
         }
 
         // ── Section header ────────────────────────────────────────────────────────
-        Text(
-            text = "${friends.size} ${if (friends.size == 1) "friend is" else "friends are"} sharing their location with you",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+        MapSectionHeader(
+            title = if (friends.size == 1) "1 friend nearby" else "${friends.size} friends nearby",
+            caption = "Sharing their live location with you"
         )
 
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(Dimens.spaceMedium))
         androidx.compose.foundation.lazy.LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(horizontal = Dimens.spaceLarge),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
         ) {
             items(items = friends, key = { "avatar-${it.userId}" }) { friend ->
                 FriendAvatarPeek(friend = friend, onClick = { onFriendClick(friend) })
             }
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(Dimens.spaceLarge))
         androidx.compose.material3.HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 20.dp),
+            modifier = Modifier.padding(horizontal = Dimens.spaceXLarge),
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
         )
 
         LazyColumn(
             contentPadding = PaddingValues(
-                start = 12.dp,
-                end = 12.dp,
-                top = 12.dp,
-                bottom = bottomReservedSpace + 16.dp
+                start = Dimens.spaceMedium,
+                end = Dimens.spaceMedium,
+                top = Dimens.spaceLarge,
+                bottom = bottomReservedSpace + Dimens.spaceLarge
             ),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
         ) {
             items(items = friends, key = { "card-${it.userId}" }) { friend ->
                 FriendCard(
@@ -1874,53 +1922,53 @@ private fun MySharesTabContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                    .padding(horizontal = Dimens.spaceXLarge, vertical = Dimens.spaceLarge),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(72.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                        .background(LocationActive.copy(alpha = 0.14f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.LocationOn,
                         null,
-                        modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        modifier = Modifier.size(Dimens.iconSizeLarge),
+                        tint = LocationActive
                     )
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(Dimens.spaceLarge))
                 Text(
                     "You're not sharing yet",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(Dimens.spaceSmall))
                 Text(
                     "Pick friends or groups to share your live location with.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(Dimens.spaceXLarge))
                 Button(
                     onClick = onAddShare,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp),
-                    shape = RoundedCornerShape(14.dp)
+                        .height(Dimens.buttonHeightSmall),
+                    shape = RoundedCornerShape(Dimens.cornerMedium)
                 ) {
                     Icon(
                         imageVector = ImageVector.vectorResource(id = R.drawable.location_arrow),
                         null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(Dimens.iconSizeSmall)
                     )
-                    Spacer(Modifier.width(6.dp))
-                    Text("Share location", fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(Dimens.spaceMedium))
+                    Text("Share location", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold)
                 }
                 Spacer(Modifier.height(bottomReservedSpace))
             }
@@ -1928,23 +1976,20 @@ private fun MySharesTabContent(
         }
 
         // ── Section header ────────────────────────────────────────────────────────
-        Text(
-            text = "You're sharing your live location with ${active.size} ${if (active.size == 1) "recipient" else "recipients"}",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+        MapSectionHeader(
+            title = if (active.size == 1) "Sharing with 1 place" else "Sharing with ${active.size} places",
+            caption = "Your live location is on for these recipients"
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(Dimens.spaceSmall))
 
         LazyColumn(
             contentPadding = PaddingValues(
-                start = 12.dp,
-                end = 12.dp,
-                top = 4.dp,
-                bottom = 12.dp
+                start = Dimens.spaceMedium,
+                end = Dimens.spaceMedium,
+                top = Dimens.spaceSmall,
+                bottom = Dimens.spaceLarge
             ),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceMedium),
             modifier = Modifier.heightIn(max = 380.dp)
         ) {
             items(active, key = { "active-${it.id}" }) { target ->
@@ -1965,41 +2010,41 @@ private fun MySharesTabContent(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = Dimens.spaceLarge),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
         ) {
             OutlinedButton(
                 onClick = onAddShare,
                 modifier = Modifier
                     .weight(1f)
-                    .height(48.dp),
-                shape = RoundedCornerShape(14.dp)
+                    .height(Dimens.buttonHeightSmall),
+                shape = RoundedCornerShape(Dimens.cornerMedium)
             ) {
                 Icon(
                     imageVector = ImageVector.vectorResource(id = R.drawable.location_arrow),
                     null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(Dimens.iconSizeSmall)
                 )
-                Spacer(Modifier.width(6.dp))
-                Text("Share more", style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.width(Dimens.spaceMedium))
+                Text("Share more", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             }
             Button(
                 onClick = onStopAll,
                 modifier = Modifier
                     .weight(1f)
-                    .height(48.dp),
-                shape = RoundedCornerShape(14.dp),
+                    .height(Dimens.buttonHeightSmall),
+                shape = RoundedCornerShape(Dimens.cornerMedium),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer,
                     contentColor = MaterialTheme.colorScheme.onErrorContainer
                 )
             ) {
-                Icon(Icons.Rounded.Stop, null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
+                Icon(Icons.Rounded.Stop, null, modifier = Modifier.size(Dimens.iconSizeSmall))
+                Spacer(Modifier.width(Dimens.spaceMedium))
                 Text(
                     "Stop all",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.ExtraBold
                 )
             }
         }
@@ -2017,35 +2062,35 @@ private fun TabEmptyState(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 24.dp),
+            .padding(horizontal = Dimens.spaceXLarge, vertical = Dimens.spaceXLarge),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
-                .size(56.dp)
+                .size(72.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 icon,
                 null,
-                modifier = Modifier.size(28.dp),
+                modifier = Modifier.size(Dimens.iconSizeLarge),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(Dimens.spaceLarge))
         Text(
             title,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.ExtraBold,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(Dimens.spaceSmall))
         Text(
             subtitle,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
@@ -2130,7 +2175,7 @@ private fun FriendDetailSheetContent(
                         .uppercase()
                         .ifEmpty { "?" },
                     style = MaterialTheme.typography.displaySmall,
-                    color = MaterialTheme.colorScheme.surface
+                    color = avatarContentColorFor(color)
                 )
             }
         }
@@ -2140,7 +2185,8 @@ private fun FriendDetailSheetContent(
         Text(
             text = friend.displayName,
             style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.ExtraBold,
+            color = MaterialTheme.colorScheme.onSurface
         )
         if (friend.username.isNotEmpty()) {
             Text(
@@ -2160,8 +2206,8 @@ private fun FriendDetailSheetContent(
                 Text(
                     text = "Sharing live${if (friend.groupName.isNotEmpty()) " • ${friend.groupName}" else ""}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.tertiary,
-                    fontWeight = FontWeight.Medium
+                    color = LocationActive,
+                    fontWeight = FontWeight.SemiBold
                 )
             } else {
                 Icon(
@@ -2187,25 +2233,29 @@ private fun FriendDetailSheetContent(
         ) {
             Button(
                 onClick = onMessage,
-                modifier = Modifier.weight(1f),
-                shape = MaterialTheme.shapes.medium
+                modifier = Modifier
+                    .weight(1f)
+                    .height(Dimens.buttonHeightSmall),
+                shape = RoundedCornerShape(Dimens.cornerMedium)
             ) {
                 Icon(
                     Icons.Default.ChatBubbleOutline,
                     null,
-                    modifier = Modifier.size(Dimens.iconSizeMedium)
+                    modifier = Modifier.size(Dimens.iconSizeSmall)
                 )
-                Spacer(Modifier.width(Dimens.spaceSmall))
-                Text("Message")
+                Spacer(Modifier.width(Dimens.spaceMedium))
+                Text("Message", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold)
             }
             OutlinedButton(
                 onClick = onNavigateToUserProfile,
-                modifier = Modifier.weight(1f),
-                shape = MaterialTheme.shapes.medium
+                modifier = Modifier
+                    .weight(1f)
+                    .height(Dimens.buttonHeightSmall),
+                shape = RoundedCornerShape(Dimens.cornerMedium)
             ) {
-                Icon(Icons.Default.Person, null, modifier = Modifier.size(Dimens.iconSizeMedium))
-                Spacer(Modifier.width(Dimens.spaceSmall))
-                Text("Profile")
+                Icon(Icons.Default.Person, null, modifier = Modifier.size(Dimens.iconSizeSmall))
+                Spacer(Modifier.width(Dimens.spaceMedium))
+                Text("Profile", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             }
         }
 
@@ -2292,14 +2342,14 @@ private fun FilterPillAvatar(filter: GroupFilter?) {
                             .ifEmpty { "?" },
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.surface
+                        color = avatarContentColorFor(color)
                     )
                 } else {
                     Icon(
                         Icons.Default.Groups,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.surface
+                        tint = avatarContentColorFor(color)
                     )
                 }
             }
@@ -2373,7 +2423,7 @@ private fun FriendAvatarPeek(
                             .ifEmpty { "?" },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.surface
+                        color = avatarContentColorFor(color)
                     )
                 }
             }
@@ -2386,7 +2436,7 @@ private fun FriendAvatarPeek(
                         .background(MaterialTheme.colorScheme.surface)
                         .padding(2.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.tertiary)
+                        .background(LocationActive)
                 )
             }
         }
@@ -2446,12 +2496,12 @@ private fun FriendCard(
 
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f),
+        shape = RoundedCornerShape(Dimens.cornerLarge),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = Dimens.spaceMedium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(contentAlignment = Alignment.BottomEnd) {
@@ -2481,7 +2531,7 @@ private fun FriendCard(
                                 .ifEmpty { "?" },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.surface
+                            color = avatarContentColorFor(color)
                         )
                     }
                 }
@@ -2494,7 +2544,7 @@ private fun FriendCard(
                             .background(MaterialTheme.colorScheme.surface)
                             .padding(2.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.tertiary)
+                            .background(LocationActive)
                     )
                 }
             }
@@ -2504,14 +2554,14 @@ private fun FriendCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = friend.displayName,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.height(Dimens.spaceSmall))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (hasMyLocation && friend.latitude != 0.0 && friend.longitude != 0.0) {
@@ -2523,60 +2573,60 @@ private fun FriendCard(
                         )
 
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                            shape = RoundedCornerShape(Dimens.cornerSmall),
+                            color = MaterialTheme.colorScheme.primaryContainer
                         ) {
                             Text(
                                 text = LocationUtils.formatDistance(context, distance),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = 3.dp)
                             )
                         }
 
                         friend.etaText?.let { eta ->
-                            Spacer(Modifier.width(6.dp))
+                            Spacer(Modifier.width(Dimens.spaceSmall))
 
                             Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
+                                shape = RoundedCornerShape(Dimens.cornerSmall),
+                                color = MaterialTheme.colorScheme.tertiaryContainer
                             ) {
                                 Text(
                                     text = "~$eta",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = 3.dp)
                                 )
                             }
                         }
 
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(Dimens.spaceSmall))
                     }
 
                     Text(
                         text = friend.timeAgo.ifEmpty { "Just now" },
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1
                     )
                 }
             }
 
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Dimens.spaceMedium))
 
             Surface(
                 onClick = onShowOnMap,
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(Dimens.iconSizeXLarge)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = ImageVector.vectorResource(id = R.drawable.navigate_to),
                         contentDescription = "Show ${friend.displayName} on map",
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(Dimens.iconSizeSmall),
                         tint = MaterialTheme.colorScheme.onPrimary
                     )
                 }
@@ -2593,12 +2643,15 @@ private fun SharingPulseDot() {
         animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
         label = "pulse_scale"
     )
+    // LocationActive (warm orange) is the brand's dedicated "alive / sharing
+    // now" accent — it reads as energy and stays distinct from the yellow
+    // primary and teal tertiary so a live pulse never looks like a button.
     Box(
         modifier = Modifier
             .size(8.dp)
             .scale(scale)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.tertiary)
+            .background(LocationActive)
     )
 }
 
@@ -2615,10 +2668,11 @@ private fun GroupFilterSheet(
             .padding(Dimens.spaceXLarge)
             .navigationBarsPadding()
     ) {
-        Text("Filter by", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text("Filter by", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+        Spacer(Modifier.height(Dimens.spaceXSmall))
         Text(
             text = "Show locations from a group or specific friend",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(Dimens.spaceLarge))
@@ -2673,11 +2727,11 @@ private fun GroupFilterSheet(
 private fun FilterSectionHeader(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.SemiBold,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.ExtraBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        letterSpacing = 1.sp,
-        modifier = Modifier.padding(start = Dimens.spaceMedium, top = 12.dp, bottom = 4.dp)
+        letterSpacing = 1.2.sp,
+        modifier = Modifier.padding(start = Dimens.spaceMedium, top = Dimens.spaceMedium, bottom = Dimens.spaceSmall)
     )
 }
 
@@ -2690,7 +2744,7 @@ private fun FilterRow(
 ) {
     Surface(
         onClick = onClick,
-        shape = MaterialTheme.shapes.large,
+        shape = RoundedCornerShape(Dimens.cornerLarge),
         color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
     ) {
         Row(
@@ -2704,8 +2758,8 @@ private fun FilterRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -2716,7 +2770,7 @@ private fun FilterRow(
                         filter.isDirect -> "Direct share"
                         else -> "Group"
                     },
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -2741,28 +2795,28 @@ private fun ActiveShareRow(
     onOpenMeetupCard: () -> Unit = {}
 ) {
     Surface(
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(Dimens.cornerLarge),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = Dimens.spaceMedium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             FilterPillAvatar(filter = target)
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(Dimens.spaceMedium))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     target.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     SharingPulseDot()
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(Dimens.spaceMedium))
                     val typeLabel = if (target.isDirect) "Direct" else "Group"
                     // Meetup-owned shares auto-stop on arrival; the timer is
                     // only a safety ceiling. Show the lifecycle, not the
@@ -2775,7 +2829,7 @@ private fun ActiveShareRow(
                     Text(
                         text = "$typeLabel • $timerLabel",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.tertiary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -2793,13 +2847,13 @@ private fun ActiveShareRow(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(Dimens.iconSizeXLarge)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Filled.Flag,
                             contentDescription = "Open meetup card to clear meetup",
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(Dimens.iconSizeSmall)
                         )
                     }
                 }
@@ -2809,13 +2863,13 @@ private fun ActiveShareRow(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.errorContainer,
                     contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(Dimens.iconSizeXLarge)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             Icons.Rounded.Stop,
                             contentDescription = "Stop sharing with ${target.name}",
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(Dimens.iconSizeSmall)
                         )
                     }
                 }
@@ -2862,48 +2916,48 @@ private fun ShareTargetSheet(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .padding(horizontal = Dimens.spaceXLarge, vertical = Dimens.spaceLarge)
     ) {
         // ── Header with back button ───────────────────────────────────────────
         Row(verticalAlignment = Alignment.CenterVertically) {
             SheetBackButton(onCancel)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Dimens.spaceMedium))
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(Dimens.iconSizeXLarge)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                    .background(LocationActive.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.LocationOn,
                     contentDescription = null,
                     modifier = Modifier.size(22.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = LocationActive
                 )
             }
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(Dimens.spaceMedium))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     "Share live location",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold
                 )
                 Text(
                     text = if (selectedIds.isEmpty()) "Pick friends or groups"
                     else "${selectedIds.size} selected",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             if (selectedIds.isNotEmpty()) {
                 TextButton(onClick = { selectedIds.clear() }) {
-                    Text("Clear")
+                    Text("Clear", fontWeight = FontWeight.SemiBold)
                 }
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(Dimens.spaceLarge))
 
         if (targets.isEmpty()) {
             ShareEmptyState(
@@ -2918,8 +2972,8 @@ private fun ShareTargetSheet(
         // ── Selected chips row (only visible when something is selected) ──────
         if (selectedIds.isNotEmpty()) {
             androidx.compose.foundation.lazy.LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 2.dp)
+                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium),
+                contentPadding = PaddingValues(horizontal = Dimens.spaceXSmall)
             ) {
                 items(
                     items = selectedIds.mapNotNull { id -> targets.firstOrNull { it.id == id } },
@@ -2931,13 +2985,13 @@ private fun ShareTargetSheet(
                     )
                 }
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(Dimens.spaceLarge))
         }
 
         // ── Friends section ───────────────────────────────────────────────────
         LazyColumn(
             modifier = Modifier.heightIn(max = 360.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall)
         ) {
             if (visibleDirect.isNotEmpty()) {
                 item { ShareSectionHeader("FRIENDS") }
@@ -2967,20 +3021,20 @@ private fun ShareTargetSheet(
             }
         }
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(Dimens.spaceXLarge))
 
         // ── Duration ──────────────────────────────────────────────────────────
         Text(
             "DURATION",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.ExtraBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            letterSpacing = 1.sp
+            letterSpacing = 1.2.sp
         )
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(Dimens.spaceMedium))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
         ) {
             DurationSegment(
                 "15m",
@@ -3008,15 +3062,15 @@ private fun ShareTargetSheet(
                     Icon(
                         Icons.Rounded.LocationOn,
                         contentDescription = null,
-                        modifier = Modifier.size(36.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        modifier = Modifier.size(Dimens.iconSizeLarge),
+                        tint = LocationActive
                     )
                 },
                 title = {
                     Text(
                         "Share until you stop?",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.ExtraBold
                     )
                 },
                 text = {
@@ -3050,7 +3104,7 @@ private fun ShareTargetSheet(
             )
         }
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(Dimens.spaceXLarge))
 
         // ── Start button ──────────────────────────────────────────────────────
         Button(
@@ -3060,8 +3114,8 @@ private fun ShareTargetSheet(
             enabled = selectedIds.isNotEmpty(),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp),
-            shape = RoundedCornerShape(16.dp),
+                .height(Dimens.buttonHeight),
+            shape = RoundedCornerShape(Dimens.cornerMedium),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary
             )
@@ -3069,18 +3123,18 @@ private fun ShareTargetSheet(
             Icon(
                 imageVector = ImageVector.vectorResource(id = R.drawable.location_arrow),
                 contentDescription = null,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(Dimens.iconSizeSmall)
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Dimens.spaceMedium))
             Text(
                 text = if (selectedIds.isEmpty()) "Pick someone to share with"
                 else "Share with ${selectedIds.size}",
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.ExtraBold
             )
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(Dimens.spaceMedium))
         Spacer(Modifier.height(bottomReservedSpace))
     }
 }
@@ -3094,12 +3148,12 @@ private fun ShareEmptyState(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 12.dp),
+            .padding(horizontal = Dimens.spaceSmall, vertical = Dimens.spaceLarge),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
-                .size(64.dp)
+                .size(72.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center
@@ -3107,60 +3161,60 @@ private fun ShareEmptyState(
             Icon(
                 Icons.Default.Groups,
                 contentDescription = null,
-                modifier = Modifier.size(30.dp),
+                modifier = Modifier.size(Dimens.iconSizeLarge),
                 tint = MaterialTheme.colorScheme.primary
             )
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(Dimens.spaceLarge))
         Text(
             "No one to share with yet",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.ExtraBold,
             color = MaterialTheme.colorScheme.onSurface
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(Dimens.spaceSmall))
         Text(
             "Add friends or create / join a group to start sharing your live location.",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier.padding(horizontal = Dimens.spaceLarge)
         )
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(Dimens.spaceXLarge))
 
         // Primary action — most likely path is adding friends (DM share).
         Button(
             onClick = onAddFriends,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp),
-            shape = RoundedCornerShape(16.dp),
+                .height(Dimens.buttonHeight),
+            shape = RoundedCornerShape(Dimens.cornerMedium),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary
             )
         ) {
-            Icon(Icons.Default.Person, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
+            Icon(Icons.Default.Person, null, Modifier.size(Dimens.iconSizeSmall))
+            Spacer(Modifier.width(Dimens.spaceMedium))
             Text(
                 "Add friends",
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.ExtraBold
             )
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(Dimens.spaceMedium))
 
         // Secondary actions — group paths.
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium),
             modifier = Modifier.fillMaxWidth()
         ) {
             Button(
                 onClick = onJoinGroup,
                 modifier = Modifier
                     .weight(1f)
-                    .height(48.dp),
-                shape = RoundedCornerShape(16.dp),
+                    .height(Dimens.buttonHeightSmall),
+                shape = RoundedCornerShape(Dimens.cornerMedium),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     contentColor = MaterialTheme.colorScheme.onSurface
@@ -3176,8 +3230,8 @@ private fun ShareEmptyState(
                 onClick = onCreateGroup,
                 modifier = Modifier
                     .weight(1f)
-                    .height(48.dp),
-                shape = RoundedCornerShape(16.dp),
+                    .height(Dimens.buttonHeightSmall),
+                shape = RoundedCornerShape(Dimens.cornerMedium),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     contentColor = MaterialTheme.colorScheme.onSurface
@@ -3191,7 +3245,7 @@ private fun ShareEmptyState(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(Dimens.spaceLarge))
     }
 }
 
@@ -3199,11 +3253,11 @@ private fun ShareEmptyState(
 private fun ShareSectionHeader(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.SemiBold,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.ExtraBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        letterSpacing = 1.sp,
-        modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 4.dp)
+        letterSpacing = 1.2.sp,
+        modifier = Modifier.padding(start = Dimens.spaceSmall, top = Dimens.spaceMedium, bottom = Dimens.spaceSmall)
     )
 }
 
@@ -3216,7 +3270,7 @@ private fun SelectableTargetRow(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         onClick = onToggle,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(Dimens.cornerLarge),
         color = if (selected) MaterialTheme.colorScheme.primaryContainer
         else MaterialTheme.colorScheme.surfaceContainerHigh,
         border = if (selected) androidx.compose.foundation.BorderStroke(
@@ -3224,23 +3278,23 @@ private fun SelectableTargetRow(
         ) else null
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = Dimens.spaceMedium, vertical = Dimens.spaceMedium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             FilterPillAvatar(filter = target)
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(Dimens.spaceMedium))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     target.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     if (target.isDirect) "Direct share" else "Group",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -3281,29 +3335,29 @@ private fun SelectedTargetChip(
     onRemove: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(Dimens.cornerLarge),
         color = MaterialTheme.colorScheme.primaryContainer,
-        modifier = Modifier.height(36.dp)
+        modifier = Modifier.height(Dimens.avatarSizeSmall + Dimens.spaceSmall)
     ) {
         Row(
-            modifier = Modifier.padding(start = 4.dp, end = 8.dp),
+            modifier = Modifier.padding(start = Dimens.spaceSmall, end = Dimens.spaceMedium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Tiny avatar
             Box(modifier = Modifier.size(28.dp)) {
                 FilterPillAvatar(filter = target)
             }
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(Dimens.spaceMedium))
             Text(
                 text = target.name,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.widthIn(max = 120.dp)
             )
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(Dimens.spaceSmall))
             Surface(
                 onClick = onRemove,
                 shape = CircleShape,
@@ -3353,19 +3407,22 @@ private fun DurationSegment(
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier,
-        shape = MaterialTheme.shapes.medium,
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+        modifier = modifier.height(Dimens.buttonHeightSmall),
+        shape = RoundedCornerShape(Dimens.cornerMedium),
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        border = if (selected) androidx.compose.foundation.BorderStroke(
+            1.5.dp, MaterialTheme.colorScheme.primary
+        ) else null
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.padding(vertical = Dimens.spaceMedium)
+            modifier = Modifier.fillMaxWidth()
         ) {
             Text(
                 text = text,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
                 maxLines = 1
             )
         }
@@ -3410,9 +3467,9 @@ private fun MapTypeSheet(
         Text(
             text = "Map Style",
             style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.ExtraBold
         )
-        Spacer(modifier = Modifier.height(Dimens.spaceSmall))
+        Spacer(modifier = Modifier.height(Dimens.spaceXSmall))
         Text(
             text = "Choose how the map looks",
             style = MaterialTheme.typography.bodyMedium,
@@ -3420,7 +3477,7 @@ private fun MapTypeSheet(
         )
         Spacer(Modifier.height(Dimens.spaceXLarge))
         Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium),
             modifier = Modifier.fillMaxWidth()
         ) {
             mapStyleOptions.forEach { option ->
@@ -3499,14 +3556,14 @@ private fun MapStyleCard(
                 ) {
                     Text(
                         text = option.label,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
                         color = if (isSelected) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = option.description,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -3594,7 +3651,7 @@ private fun Life360PinMarker(
                         .take(1)
                         .uppercase()
                         .ifEmpty { "?" },
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.ExtraBold
                 )

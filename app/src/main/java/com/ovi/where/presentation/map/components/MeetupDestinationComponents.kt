@@ -96,8 +96,8 @@ import kotlin.math.absoluteValue
 
 private val SheetShape = RoundedCornerShape(topStart = 38.dp, topEnd = 38.dp)
 private val ButtonShape = RoundedCornerShape(16.dp)
-private val CardShape = RoundedCornerShape(20.dp)
-private val ChipShape = RoundedCornerShape(14.dp)
+private val CardShape = RoundedCornerShape(24.dp)
+private val ChipShape = RoundedCornerShape(24.dp)
 
 /**
  * "Set meetup point" bottom sheet — the dialog opened after the user picks a
@@ -147,14 +147,14 @@ fun SetMeetupDestinationSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Set meetup point",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = pick.address?.takeIf { it.isNotBlank() }
                             ?: "Lat ${"%.5f".format(pick.latitude)}, Lng ${"%.5f".format(pick.longitude)}",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -164,7 +164,7 @@ fun SetMeetupDestinationSheet(
                     CircularProgressIndicator(
                         modifier = Modifier.size(16.dp),
                         strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.tertiary
                     )
                 }
             }
@@ -248,7 +248,7 @@ fun SetMeetupDestinationSheet(
                         onClick = onDismiss,
                         modifier = Modifier
                             .weight(1f)
-                            .height(52.dp),
+                            .height(Dimens.buttonHeight),
                         shape = ButtonShape
                     ) {
                         Text(
@@ -266,19 +266,19 @@ fun SetMeetupDestinationSheet(
                         },
                         modifier = Modifier
                             .weight(2f)
-                            .height(52.dp),
+                            .height(Dimens.buttonHeight),
                         enabled = selectedGroupId.isNotBlank() && groups.isNotEmpty(),
                         shape = ButtonShape,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Icon(Icons.Filled.Flag, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
+                        Icon(Icons.Filled.Flag, null, Modifier.size(Dimens.iconSizeSmall))
+                        Spacer(Modifier.width(Dimens.spaceMedium))
                         Text(
                             "Set meetup point",
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.ExtraBold
                         )
                     }
                 }
@@ -291,10 +291,10 @@ fun SetMeetupDestinationSheet(
 private fun ShareSectionLabel(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.ExtraBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        letterSpacing = 1.sp,
+        letterSpacing = 1.2.sp,
         modifier = Modifier.padding(horizontal = Dimens.spaceLarge)
     )
 }
@@ -363,7 +363,7 @@ private fun GroupPickerRow(
     val context = LocalContext.current
     Surface(
         onClick = onSelect,
-        shape = ChipShape,
+        shape = RoundedCornerShape(Dimens.cornerLarge),
         color = if (selected) MaterialTheme.colorScheme.primaryContainer
         else MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
@@ -375,14 +375,14 @@ private fun GroupPickerRow(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = Dimens.spaceMedium),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(Dimens.iconSizeXLarge)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 if (!group.photoUrl.isNullOrBlank()) {
@@ -409,17 +409,17 @@ private fun GroupPickerRow(
                     Icon(
                         imageVector = Icons.Filled.Group,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
                 }
             }
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(Dimens.spaceMedium))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = group.name,
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -600,13 +600,13 @@ fun MeetupPlacementActionBar(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                    .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Filled.Place,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -616,17 +616,17 @@ fun MeetupPlacementActionBar(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "MEETUP POINT",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.2.sp
                 )
                 if (isResolving && address.isNullOrBlank()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(11.dp),
                             strokeWidth = 1.5.dp,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.tertiary
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
@@ -702,11 +702,11 @@ fun DestinationPinMarker() {
 fun PlacementCrosshair(
     modifier: Modifier = Modifier
 ) {
-    val primary = MaterialTheme.colorScheme.primary
+    val tertiary = MaterialTheme.colorScheme.tertiary
     Box(modifier = modifier.size(120.dp), contentAlignment = Alignment.Center) {
-        RadarRing(color = primary, phase = 0f)
-        RadarRing(color = primary, phase = 0.33f)
-        RadarRing(color = primary, phase = 0.66f)
+        RadarRing(color = tertiary, phase = 0f)
+        RadarRing(color = tertiary, phase = 0.33f)
+        RadarRing(color = tertiary, phase = 0.66f)
         MeetupPin(size = 48.dp)
     }
 }

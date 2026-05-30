@@ -88,7 +88,7 @@ fun Life360PinMarker(
             } else {
                 Text(
                     text = fallbackLabel,
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.ExtraBold
                 )

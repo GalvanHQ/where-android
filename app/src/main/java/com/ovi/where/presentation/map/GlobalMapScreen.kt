@@ -157,8 +157,6 @@ import com.ovi.where.presentation.map.components.MeetupPlaceCardSheet
 import com.ovi.where.presentation.map.components.MeetupPlacementActionBar
 import com.ovi.where.presentation.map.components.SetMeetupDestinationSheet
 import com.ovi.where.presentation.map.components.fanOutOverlappingMarkers
-import com.ovi.where.presentation.notification.NotificationsViewModel
-import com.ovi.where.presentation.notification.components.NotificationChip
 import kotlinx.coroutines.launch
 
 /**
@@ -176,7 +174,6 @@ fun GlobalMapScreen(
     onNavigateToCreateGroup: () -> Unit = {},
     onNavigateToJoinGroup: () -> Unit = {},
     onNavigateToAddFriends: () -> Unit = {},
-    onNavigateToNotifications: () -> Unit = {},
     /**
      * True when the Map tab is the currently selected destination.
      *
@@ -907,16 +904,6 @@ fun GlobalMapScreen(
                         distanceText = uiState.meetupDestinationDistanceText,
                         onIdleClick = { viewModel.enterMeetupPlacement() },
                         onActiveClick = { viewModel.openMeetupPlaceCard() }
-                    )
-
-                    // Icon-only notifications chip — drives the in-app inbox.
-                    // The unread count is observed via NotificationsViewModel and
-                    // appears as a small primary badge on the top-right corner.
-                    val notificationsVm: NotificationsViewModel = hiltViewModel()
-                    val unreadCount by notificationsVm.unreadCount.collectAsState()
-                    NotificationChip(
-                        onClick = onNavigateToNotifications,
-                        unreadCount = unreadCount
                     )
                 }
             }

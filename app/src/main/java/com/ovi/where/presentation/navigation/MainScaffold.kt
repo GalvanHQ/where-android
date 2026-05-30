@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -19,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
@@ -57,6 +60,13 @@ internal sealed class BottomTab(
         label = "Friends"
     )
 
+    object Notifications : BottomTab(
+        route = Screen.NotificationsTab.route,
+        selectedIconResId = R.drawable.notifications_filled,
+        unselectedIconResId = R.drawable.notifications_outlined,
+        label = "Notifications"
+    )
+
     object Profile : BottomTab(
         route = Screen.ProfileTab.route,
         selectedIconResId = R.drawable.profile_filled,
@@ -69,6 +79,7 @@ private val bottomTabs = listOf(
     BottomTab.Map,
     BottomTab.Chats,
     BottomTab.People,
+    BottomTab.Notifications,
     BottomTab.Profile
 )
 
@@ -85,6 +96,8 @@ internal fun WhereBottomBar(
     viewModel: MainScaffoldViewModel = hiltViewModel()
 ) {
     val profilePhotoUrl by viewModel.profilePhotoUrl.collectAsState()
+    val unreadNotifications by viewModel.unreadNotificationCount.collectAsState()
+    val hasUnreadChats by viewModel.hasUnreadChats.collectAsState()
 
     NavigationBar(
         modifier = modifier,
@@ -93,6 +106,12 @@ internal fun WhereBottomBar(
     ) {
         bottomTabs.forEach { tab ->
             val selected = currentRoute == tab.route
+            // Show a glanceable unread dot on Chats + Notifications tabs.
+            val showBadge = when (tab) {
+                BottomTab.Chats -> hasUnreadChats
+                BottomTab.Notifications -> unreadNotifications > 0
+                else -> false
+            }
             NavigationBarItem(
                 selected = selected,
                 onClick = { onTabClick(tab.route) },
@@ -125,14 +144,38 @@ internal fun WhereBottomBar(
                         )
                     } else {
                         val iconResId = if (selected) tab.selectedIconResId else tab.unselectedIconResId
-                        Icon(
-                            painter = painterResource(id = iconResId),
-                            contentDescription = tab.label,
-                            modifier = Modifier.size(24.dp)
-                        )
+                        val icon = @Composable {
+                            Icon(
+                                painter = painterResource(id = iconResId),
+                                contentDescription = tab.label,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        // Chats + Notifications carry an unread dot so the
+                        // user gets the same "something new" cue the old map
+                        // bell chip provided.
+                        if (showBadge) {
+                            BadgedBox(
+                                badge = {
+                                    Badge(
+                                        containerColor = MaterialTheme.colorScheme.error,
+                                        contentColor = MaterialTheme.colorScheme.onError
+                                    )
+                                }
+                            ) { icon() }
+                        } else {
+                            icon()
+                        }
                     }
                 },
-                label = { Text(text = tab.label) },
+                label = {
+                    Text(
+                        text = tab.label,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Visible
+                    )
+                },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MaterialTheme.colorScheme.primary,
                     selectedTextColor = MaterialTheme.colorScheme.primary,

@@ -52,6 +52,7 @@ import com.ovi.where.presentation.group.join.JoinGroupScreen
 import com.ovi.where.presentation.map.GlobalMapScreen
 import com.ovi.where.presentation.map.MapNavBarHeight
 import com.ovi.where.presentation.navigation.gatekeeper.AuthGatekeeperViewModel
+import com.ovi.where.presentation.notification.NotificationsScreen
 import com.ovi.where.presentation.onboarding.OnboardingScreen
 import com.ovi.where.presentation.people.FriendRequestsScreen
 import com.ovi.where.presentation.people.PeopleScreen
@@ -65,6 +66,7 @@ import com.ovi.where.presentation.settings.DataStorageScreen
 import com.ovi.where.presentation.settings.DevelopersScreen
 import com.ovi.where.presentation.settings.HelpScreen
 import com.ovi.where.presentation.settings.NotificationPreferencesScreen
+import com.ovi.where.presentation.settings.PermissionsScreen
 import com.ovi.where.presentation.settings.PrivacyPolicyScreen
 import com.ovi.where.presentation.settings.PrivacyScreen
 import com.ovi.where.presentation.settings.SecurityScreen
@@ -79,6 +81,7 @@ internal val BottomTabRoutes = setOf(
     Screen.MapTab.route,
     Screen.ChatsTab.route,
     Screen.PeopleTab.route,
+    Screen.NotificationsTab.route,
     Screen.ProfileTab.route
 )
 
@@ -209,11 +212,6 @@ fun AppNavGraph(
                 },
                 onNavigateToAddFriends = {
                     navController.navigate(Screen.Search.createRoute("people")) {
-                        launchSingleTop = true
-                    }
-                },
-                onNavigateToNotifications = {
-                    navController.navigate(Screen.Notifications.route) {
                         launchSingleTop = true
                     }
                 }
@@ -481,6 +479,12 @@ fun AppNavGraph(
                 )
             }
 
+            composable(Screen.NotificationsTab.route) {
+                NotificationsScreen(
+                    contentPadding = nonMapContentPadding
+                )
+            }
+
             composable(Screen.ProfileTab.route) {
                 ProfileScreen(
                     contentPadding = nonMapContentPadding,
@@ -654,14 +658,8 @@ fun AppNavGraph(
                 DevelopersScreen(onNavigateBack = { navController.popBackStack() })
             }
 
-            composable(Screen.Notifications.route) {
-                com.ovi.where.presentation.notification.NotificationsScreen(
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
-
             composable(Screen.Permissions.route) {
-                com.ovi.where.presentation.settings.PermissionsScreen(
+                PermissionsScreen(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
@@ -1105,7 +1103,7 @@ internal fun navigateToDeepLink(navController: NavHostController, route: String)
 
         // ── Settings + inbox ───────────────────────────────────────────────
         trimmed == "notifications" -> {
-            navController.navigate(Screen.Notifications.route) { launchSingleTop = true }
+            navController.navigateToTab(Screen.NotificationsTab.route)
         }
         trimmed == "permissions" -> {
             navController.navigate(Screen.Permissions.route) { launchSingleTop = true }
@@ -1118,6 +1116,7 @@ internal fun navigateToDeepLink(navController: NavHostController, route: String)
         trimmed == Screen.MapTab.route -> navController.navigateToTab(Screen.MapTab.route)
         trimmed == Screen.ChatsTab.route -> navController.navigateToTab(Screen.ChatsTab.route)
         trimmed == Screen.PeopleTab.route -> navController.navigateToTab(Screen.PeopleTab.route)
+        trimmed == Screen.NotificationsTab.route -> navController.navigateToTab(Screen.NotificationsTab.route)
         trimmed == Screen.ProfileTab.route -> navController.navigateToTab(Screen.ProfileTab.route)
 
         // ── Fallback ───────────────────────────────────────────────────────
@@ -1128,11 +1127,10 @@ internal fun navigateToDeepLink(navController: NavHostController, route: String)
 
 /**
  * Fallback target when a notification carries an unrecognized or empty
- * deep-link route. The Notifications inbox is the single screen guaranteed
- * to have context for the missed event, so it's the safest landing pad.
+ * deep-link route. The Notifications tab is the single destination
+ * guaranteed to have context for the missed event, so it's the safest
+ * landing pad.
  */
 private fun NavHostController.fallbackToNotifications() {
-    navigate(Screen.Notifications.route) {
-        launchSingleTop = true
-    }
+    navigateToTab(Screen.NotificationsTab.route)
 }

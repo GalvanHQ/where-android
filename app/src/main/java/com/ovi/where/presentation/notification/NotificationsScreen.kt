@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,7 +33,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
@@ -57,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
@@ -64,7 +65,6 @@ import coil.request.ImageRequest
 import com.ovi.where.R
 import com.ovi.where.core.notification.NotificationType
 import com.ovi.where.core.theme.Dimens
-import com.ovi.where.presentation.common.WhereTopAppBar
 import java.text.DateFormat
 import java.util.Date
 
@@ -92,7 +92,7 @@ import java.util.Date
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationsScreen(
-    onNavigateBack: () -> Unit,
+    contentPadding: PaddingValues = PaddingValues(),
     viewModel: NotificationsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -101,49 +101,73 @@ fun NotificationsScreen(
     // is one Firestore write regardless of how many rows are unread.
     LaunchedEffect(Unit) { viewModel.onScreenOpened() }
 
-    Scaffold(
-        topBar = {
-            WhereTopAppBar(
-                title = stringResource(R.string.notifications_title),
-                onNavigateBack = onNavigateBack,
-                actions = {
-                    if (uiState.items.isNotEmpty()) {
-                        TextButton(onClick = viewModel::onClearAll) {
-                            Text(stringResource(R.string.notifications_clear_all))
-                        }
-                    }
-                }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(contentPadding)
+            .statusBarsPadding()
+    ) {
+        // ── Header — a bold title anchors the row (the other tabs use a
+        //    search bar for this weight; Notifications has none, so a lone
+        //    action floated unbalanced). Title left, "Clear all" right.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = Dimens.spaceLarge,
+                    end = Dimens.spaceMedium,
+                    top = Dimens.spaceMedium,
+                    bottom = Dimens.spaceSmall
+                ),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.notifications_title),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f)
             )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when {
-                uiState.isLoading -> Box(Modifier.fillMaxSize())
-                uiState.isEmpty -> EmptyState(
-                    title = stringResource(R.string.notifications_empty_title),
-                    body = stringResource(R.string.notifications_empty_body),
-                    modifier = Modifier.fillMaxSize(),
-                )
-                else -> LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = Dimens.space2XLarge),
-                ) {
-                    uiState.sections.forEach { section ->
-                        item(key = "h_${section.id}") { SectionHeader(section.id, section.items.size) }
-                        items(section.items, key = { it.id }) { item ->
-                            DismissibleNotificationRow(
-                                item = item,
-                                onDismiss = { viewModel.onDelete(item.id) },
-                                onAccept = { viewModel.onAcceptFriendRequest(item) },
-                                onDecline = { viewModel.onDeclineFriendRequest(item) },
-                                modifier = Modifier.animateItem(
-                                    fadeInSpec = tween(200),
-                                    placementSpec = tween(200),
-                                    fadeOutSpec = tween(150),
-                                ),
-                            )
-                        }
+            if (uiState.items.isNotEmpty()) {
+                TextButton(onClick = viewModel::onClearAll) {
+                    Text(
+                        stringResource(R.string.notifications_clear_all),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
+        when {
+            uiState.isLoading -> Box(Modifier.fillMaxSize())
+            uiState.isEmpty -> EmptyState(
+                title = stringResource(R.string.notifications_empty_title),
+                body = stringResource(R.string.notifications_empty_body),
+                modifier = Modifier.fillMaxSize(),
+            )
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    bottom = Dimens.space2XLarge + contentPadding.calculateBottomPadding()
+                ),
+            ) {
+                uiState.sections.forEach { section ->
+                    item(key = "h_${section.id}") { SectionHeader(section.id, section.items.size) }
+                    items(section.items, key = { it.id }) { item ->
+                        DismissibleNotificationRow(
+                            item = item,
+                            onDismiss = { viewModel.onDelete(item.id) },
+                            onAccept = { viewModel.onAcceptFriendRequest(item) },
+                            onDecline = { viewModel.onDeclineFriendRequest(item) },
+                            modifier = Modifier.animateItem(
+                                fadeInSpec = tween(200),
+                                placementSpec = tween(200),
+                                fadeOutSpec = tween(150),
+                            ),
+                        )
                     }
                 }
             }
@@ -270,6 +294,7 @@ private fun NotificationRow(
                     fontWeight = titleWeight,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
+                    lineHeight = 20.sp,
                     overflow = TextOverflow.Ellipsis
                 )
                 if (item.body.isNotBlank()) {

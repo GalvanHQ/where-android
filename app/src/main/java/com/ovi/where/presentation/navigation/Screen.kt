@@ -51,6 +51,9 @@ sealed class Screen(val route: String) {
     data object PeopleTab : Screen("tab_people")
 
     @Serializable
+    data object NotificationsTab : Screen("tab_notifications")
+
+    @Serializable
     data object ProfileTab : Screen("tab_profile")
 
     // ── Profile sub-screens ───────────────────────────────────────────────────

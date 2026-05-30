@@ -48,6 +48,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -100,8 +102,15 @@ fun UserProfileScreen(
     val navigateToChat by viewModel.navigateToChat.collectAsState()
     var showBlockDialog by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(userId) { viewModel.loadUser(userId) }
+
+    // Surface action failures (friend requests, block, location sharing, close
+    // friends) that the ViewModel maps to user-facing messages.
+    LaunchedEffect(Unit) {
+        viewModel.snackbarEvent.collect { snackbarHostState.showSnackbar(it) }
+    }
 
     // Start location service when sharing is activated from this screen
     val context = LocalContext.current
@@ -192,7 +201,8 @@ fun UserProfileScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Box(
             modifier = Modifier

@@ -867,7 +867,7 @@ fun GlobalMapScreen(
                             if (activeFilter == null) {
                                 // Default "All Friends" — bare warm people glyph.
                                 Icon(
-                                    imageVector = ImageVector.vectorResource(id = R.drawable.people_outlined),
+                                    imageVector = ImageVector.vectorResource(id = R.drawable.group_outlined),
                                     contentDescription = null,
                                     modifier = Modifier.size(14.dp),
                                     tint = MaterialTheme.colorScheme.primary
@@ -1045,7 +1045,7 @@ fun GlobalMapScreen(
                         )
                     ) {
                         Icon(
-                            imageVector = ImageVector.vectorResource(id = R.drawable.layers),
+                            imageVector = ImageVector.vectorResource(id = R.drawable.layers_outlined),
                             contentDescription = "Map type",
                             modifier = Modifier.size(Dimens.iconSizeMedium)
                         )
@@ -1077,7 +1077,7 @@ fun GlobalMapScreen(
                         )
                     ) {
                         Icon(
-                            imageVector = ImageVector.vectorResource(id = R.drawable.location_crosshairs),
+                            imageVector = ImageVector.vectorResource(id = R.drawable.location_crosshairs_outlined),
                             contentDescription = stringResource(R.string.cd_my_location),
                             modifier = Modifier.size(Dimens.iconSizeMedium)
                         )

@@ -69,8 +69,20 @@ data class OtherUserProfileUiModel(
     val isOnline: Boolean,
     val lastSeen: Long,
     val createdAt: Long,
-    val friendshipAction: ProfileFriendshipAction
-)
+    val friendshipAction: ProfileFriendshipAction,
+    // ── Home + social ──────────────────────────────────────────────────────
+    val homeLabel: String,
+    val hasHome: Boolean,
+    val homeLatitude: Double,
+    val homeLongitude: Double,
+    val facebookUrl: String,
+    val instagramUrl: String,
+    val linkedinUrl: String
+) {
+    /** True when at least one social link is present. */
+    val hasAnySocial: Boolean
+        get() = facebookUrl.isNotBlank() || instagramUrl.isNotBlank() || linkedinUrl.isNotBlank()
+}
 
 fun User.toOtherProfileUiModel(
     status: FriendshipStatus?,
@@ -87,5 +99,12 @@ fun User.toOtherProfileUiModel(
         isOnline         = isOnline,
         lastSeen         = lastSeen,
         createdAt        = createdAt,
-        friendshipAction = status.toProfileAction(callerUid, requesterId)
+        friendshipAction = status.toProfileAction(callerUid, requesterId),
+        homeLabel        = homeLabel,
+        hasHome          = hasHome,
+        homeLatitude     = homeLatitude,
+        homeLongitude    = homeLongitude,
+        facebookUrl      = facebookUrl,
+        instagramUrl     = instagramUrl,
+        linkedinUrl      = linkedinUrl
     )

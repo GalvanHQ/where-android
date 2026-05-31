@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.location.LocationManager as SystemLocationManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -21,12 +20,13 @@ import com.ovi.where.core.constants.AppConstants.TIME_AGO_REFRESH_INTERVAL_MS
 import com.ovi.where.core.constants.AppConstants.USER_FETCH_DEBOUNCE_MS
 import com.ovi.where.data.local.prefs.UserPreferences
 import com.ovi.where.data.location.LocationManager
-import com.ovi.where.domain.model.SharedLocation
 import com.ovi.where.domain.model.MeetupDestination
+import com.ovi.where.domain.model.SharedLocation
 import com.ovi.where.domain.model.SystemEventType
 import com.ovi.where.domain.model.User
 import com.ovi.where.domain.repository.ConversationRepository
 import com.ovi.where.domain.repository.LocationRepository
+import com.ovi.where.domain.usecase.auth.ObserveCurrentUserUseCase
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
 import com.ovi.where.domain.usecase.friend.ObserveFriendsUseCase
 import com.ovi.where.domain.usecase.group.GetUserGroupsUseCase
@@ -38,10 +38,8 @@ import com.ovi.where.domain.usecase.location.SetMeetupDestinationUseCase
 import com.ovi.where.domain.usecase.location.StartLocationSharingUseCase
 import com.ovi.where.domain.usecase.location.StopLocationSharingUseCase
 import com.ovi.where.domain.usecase.user.GetUsersUseCase
-import com.ovi.where.domain.usecase.auth.ObserveCurrentUserUseCase
 import com.ovi.where.service.LocationTrackingService
 import dagger.hilt.android.lifecycle.HiltViewModel
-import timber.log.Timber
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -54,7 +52,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
+import android.location.LocationManager as SystemLocationManager
 
 /**
  * A single friend's location as shown on the global map.
@@ -90,7 +90,27 @@ data class FriendLocationUiModel(
      * (e.g. "Arrived" / "Can't make it"). Null when not part of any active
      * meetup.
      */
-    val meetupStatus: com.ovi.where.domain.model.MeetupParticipantStatus? = null
+    val meetupStatus: com.ovi.where.domain.model.MeetupParticipantStatus? = null,
+    /**
+     * Whether this friend is currently within their saved home geofence.
+     * Sourced from the denormalized `isAtHome` flag the sharer's device
+     * writes onto their location doc. Drives an "At Home" pin badge.
+     */
+    val isAtHome: Boolean = false
+)
+
+/**
+ * A temporary "home" pin shown on the map when the user taps a profile's
+ * Home section. Distinct from live friend pins — it's not driven by a
+ * location share, just a one-off marker at saved home coordinates.
+ */
+data class HomePinUiModel(
+    val userId: String,
+    val displayName: String,
+    val photoUrl: String?,
+    val latitude: Double,
+    val longitude: Double,
+    val label: String
 )
 
 /**
@@ -150,7 +170,8 @@ class GlobalMapViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter,
     private val userCachePersistent: com.ovi.where.data.cache.UserCache,
-    private val meetupPlaceCardEventBus: com.ovi.where.core.event.MeetupPlaceCardEventBus
+    private val meetupPlaceCardEventBus: com.ovi.where.core.event.MeetupPlaceCardEventBus,
+    private val homePinEventBus: com.ovi.where.core.event.HomePinEventBus
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(GlobalMapUiState())
@@ -164,6 +185,16 @@ class GlobalMapViewModel @Inject constructor(
 
     // User profile cache (userId → User)
     private val userCache = mutableMapOf<String, User>()
+
+    // ── Self at-home state ───────────────────────────────────────────────────
+    // Cached from the current user's profile so we can compute whether our own
+    // pin is "At Home" without re-reading Firestore on every fix.
+    @Volatile
+    private var myHomeLat: Double = 0.0
+    @Volatile
+    private var myHomeLng: Double = 0.0
+    @Volatile
+    private var myHasHome: Boolean = false
 
     // Debounced user-fetch tracking
     private val pendingUserFetchIds = mutableSetOf<String>()
@@ -227,6 +258,7 @@ class GlobalMapViewModel @Inject constructor(
         restoreSharingState()
         observeRepoSharingState()
         observeMeetupPlaceCardRequests()
+        observeHomePinRequests()
     }
 
     /**
@@ -446,8 +478,35 @@ class GlobalMapViewModel @Inject constructor(
     private fun observeCurrentUser() {
         viewModelScope.launch {
             observeCurrentUserUseCase().collect { user ->
+                myHomeLat = user?.homeLatitude ?: 0.0
+                myHomeLng = user?.homeLongitude ?: 0.0
+                myHasHome = user?.hasHome ?: false
                 _uiState.value = _uiState.value.copy(myPhotoUrl = user?.photoUrl)
+                // Recompute self at-home in case home changed while we already
+                // have a fix.
+                if (_uiState.value.hasMyLocation) {
+                    recomputeSelfAtHome(_uiState.value.myLatitude, _uiState.value.myLongitude)
+                }
             }
+        }
+    }
+
+    /**
+     * Recomputes [GlobalMapUiState.selfIsAtHome] by comparing the current fix
+     * against the user's saved home geofence. No-op when no home is set.
+     */
+    private fun recomputeSelfAtHome(latitude: Double, longitude: Double) {
+        val atHome = if (!myHasHome) {
+            false
+        } else {
+            val results = FloatArray(1)
+            android.location.Location.distanceBetween(
+                latitude, longitude, myHomeLat, myHomeLng, results
+            )
+            results[0] <= com.ovi.where.core.constants.AppConstants.HOME_RADIUS_METERS
+        }
+        if (atHome != _uiState.value.selfIsAtHome) {
+            _uiState.value = _uiState.value.copy(selfIsAtHome = atHome)
         }
     }
 
@@ -722,7 +781,8 @@ class GlobalMapViewModel @Inject constructor(
                 etaText = computeEta(distance, loc.speed),
                 lastUpdatedTimestamp = loc.timestamp,
                 meetupNote = participantEntry?.note.orEmpty(),
-                meetupStatus = participantEntry?.status
+                meetupStatus = participantEntry?.status,
+                isAtHome = loc.isAtHome
             )
         }
 
@@ -2140,6 +2200,8 @@ class GlobalMapViewModel @Inject constructor(
             // Refresh distance/ETA + arrival detection now that we have a fix.
             recomputeDestinationMetrics()
             checkSelfArrival(loc.latitude, loc.longitude)
+            // Recompute whether our own pin should show "At Home".
+            recomputeSelfAtHome(loc.latitude, loc.longitude)
             // Throttle the DataStore write: only persist when the new fix is
             // meaningfully different from the saved one. Stops every tab return
             // (which recreates this ViewModel) from spamming a write with the
@@ -2223,6 +2285,53 @@ class GlobalMapViewModel @Inject constructor(
                 _uiEvent.send(UiEvent.ShowSnackbar(UiText.DynamicString("Meetup destination not available yet")))
             }
         }
+    }
+
+    /**
+     * Consumes home-pin requests from [com.ovi.where.core.event.HomePinEventBus]
+     * (published when a user taps the Home section on a profile). Drops a
+     * temporary "home" pin on the map, animates the camera onto it, and
+     * shows a status bubble. We react to each request once via its monotonic
+     * [com.ovi.where.core.event.HomePinEventBus.HomePinRequest.tick].
+     */
+    private fun observeHomePinRequests() {
+        viewModelScope.launch {
+            var lastHandled = 0L
+            homePinEventBus.request.collect { req ->
+                if (req == null) {
+                    _uiState.value = _uiState.value.copy(homePin = null)
+                    return@collect
+                }
+                if (req.tick == lastHandled) return@collect
+                lastHandled = req.tick
+                if (req.latitude == 0.0 && req.longitude == 0.0) {
+                    _uiEvent.send(UiEvent.ShowSnackbar(UiText.DynamicString("No home location set")))
+                    return@collect
+                }
+                _uiState.value = _uiState.value.copy(
+                    homePin = HomePinUiModel(
+                        userId = req.userId,
+                        displayName = req.displayName,
+                        photoUrl = req.photoUrl,
+                        latitude = req.latitude,
+                        longitude = req.longitude,
+                        label = req.label
+                    ),
+                    requestHomePinFocus = true
+                )
+            }
+        }
+    }
+
+    /** Clears the one-shot camera-focus flag once the screen has consumed it. */
+    fun onHomePinFocusConsumed() {
+        _uiState.value = _uiState.value.copy(requestHomePinFocus = false)
+    }
+
+    /** Dismisses the temporary home pin (tap elsewhere / close affordance). */
+    fun dismissHomePin() {
+        homePinEventBus.clear()
+        _uiState.value = _uiState.value.copy(homePin = null)
     }
 
     /**
@@ -2454,6 +2563,12 @@ data class GlobalMapUiState(
     val showPermissionOnboarding: Boolean = false,
     val myPhotoUrl: String? = null,
     val isLocationEnabled: Boolean = true,
+    /** Whether the local user's own pin is within their saved home geofence. */
+    val selfIsAtHome: Boolean = false,
+    /** Temporary "home" pin shown when a profile's Home section is tapped. */
+    val homePin: HomePinUiModel? = null,
+    /** One-shot flag asking the screen to animate the camera onto [homePin]. */
+    val requestHomePinFocus: Boolean = false,
     val isLoading: Boolean = true,
     val error: String? = null,
     /** Whether the initial auto-zoom to fit all friends has already fired. */

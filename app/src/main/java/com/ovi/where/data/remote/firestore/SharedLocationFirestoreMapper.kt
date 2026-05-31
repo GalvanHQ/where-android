@@ -90,6 +90,7 @@ object SharedLocationFirestoreMapper {
             displayName = data["displayName"] as? String ?: "",
             photoUrl = data["photoUrl"] as? String,
             sharingStartedAt = (data["sharingStartedAt"] as? Number)?.toLong() ?: 0L,
+            isAtHome = data["isAtHome"] as? Boolean ?: false,
         )
     }
 }

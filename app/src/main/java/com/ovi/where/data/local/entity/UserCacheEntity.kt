@@ -41,6 +41,13 @@ data class UserCacheEntity(
     val photoUrl: String?,
     val isOnline: Boolean,
     val lastSeen: Long,
+    // ── Home + social (denormalized for profile rendering from cache) ──
+    val homeLatitude: Double = 0.0,
+    val homeLongitude: Double = 0.0,
+    val homeLabel: String = "",
+    val facebookUrl: String = "",
+    val instagramUrl: String = "",
+    val linkedinUrl: String = "",
     /** When this row was last refreshed locally — drives staleness checks. */
     val cachedAt: Long
 )
@@ -56,6 +63,12 @@ fun User.toCacheEntity(now: Long = System.currentTimeMillis()): UserCacheEntity 
         photoUrl = photoUrl,
         isOnline = isOnline,
         lastSeen = lastSeen,
+        homeLatitude = homeLatitude,
+        homeLongitude = homeLongitude,
+        homeLabel = homeLabel,
+        facebookUrl = facebookUrl,
+        instagramUrl = instagramUrl,
+        linkedinUrl = linkedinUrl,
         cachedAt = now,
     )
 
@@ -73,4 +86,10 @@ fun UserCacheEntity.toDomain(): User =
         photoUrl = photoUrl,
         isOnline = isOnline,
         lastSeen = lastSeen,
+        homeLatitude = homeLatitude,
+        homeLongitude = homeLongitude,
+        homeLabel = homeLabel,
+        facebookUrl = facebookUrl,
+        instagramUrl = instagramUrl,
+        linkedinUrl = linkedinUrl,
     )

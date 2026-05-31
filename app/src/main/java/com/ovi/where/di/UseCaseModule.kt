@@ -84,6 +84,10 @@ object UseCaseModule {
     @Provides fun provideUpdateBioUseCase(r: AuthRepository) = UpdateBioUseCase(r)
     @Provides fun provideUpdateUsernameUseCase(r: AuthRepository) = UpdateUsernameUseCase(r)
     @Provides fun provideCheckUsernameAvailableUseCase(r: AuthRepository) = CheckUsernameAvailableUseCase(r)
+    @Provides fun provideUpdateHomeUseCase(r: AuthRepository) =
+        com.ovi.where.domain.usecase.auth.UpdateHomeUseCase(r)
+    @Provides fun provideUpdateSocialLinksUseCase(r: AuthRepository) =
+        com.ovi.where.domain.usecase.auth.UpdateSocialLinksUseCase(r)
     @Provides fun provideSendEmailVerificationUseCase(r: AuthRepository) = SendEmailVerificationUseCase(r)
     @Provides fun provideReloadUserUseCase(r: AuthRepository) = ReloadUserUseCase(r)
     @Provides fun provideCompleteProfileUseCase(r: AuthRepository) = CompleteProfileUseCase(r)

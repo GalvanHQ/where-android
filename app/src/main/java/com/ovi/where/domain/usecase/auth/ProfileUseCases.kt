@@ -22,3 +22,23 @@ class CheckUsernameAvailableUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(username: String): Boolean = authRepository.checkUsernameAvailable(username)
 }
+
+class UpdateHomeUseCase @Inject constructor(
+    private val authRepository: AuthRepository
+) {
+    suspend operator fun invoke(
+        latitude: Double,
+        longitude: Double,
+        label: String
+    ): Resource<User> = authRepository.updateHome(latitude, longitude, label)
+}
+
+class UpdateSocialLinksUseCase @Inject constructor(
+    private val authRepository: AuthRepository
+) {
+    suspend operator fun invoke(
+        facebookUrl: String,
+        instagramUrl: String,
+        linkedinUrl: String
+    ): Resource<User> = authRepository.updateSocialLinks(facebookUrl, instagramUrl, linkedinUrl)
+}

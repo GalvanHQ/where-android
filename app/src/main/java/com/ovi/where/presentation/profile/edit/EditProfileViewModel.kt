@@ -7,7 +7,9 @@ import com.ovi.where.core.common.Resource
 import com.ovi.where.domain.usecase.auth.CheckUsernameAvailableUseCase
 import com.ovi.where.domain.usecase.auth.ObserveCurrentUserUseCase
 import com.ovi.where.domain.usecase.auth.UpdateBioUseCase
+import com.ovi.where.domain.usecase.auth.UpdateHomeUseCase
 import com.ovi.where.domain.usecase.auth.UpdateProfileUseCase
+import com.ovi.where.domain.usecase.auth.UpdateSocialLinksUseCase
 import com.ovi.where.domain.usecase.auth.UpdateUsernameUseCase
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -29,6 +31,8 @@ class EditProfileViewModel @Inject constructor(
     private val updateBioUseCase: UpdateBioUseCase,
     private val updateUsernameUseCase: UpdateUsernameUseCase,
     private val checkUsernameAvailableUseCase: CheckUsernameAvailableUseCase,
+    private val updateHomeUseCase: UpdateHomeUseCase,
+    private val updateSocialLinksUseCase: UpdateSocialLinksUseCase,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -49,6 +53,12 @@ class EditProfileViewModel @Inject constructor(
                             username = user.username,
                             bio = user.bio,
                             photoUrl = user.photoUrl,
+                            homeLatitude = user.homeLatitude,
+                            homeLongitude = user.homeLongitude,
+                            homeLabel = user.homeLabel,
+                            facebookUrl = user.facebookUrl,
+                            instagramUrl = user.instagramUrl,
+                            linkedinUrl = user.linkedinUrl,
                             isInitialized = true
                         )
                     }
@@ -96,6 +106,38 @@ class EditProfileViewModel @Inject constructor(
         uri?.let {
             _uiState.update { it.copy(newPhotoUri = uri) }
         }
+    }
+
+    // ── Home + social handlers ──────────────────────────────────────────────
+
+    /** Called when the home picker returns a confirmed coordinate + address. */
+    fun onHomePicked(latitude: Double, longitude: Double, label: String) {
+        _uiState.update {
+            it.copy(
+                homeLatitude = latitude,
+                homeLongitude = longitude,
+                homeLabel = label
+            )
+        }
+    }
+
+    /** Clears the saved home location. */
+    fun onClearHome() {
+        _uiState.update {
+            it.copy(homeLatitude = 0.0, homeLongitude = 0.0, homeLabel = "")
+        }
+    }
+
+    fun onFacebookChanged(value: String) {
+        _uiState.update { it.copy(facebookUrl = value.trim()) }
+    }
+
+    fun onInstagramChanged(value: String) {
+        _uiState.update { it.copy(instagramUrl = value.trim()) }
+    }
+
+    fun onLinkedinChanged(value: String) {
+        _uiState.update { it.copy(linkedinUrl = value.trim()) }
     }
 
     fun saveProfile() {
@@ -146,6 +188,28 @@ class EditProfileViewModel @Inject constructor(
                 }
             }
 
+            // Update home location (all-zero clears it server-side)
+            val homeResult = updateHomeUseCase(
+                state.homeLatitude,
+                state.homeLongitude,
+                state.homeLabel
+            )
+            if (homeResult is Resource.Error) {
+                _uiState.update { it.copy(isSaving = false, error = homeResult.message) }
+                return@launch
+            }
+
+            // Update social links
+            val socialResult = updateSocialLinksUseCase(
+                state.facebookUrl,
+                state.instagramUrl,
+                state.linkedinUrl
+            )
+            if (socialResult is Resource.Error) {
+                _uiState.update { it.copy(isSaving = false, error = socialResult.message) }
+                return@launch
+            }
+
             _uiState.update { it.copy(isSaving = false, isSaved = true) }
         }
     }
@@ -161,10 +225,20 @@ data class EditProfileUiState(
     val bio: String = "",
     val photoUrl: String? = null,
     val newPhotoUri: Uri? = null,
+    // ── Home + social ──────────────────────────────────────────────────────
+    val homeLatitude: Double = 0.0,
+    val homeLongitude: Double = 0.0,
+    val homeLabel: String = "",
+    val facebookUrl: String = "",
+    val instagramUrl: String = "",
+    val linkedinUrl: String = "",
     val isInitialized: Boolean = false,
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,
     val isUsernameAvailable: Boolean? = null,
     val usernameError: String? = null,
     val error: String? = null
-)
+) {
+    /** True when a home location has been set. */
+    val hasHome: Boolean get() = homeLatitude != 0.0 || homeLongitude != 0.0
+}

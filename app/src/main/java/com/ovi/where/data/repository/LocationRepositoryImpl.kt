@@ -143,6 +143,22 @@ class LocationRepositoryImpl @Inject constructor(
     @Volatile
     private var lastSocketEmitTimestamp = 0L
 
+    // ── At-home detection state ───────────────────────────────────────────────
+    // The sharer's own device is the only one that knows their home coords,
+    // so we cache them here (refreshed on a short TTL) and stamp an `isAtHome`
+    // flag onto every location write. Viewers read the boolean — they never
+    // see the home coordinates, keeping home private.
+    @Volatile
+    private var cachedHomeUid: String? = null
+    @Volatile
+    private var cachedHomeLat: Double = 0.0
+    @Volatile
+    private var cachedHomeLng: Double = 0.0
+    @Volatile
+    private var cachedHomeHasHome: Boolean = false
+    @Volatile
+    private var cachedHomeAt: Long = 0L
+
     // Socket.IO location state management
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val socketLocationCache = MutableStateFlow<Map<String, SharedLocation>>(emptyMap())
@@ -155,6 +171,9 @@ class LocationRepositoryImpl @Inject constructor(
 
         /** Duration to wait for Socket.IO location update before Firestore fallback */
         const val LOCATION_SOCKET_FALLBACK_TIMEOUT_MS = 10_000L
+
+        /** Home coords cache TTL — re-read `users/{uid}` home at most this often. */
+        private const val HOME_CACHE_TTL_MS = 60_000L
 
         /** Speed threshold (m/s) for moving vs stationary classification */
         private const val SPEED_MOVING_THRESHOLD = 1.0f
@@ -491,6 +510,42 @@ class LocationRepositoryImpl @Inject constructor(
      * This reduces Firestore writes by ~50-70% compared to the old flat 15s throttle
      * while maintaining real-time UX via Socket.IO for connected peers.
      */
+    /**
+     * Resolves whether the live fix at ([latitude], [longitude]) falls within
+     * the sharer's saved home geofence. Returns false when no home is set.
+     *
+     * Home coordinates are cached for 60s so we don't read `users/{uid}` on
+     * every throttled location write. Only the user's own device runs this —
+     * viewers read the denormalized boolean off the location doc.
+     */
+    private suspend fun computeIsAtHome(uid: String, latitude: Double, longitude: Double): Boolean {
+        val now = System.currentTimeMillis()
+        if (cachedHomeUid != uid || now - cachedHomeAt > HOME_CACHE_TTL_MS) {
+            runCatching {
+                val doc = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                    .document(uid)
+                    .get()
+                    .await()
+                val hLat = (doc.get("homeLatitude") as? Number)?.toDouble() ?: 0.0
+                val hLng = (doc.get("homeLongitude") as? Number)?.toDouble() ?: 0.0
+                cachedHomeLat = hLat
+                cachedHomeLng = hLng
+                cachedHomeHasHome = hLat != 0.0 || hLng != 0.0
+                cachedHomeUid = uid
+                cachedHomeAt = now
+            }.onFailure {
+                // On a read failure keep whatever we had; default is "not home".
+                Timber.w(it, "computeIsAtHome: failed to read home coords")
+            }
+        }
+        if (!cachedHomeHasHome) return false
+        val results = FloatArray(1)
+        android.location.Location.distanceBetween(
+            latitude, longitude, cachedHomeLat, cachedHomeLng, results
+        )
+        return results[0] <= AppConstants.HOME_RADIUS_METERS
+    }
+
     override suspend fun updateLocation(
         groupId: String,
         latitude: Double,
@@ -525,6 +580,7 @@ class LocationRepositoryImpl @Inject constructor(
             // Denormalized profile data
             val displayName = (currentDisplayName ?: "").take(50)
             val photoUrl = (currentPhotoUrl ?: "").take(2048)
+            val isAtHome = computeIsAtHome(uid, latitude, longitude)
 
             // Single consolidated write — includes userId so the document is queryable
             val activeData = hashMapOf<String, Any>(
@@ -537,7 +593,8 @@ class LocationRepositoryImpl @Inject constructor(
                 "timestamp" to now,
                 "isSharingActive" to true,
                 "displayName" to displayName,
-                "photoUrl" to photoUrl
+                "photoUrl" to photoUrl,
+                "isAtHome" to isAtHome
             )
 
             try {

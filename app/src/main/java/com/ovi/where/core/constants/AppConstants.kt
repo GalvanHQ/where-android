@@ -23,6 +23,13 @@ object AppConstants {
     /** Radius (meters) for arrival detection geofence. */
     const val ARRIVAL_RADIUS_METERS = 100.0
 
+    /**
+     * Radius (meters) around a user's saved home within which they're
+     * considered "At Home". Slightly larger than the arrival geofence to
+     * tolerate GPS drift indoors where the fix is weaker.
+     */
+    const val HOME_RADIUS_METERS = 150.0
+
     // Notifications
     const val NOTIFICATION_ID = 1001
     const val NOTIFICATION_CHANNEL_ID = "location_service_channel"

@@ -59,6 +59,7 @@ import com.ovi.where.presentation.people.PeopleScreen
 import com.ovi.where.presentation.people.UserProfileScreen
 import com.ovi.where.presentation.profile.ProfileScreen
 import com.ovi.where.presentation.profile.edit.EditProfileScreen
+import com.ovi.where.presentation.profile.edit.HomePickerScreen
 import com.ovi.where.presentation.search.SearchScreen
 import com.ovi.where.presentation.settings.AboutScreen
 import com.ovi.where.presentation.settings.AppearanceScreen
@@ -503,13 +504,54 @@ fun AppNavGraph(
                     },
                     onNavigateToLocationSharing = {
                         navController.navigateToTab(Screen.MapTab.route)
+                    },
+                    onNavigateToMap = {
+                        navController.navigateToTab(Screen.MapTab.route)
                     }
                 )
             }
 
             // ── Edit Profile ──────────────────────────────────────────────────
-            composable(Screen.EditProfile.route) {
+            composable(Screen.EditProfile.route) { backStackEntry ->
+                // Read a home pick returned by HomePicker via savedStateHandle.
+                val savedHandle = backStackEntry.savedStateHandle
+                val pickedHomeState = savedHandle
+                    .getStateFlow<DoubleArray?>("picked_home_coords", null)
+                    .collectAsState()
+                val pickedHomeLabel = savedHandle
+                    .getStateFlow("picked_home_label", "")
+                    .collectAsState()
+                val coords = pickedHomeState.value
+                val pickedHome = coords?.let {
+                    Triple(it[0], it[1], pickedHomeLabel.value)
+                }
+
                 EditProfileScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToHomePicker = { lat, lng ->
+                        savedHandle["home_seed_lat"] = lat
+                        savedHandle["home_seed_lng"] = lng
+                        navController.navigate(Screen.HomePicker.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    pickedHome = pickedHome
+                )
+            }
+
+            // ── Home Picker (full-screen map) ───────────────────────────────────
+            composable(Screen.HomePicker.route) {
+                val editEntry = navController.getBackStackEntry(Screen.EditProfile.route)
+                val seedLat = editEntry.savedStateHandle.get<Double>("home_seed_lat") ?: 0.0
+                val seedLng = editEntry.savedStateHandle.get<Double>("home_seed_lng") ?: 0.0
+                HomePickerScreen(
+                    initialLatitude = seedLat,
+                    initialLongitude = seedLng,
+                    onConfirm = { lat, lng, label ->
+                        editEntry.savedStateHandle["picked_home_coords"] = doubleArrayOf(lat, lng)
+                        editEntry.savedStateHandle["picked_home_label"] = label
+                        navController.popBackStack()
+                    },
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
@@ -529,6 +571,9 @@ fun AppNavGraph(
                         },
                         onNavigateToMessages = { navController.popBackStack() },
                         onNavigateToLocationSharing = { navController.popBackStack() },
+                        onNavigateToMap = {
+                            navController.navigateToTab(Screen.MapTab.route)
+                        },
                         contentPadding = PaddingValues(top = 48.dp)
                     )
                     androidx.compose.material3.IconButton(
@@ -846,6 +891,9 @@ fun AppNavGraph(
                         navController.navigate(Screen.Chat.createRoute(convId)) {
                             launchSingleTop = true
                         }
+                    },
+                    onNavigateToMap = {
+                        navController.navigateToTab(Screen.MapTab.route)
                     }
                 )
             }

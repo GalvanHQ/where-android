@@ -61,6 +61,9 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.rounded.Cancel
+import androidx.compose.material.icons.rounded.ChatBubble
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.LocationOn
@@ -106,11 +109,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
@@ -123,6 +134,9 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -258,6 +272,8 @@ fun GlobalMapScreen(
     }
 
     // ── Permission launcher ───────────────────────────────────────────────────
+    val locationDeniedMessage = stringResource(R.string.toast_location_denied)
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { perms ->
@@ -265,7 +281,7 @@ fun GlobalMapScreen(
                 perms[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         locationGranted = granted
         if (granted) viewModel.locateMe()
-        else context.showToast(context.getString(R.string.toast_location_denied))
+        else context.showToast(locationDeniedMessage)
     }
 
     // ── Camera animation on requestCameraMove flag ────────────────────────────
@@ -696,7 +712,8 @@ fun GlobalMapScreen(
                                 myAvatarBitmap ?: Unit,
                                 uiState.selfMeetupNote,
                                 uiState.selfMeetupStatus,
-                                uiState.meetupDestination != null
+                                uiState.meetupDestination != null,
+                                uiState.selfIsAtHome
                             ),
                             state = myMarkerState,
                             title = "My Location",
@@ -711,7 +728,8 @@ fun GlobalMapScreen(
                                 avatarBitmap = myAvatarBitmap,
                                 note = uiState.selfMeetupNote,
                                 meetupStatus = uiState.selfMeetupStatus
-                                    .takeIf { uiState.meetupDestination != null }
+                                    .takeIf { uiState.meetupDestination != null },
+                                isAtHome = uiState.selfIsAtHome
                             )
                         }
                     }
@@ -759,7 +777,8 @@ fun GlobalMapScreen(
                             keys = arrayOf(
                                 friendAvatarBitmap ?: Unit,
                                 friend.meetupNote,
-                                friend.meetupStatus?.name ?: ""
+                                friend.meetupStatus?.name ?: "",
+                                friend.isAtHome
                             ),
                             state = friendMarkerState,
                             title = friend.displayName,
@@ -799,6 +818,51 @@ fun GlobalMapScreen(
                             }
                         ) {
                             DestinationPinMarker()
+                        }
+                    }
+
+                    // ── Home pin (tapped from a profile's Home section) ───────────
+                    val homePin = uiState.homePin
+                    if (homePin != null) {
+                        val homeLatLng = remember(homePin.latitude, homePin.longitude) {
+                            LatLng(homePin.latitude, homePin.longitude)
+                        }
+                        val homeMarkerState = remember(homeLatLng) {
+                            MarkerState(position = homeLatLng)
+                        }
+                        // Pre-load the home owner's avatar for the pin.
+                        var homeAvatarBitmap by remember(homePin.userId) {
+                            mutableStateOf<Bitmap?>(null)
+                        }
+                        LaunchedEffect(homePin.photoUrl) {
+                            val url = homePin.photoUrl
+                            if (!url.isNullOrEmpty()) {
+                                val request = ImageRequest.Builder(context)
+                                    .data(url)
+                                    .allowHardware(false)
+                                    .size(128)
+                                    .build()
+                                val result = context.imageLoader.execute(request)
+                                if (result is SuccessResult) {
+                                    homeAvatarBitmap = (result.drawable as? BitmapDrawable)?.bitmap
+                                }
+                            }
+                        }
+                        MarkerComposable(
+                            keys = arrayOf(homePin.userId, homeAvatarBitmap ?: Unit),
+                            state = homeMarkerState,
+                            title = homePin.label.ifEmpty { "${homePin.displayName}'s home" },
+                            snippet = homePin.label.takeIf { it.isNotBlank() },
+                            zIndex = 6f,
+                            onClick = {
+                                viewModel.dismissHomePin()
+                                true
+                            }
+                        ) {
+                            HomePinMarkerContent(
+                                ownerName = homePin.displayName,
+                                avatarBitmap = homeAvatarBitmap
+                            )
                         }
                     }
 
@@ -1243,6 +1307,23 @@ fun GlobalMapScreen(
                         durationMs = 700
                     )
                     viewModel.onDestinationFocusConsumed()
+                }
+            }
+
+            // ── Frame the camera onto a tapped Home pin ────────────────────
+            // Triggered when a user taps the Home section on a profile. The
+            // home pin is published via HomePinEventBus and the VM flips
+            // requestHomePinFocus; we animate the camera once, then consume.
+            LaunchedEffect(uiState.requestHomePinFocus, uiState.homePin) {
+                val pin = uiState.homePin
+                if (uiState.requestHomePinFocus && pin != null) {
+                    cameraPositionState.animate(
+                        CameraUpdateFactory.newLatLngZoom(
+                            LatLng(pin.latitude, pin.longitude), 16f
+                        ),
+                        durationMs = 700
+                    )
+                    viewModel.onHomePinFocusConsumed()
                 }
             }
 
@@ -3574,16 +3655,17 @@ private const val MY_MARKER_KEY = "__my_location__"
 
 // ── Premium Map Pin Marker ───────────────────────────────────────────────────
 
-private val PIN_BODY_SIZE = 52.dp        // Circle avatar area
-private val PIN_BORDER_WIDTH = 3.dp      // White border ring
-private val PIN_TAIL_WIDTH = 20.dp       // Tail width
-private val PIN_TAIL_HEIGHT = 12.dp      // Tail height
-private val PIN_INNER_PADDING = 3.5.dp   // Gap between border and avatar
+private val PIN_BODY_SIZE = 62.dp        // Rounded-square avatar area
+private val PIN_BORDER_WIDTH = 3.5.dp      // White border ring
+private val PIN_CORNER_RADIUS = 26.dp    // Rounded corners (squircle feel)
+private val PIN_TAIL_WIDTH = 14.dp       // Tail width
+private val PIN_TAIL_HEIGHT = 10.dp      // Tail height
 
 /**
- * Premium drop-pin marker — circular avatar body with a clean white border,
- * smooth bezier-curved tail pointer, accent-colored shadow, and optional
- * avatar bitmap. Pre-loaded bitmap avoids async issues on software canvas.
+ * Map pin marker — a speech-bubble shape: a rounded square (squircle) with
+ * the avatar clipped inside, plus a small triangular pointer at the bottom
+ * center. White border ring, soft shadow. Matches the Life360 / reference
+ * design where the pin is NOT a circle but a rounded rectangle.
  */
 @Composable
 private fun Life360PinMarker(
@@ -3597,81 +3679,87 @@ private fun Life360PinMarker(
     } else {
         borderColor
     }
-    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
-    val avatarImageBitmap = remember(avatarBitmap) {
-        avatarBitmap?.asImageBitmap()
+
+    val avatarImageBitmap = remember(avatarBitmap) { avatarBitmap?.asImageBitmap() }
+    val innerClipShape = RoundedCornerShape(PIN_CORNER_RADIUS - PIN_BORDER_WIDTH)
+
+    val markerShape = remember {
+        MapMarkerShape(
+            cornerRadius = PIN_CORNER_RADIUS,
+            tailWidth = PIN_TAIL_WIDTH,
+            tailHeight = PIN_TAIL_HEIGHT
+        )
     }
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
+    // 1. Outer wrapper prevents the drop shadow from being clipped by the Map Bitmap
+    Box(
+        modifier = Modifier.padding(
+            start = 16.dp,
+            end = 16.dp,
+            top = 16.dp,
+            bottom = 4.dp // Kept small so the map pin anchor stays locked to the tail tip
+        )
     ) {
-        // ── Circular avatar body ──────────────────────────────────────────
+        // 2. The Pin Shape
         Box(
-            contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(PIN_BODY_SIZE)
-                .shadow(
-                    elevation = 10.dp,
-                    shape = CircleShape,
-                    ambientColor = accentColor.copy(alpha = 0.25f),
-                    spotColor = accentColor.copy(alpha = 0.35f)
+                .size(
+                    width = PIN_BODY_SIZE,
+                    height = PIN_BODY_SIZE + PIN_TAIL_HEIGHT
                 )
-                .background(resolvedBorderColor, CircleShape)
+                .drawBehind {
+                    // FIX: Draw the drop shadow ONLY for the squircle body, ignoring the tail
+                    val paint = Paint()
+                    val frameworkPaint = paint.asFrameworkPaint()
+                    frameworkPaint.color = android.graphics.Color.BLACK
+                    frameworkPaint.setShadowLayer(
+                        12.dp.toPx(), // Blur
+                        0f,           // Offset X
+                        8.dp.toPx(),  // Offset Y
+                        android.graphics.Color.argb(70, 0, 0, 0) // ~28% alpha black
+                    )
+
+                    drawIntoCanvas { canvas ->
+                        canvas.drawRoundRect(
+                            left = 0f,
+                            top = 0f,
+                            right = size.width,
+                            bottom = size.height - PIN_TAIL_HEIGHT.toPx(),
+                            radiusX = PIN_CORNER_RADIUS.toPx(), // ⬅️ Changed from rx
+                            radiusY = PIN_CORNER_RADIUS.toPx(), // ⬅️ Changed from ry
+                            paint = paint
+                        )
+                    }
+                }
+                .background(resolvedBorderColor, markerShape)
+                .padding(bottom = PIN_TAIL_HEIGHT)
                 .padding(PIN_BORDER_WIDTH)
-                .clip(CircleShape)
-                .background(accentColor)
-                .padding(PIN_INNER_PADDING)
-                .clip(CircleShape)
-                .background(surfaceVariant)
         ) {
-            if (avatarImageBitmap != null) {
-                Image(
-                    painter = BitmapPainter(avatarImageBitmap),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Text(
-                    text = fallbackLabel
-                        .trim()
-                        .take(1)
-                        .uppercase()
-                        .ifEmpty { "?" },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.ExtraBold
-                )
+            // ── Inner Avatar ────────────────────────────────────────────
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(innerClipShape)
+                    .background(accentColor)
+            ) {
+                if (avatarImageBitmap != null) {
+                    Image(
+                        painter = BitmapPainter(avatarImageBitmap),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Text(
+                        text = fallbackLabel.trim().take(1).uppercase().ifEmpty { "?" },
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
-
-        // ── Smooth curved tail pointer ────────────────────────────────────
-        Box(
-            modifier = Modifier
-                .offset(y = (-2).dp) // Overlap body slightly for seamless join
-                .size(width = PIN_TAIL_WIDTH, height = PIN_TAIL_HEIGHT)
-                .drawBehind {
-                    val path = Path().apply {
-                        // Flat top edge
-                        moveTo(0f, 0f)
-                        lineTo(size.width, 0f)
-                        // Right curve down to point
-                        cubicTo(
-                            size.width * 0.75f, size.height * 0.15f,
-                            size.width * 0.6f, size.height * 0.85f,
-                            size.width / 2f, size.height
-                        )
-                        // Left curve back up from point
-                        cubicTo(
-                            size.width * 0.4f, size.height * 0.85f,
-                            size.width * 0.25f, size.height * 0.15f,
-                            0f, 0f
-                        )
-                        close()
-                    }
-                    drawPath(path, color = resolvedBorderColor)
-                }
-        )
     }
 }
 
@@ -3679,7 +3767,8 @@ private fun Life360PinMarker(
 private fun MyLocationMarkerContent(
     avatarBitmap: Bitmap?,
     note: String = "",
-    meetupStatus: com.ovi.where.domain.model.MeetupParticipantStatus? = null
+    meetupStatus: com.ovi.where.domain.model.MeetupParticipantStatus? = null,
+    isAtHome: Boolean = false
 ) {
     val statusLabel = when {
         note.isNotBlank() -> FriendStatusLabel(text = note, tint = FriendStatusTint.Note)
@@ -3689,24 +3778,37 @@ private fun MyLocationMarkerContent(
         meetupStatus == com.ovi.where.domain.model.MeetupParticipantStatus.CANT_MAKE_IT ->
             FriendStatusLabel(text = "Can't make it", tint = FriendStatusTint.Error)
 
+        isAtHome -> FriendStatusLabel(text = "At Home", tint = FriendStatusTint.Home)
+
         else -> null
     }
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.widthIn(max = 220.dp)
+    // Use a Box so the bubble can overlap the pin's top-right (reference style).
+    Box(
+        modifier = Modifier
+            .padding(start = 120.dp, end = 180.dp, top = 100.dp),
+        contentAlignment = Alignment.BottomCenter
     ) {
-        if (statusLabel != null) {
-            FriendStatusBubble(
-                text = statusLabel.text,
-                tint = statusLabel.tint
-            )
-            Spacer(Modifier.height(2.dp))
-        }
+        // Pin at center-bottom.
         Life360PinMarker(
             avatarBitmap = avatarBitmap,
             fallbackLabel = "ME",
             accentColor = MaterialTheme.colorScheme.primary
         )
+        // Bubble anchored at the pin's top-right edge.
+        if (statusLabel != null) {
+            Box(
+                modifier = Modifier.size(0.dp),
+                contentAlignment = Alignment.BottomStart
+            ) {
+                FriendStatusBubble(
+                    text = statusLabel.text,
+                    tint = statusLabel.tint,
+                    caption = statusLabel.caption,
+                    modifier = Modifier
+                        .offset(x = 14.dp, y = (-30).dp)
+                )
+            }
+        }
     }
 }
 
@@ -3715,27 +3817,33 @@ private fun FriendMapMarkerContent(
     friend: FriendLocationUiModel,
     avatarBitmap: Bitmap?
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.widthIn(max = 220.dp)
+    // Use a Box so the bubble can overlap the pin's top-right (reference style).
+    Box(
+        modifier = Modifier
+            .padding(start = 120.dp, end = 180.dp, top = 100.dp),
+        contentAlignment = Alignment.BottomCenter
     ) {
-        // Status bubble — caption-style chip showing the user's free-form
-        // meetup note, or the canonical "Arrived" / "Can't make it" label
-        // when they're in a terminal status. We keep this above the pin so
-        // the avatar stays the focal point.
-        val statusLabel = friend.statusBubbleLabel()
-        if (statusLabel != null) {
-            FriendStatusBubble(
-                text = statusLabel.text,
-                tint = statusLabel.tint
-            )
-            Spacer(Modifier.height(2.dp))
-        }
+        // Pin at center-bottom.
         Life360PinMarker(
             avatarBitmap = avatarBitmap,
             fallbackLabel = friend.displayName.take(1).uppercase(),
             accentColor = avatarColorFor(friend.userId)
         )
+        // Bubble anchored at the pin's top-right edge.
+        val statusLabel = friend.statusBubbleLabel()
+        if (statusLabel != null) {
+            Box(
+                modifier = Modifier.size(0.dp),
+                contentAlignment = Alignment.BottomStart
+            ) {
+                FriendStatusBubble(
+                    text = statusLabel.text,
+                    tint = statusLabel.tint,
+                    caption = statusLabel.caption,
+                    modifier = Modifier.offset(x = 14.dp, y = (-30).dp)
+                )
+            }
+        }
     }
 }
 
@@ -3758,80 +3866,145 @@ private fun FriendLocationUiModel.statusBubbleLabel(): FriendStatusLabel? {
         com.ovi.where.domain.model.MeetupParticipantStatus.CANT_MAKE_IT ->
             FriendStatusLabel(text = "Can't make it", tint = FriendStatusTint.Error)
 
-        else -> null
+        else ->
+            // No meetup context — fall back to the home presence badge.
+            if (isAtHome) FriendStatusLabel(text = "At Home", tint = FriendStatusTint.Home)
+            else null
     }
 }
 
 private data class FriendStatusLabel(
     val text: String,
-    val tint: FriendStatusTint
+    val tint: FriendStatusTint,
+    /** Optional small caption shown above [text] (e.g. "Here for"). */
+    val caption: String? = null
 )
 
-private enum class FriendStatusTint { Note, Success, Error }
+private enum class FriendStatusTint { Note, Success, Error, Home }
 
 /**
- * Chat-bubble-shaped status caption shown above a friend's pin —
- * rounded body + a small triangular tail that points at the avatar
- * below. Reads like a WhatsApp / Messenger speech bubble so the user's
- * note feels like *their words*, not a plain badge.
- *
- * Tail is a 6dp-tall isoceles triangle drawn with [drawBehind] so we
- * stay on a single composition layer (no nested Surfaces / clips).
+ * Status bubble shown next to a map pin, styled after the reference: a white
+ * rounded pill with a colored rounded-square icon badge on the left and a
+ * text column on the right (optional small grey caption above a bold value).
+ * Each status drives the badge colour + icon. The pill overlaps the pin via
+ * the caller's offset/zIndex.
  */
 @Composable
-private fun FriendStatusBubble(text: String, tint: FriendStatusTint) {
-    val (bg, fg) = when (tint) {
-        FriendStatusTint.Note ->
-            MaterialTheme.colorScheme.surface to MaterialTheme.colorScheme.onSurface
-
-        FriendStatusTint.Success ->
-            MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
-
-        FriendStatusTint.Error ->
-            MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
-    }
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.widthIn(max = 200.dp)
-    ) {
-        // ── Bubble body ───────────────────────────────────────────────
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = bg,
-            tonalElevation = 2.dp,
-            shadowElevation = 3.dp
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelSmall,
-                color = fg,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-            )
+private fun FriendStatusBubble(
+    text: String,
+    tint: FriendStatusTint,
+    modifier: Modifier = Modifier,
+    caption: String? = null
+) {
+    // Per-status badge colour + icon/image. The pill body is always white.
+    val badgeColor: Color
+    val valueColor: Color
+    val badgeIcon: ImageVector?
+    val badgeImageRes: Int?
+    when (tint) {
+        FriendStatusTint.Success -> {
+            badgeColor = Color(0xFF2E7D32)
+            valueColor = Color(0xFF1B5E20)
+            badgeIcon = Icons.Rounded.CheckCircle
+            badgeImageRes = null
         }
 
-        // ── Tail pointing down at the avatar ──────────────────────────
-        // Slight overlap pulls the triangle into the body so the join
-        // reads as a single bubble rather than two stacked shapes.
-        Box(
-            modifier = Modifier
-                .offset(y = (-1).dp)
-                .size(width = 12.dp, height = 6.dp)
-                .drawBehind {
-                    val path = Path().apply {
-                        moveTo(0f, 0f)
-                        lineTo(size.width, 0f)
-                        lineTo(size.width / 2f, size.height)
-                        close()
-                    }
-                    drawPath(path, color = bg)
-                }
-        )
+        FriendStatusTint.Error -> {
+            badgeColor = Color(0xFFC62828)
+            valueColor = Color(0xFFB3261E)
+            badgeIcon = Icons.Rounded.Cancel
+            badgeImageRes = null
+        }
+
+        FriendStatusTint.Home -> {
+            badgeColor = Color(0xFF7C4DFF)
+            valueColor = Color(0xFF4527A0)
+            badgeIcon = null
+            badgeImageRes = R.drawable.mansion
+        }
+
+        FriendStatusTint.Note -> {
+            badgeColor = Color(0xFF5B6470)
+            valueColor = Color(0xFF1C1B1F)
+            badgeIcon = Icons.Rounded.ChatBubble
+            badgeImageRes = null
+        }
     }
+
+    val bodyColor = Color(0xFFFFFFFF)
+    val bubbleShape = RoundedCornerShape(50)
+
+    Box(modifier = modifier.padding(12.dp)) {
+    Surface(
+        modifier = Modifier
+            .widthIn(min = 44.dp, max = 200.dp)
+            .dropShadow(
+                shape = bubbleShape,
+                color = Color.Black.copy(alpha = 0.25f),
+                blur = 10.dp,
+                offsetX = 0.dp,
+                offsetY = 6.dp                           // Drops down
+            ),
+        shape = bubbleShape,
+        color = bodyColor,
+        shadowElevation = 0.dp
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 6.dp, end = 14.dp, top = 6.dp, bottom = 6.dp)
+        ) {
+            // Colored rounded-square icon badge.
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(badgeColor),
+                contentAlignment = Alignment.Center
+            ) {
+                if (badgeImageRes != null) {
+                    Image(
+                        painter = painterResource(id = badgeImageRes),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                } else if (badgeIcon != null) {
+                    Icon(
+                        imageVector = badgeIcon,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Column {
+                if (caption != null) {
+                    Text(
+                        text = caption,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF8A8F98),
+                        fontSize = 11.sp,
+                        lineHeight = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = valueColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = if (caption != null) 15.sp else 13.sp,
+                    lineHeight = 17.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
 }
 
 /**
@@ -3880,7 +4053,7 @@ private fun NavigationStatusCard(
                         imageVector = ImageVector.vectorResource(id = R.drawable.navigate_to),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
                 Spacer(Modifier.width(10.dp))
@@ -3977,7 +4150,7 @@ private fun NavigationStatusCard(
 
 @Composable
 private fun NavMetricChip(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     label: String,
     value: String,
     modifier: Modifier = Modifier
@@ -4020,5 +4193,125 @@ private fun NavMetricChip(
                 )
             }
         }
+    }
+}
+
+// ── Home pin marker (shown when a profile's Home section is tapped) ──────────
+@Composable
+private fun HomePinMarkerContent(
+    ownerName: String,
+    avatarBitmap: Bitmap?
+) {
+    Box(
+        modifier = Modifier
+            .padding(start = 120.dp, end = 180.dp, top = 100.dp),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Life360PinMarker(
+            avatarBitmap = avatarBitmap,
+            fallbackLabel = ownerName.take(1).uppercase(),
+            accentColor = MaterialTheme.colorScheme.primary
+        )
+        Box(
+            modifier = Modifier.size(0.dp),
+            contentAlignment = Alignment.BottomStart
+        ) {
+            FriendStatusBubble(
+                text = "$ownerName lives here",
+                tint = FriendStatusTint.Home,
+                modifier = Modifier.offset(x = 14.dp, y = (-30).dp)
+            )
+        }
+    }
+}
+
+/**
+ * A custom shape that merges the rounded rectangular body and the triangular pointer.
+ * This guarantees the shadow drops evenly behind the *entire* pin, including the tail.
+ */
+private class MapMarkerShape(
+    private val cornerRadius: Dp,
+    private val tailWidth: Dp,
+    private val tailHeight: Dp
+) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Outline = with(density) {
+        val cr = cornerRadius.toPx()
+        val tw = tailWidth.toPx()
+        val th = tailHeight.toPx()
+
+        val bodyHeight = size.height - th
+        val center = size.width / 2f
+        val halfTail = tw / 2f
+
+        val path = Path().apply {
+            // 1. Draw the main squircle body
+            addRoundRect(
+                RoundRect(
+                    left = 0f,
+                    top = 0f,
+                    right = size.width,
+                    bottom = bodyHeight,
+                    cornerRadius = CornerRadius(cr, cr)
+                )
+            )
+
+            // 2. Draw the tail seamlessly appended to the bottom
+            // Drawn clockwise to match addRoundRect's winding direction for a solid fill
+            moveTo(center - halfTail, bodyHeight)
+            lineTo(center + halfTail, bodyHeight) // Cross over to the right side of the tail base
+
+            // Curve down to the bottom tip
+            cubicTo(
+                center + halfTail * 0.7f, bodyHeight + th * 0.2f,
+                center + halfTail * 0.4f, bodyHeight + th * 0.8f,
+                center, size.height
+            )
+
+            // Curve back up to the left side
+            cubicTo(
+                center - halfTail * 0.4f, bodyHeight + th * 0.8f,
+                center - halfTail * 0.7f, bodyHeight + th * 0.2f,
+                center - halfTail, bodyHeight
+            )
+            close()
+        }
+
+        Outline.Generic(path)
+    }
+}
+
+
+/**
+ * Creates a true 2D drop shadow (Figma/CSS style) instead of Android's 3D elevation.
+ */
+fun Modifier.dropShadow(
+    shape: Shape,
+    color: Color = Color.Black.copy(alpha = 0.25f),
+    blur: Dp = 8.dp,
+    offsetX: Dp = 0.dp,
+    offsetY: Dp = 4.dp
+) = this.drawBehind {
+    val outline = shape.createOutline(size, layoutDirection, this)
+
+    val paint = Paint()
+    val frameworkPaint = paint.asFrameworkPaint()
+
+    // FIX: Must be an opaque color (like BLACK) to cast a shadow.
+    // Since we are drawing behind an opaque white UI, the black shape will be perfectly hidden!
+    frameworkPaint.color = android.graphics.Color.BLACK
+
+    frameworkPaint.setShadowLayer(
+        blur.toPx(),
+        offsetX.toPx(),
+        offsetY.toPx(),
+        color.toArgb()
+    )
+
+    drawIntoCanvas { canvas ->
+        canvas.drawOutline(outline, paint)
     }
 }

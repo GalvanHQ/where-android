@@ -19,7 +19,8 @@ import javax.inject.Inject
 class ProfileViewModel @Inject constructor(
     private val observeCurrentUserUseCase: ObserveCurrentUserUseCase,
     private val getUserGroupsUseCase: GetUserGroupsUseCase,
-    private val observeFriendsUseCase: ObserveFriendsUseCase
+    private val observeFriendsUseCase: ObserveFriendsUseCase,
+    private val homePinEventBus: com.ovi.where.core.event.HomePinEventBus
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfileUiState())
@@ -28,6 +29,24 @@ class ProfileViewModel @Inject constructor(
     init {
         observeUser()
         loadStats()
+    }
+
+    /**
+     * Publishes a request to show the current user's home on the map. The
+     * caller navigates to the Map tab; [com.ovi.where.presentation.map.GlobalMapViewModel]
+     * consumes the request and drops the pin.
+     */
+    fun showHomeOnMap() {
+        val p = _uiState.value.profile ?: return
+        if (!p.hasHome) return
+        homePinEventBus.requestShow(
+            userId = p.userId,
+            displayName = "You",
+            photoUrl = p.photoUrl,
+            latitude = p.homeLatitude,
+            longitude = p.homeLongitude,
+            label = p.homeLabel
+        )
     }
 
     private fun observeUser() {

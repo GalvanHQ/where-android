@@ -28,11 +28,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Chat
-import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.AddLink
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Group
-import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
@@ -53,9 +51,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,11 +65,13 @@ import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.ovi.where.core.theme.Dimens
+import androidx.core.net.toUri
 
 /**
- * Professional Profile screen with compact header + stats inline,
- * action buttons, and sectioned quick actions.
- * Inspired by Instagram / Telegram profile layouts.
+ * Profile screen — clean, content-first layout inspired by Instagram /
+ * Facebook: a compact header (avatar + stats + name + bio + home), primary
+ * actions, then a single "Links" list where every saved social link is its
+ * own full, tappable row.
  */
 @Composable
 fun ProfileScreen(
@@ -77,11 +79,13 @@ fun ProfileScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToMessages: () -> Unit,
     onNavigateToLocationSharing: () -> Unit,
+    onNavigateToMap: () -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(),
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val profile = uiState.profile
+    val context = LocalContext.current
 
     // ── Entrance animation ───────────────────────────────────────────────
     val contentAlpha = remember { Animatable(0f) }
@@ -104,6 +108,10 @@ fun ProfileScreen(
         label = "ring_alpha"
     )
 
+    val hasSocial = !profile?.facebookUrl.isNullOrBlank() ||
+        !profile?.instagramUrl.isNullOrBlank() ||
+        !profile?.linkedinUrl.isNullOrBlank()
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -112,130 +120,262 @@ fun ProfileScreen(
             .alpha(contentAlpha.value),
         contentPadding = PaddingValues(bottom = Dimens.space3XLarge)
     ) {
-            // ── Profile Card: Avatar + Info + Stats (Instagram-style) ────────
+        // ── Header: Avatar + Stats + Name + Bio ─────────────────────────
+        item {
+            ProfileHeaderCard(
+                displayName = profile?.displayName ?: "—",
+                username = profile?.username,
+                bio = profile?.bio,
+                photoUrl = profile?.photoUrl,
+                groupCount = uiState.groupCount,
+                friendCount = uiState.friendCount,
+                sharedCount = uiState.sharedLocations,
+                ringAlpha = ringAlpha
+            )
+        }
+
+        // ── Action Buttons ──────────────────────────────────────────────
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Dimens.spaceLarge),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
+            ) {
+                Button(
+                    onClick = onNavigateToEditProfile,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(Dimens.buttonHeightSmall),
+                    shape = RoundedCornerShape(Dimens.cornerMedium),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Icon(
+                        Icons.Outlined.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(Dimens.iconSizeSmall)
+                    )
+                    Spacer(modifier = Modifier.width(Dimens.spaceMedium))
+                    Text("Edit profile", style = MaterialTheme.typography.labelLarge)
+                }
+
+                OutlinedButton(
+                    onClick = onNavigateToSettings,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(Dimens.buttonHeightSmall),
+                    shape = RoundedCornerShape(Dimens.cornerMedium),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                ) {
+                    Icon(
+                        Icons.Outlined.Settings,
+                        contentDescription = null,
+                        modifier = Modifier.size(Dimens.iconSizeSmall)
+                    )
+                    Spacer(modifier = Modifier.width(Dimens.spaceMedium))
+                    Text("Settings", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+
+        // ── Home section ────────────────────────────────────────────────
+        if (profile != null) {
             item {
-                ProfileHeaderCard(
-                    displayName = profile?.displayName ?: "—",
-                    username = profile?.username,
-                    bio = profile?.bio,
-                    photoUrl = profile?.photoUrl,
-                    groupCount = uiState.groupCount,
-                    friendCount = uiState.friendCount,
-                    sharedCount = uiState.sharedLocations,
-                    ringAlpha = ringAlpha
+                SectionHeader(
+                    title = "Home",
+                    showEdit = profile.hasHome,
+                    onEdit = onNavigateToEditProfile
                 )
             }
-
-            // ── Action Buttons ───────────────────────────────────────────────
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal = Dimens.spaceLarge,
-                            vertical = Dimens.spaceLarge
-                        ),
-                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceMedium)
-                ) {
-                    Button(
-                        onClick = onNavigateToEditProfile,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp),
-                        shape = RoundedCornerShape(Dimens.cornerSmall),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
+                SectionCard {
+                    if (profile.hasHome) {
+                        AboutRow(
+                            icon = ImageVector.vectorResource(id = com.ovi.where.R.drawable.home_outlined),
+                            title = "Home",
+                            subtitle = profile.homeLabel.ifBlank { "Location set" },
+                            onClick = {
+                                viewModel.showHomeOnMap()
+                                onNavigateToMap()
+                            }
                         )
-                    ) {
-                        Icon(
-                            Icons.Outlined.Edit,
-                            contentDescription = null,
-                            modifier = Modifier.size(Dimens.iconSizeSmall)
+                    } else {
+                        SectionEmptyState(
+                            icon = ImageVector.vectorResource(id = com.ovi.where.R.drawable.home_outlined),
+                            text = "Set your home so friends know when you're around.",
+                            actionLabel = "Set home",
+                            onAction = onNavigateToEditProfile
                         )
-                        Spacer(modifier = Modifier.width(Dimens.spaceMedium))
-                        Text("Edit Profile", style = MaterialTheme.typography.labelLarge)
-                    }
-
-                    OutlinedButton(
-                        onClick = onNavigateToSettings,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp),
-                        shape = RoundedCornerShape(Dimens.cornerSmall),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    ) {
-                        Icon(
-                            Icons.Outlined.Settings,
-                            contentDescription = null,
-                            modifier = Modifier.size(Dimens.iconSizeSmall)
-                        )
-                        Spacer(modifier = Modifier.width(Dimens.spaceMedium))
-                        Text("Settings", style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }
 
-            // ── Section: Shortcuts ───────────────────────────────────────────
+            // ── Social section ────────────────────────────────────────────
             item {
-                Text(
-                    text = "Shortcuts",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(
-                        start = Dimens.spaceLarge,
-                        end = Dimens.spaceLarge,
-                        top = Dimens.spaceMedium,
-                        bottom = Dimens.spaceMedium
-                    )
+                SectionHeader(
+                    title = "Social",
+                    showEdit = hasSocial,
+                    onEdit = onNavigateToEditProfile
                 )
             }
-
             item {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Dimens.spaceLarge),
-                    shape = RoundedCornerShape(Dimens.cornerMedium),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    tonalElevation = 0.dp
-                ) {
-                    Column {
-                        QuickActionRow(
-                            icon = Icons.AutoMirrored.Outlined.Chat,
-                            title = "Messages",
-                            subtitle = "Your conversations",
-                            onClick = onNavigateToMessages
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 56.dp),
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                        )
-                        QuickActionRow(
-                            icon = Icons.Outlined.Group,
-                            title = "Groups",
-                            subtitle = "Manage your groups",
-                            onClick = onNavigateToMessages
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 56.dp),
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                        )
-                        QuickActionRow(
-                            icon = Icons.Outlined.LocationOn,
-                            title = "Location Sharing",
-                            subtitle = "Active sharing sessions",
-                            onClick = onNavigateToLocationSharing
+                SectionCard {
+                    if (hasSocial) {
+                        Column {
+                            val rows = buildList<@Composable () -> Unit> {
+                                if (profile.facebookUrl.isNotBlank()) add {
+                                    AboutRow(
+                                        icon = ImageVector.vectorResource(id = com.ovi.where.R.drawable.facebook),
+                                        title = "Facebook",
+                                        subtitle = prettySocialHandle(profile.facebookUrl),
+                                        onClick = { openSocialLink(context, profile.facebookUrl) }
+                                    )
+                                }
+                                if (profile.instagramUrl.isNotBlank()) add {
+                                    AboutRow(
+                                        icon = ImageVector.vectorResource(id = com.ovi.where.R.drawable.instagram),
+                                        title = "Instagram",
+                                        subtitle = prettySocialHandle(profile.instagramUrl),
+                                        onClick = { openSocialLink(context, profile.instagramUrl) }
+                                    )
+                                }
+                                if (profile.linkedinUrl.isNotBlank()) add {
+                                    AboutRow(
+                                        icon = ImageVector.vectorResource(id = com.ovi.where.R.drawable.linkedin),
+                                        title = "LinkedIn",
+                                        subtitle = prettySocialHandle(profile.linkedinUrl),
+                                        onClick = { openSocialLink(context, profile.linkedinUrl) }
+                                    )
+                                }
+                            }
+                            rows.forEachIndexed { index, row ->
+                                if (index > 0) {
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(start = 64.dp),
+                                        thickness = 0.5.dp,
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                    )
+                                }
+                                row()
+                            }
+                        }
+                    } else {
+                        SectionEmptyState(
+                            icon = Icons.Outlined.AddLink,
+                            text = "Link your Facebook, Instagram, or LinkedIn.",
+                            actionLabel = "Add links",
+                            onAction = onNavigateToEditProfile
                         )
                     }
                 }
             }
         }
+    }
+}
+
+// ── Section header (title + optional Edit action) ────────────────────────────
+@Composable
+private fun SectionHeader(
+    title: String,
+    showEdit: Boolean,
+    onEdit: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = Dimens.spaceLarge,
+                end = Dimens.spaceLarge,
+                top = Dimens.spaceXLarge,
+                bottom = Dimens.spaceMedium
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        if (showEdit) {
+            Text(
+                text = "Edit",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable(onClick = onEdit)
+            )
+        }
+    }
+}
+
+// ── Section card wrapper ──────────────────────────────────────────────────────
+@Composable
+private fun SectionCard(content: @Composable () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Dimens.spaceLarge),
+        shape = RoundedCornerShape(Dimens.cornerLarge),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 0.dp
+    ) {
+        content()
+    }
+}
+
+// ── Per-section empty state (compact, inviting) ──────────────────────────────
+@Composable
+private fun SectionEmptyState(
+    icon: ImageVector,
+    text: String,
+    actionLabel: String,
+    onAction: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onAction)
+            .padding(horizontal = Dimens.spaceLarge, vertical = Dimens.spaceLarge),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    shape = CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(modifier = Modifier.width(Dimens.spaceLarge))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(modifier = Modifier.width(Dimens.spaceMedium))
+        Text(
+            text = actionLabel,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
 }
 
 // ── Profile Header Card (Avatar left, Stats right — Instagram-style) ─────────
@@ -398,17 +538,18 @@ private fun StatItem(
     }
 }
 
+// ── About row (icon badge + title + subtitle, optional open action) ──────────
 @Composable
-private fun QuickActionRow(
+private fun AboutRow(
     icon: ImageVector,
     title: String,
     subtitle: String,
-    onClick: () -> Unit
+    onClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = Dimens.spaceLarge, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -439,14 +580,53 @@ private fun QuickActionRow(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
-        Icon(
-            Icons.Outlined.ChevronRight,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-        )
+        if (onClick != null) {
+            Icon(
+                Icons.AutoMirrored.Outlined.OpenInNew,
+                contentDescription = null,
+                modifier = Modifier.size(Dimens.iconSizeSmall),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
+        }
+    }
+}
+
+/**
+ * Strips scheme / www / trailing slash for a clean, readable handle line.
+ * "https://www.instagram.com/foo/" → "instagram.com/foo".
+ */
+internal fun prettySocialHandle(raw: String): String {
+    var s = raw.trim()
+    s = s.removePrefix("https://").removePrefix("http://")
+    s = s.removePrefix("www.")
+    s = s.trimEnd('/')
+    return s.ifBlank { raw.trim() }
+}
+
+/**
+ * Opens a social link in the browser. Bare handles / domains are normalized
+ * to an https URL so a value like "instagram.com/foo" or "foo" still opens.
+ */
+internal fun openSocialLink(context: android.content.Context, raw: String) {
+    val trimmed = raw.trim()
+    if (trimmed.isEmpty()) return
+    val url = when {
+        trimmed.startsWith("http://", ignoreCase = true) ||
+            trimmed.startsWith("https://", ignoreCase = true) -> trimmed
+        else -> "https://$trimmed"
+    }
+    try {
+        val intent = android.content.Intent(
+            android.content.Intent.ACTION_VIEW,
+            url.toUri()
+        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        // No browser / malformed URL — silently ignore.
     }
 }

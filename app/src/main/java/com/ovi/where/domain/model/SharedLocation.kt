@@ -28,7 +28,18 @@ data class SharedLocation(
     // Display info for live location bubble rendering
     val displayName: String = "",
     val photoUrl: String? = null,
-    val sharingStartedAt: Long = 0L
+    val sharingStartedAt: Long = 0L,
+    /**
+     * Denormalized "is this user currently at their saved home?" flag.
+     *
+     * Computed client-side by the *sharer's* own device (it's the only
+     * device that knows the sharer's home coords) on every location write,
+     * by checking whether the live GPS fix falls within
+     * [com.ovi.where.core.constants.AppConstants.HOME_RADIUS_METERS] of
+     * their saved home. Viewers just read the boolean — they never need
+     * the sharer's home coordinates, which keeps home location private.
+     */
+    val isAtHome: Boolean = false
 ) {
     /**
      * Secondary constructor for Firestore deserialization.
@@ -55,6 +66,7 @@ data class SharedLocation(
         visibleTo = emptyList(),
         displayName = "",
         photoUrl = null,
-        sharingStartedAt = 0L
+        sharingStartedAt = 0L,
+        isAtHome = false
     )
 }

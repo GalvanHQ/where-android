@@ -40,10 +40,41 @@ data class User(
      * user is offline. We don't need a server-side rule mirror because
      * the foreign side never reads my mode — only my own client does.
      */
-    val locationSharingMode: String = "friends"
+    val locationSharingMode: String = "friends",
+
+    // ── Home location ─────────────────────────────────────────────────────────
+    /**
+     * The user's home coordinates, picked on a map in Edit Profile. A value of
+     * `0.0` for both lat/lng means "no home set" (see [hasHome]).
+     *
+     * Home is used for two things:
+     *  • Rendered on the profile (own + other) as a "Home" row.
+     *  • Drives the denormalized `isAtHome` flag the location pipeline writes
+     *    onto `activeLocations/{uid}` — when the live GPS fix falls inside the
+     *    home geofence the user's pin shows an "At Home" badge to viewers.
+     */
+    val homeLatitude: Double = 0.0,
+    val homeLongitude: Double = 0.0,
+    /** Optional human-readable label for [homeLatitude]/[homeLongitude] (resolved address). */
+    val homeLabel: String = "",
+
+    // ── Social links ───────────────────────────────────────────────────────────
+    /**
+     * Social handles or full URLs the user chooses to share on their profile.
+     * Stored verbatim as the user typed them; the UI normalizes bare handles
+     * to full `https://…` links when opening them. Empty string = not set.
+     */
+    val facebookUrl: String = "",
+    val instagramUrl: String = "",
+    val linkedinUrl: String = ""
 ) {
     /** Profile is complete when the user has chosen a username. */
     @get:Exclude
     val isProfileComplete: Boolean
         get() = username.isNotBlank()
+
+    /** True when the user has set a home location (non-zero coordinates). */
+    @get:Exclude
+    val hasHome: Boolean
+        get() = homeLatitude != 0.0 || homeLongitude != 0.0
 }

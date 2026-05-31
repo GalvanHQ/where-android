@@ -61,6 +61,7 @@ class UserProfileViewModel @Inject constructor(
     private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter,
     private val closeFriendsRepository: com.ovi.where.data.repository.CloseFriendsRepository,
     private val userCache: com.ovi.where.data.cache.UserCache,
+    private val homePinEventBus: com.ovi.where.core.event.HomePinEventBus,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UserProfileUiState())
@@ -311,6 +312,24 @@ class UserProfileViewModel @Inject constructor(
 
     fun onChatNavigated() {
         _navigateToChat.value = null
+    }
+
+    /**
+     * Publishes a request to show this user's home on the map. The caller
+     * navigates to the Map tab; the map consumes the request and drops a
+     * pin with a "This is <name>'s home" bubble.
+     */
+    fun showHomeOnMap() {
+        val p = _uiState.value.profile ?: return
+        if (!p.hasHome) return
+        homePinEventBus.requestShow(
+            userId = p.userId,
+            displayName = p.displayName,
+            photoUrl = p.photoUrl,
+            latitude = p.homeLatitude,
+            longitude = p.homeLongitude,
+            label = p.homeLabel
+        )
     }
 
     /**

@@ -11,6 +11,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Person
@@ -96,6 +98,7 @@ fun UserProfileScreen(
     userId: String,
     onNavigateBack: () -> Unit = {},
     onNavigateToChat: (String) -> Unit = {},
+    onNavigateToMap: () -> Unit = {},
     viewModel: UserProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -490,7 +493,7 @@ fun UserProfileScreen(
                             }
                         }
 
-                        // ── Info Section ─────────────────────────────────────────
+                        // ── About Section ────────────────────────────────────────
                         item {
                             Text(
                                 text = "About",
@@ -542,6 +545,109 @@ fun UserProfileScreen(
                                             title = "Member since",
                                             subtitle = formatJoinDate(profile.createdAt)
                                         )
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── Home Section ─────────────────────────────────────────
+                        if (profile.hasHome) {
+                            item {
+                                Text(
+                                    text = "Home",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(
+                                        start = Dimens.spaceLarge,
+                                        top = Dimens.spaceLarge,
+                                        bottom = Dimens.spaceMedium
+                                    )
+                                )
+                            }
+                            item {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = Dimens.spaceLarge),
+                                    shape = RoundedCornerShape(Dimens.cornerMedium),
+                                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                    tonalElevation = 0.dp
+                                ) {
+                                    InfoRow(
+                                        icon = ImageVector.vectorResource(id = R.drawable.home_outlined),
+                                        title = "Home",
+                                        subtitle = profile.homeLabel.ifBlank { "Location set" },
+                                        onClick = {
+                                            viewModel.showHomeOnMap()
+                                            onNavigateToMap()
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        // ── Social Section ───────────────────────────────────────
+                        if (profile.hasAnySocial) {
+                            item {
+                                Text(
+                                    text = "Social",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(
+                                        start = Dimens.spaceLarge,
+                                        top = Dimens.spaceLarge,
+                                        bottom = Dimens.spaceMedium
+                                    )
+                                )
+                            }
+                            item {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = Dimens.spaceLarge),
+                                    shape = RoundedCornerShape(Dimens.cornerMedium),
+                                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                    tonalElevation = 0.dp
+                                ) {
+                                    Column {
+                                        val socialRows = buildList<@Composable () -> Unit> {
+                                            if (profile.facebookUrl.isNotBlank()) add {
+                                                InfoRow(
+                                                    icon = ImageVector.vectorResource(id = R.drawable.facebook),
+                                                    title = "Facebook",
+                                                    subtitle = com.ovi.where.presentation.profile.prettySocialHandle(profile.facebookUrl),
+                                                    onClick = { com.ovi.where.presentation.profile.openSocialLink(context, profile.facebookUrl) }
+                                                )
+                                            }
+                                            if (profile.instagramUrl.isNotBlank()) add {
+                                                InfoRow(
+                                                    icon = ImageVector.vectorResource(id = R.drawable.instagram),
+                                                    title = "Instagram",
+                                                    subtitle = com.ovi.where.presentation.profile.prettySocialHandle(profile.instagramUrl),
+                                                    onClick = { com.ovi.where.presentation.profile.openSocialLink(context, profile.instagramUrl) }
+                                                )
+                                            }
+                                            if (profile.linkedinUrl.isNotBlank()) add {
+                                                InfoRow(
+                                                    icon = ImageVector.vectorResource(id = R.drawable.linkedin),
+                                                    title = "LinkedIn",
+                                                    subtitle = com.ovi.where.presentation.profile.prettySocialHandle(profile.linkedinUrl),
+                                                    onClick = { com.ovi.where.presentation.profile.openSocialLink(context, profile.linkedinUrl) }
+                                                )
+                                            }
+                                        }
+                                        socialRows.forEachIndexed { index, row ->
+                                            if (index > 0) {
+                                                HorizontalDivider(
+                                                    modifier = Modifier.padding(start = 56.dp),
+                                                    thickness = 0.5.dp,
+                                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                                )
+                                            }
+                                            row()
+                                        }
                                     }
                                 }
                             }
@@ -618,11 +724,13 @@ private fun StatItem(
 private fun InfoRow(
     icon: ImageVector,
     title: String,
-    subtitle: String
+    subtitle: String,
+    onClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = Dimens.spaceLarge, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -652,7 +760,17 @@ private fun InfoRow(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        if (onClick != null) {
+            Icon(
+                Icons.AutoMirrored.Outlined.OpenInNew,
+                contentDescription = null,
+                modifier = Modifier.size(Dimens.iconSizeSmall),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
             )
         }
     }
@@ -676,4 +794,28 @@ private fun formatShortDate(timestamp: Long): String {
 private fun formatJoinDate(timestamp: Long): String {
     if (timestamp == 0L) return "Unknown"
     return SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Date(timestamp))
+}
+
+// ── Compact social chip (small inline pill, IG/Telegram-style) ───────────────
+@Composable
+private fun SocialChip(
+    iconRes: Int,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = ImageVector.vectorResource(id = iconRes),
+            contentDescription = contentDescription,
+            modifier = Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.onSurface
+        )
+    }
 }

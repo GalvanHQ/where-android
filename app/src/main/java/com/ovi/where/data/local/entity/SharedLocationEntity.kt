@@ -30,6 +30,8 @@ data class SharedLocationEntity(
     val photoUrl: String? = null,
     val targetType: String = "",
     val targetId: String = "",
+    /** Denormalized "at home" flag — see [SharedLocation.isAtHome]. */
+    val isAtHome: Boolean = false,
     /** JSON-serialized list of target ids for multi-target shares.
      *  When the sharer fans out to several groups + direct friends at once,
      *  the legacy [targetId] is empty and only [targetIdsJson] carries the
@@ -58,6 +60,7 @@ fun SharedLocationEntity.toDomain(): SharedLocation {
         sharingStartedAt = sharingStartedAt,
         targetType = targetType,
         targetId = targetId,
+        isAtHome = isAtHome,
         targetIds = targetIdsJson?.let {
             try {
                 Json.parseToJsonElement(it).jsonArray.map { el -> el.jsonPrimitive.content }
@@ -89,6 +92,7 @@ fun SharedLocation.toEntity(): SharedLocationEntity {
         sharingStartedAt = sharingStartedAt,
         targetType = targetType,
         targetId = targetId,
+        isAtHome = isAtHome,
         targetIdsJson = if (targetIds.isNotEmpty()) {
             JsonArray(targetIds.map { JsonPrimitive(it) }).toString()
         } else null,

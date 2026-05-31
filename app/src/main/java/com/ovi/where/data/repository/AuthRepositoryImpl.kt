@@ -390,6 +390,72 @@ constructor(
         return docs.isEmpty || (docs.size() == 1 && docs.documents[0].id == currentUid)
     }
 
+    // ── Home location ──────────────────────────────────────────────────────────
+
+    override suspend fun updateHome(
+            latitude: Double,
+            longitude: Double,
+            label: String
+    ): Resource<User> {
+        return try {
+            val userId = currentUserId ?: return Resource.Error("Not authenticated")
+            firestore
+                    .collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                    .document(userId)
+                    .update(
+                            mapOf(
+                                    "homeLatitude" to latitude,
+                                    "homeLongitude" to longitude,
+                                    "homeLabel" to label
+                            )
+                    )
+                    .await()
+            Resource.Success(
+                    fetchUserWithFallback(userId, "", null)
+                            .copy(
+                                    homeLatitude = latitude,
+                                    homeLongitude = longitude,
+                                    homeLabel = label
+                            )
+            )
+        } catch (e: Exception) {
+            Resource.Error(mapFirebaseError(e))
+        }
+    }
+
+    // ── Social links ─────────────────────────────────────────────────────────
+
+    override suspend fun updateSocialLinks(
+            facebookUrl: String,
+            instagramUrl: String,
+            linkedinUrl: String
+    ): Resource<User> {
+        return try {
+            val userId = currentUserId ?: return Resource.Error("Not authenticated")
+            firestore
+                    .collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                    .document(userId)
+                    .update(
+                            mapOf(
+                                    "facebookUrl" to facebookUrl,
+                                    "instagramUrl" to instagramUrl,
+                                    "linkedinUrl" to linkedinUrl
+                            )
+                    )
+                    .await()
+            Resource.Success(
+                    fetchUserWithFallback(userId, "", null)
+                            .copy(
+                                    facebookUrl = facebookUrl,
+                                    instagramUrl = instagramUrl,
+                                    linkedinUrl = linkedinUrl
+                            )
+            )
+        } catch (e: Exception) {
+            Resource.Error(mapFirebaseError(e))
+        }
+    }
+
     // ── Email verification ───────────────────────────────────────────────────
 
     override suspend fun sendEmailVerification(): Resource<Unit> {

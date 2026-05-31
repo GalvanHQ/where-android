@@ -42,7 +42,7 @@ import com.ovi.where.data.local.entity.VoiceMessageCacheEntity
         NotificationEntity::class,
         com.ovi.where.data.local.entity.UserCacheEntity::class
     ],
-    version = 19,
+    version = 20,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -310,6 +310,28 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE `shared_location` ADD COLUMN `targetIdsJson` TEXT DEFAULT NULL"
                 )
+            }
+        }
+
+        /**
+         * Adds home + social columns to `user_cache` and the denormalized
+         * `isAtHome` flag to `shared_location`.
+         *
+         * The home/social columns let the profile screens render a cached
+         * user's Home row + social links without waiting on Firestore, and
+         * `isAtHome` carries the sharer's "at home" state to viewers so the
+         * map pin can show an "At Home" badge. All additive with safe
+         * defaults so existing rows read unchanged.
+         */
+        val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `user_cache` ADD COLUMN `homeLatitude` REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE `user_cache` ADD COLUMN `homeLongitude` REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE `user_cache` ADD COLUMN `homeLabel` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `user_cache` ADD COLUMN `facebookUrl` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `user_cache` ADD COLUMN `instagramUrl` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `user_cache` ADD COLUMN `linkedinUrl` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `shared_location` ADD COLUMN `isAtHome` INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

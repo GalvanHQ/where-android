@@ -61,6 +61,14 @@ sealed class Screen(val route: String) {
     @Serializable
     data object EditProfile : Screen("edit_profile")
 
+    /**
+     * Full-screen map picker for choosing a home location. Seeded with the
+     * current home (or last-known GPS) and returns the picked coordinates +
+     * resolved address to [EditProfile] via a savedStateHandle result.
+     */
+    @Serializable
+    data object HomePicker : Screen("home_picker")
+
     @Serializable
     data object MyProfile : Screen("my_profile")
 

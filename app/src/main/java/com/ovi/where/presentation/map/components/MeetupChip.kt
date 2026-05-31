@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -24,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
@@ -31,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ovi.where.R
 import com.ovi.where.domain.model.MeetupDestination
+import com.ovi.where.presentation.map.softDropShadow
 
 /**
  * Top-of-map labeled chip for the meetup destination.
@@ -65,7 +65,7 @@ fun MeetupChip(
     ) { isActive ->
         if (isActive && destination != null) {
             ActiveChip(
-                name = destination.name.ifBlank { "Meetup point" },
+                name = destination.name.ifBlank { "Meetup Point" },
                 distanceText = distanceText,
                 onClick = onActiveClick
             )
@@ -81,13 +81,18 @@ private fun IdleChip(onClick: () -> Unit) {
     Surface(
         modifier = Modifier
             .height(CHIP_HEIGHT)
+            .padding(end = 16.dp)
+            .softDropShadow(
+                color = Color.Black.copy(alpha = 0.12f),
+                blurRadius = 16.dp,
+                offsetY = 6.dp
+            )
             .clip(RoundedCornerShape(50))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shadowElevation = 8.dp,
-        tonalElevation = 1.dp
+        shadowElevation = 0.dp
     ) {
         Row(
             modifier = Modifier.padding(start = 12.dp, end = 16.dp),
@@ -101,7 +106,7 @@ private fun IdleChip(onClick: () -> Unit) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "Meetup point",
+                text = "Meetup Point",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -122,13 +127,18 @@ private fun ActiveChip(
     Surface(
         modifier = Modifier
             .height(CHIP_HEIGHT)
+            .padding(end = 16.dp)
+            .softDropShadow(
+                color = Color.Black.copy(alpha = 0.12f),
+                blurRadius = 16.dp,
+                offsetY = 6.dp
+            )
             .clip(RoundedCornerShape(50))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.primary,
         contentColor = MaterialTheme.colorScheme.onPrimary,
-        shadowElevation = 8.dp,
-        tonalElevation = 1.dp
+        shadowElevation = 0.dp
     ) {
         Row(
             modifier = Modifier.padding(start = 12.dp, end = 16.dp),

@@ -118,7 +118,6 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toArgb
@@ -912,13 +911,18 @@ fun GlobalMapScreen(
                     Surface(
                         modifier = Modifier
                             .height(40.dp)
+                            .padding(start = 16.dp)
+                            .softDropShadow(
+                                color = Color.Black.copy(alpha = 0.12f),
+                                blurRadius = 16.dp,
+                                offsetY = 6.dp
+                            )
                             .clip(RoundedCornerShape(50))
                             .clickable { viewModel.showGroupPicker(true) },
                         shape = RoundedCornerShape(50),
                         color = MaterialTheme.colorScheme.surface,
                         contentColor = MaterialTheme.colorScheme.onSurface,
-                        shadowElevation = 8.dp,
-                        tonalElevation = 1.dp
+                        shadowElevation = 0.dp
                     ) {
                         Row(
                             modifier = Modifier.padding(start = 12.dp, end = 8.dp),
@@ -979,7 +983,7 @@ fun GlobalMapScreen(
             if (uiState.isMeetupNavigating) {
                 NavigationStatusCard(
                     destinationName = uiState.meetupDestination?.name?.takeIf { it.isNotBlank() }
-                        ?: "Meetup point",
+                        ?: "Meetup Point",
                     distanceLabel = uiState.navigationDistanceLabel,
                     etaLabel = uiState.navigationEtaLabel,
                     isLoading = uiState.navigationLoading,
@@ -3672,7 +3676,8 @@ private fun Life360PinMarker(
     avatarBitmap: Bitmap?,
     fallbackLabel: String,
     accentColor: Color,
-    borderColor: Color = Color.Unspecified
+    borderColor: Color = Color.Unspecified,
+    modifier: Modifier = Modifier
 ) {
     val resolvedBorderColor = if (borderColor == Color.Unspecified) {
         MaterialTheme.colorScheme.surface
@@ -3693,7 +3698,7 @@ private fun Life360PinMarker(
 
     // 1. Outer wrapper prevents the drop shadow from being clipped by the Map Bitmap
     Box(
-        modifier = Modifier.padding(
+        modifier = modifier.padding(
             start = 16.dp,
             end = 16.dp,
             top = 16.dp,
@@ -3774,41 +3779,31 @@ private fun MyLocationMarkerContent(
         note.isNotBlank() -> FriendStatusLabel(text = note, tint = FriendStatusTint.Note)
         meetupStatus == com.ovi.where.domain.model.MeetupParticipantStatus.ARRIVED ->
             FriendStatusLabel(text = "Arrived", tint = FriendStatusTint.Success)
-
         meetupStatus == com.ovi.where.domain.model.MeetupParticipantStatus.CANT_MAKE_IT ->
             FriendStatusLabel(text = "Can't make it", tint = FriendStatusTint.Error)
-
         isAtHome -> FriendStatusLabel(text = "At Home", tint = FriendStatusTint.Home)
-
         else -> null
     }
-    // Use a Box so the bubble can overlap the pin's top-right (reference style).
-    Box(
-        modifier = Modifier
-            .padding(start = 120.dp, end = 180.dp, top = 100.dp),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        // Pin at center-bottom.
+    if (statusLabel != null) {
+        // Row: pin + bubble with negative margin so bubble overlaps pin's right edge.
+        Row(verticalAlignment = Alignment.Top) {
+            Life360PinMarker(
+                avatarBitmap = avatarBitmap,
+                fallbackLabel = "ME",
+                accentColor = MaterialTheme.colorScheme.primary
+            )
+            FriendStatusBubble(
+                text = statusLabel.text,
+                tint = statusLabel.tint,
+                modifier = Modifier.offset(x = (-40).dp, y = 5.dp)
+            )
+        }
+    } else {
         Life360PinMarker(
             avatarBitmap = avatarBitmap,
             fallbackLabel = "ME",
             accentColor = MaterialTheme.colorScheme.primary
         )
-        // Bubble anchored at the pin's top-right edge.
-        if (statusLabel != null) {
-            Box(
-                modifier = Modifier.size(0.dp),
-                contentAlignment = Alignment.BottomStart
-            ) {
-                FriendStatusBubble(
-                    text = statusLabel.text,
-                    tint = statusLabel.tint,
-                    caption = statusLabel.caption,
-                    modifier = Modifier
-                        .offset(x = 14.dp, y = (-30).dp)
-                )
-            }
-        }
     }
 }
 
@@ -3817,33 +3812,26 @@ private fun FriendMapMarkerContent(
     friend: FriendLocationUiModel,
     avatarBitmap: Bitmap?
 ) {
-    // Use a Box so the bubble can overlap the pin's top-right (reference style).
-    Box(
-        modifier = Modifier
-            .padding(start = 120.dp, end = 180.dp, top = 100.dp),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        // Pin at center-bottom.
+    val statusLabel = friend.statusBubbleLabel()
+    if (statusLabel != null) {
+        Row(verticalAlignment = Alignment.Top) {
+            Life360PinMarker(
+                avatarBitmap = avatarBitmap,
+                fallbackLabel = friend.displayName.take(1).uppercase(),
+                accentColor = avatarColorFor(friend.userId)
+            )
+            FriendStatusBubble(
+                text = statusLabel.text,
+                tint = statusLabel.tint,
+                modifier = Modifier.offset(x = (-40).dp, y = 5.dp)
+            )
+        }
+    } else {
         Life360PinMarker(
             avatarBitmap = avatarBitmap,
             fallbackLabel = friend.displayName.take(1).uppercase(),
             accentColor = avatarColorFor(friend.userId)
         )
-        // Bubble anchored at the pin's top-right edge.
-        val statusLabel = friend.statusBubbleLabel()
-        if (statusLabel != null) {
-            Box(
-                modifier = Modifier.size(0.dp),
-                contentAlignment = Alignment.BottomStart
-            ) {
-                FriendStatusBubble(
-                    text = statusLabel.text,
-                    tint = statusLabel.tint,
-                    caption = statusLabel.caption,
-                    modifier = Modifier.offset(x = 14.dp, y = (-30).dp)
-                )
-            }
-        }
     }
 }
 
@@ -3875,136 +3863,95 @@ private fun FriendLocationUiModel.statusBubbleLabel(): FriendStatusLabel? {
 
 private data class FriendStatusLabel(
     val text: String,
-    val tint: FriendStatusTint,
-    /** Optional small caption shown above [text] (e.g. "Here for"). */
-    val caption: String? = null
+    val tint: FriendStatusTint
 )
 
 private enum class FriendStatusTint { Note, Success, Error, Home }
 
 /**
- * Status bubble shown next to a map pin, styled after the reference: a white
- * rounded pill with a colored rounded-square icon badge on the left and a
- * text column on the right (optional small grey caption above a bold value).
- * Each status drives the badge colour + icon. The pill overlaps the pin via
- * the caller's offset/zIndex.
+ * Status bubble shown next to a map pin: white rounded pill with an
+ * image or icon on the left and text on the right. No badge box, no caption.
  */
 @Composable
 private fun FriendStatusBubble(
     text: String,
     tint: FriendStatusTint,
-    modifier: Modifier = Modifier,
-    caption: String? = null
+    modifier: Modifier = Modifier
 ) {
-    // Per-status badge colour + icon/image. The pill body is always white.
-    val badgeColor: Color
-    val valueColor: Color
-    val badgeIcon: ImageVector?
-    val badgeImageRes: Int?
+    val textColor: Color
+    val bubbleColor: Color
+    val iconTint: Color
+    val iconVector: ImageVector?
+    val imageRes: Int?
     when (tint) {
         FriendStatusTint.Success -> {
-            badgeColor = Color(0xFF2E7D32)
-            valueColor = Color(0xFF1B5E20)
-            badgeIcon = Icons.Rounded.CheckCircle
-            badgeImageRes = null
+            bubbleColor = Color(0xFF4CAF50)
+            textColor = Color.White
+            iconTint = Color.White
+            iconVector = Icons.Rounded.CheckCircle
+            imageRes = null
         }
-
         FriendStatusTint.Error -> {
-            badgeColor = Color(0xFFC62828)
-            valueColor = Color(0xFFB3261E)
-            badgeIcon = Icons.Rounded.Cancel
-            badgeImageRes = null
+            bubbleColor = Color(0xFFE53935)
+            textColor = Color.White
+            iconTint = Color.White
+            iconVector = Icons.Rounded.Cancel
+            imageRes = null
         }
-
         FriendStatusTint.Home -> {
-            badgeColor = Color(0xFF7C4DFF)
-            valueColor = Color(0xFF4527A0)
-            badgeIcon = null
-            badgeImageRes = R.drawable.mansion
+            bubbleColor = Color(0xFF7C4DFF)
+            textColor = Color.White
+            iconTint = Color.Unspecified
+            iconVector = null
+            imageRes = R.drawable.mansion
         }
-
         FriendStatusTint.Note -> {
-            badgeColor = Color(0xFF5B6470)
-            valueColor = Color(0xFF1C1B1F)
-            badgeIcon = Icons.Rounded.ChatBubble
-            badgeImageRes = null
+            bubbleColor = Color(0xFF1E88E5)
+            textColor = Color.White
+            iconTint = Color.White
+            iconVector = Icons.Rounded.ChatBubble
+            imageRes = null
         }
     }
 
-    val bodyColor = Color(0xFFFFFFFF)
-    val bubbleShape = RoundedCornerShape(50)
-
-    Box(modifier = modifier.padding(12.dp)) {
     Surface(
-        modifier = Modifier
-            .widthIn(min = 44.dp, max = 200.dp)
-            .dropShadow(
-                shape = bubbleShape,
-                color = Color.Black.copy(alpha = 0.25f),
-                blur = 10.dp,
-                offsetX = 0.dp,
-                offsetY = 6.dp                           // Drops down
-            ),
-        shape = bubbleShape,
-        color = bodyColor,
-        shadowElevation = 0.dp
+        modifier = modifier.widthIn(min = 44.dp),
+        shape = RoundedCornerShape(50),
+        color = bubbleColor,
+        shadowElevation = 6.dp
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(start = 6.dp, end = 14.dp, top = 6.dp, bottom = 6.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
         ) {
-            // Colored rounded-square icon badge.
-            Box(
-                modifier = Modifier
-                    .size(30.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(badgeColor),
-                contentAlignment = Alignment.Center
-            ) {
-                if (badgeImageRes != null) {
-                    Image(
-                        painter = painterResource(id = badgeImageRes),
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                } else if (badgeIcon != null) {
-                    Icon(
-                        imageVector = badgeIcon,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Column {
-                if (caption != null) {
-                    Text(
-                        text = caption,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF8A8F98),
-                        fontSize = 11.sp,
-                        lineHeight = 13.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = valueColor,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = if (caption != null) 15.sp else 13.sp,
-                    lineHeight = 17.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+            if (imageRes != null) {
+                Image(
+                    painter = painterResource(id = imageRes),
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+            } else if (iconVector != null) {
+                Icon(
+                    imageVector = iconVector,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(12.dp)
                 )
             }
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge,
+                color = textColor,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                lineHeight = 14.sp,
+                maxLines = 5,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 100.dp)
+            )
         }
     }
-}
 }
 
 /**
@@ -4202,26 +4149,17 @@ private fun HomePinMarkerContent(
     ownerName: String,
     avatarBitmap: Bitmap?
 ) {
-    Box(
-        modifier = Modifier
-            .padding(start = 120.dp, end = 180.dp, top = 100.dp),
-        contentAlignment = Alignment.BottomCenter
-    ) {
+    Row(verticalAlignment = Alignment.Top) {
         Life360PinMarker(
             avatarBitmap = avatarBitmap,
             fallbackLabel = ownerName.take(1).uppercase(),
             accentColor = MaterialTheme.colorScheme.primary
         )
-        Box(
-            modifier = Modifier.size(0.dp),
-            contentAlignment = Alignment.BottomStart
-        ) {
-            FriendStatusBubble(
-                text = "$ownerName lives here",
-                tint = FriendStatusTint.Home,
-                modifier = Modifier.offset(x = 14.dp, y = (-30).dp)
-            )
-        }
+        FriendStatusBubble(
+            text = "$ownerName lives here",
+            tint = FriendStatusTint.Home,
+            modifier = Modifier.offset(x = (-40).dp, y = 5.dp)
+        )
     }
 }
 
@@ -4284,34 +4222,37 @@ private class MapMarkerShape(
     }
 }
 
-
-/**
- * Creates a true 2D drop shadow (Figma/CSS style) instead of Android's 3D elevation.
- */
-fun Modifier.dropShadow(
-    shape: Shape,
-    color: Color = Color.Black.copy(alpha = 0.25f),
-    blur: Dp = 8.dp,
+fun Modifier.softDropShadow(
+    color: Color = Color(0x26000000), // 15% black
+    blurRadius: Dp = 12.dp,
+    offsetY: Dp = 4.dp,
     offsetX: Dp = 0.dp,
-    offsetY: Dp = 4.dp
+    cornerRadius: Dp = 20.dp // Half of your 40.dp height to make a perfect pill
 ) = this.drawBehind {
-    val outline = shape.createOutline(size, layoutDirection, this)
+    val shadowColor = color.toArgb()
+    val transparent = Color.Transparent.toArgb()
 
-    val paint = Paint()
-    val frameworkPaint = paint.asFrameworkPaint()
-
-    // FIX: Must be an opaque color (like BLACK) to cast a shadow.
-    // Since we are drawing behind an opaque white UI, the black shape will be perfectly hidden!
-    frameworkPaint.color = android.graphics.Color.BLACK
-
-    frameworkPaint.setShadowLayer(
-        blur.toPx(),
-        offsetX.toPx(),
-        offsetY.toPx(),
-        color.toArgb()
-    )
+    val paint = Paint().apply {
+        asFrameworkPaint().apply {
+            this.color = transparent
+            setShadowLayer(
+                blurRadius.toPx(),
+                offsetX.toPx(),
+                offsetY.toPx(),
+                shadowColor
+            )
+        }
+    }
 
     drawIntoCanvas { canvas ->
-        canvas.drawOutline(outline, paint)
+        canvas.drawRoundRect(
+            left = 0f,
+            top = 0f,
+            right = size.width,
+            bottom = size.height,
+            radiusX = cornerRadius.toPx(),
+            radiusY = cornerRadius.toPx(),
+            paint = paint
+        )
     }
 }

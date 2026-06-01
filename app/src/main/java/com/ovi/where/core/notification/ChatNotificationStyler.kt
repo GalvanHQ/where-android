@@ -9,7 +9,7 @@ import androidx.core.graphics.drawable.IconCompat
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
-import com.ovi.where.R
+import com.ovi.where.core.notification.ChatNotificationStyler.Companion.MAX_HISTORY
 import com.ovi.where.data.local.dao.MessageDao
 import com.ovi.where.data.local.entity.MessageEntity
 import com.ovi.where.domain.model.MessageType

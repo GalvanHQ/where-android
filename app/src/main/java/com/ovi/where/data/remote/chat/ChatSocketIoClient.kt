@@ -1,6 +1,5 @@
 package com.ovi.where.data.remote.chat
 
-import android.util.Log
 import com.ovi.where.data.remote.chat.ChatSocketIoClient.Companion.FOREGROUND_RECONNECT_TIMEOUT_MS
 import io.socket.client.IO
 import io.socket.client.Socket
@@ -91,7 +90,7 @@ class ChatSocketIoClient @Inject constructor() {
             }
 
             socket?.on(Socket.EVENT_CONNECT_ERROR) { args ->
-                Log.e(TAG, "Socket.IO connect error: ${args.firstOrNull()}")
+                Timber.tag(TAG).e("Socket.IO connect error: ${args.firstOrNull()}")
                 _connectionState.value = ConnectionState.ERROR
                 if (!isManualDisconnect) {
                     startReconnection()
@@ -104,7 +103,7 @@ class ChatSocketIoClient @Inject constructor() {
                     val frame = json.decodeFromString<ServerFrame.Connected>(data.toString())
                     scope.launch { _incomingFrames.emit(frame) }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Parse error (connected): ${e.message}")
+                    Timber.tag(TAG).e("Parse error (connected): ${e.message}")
                 }
             }
 
@@ -114,7 +113,7 @@ class ChatSocketIoClient @Inject constructor() {
                     val frame = json.decodeFromString<ServerFrame.MessageDelivered>(data.toString())
                     scope.launch { _incomingFrames.emit(frame) }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Parse error (message): ${e.message}")
+                    Timber.tag(TAG).e("Parse error (message): ${e.message}")
                 }
             }
 
@@ -124,7 +123,7 @@ class ChatSocketIoClient @Inject constructor() {
                     val frame = json.decodeFromString<ServerFrame.MessageAck>(data.toString())
                     scope.launch { _incomingFrames.emit(frame) }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Parse error (ack): ${e.message}")
+                    Timber.tag(TAG).e("Parse error (ack): ${e.message}")
                 }
             }
 
@@ -134,7 +133,7 @@ class ChatSocketIoClient @Inject constructor() {
                     val frame = json.decodeFromString<ServerFrame.UserTyping>(data.toString())
                     scope.launch { _incomingFrames.emit(frame) }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Parse error (typing): ${e.message}")
+                    Timber.tag(TAG).e("Parse error (typing): ${e.message}")
                 }
             }
 
@@ -144,7 +143,7 @@ class ChatSocketIoClient @Inject constructor() {
                     val frame = json.decodeFromString<ServerFrame.ReactionUpdate>(data.toString())
                     scope.launch { _incomingFrames.emit(frame) }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Parse error (reaction_update): ${e.message}")
+                    Timber.tag(TAG).e("Parse error (reaction_update): ${e.message}")
                 }
             }
 
@@ -154,7 +153,7 @@ class ChatSocketIoClient @Inject constructor() {
                     val frame = json.decodeFromString<ServerFrame.ReadReceipt>(data.toString())
                     scope.launch { _incomingFrames.emit(frame) }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Parse error (read_receipt): ${e.message}")
+                    Timber.tag(TAG).e("Parse error (read_receipt): ${e.message}")
                 }
             }
 
@@ -164,7 +163,7 @@ class ChatSocketIoClient @Inject constructor() {
                     val frame = json.decodeFromString<ServerFrame.Presence>(data.toString())
                     scope.launch { _incomingFrames.emit(frame) }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Parse error (presence): ${e.message}")
+                    Timber.tag(TAG).e("Parse error (presence): ${e.message}")
                 }
             }
 
@@ -174,7 +173,7 @@ class ChatSocketIoClient @Inject constructor() {
                     val frame = json.decodeFromString<ServerFrame.LocationUpdate>(data.toString())
                     scope.launch { _incomingFrames.emit(frame) }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Parse error (location_update): ${e.message}")
+                    Timber.tag(TAG).e("Parse error (location_update): ${e.message}")
                 }
             }
 
@@ -184,14 +183,14 @@ class ChatSocketIoClient @Inject constructor() {
                     val frame = json.decodeFromString<ServerFrame.Error>(data.toString())
                     scope.launch { _incomingFrames.emit(frame) }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Parse error (error): ${e.message}")
+                    Timber.tag(TAG).e("Parse error (error): ${e.message}")
                 }
             }
 
             socket?.connect()
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to connect: ${e.message}")
+            Timber.tag(TAG).e("Failed to connect: ${e.message}")
             _connectionState.value = ConnectionState.ERROR
         }
     }
@@ -236,7 +235,7 @@ class ChatSocketIoClient @Inject constructor() {
         socket?.emit("message", payload)
     }
 
-    suspend fun sendLocation(latitude: Double, longitude: Double, tempId: String) {
+    fun sendLocation(latitude: Double, longitude: Double, tempId: String) {
         if (_connectionState.value != ConnectionState.CONNECTED) return
         val payload = JSONObject().apply {
             put("tempId", tempId)
@@ -246,7 +245,7 @@ class ChatSocketIoClient @Inject constructor() {
         socket?.emit("location_message", payload)
     }
 
-    suspend fun sendImage(imageUrl: String, tempId: String) {
+    fun sendImage(imageUrl: String, tempId: String) {
         if (_connectionState.value != ConnectionState.CONNECTED) return
         val payload = JSONObject().apply {
             put("tempId", tempId)
@@ -255,7 +254,7 @@ class ChatSocketIoClient @Inject constructor() {
         socket?.emit("image_message", payload)
     }
 
-    suspend fun sendVoiceMessage(conversationId: String, tempId: String, voiceUrl: String, durationMs: Long) {
+    fun sendVoiceMessage(tempId: String, voiceUrl: String, durationMs: Long) {
         if (_connectionState.value != ConnectionState.CONNECTED) return
         val payload = JSONObject().apply {
             put("tempId", tempId)
@@ -265,7 +264,7 @@ class ChatSocketIoClient @Inject constructor() {
         socket?.emit("voice_message", payload)
     }
 
-    suspend fun sendTyping(isTyping: Boolean) {
+    fun sendTyping(isTyping: Boolean) {
         if (_connectionState.value != ConnectionState.CONNECTED) return
         val payload = JSONObject().apply {
             put("isTyping", isTyping)
@@ -273,12 +272,12 @@ class ChatSocketIoClient @Inject constructor() {
         socket?.emit("typing", payload)
     }
 
-    suspend fun sendRead() {
+    fun sendRead() {
         if (_connectionState.value != ConnectionState.CONNECTED) return
         socket?.emit("read")
     }
 
-    suspend fun sendReaction(messageId: String, emoji: String) {
+    fun sendReaction(messageId: String, emoji: String) {
         if (_connectionState.value != ConnectionState.CONNECTED) return
         val payload = JSONObject().apply {
             put("messageId", messageId)
@@ -287,7 +286,7 @@ class ChatSocketIoClient @Inject constructor() {
         socket?.emit("reaction", payload)
     }
 
-    suspend fun removeReaction(messageId: String, emoji: String) {
+    fun removeReaction(messageId: String, emoji: String) {
         if (_connectionState.value != ConnectionState.CONNECTED) return
         val payload = JSONObject().apply {
             put("messageId", messageId)
@@ -344,7 +343,7 @@ class ChatSocketIoClient @Inject constructor() {
             }
 
             // Exhausted all attempts - stop automatic reconnection
-            Log.w(TAG, "Exhausted all $MAX_RECONNECT_ATTEMPTS reconnection attempts")
+            Timber.tag(TAG).w("Exhausted all $MAX_RECONNECT_ATTEMPTS reconnection attempts")
             _connectionState.value = ConnectionState.ERROR
         }
     }
@@ -380,7 +379,7 @@ class ChatSocketIoClient @Inject constructor() {
             }
 
             socket?.on(Socket.EVENT_CONNECT_ERROR) { args ->
-                Log.e(TAG, "Socket.IO reconnect error: ${args.firstOrNull()}")
+                Timber.tag(TAG).e("Socket.IO reconnect error: ${args.firstOrNull()}")
                 _connectionState.value = ConnectionState.ERROR
             }
 
@@ -389,7 +388,7 @@ class ChatSocketIoClient @Inject constructor() {
 
             socket?.connect()
         } catch (e: Exception) {
-            Log.e(TAG, "Reconnection attempt failed: ${e.message}")
+            Timber.tag(TAG).e("Reconnection attempt failed: ${e.message}")
             _connectionState.value = ConnectionState.ERROR
         }
     }
@@ -401,7 +400,7 @@ class ChatSocketIoClient @Inject constructor() {
                 val frame = json.decodeFromString<ServerFrame.Connected>(data.toString())
                 scope.launch { _incomingFrames.emit(frame) }
             } catch (e: Exception) {
-                Log.e(TAG, "Parse error (connected): ${e.message}")
+                Timber.tag(TAG).e("Parse error (connected): ${e.message}")
             }
         }
 
@@ -411,7 +410,7 @@ class ChatSocketIoClient @Inject constructor() {
                 val frame = json.decodeFromString<ServerFrame.MessageDelivered>(data.toString())
                 scope.launch { _incomingFrames.emit(frame) }
             } catch (e: Exception) {
-                Log.e(TAG, "Parse error (message): ${e.message}")
+                Timber.tag(TAG).e("Parse error (message): ${e.message}")
             }
         }
 
@@ -421,7 +420,7 @@ class ChatSocketIoClient @Inject constructor() {
                 val frame = json.decodeFromString<ServerFrame.MessageAck>(data.toString())
                 scope.launch { _incomingFrames.emit(frame) }
             } catch (e: Exception) {
-                Log.e(TAG, "Parse error (ack): ${e.message}")
+                Timber.tag(TAG).e("Parse error (ack): ${e.message}")
             }
         }
 
@@ -431,7 +430,7 @@ class ChatSocketIoClient @Inject constructor() {
                 val frame = json.decodeFromString<ServerFrame.UserTyping>(data.toString())
                 scope.launch { _incomingFrames.emit(frame) }
             } catch (e: Exception) {
-                Log.e(TAG, "Parse error (typing): ${e.message}")
+                Timber.tag(TAG).e("Parse error (typing): ${e.message}")
             }
         }
 
@@ -441,7 +440,7 @@ class ChatSocketIoClient @Inject constructor() {
                 val frame = json.decodeFromString<ServerFrame.ReactionUpdate>(data.toString())
                 scope.launch { _incomingFrames.emit(frame) }
             } catch (e: Exception) {
-                Log.e(TAG, "Parse error (reaction_update): ${e.message}")
+                Timber.tag(TAG).e("Parse error (reaction_update): ${e.message}")
             }
         }
 
@@ -451,7 +450,7 @@ class ChatSocketIoClient @Inject constructor() {
                 val frame = json.decodeFromString<ServerFrame.ReadReceipt>(data.toString())
                 scope.launch { _incomingFrames.emit(frame) }
             } catch (e: Exception) {
-                Log.e(TAG, "Parse error (read_receipt): ${e.message}")
+                Timber.tag(TAG).e("Parse error (read_receipt): ${e.message}")
             }
         }
 
@@ -461,7 +460,7 @@ class ChatSocketIoClient @Inject constructor() {
                 val frame = json.decodeFromString<ServerFrame.Presence>(data.toString())
                 scope.launch { _incomingFrames.emit(frame) }
             } catch (e: Exception) {
-                Log.e(TAG, "Parse error (presence): ${e.message}")
+                Timber.tag(TAG).e("Parse error (presence): ${e.message}")
             }
         }
 
@@ -471,7 +470,7 @@ class ChatSocketIoClient @Inject constructor() {
                 val frame = json.decodeFromString<ServerFrame.LocationUpdate>(data.toString())
                 scope.launch { _incomingFrames.emit(frame) }
             } catch (e: Exception) {
-                Log.e(TAG, "Parse error (location_update): ${e.message}")
+                Timber.tag(TAG).e("Parse error (location_update): ${e.message}")
             }
         }
 
@@ -481,7 +480,7 @@ class ChatSocketIoClient @Inject constructor() {
                 val frame = json.decodeFromString<ServerFrame.Error>(data.toString())
                 scope.launch { _incomingFrames.emit(frame) }
             } catch (e: Exception) {
-                Log.e(TAG, "Parse error (error): ${e.message}")
+                Timber.tag(TAG).e("Parse error (error): ${e.message}")
             }
         }
     }
@@ -537,24 +536,6 @@ class ChatSocketIoClient @Inject constructor() {
         // Recreate scope for potential reuse after re-authentication
         supervisorJob = SupervisorJob()
         scope = CoroutineScope(Dispatchers.IO + supervisorJob)
-    }
-
-    /**
-     * Called when the Application process is destroyed. Cancels the SupervisorJob-based
-     * CoroutineScope and releases the socket reference, ensuring no background threads
-     * or socket connections persist beyond process termination.
-     *
-     * Requirement 21.3: On process destroy, cancel scope and release socket reference.
-     */
-    fun onProcessDestroy() {
-        Timber.i("ChatSocketIoClient onProcessDestroy: releasing all resources")
-        supervisorJob.cancel()
-        reconnectionJob = null
-        typingIndicatorManager.reset()
-        socket?.disconnect()
-        socket?.off()
-        socket = null
-        _connectionState.value = ConnectionState.DISCONNECTED
     }
 
     /**

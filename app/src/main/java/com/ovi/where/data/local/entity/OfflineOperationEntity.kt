@@ -19,19 +19,6 @@ data class OfflineOperationEntity(
 )
 
 /**
- * Types of write operations that can be queued offline.
- */
-enum class OperationType {
-    SEND_MESSAGE,
-    CREATE_GROUP,
-    UPDATE_PROFILE,
-    UPDATE_GROUP,
-    DELETE_CONVERSATION,
-    ADD_FRIEND,
-    REMOVE_FRIEND
-}
-
-/**
  * Status of an offline operation in the queue.
  */
 enum class OperationStatus {

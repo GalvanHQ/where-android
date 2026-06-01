@@ -1,6 +1,7 @@
 package com.ovi.where.data.remote.firestore
 
 import com.google.firebase.firestore.DocumentSnapshot
+import com.ovi.where.data.remote.firestore.SharedLocationFirestoreMapper.fromDocument
 import com.ovi.where.domain.model.SharedLocation
 import timber.log.Timber
 

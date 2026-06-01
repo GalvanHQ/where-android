@@ -58,76 +58,39 @@ import androidx.compose.ui.graphics.Color
 val BrandYellow = Color(0xFFF9DF4D)
 
 // ── Primary (yellow-gold — Primary80 = #F9DF4D, the logo bubble) ────────────
-val Primary0   = Color(0xFF000000)
 val Primary10  = Color(0xFF271900)
-val Primary20  = Color(0xFF422D00)
-val Primary25  = Color(0xFF503700)
 val Primary30  = Color(0xFF5E4200)
-val Primary35  = Color(0xFF6E4F00)
 val Primary40  = Color(0xFF7E5C00)   // light-mode primary (AA on white)
-val Primary50  = Color(0xFF9E7700)
 val Primary60  = Color(0xFFBD9300)
-val Primary70  = Color(0xFFDDAF00)
 val Primary80  = Color(0xFFF9DF4D)   // BRAND — matches logo bubble exactly
 val Primary90  = Color(0xFFFFE893)
-val Primary95  = Color(0xFFFFF1C8)
-val Primary98  = Color(0xFFFFF9E5)
-val Primary99  = Color(0xFFFFFCF2)
 val Primary100 = Color(0xFFFFFFFF)
 
 // ── Secondary (warm sand / muted khaki — same hue family, low chroma) ──────
-val Secondary0   = Color(0xFF000000)
 val Secondary10  = Color(0xFF231B04)
 val Secondary20  = Color(0xFF393019)
-val Secondary25  = Color(0xFF443B23)
 val Secondary30  = Color(0xFF50462E)
-val Secondary35  = Color(0xFF5C5239)
 val Secondary40  = Color(0xFF695E45)
-val Secondary50  = Color(0xFF82765C)
-val Secondary60  = Color(0xFF9D9074)
-val Secondary70  = Color(0xFFB8AB8D)
 val Secondary80  = Color(0xFFD4C6A7)
 val Secondary90  = Color(0xFFF1E2C2)
-val Secondary95  = Color(0xFFFFF0D7)
-val Secondary98  = Color(0xFFFFF9EE)
-val Secondary99  = Color(0xFFFFFBF5)
 val Secondary100 = Color(0xFFFFFFFF)
 
-// ── Tertiary (deep teal — yellow's cool complement) ─────────────────────────
-val Tertiary0   = Color(0xFF000000)
 val Tertiary10  = Color(0xFF00201F)
 val Tertiary20  = Color(0xFF003735)
-val Tertiary25  = Color(0xFF004342)
 val Tertiary30  = Color(0xFF00504F)
-val Tertiary35  = Color(0xFF005E5C)
 val Tertiary40  = Color(0xFF006B69)   // light-mode tertiary (AA on white)
-val Tertiary50  = Color(0xFF008784)
-val Tertiary60  = Color(0xFF00A3A0)
-val Tertiary70  = Color(0xFF00BFBC)
 val Tertiary80  = Color(0xFF4DDBD7)   // dark-mode tertiary
 val Tertiary90  = Color(0xFFA5F2EE)
-val Tertiary95  = Color(0xFFD1FAF7)
-val Tertiary98  = Color(0xFFEEFDFC)
-val Tertiary99  = Color(0xFFF6FFFE)
 val Tertiary100 = Color(0xFFFFFFFF)
 
 // ── Error (warmed tomato red — sits clearly apart from the yellow brand
 //    so error states never get mistaken for warnings or highlights) ─────────
-val Error0   = Color(0xFF000000)
 val Error10  = Color(0xFF410002)
 val Error20  = Color(0xFF690005)
-val Error25  = Color(0xFF7E0007)
 val Error30  = Color(0xFF93000A)
-val Error35  = Color(0xFFA80710)
 val Error40  = Color(0xFFC4351F)
-val Error50  = Color(0xFFE85540)
-val Error60  = Color(0xFFFF6B57)
-val Error70  = Color(0xFFFF9282)
 val Error80  = Color(0xFFFFB4A8)
 val Error90  = Color(0xFFFFDAD2)
-val Error95  = Color(0xFFFFEDE8)
-val Error98  = Color(0xFFFFF8F6)
-val Error99  = Color(0xFFFFFBFF)
 val Error100 = Color(0xFFFFFFFF)
 
 // ── Neutral (true grey — chroma 0). Kept dead neutral on purpose so the
@@ -143,14 +106,6 @@ val Neutral17  = Color(0xFF272727)
 val Neutral20  = Color(0xFF2D2D2D)
 val Neutral22  = Color(0xFF323232)
 val Neutral24  = Color(0xFF373737)
-val Neutral25  = Color(0xFF3A3A3A)
-val Neutral30  = Color(0xFF454545)
-val Neutral35  = Color(0xFF515151)
-val Neutral40  = Color(0xFF5D5D5D)
-val Neutral50  = Color(0xFF767676)
-val Neutral60  = Color(0xFF909090)
-val Neutral70  = Color(0xFFAAAAAA)
-val Neutral80  = Color(0xFFC6C6C6)
 val Neutral87  = Color(0xFFDADADA)
 val Neutral90  = Color(0xFFE2E2E2)
 val Neutral92  = Color(0xFFE8E8E8)
@@ -158,27 +113,16 @@ val Neutral94  = Color(0xFFEEEEEE)
 val Neutral95  = Color(0xFFF1F1F1)
 val Neutral96  = Color(0xFFF4F4F4)
 val Neutral98  = Color(0xFFFAFAFA)
-val Neutral99  = Color(0xFFFDFDFD)
 val Neutral100 = Color(0xFFFFFFFF)
 
 // ── Neutral Variant (also true grey — slightly lighter at the same tone
 //    so outlines/dividers separate from surfaces without colouring them) ─
-val NeutralVar0   = Color(0xFF000000)
-val NeutralVar10  = Color(0xFF1B1B1B)
-val NeutralVar20  = Color(0xFF303030)
-val NeutralVar25  = Color(0xFF3B3B3B)
 val NeutralVar30  = Color(0xFF474747)
-val NeutralVar35  = Color(0xFF535353)
 val NeutralVar40  = Color(0xFF5F5F5F)
 val NeutralVar50  = Color(0xFF787878)
 val NeutralVar60  = Color(0xFF929292)
-val NeutralVar70  = Color(0xFFADADAD)
 val NeutralVar80  = Color(0xFFC9C9C9)
 val NeutralVar90  = Color(0xFFE5E5E5)
-val NeutralVar95  = Color(0xFFF3F3F3)
-val NeutralVar98  = Color(0xFFFCFCFC)
-val NeutralVar99  = Color(0xFFFFFFFF)
-val NeutralVar100 = Color(0xFFFFFFFF)
 
 // ── Brand gradient — a warm sunset distilled from the brand yellow.
 //    Used for splash, onboarding hero, premium upsell, and any
@@ -201,7 +145,6 @@ val BrandGradient = listOf(
 //    button highlight.
 //    "Inactive" stays neutral so it doesn't compete with anything.
 val LocationActive   = Color(0xFFFF7A1F)
-val LocationInactive = NeutralVar40
 
 // ── Avatar palette — single source for chat / map / group avatars.
 //    Eight saturated, well-separated hues so neighbouring avatars never

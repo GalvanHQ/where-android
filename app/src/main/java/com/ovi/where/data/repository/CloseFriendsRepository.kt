@@ -2,7 +2,6 @@ package com.ovi.where.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
 import com.ovi.where.core.firestore.observeDoc
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -82,7 +81,7 @@ class CloseFriendsRepository @Inject constructor(
             .collection("preferences").document(DOC_ID)
         try {
             ref.update("members.$friendUid", System.currentTimeMillis()).await()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Doc didn't exist yet — create it with the first entry.
             ref.set(
                 mapOf("members" to mapOf(friendUid to System.currentTimeMillis()))
@@ -98,7 +97,7 @@ class CloseFriendsRepository @Inject constructor(
                 .collection("preferences").document(DOC_ID)
                 .update("members.$friendUid", com.google.firebase.firestore.FieldValue.delete())
                 .await()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // No doc to remove from — nothing to do. Silent success matches
             // the "remove what isn't there" Set semantics callers expect.
         }

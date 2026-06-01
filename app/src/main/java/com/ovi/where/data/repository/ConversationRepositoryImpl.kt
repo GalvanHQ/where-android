@@ -25,7 +25,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -803,7 +802,6 @@ class ConversationRepositoryImpl @Inject constructor(
                 ChatApiClient.apiService.getConversations("Bearer $token")
             },
             saveFetchResult = { conversations ->
-                val uid = currentUid ?: return@networkBoundResource
                 val entities = conversations.map { dto ->
                     ConversationEntity(
                         id = dto.id,
@@ -875,7 +873,6 @@ class ConversationRepositoryImpl @Inject constructor(
                 ChatApiClient.apiService.getConversations("Bearer $token")
             },
             saveFetchResult = { conversations ->
-                val uid = currentUid ?: return@networkBoundResource
                 val entities = conversations.map { dto ->
                     ConversationEntity(
                         id = dto.id,

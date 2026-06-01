@@ -4,9 +4,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.ovi.where.core.common.Resource
 import com.ovi.where.core.constants.AppConstants
+import com.ovi.where.core.firestore.observeDoc
 import com.ovi.where.data.local.dao.UserCacheDao
 import com.ovi.where.data.local.entity.toCacheEntity
-import com.ovi.where.core.firestore.observeDoc
 import com.ovi.where.domain.model.User
 import com.ovi.where.domain.repository.UserRepository
 import kotlinx.coroutines.CoroutineScope

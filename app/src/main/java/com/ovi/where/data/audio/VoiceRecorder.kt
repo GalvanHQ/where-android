@@ -3,6 +3,7 @@ package com.ovi.where.data.audio
 import android.content.Context
 import android.media.MediaRecorder
 import android.os.Build
+import com.ovi.where.BuildConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -177,19 +178,19 @@ class VoiceRecorder @Inject constructor(
         if (!_state.value.isRecording) return
 
         try {
-            mediaRecorder?.apply {
-                stop()
-                release()
-            }
+            mediaRecorder?.stop()
         } catch (e: Exception) {
-            Timber.e(e, "Error cancelling MediaRecorder")
+            if (BuildConfig.DEBUG) {
+                Timber.e(e, "Error cancelling MediaRecorder")
+            }
+        } finally {
+            mediaRecorder?.release()
+            mediaRecorder = null
         }
 
-        mediaRecorder = null
         stopTimer()
         stopAmplitudeSampling()
 
-        // Delete the recorded file
         outputFile?.delete()
         outputFile = null
 
@@ -207,16 +208,6 @@ class VoiceRecorder @Inject constructor(
         _state.value = _state.value.copy(isLocked = true)
     }
 
-    /**
-     * Returns the current recording duration in milliseconds.
-     */
-    fun getCurrentDurationMs(): Long {
-        return if (_state.value.isRecording) {
-            System.currentTimeMillis() - recordingStartTime
-        } else {
-            0L
-        }
-    }
 
     /**
      * Called when max duration (5 minutes) is reached.

@@ -1,10 +1,10 @@
 package com.ovi.where.core.event
 
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Cross-screen request bus for "show a user's home on the map".
@@ -38,7 +38,6 @@ class HomePinEventBus @Inject constructor() {
         val latitude: Double,
         val longitude: Double,
         val label: String,
-        /** Monotonic token so the consumer handles each publish once. */
         val tick: Long
     )
 

@@ -28,8 +28,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Info
@@ -60,20 +60,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.notification.activeConversationTracker
+import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.LocalReducedMotion
 import com.ovi.where.core.utils.showToast
 import com.ovi.where.presentation.chat.components.AnimatedMessageBubble
@@ -622,10 +622,6 @@ fun ChatScreen(
                         }
                     }
                     val isGroupConversation = uiState.conversation?.groupId != null
-                    val searchQuery = if (uiState.isSearchActive) uiState.searchQuery else null
-                    val searchResultIds = uiState.searchResultIds
-                    val currentSearchResultIndex = uiState.currentSearchResultIndex
-                    // Track new message IDs for entrance animation (Task 15.1)
                     val animatableNewMessageIds = newMessageIds
 
                     // Requirement 2.5: Maintain scroll position on prepend (pagination)
@@ -1369,7 +1365,7 @@ private fun InfiniteShareBulletInline(text: String) {
             "•",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.primary,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+            fontWeight = FontWeight.Bold
         )
         Spacer(Modifier.width(8.dp))
         Text(

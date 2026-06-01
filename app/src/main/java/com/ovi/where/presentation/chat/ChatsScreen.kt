@@ -545,5 +545,3 @@ internal fun ConversationRow(
         }
     }
 }
-
-// ── End of ChatsScreen ───────────────────────────────────────────────────────────

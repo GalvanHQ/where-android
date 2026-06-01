@@ -97,11 +97,6 @@ private fun MemberPickerRow(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val backgroundColor = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
 
     Row(
         modifier = Modifier

@@ -2,16 +2,15 @@ package com.ovi.where.core.utils
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import androidx.core.app.NotificationManagerCompat
+import androidx.core.net.toUri
 
 object BatteryOptimizationUtils {
     
     fun isBatteryOptimizationDisabled(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val powerManager = context.getSystemService(Context.POWER_SERVICE) 
+            val powerManager = context.getSystemService(Context.POWER_SERVICE)
                 as android.os.PowerManager
             powerManager.isIgnoringBatteryOptimizations(context.packageName)
         } else {
@@ -23,7 +22,7 @@ object BatteryOptimizationUtils {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             try {
                 val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                    data = Uri.parse("package:${context.packageName}")
+                    data = "package:${context.packageName}".toUri()
                 }
                 context.startActivity(intent)
             } catch (e: Exception) {
@@ -35,7 +34,7 @@ object BatteryOptimizationUtils {
     fun openAppSettings(context: Context) {
         try {
             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.parse("package:${context.packageName}")
+                data = "package:${context.packageName}".toUri()
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
@@ -47,10 +46,6 @@ object BatteryOptimizationUtils {
         }
     }
     
-    fun areNotificationsEnabled(context: Context): Boolean {
-        return NotificationManagerCompat.from(context).areNotificationsEnabled()
-    }
-    
     fun openNotificationSettings(context: Context) {
         try {
             val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -59,7 +54,7 @@ object BatteryOptimizationUtils {
                 }
             } else {
                 Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.parse("package:${context.packageName}")
+                    data = "package:${context.packageName}".toUri()
                 }
             }
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

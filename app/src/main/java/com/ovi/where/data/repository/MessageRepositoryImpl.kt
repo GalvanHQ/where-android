@@ -2,7 +2,6 @@ package com.ovi.where.data.repository
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.storage.FirebaseStorage
 import com.ovi.where.core.common.Resource
@@ -22,6 +21,7 @@ import com.ovi.where.domain.model.MessagePage
 import com.ovi.where.domain.model.MessageStatus
 import com.ovi.where.domain.model.MessageType
 import com.ovi.where.domain.repository.MessageRepository
+import dagger.Lazy
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,21 +31,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
+import timber.log.Timber
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import javax.inject.Inject
 import javax.inject.Singleton
-import timber.log.Timber
-import dagger.Lazy
 import com.ovi.where.data.util.Resource as DataResource
 
 private const val TAG = "MessageRepositoryImpl"
@@ -448,7 +445,7 @@ class MessageRepositoryImpl @Inject constructor(
                 break // Success
             } catch (e: Exception) {
                 lastError = e
-                Log.w(TAG, "Image upload attempt $attempt failed: ${e.message}")
+                Timber.tag(TAG).w("Image upload attempt $attempt failed: ${e.message}")
                 if (attempt < MAX_UPLOAD_RETRIES) {
                     delay(UPLOAD_RETRY_DELAY_MS)
                 }
@@ -459,7 +456,7 @@ class MessageRepositoryImpl @Inject constructor(
         try {
             compressedFile.delete()
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to delete compressed file: ${e.message}")
+            Timber.tag(TAG).w("Failed to delete compressed file: ${e.message}")
         }
 
         // Step 5: Handle result
@@ -482,7 +479,7 @@ class MessageRepositoryImpl @Inject constructor(
                 wsClient.sendImage(uploadUrl, tempId)
                 startAckTimeout(tempId)
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to emit image message $tempId: ${e.message}")
+                Timber.tag(TAG).e("Failed to emit image message $tempId: ${e.message}")
                 messageDao.updateStatus(tempId, MessageStatus.FAILED.name)
                 return Resource.Error("Failed to send image message: ${e.message}")
             }
@@ -554,7 +551,7 @@ class MessageRepositoryImpl @Inject constructor(
 
             messageDao.upsertAll(messages)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to load history: ${e.message}")
+            Timber.tag(TAG).e("Failed to load history: ${e.message}")
         }
     }
 
@@ -586,7 +583,8 @@ class MessageRepositoryImpl @Inject constructor(
             }
             Resource.Success(Unit)
         } catch (e: Exception) {
-            Log.w(TAG, "First attempt to fetch missed messages failed, retrying in 2s: ${e.message}")
+            Timber.tag(TAG)
+                .w("First attempt to fetch missed messages failed, retrying in 2s: ${e.message}")
             // Retry once after 2 seconds (Requirement 13.6)
             try {
                 delay(MISSED_MESSAGES_RETRY_DELAY_MS)
@@ -602,7 +600,8 @@ class MessageRepositoryImpl @Inject constructor(
                 }
                 Resource.Success(Unit)
             } catch (retryError: Exception) {
-                Log.e(TAG, "Retry to fetch missed messages also failed: ${retryError.message}")
+                Timber.tag(TAG)
+                    .e("Retry to fetch missed messages also failed: ${retryError.message}")
                 Resource.Error("Failed to fetch missed messages: ${retryError.message}")
             }
         }
@@ -660,7 +659,7 @@ class MessageRepositoryImpl @Inject constructor(
                         messageDao.upsertAll(serverEntities)
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Background sync failed: ${e.message}")
+                    Timber.tag(TAG).e("Background sync failed: ${e.message}")
                 }
             }
 
@@ -702,7 +701,7 @@ class MessageRepositoryImpl @Inject constructor(
                     hasMore = serverPage.hasMore
                 )
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to load older messages: ${e.message}")
+                Timber.tag(TAG).e("Failed to load older messages: ${e.message}")
                 MessagePage(messages = emptyList(), nextCursor = beforeCursor, hasMore = true)
             }
         }
@@ -768,7 +767,7 @@ class MessageRepositoryImpl @Inject constructor(
             Resource.Success(Unit)
         } catch (e: Exception) {
             // Rollback optimistic update to previous state
-            Log.w(TAG, "Reaction failed for message $messageId, rolling back: ${e.message}")
+            Timber.tag(TAG).w("Reaction failed for message $messageId, rolling back: ${e.message}")
             messageDao.updateReactions(messageId, previousReactionsJson)
             Resource.Error("Failed to update reaction: ${e.message}")
         }
@@ -822,7 +821,8 @@ class MessageRepositoryImpl @Inject constructor(
             Resource.Success(Unit)
         } catch (e: Exception) {
             // Rollback optimistic update
-            Log.w(TAG, "Remove reaction failed for message $messageId, rolling back: ${e.message}")
+            Timber.tag(TAG)
+                .w("Remove reaction failed for message $messageId, rolling back: ${e.message}")
             messageDao.updateReactions(messageId, previousReactionsJson)
             Resource.Error("Failed to remove reaction: ${e.message}")
         }
@@ -858,7 +858,7 @@ class MessageRepositoryImpl @Inject constructor(
             wsClient.sendText(text, tempId, replyToId, replyToText, replyToSenderName, mentionedUserIds)
             startAckTimeout(tempId)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to emit message $tempId: ${e.message}")
+            Timber.tag(TAG).e("Failed to emit message $tempId: ${e.message}")
             messageDao.updateStatus(tempId, MessageStatus.FAILED.name)
         }
     }
@@ -868,7 +868,7 @@ class MessageRepositoryImpl @Inject constructor(
             wsClient.sendLocation(latitude, longitude, tempId)
             startAckTimeout(tempId)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to emit location message $tempId: ${e.message}")
+            Timber.tag(TAG).e("Failed to emit location message $tempId: ${e.message}")
             messageDao.updateStatus(tempId, MessageStatus.FAILED.name)
         }
     }
@@ -878,7 +878,7 @@ class MessageRepositoryImpl @Inject constructor(
             wsClient.sendImage(imageUrl, tempId)
             startAckTimeout(tempId)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to emit image message $tempId: ${e.message}")
+            Timber.tag(TAG).e("Failed to emit image message $tempId: ${e.message}")
             messageDao.updateStatus(tempId, MessageStatus.FAILED.name)
         }
     }
@@ -891,7 +891,7 @@ class MessageRepositoryImpl @Inject constructor(
         val job = scope.launch {
             delay(ACK_TIMEOUT_MS)
             // Timeout reached without ack — mark as FAILED
-            Log.w(TAG, "Ack timeout for message $tempId")
+            Timber.tag(TAG).w("Ack timeout for message $tempId")
             messageDao.updateStatus(tempId, MessageStatus.FAILED.name)
             ackTimeoutJobs.remove(tempId)
         }
@@ -923,7 +923,7 @@ class MessageRepositoryImpl @Inject constructor(
                     is ServerFrame.MessageDelivered -> handleIncomingMessage(frame)
                     is ServerFrame.ReadReceipt -> handleReadReceipt(frame)
                     is ServerFrame.Error -> {
-                        Log.e(TAG, "Server error: ${frame.message}")
+                        Timber.tag(TAG).e("Server error: ${frame.message}")
                     }
                     else -> { /* handled by other components */ }
                 }
@@ -1157,7 +1157,8 @@ class MessageRepositoryImpl @Inject constructor(
             if (offlineQueue.size >= MAX_OFFLINE_QUEUE_SIZE) {
                 // Queue full — mark message as FAILED
                 messageDao.updateStatus(message.tempId, MessageStatus.FAILED.name)
-                Log.w(TAG, "Offline queue full (${MAX_OFFLINE_QUEUE_SIZE}), rejecting message ${message.tempId}")
+                Timber.tag(TAG)
+                    .w("Offline queue full (${MAX_OFFLINE_QUEUE_SIZE}), rejecting message ${message.tempId}")
                 return
             }
             offlineQueue.add(message)
@@ -1185,7 +1186,7 @@ class MessageRepositoryImpl @Inject constructor(
             try {
                 wsClient.sendRead()
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to flush deferred read event: ${e.message}")
+                Timber.tag(TAG).e("Failed to flush deferred read event: ${e.message}")
             }
         }
     }
@@ -1216,7 +1217,8 @@ class MessageRepositoryImpl @Inject constructor(
                     // Small delay between messages to avoid overwhelming the server
                     delay(QUEUE_FLUSH_DELAY_MS)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to flush queued message ${queued.tempId}: ${e.message}")
+                    Timber.tag(TAG)
+                        .e("Failed to flush queued message ${queued.tempId}: ${e.message}")
                     messageDao.updateStatus(queued.tempId, MessageStatus.FAILED.name)
                 }
             }
@@ -1336,7 +1338,7 @@ class MessageRepositoryImpl @Inject constructor(
             messageDao.deleteById(messageId)
             Resource.Success(Unit)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to delete message $messageId: ${e.message}")
+            Timber.tag(TAG).e("Failed to delete message $messageId: ${e.message}")
             Resource.Error("Failed to delete message: ${e.message}")
         }
     }
@@ -1432,7 +1434,7 @@ class MessageRepositoryImpl @Inject constructor(
             // Send via WebSocket — ack is handled by observeIncomingFrames/handleAck
             val isConnected = wsClient.connectionState.value == ChatSocketIoClient.ConnectionState.CONNECTED
             if (isConnected) {
-                wsClient.sendVoiceMessage(conversationId, tempId, downloadUrl, durationMs)
+                wsClient.sendVoiceMessage(tempId, downloadUrl, durationMs)
                 startAckTimeout(tempId)
             } else {
                 // Voice messages don't have offline queue support yet — mark as failed

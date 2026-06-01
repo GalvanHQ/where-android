@@ -16,7 +16,4 @@ data class Route(
     val distanceMeters: Long,
     /** Estimated duration along the route, in seconds (driving). */
     val durationSeconds: Long
-) {
-    val isValid: Boolean
-        get() = points.size >= 2
-}
+)

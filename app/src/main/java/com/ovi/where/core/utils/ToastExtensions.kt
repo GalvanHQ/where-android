@@ -12,14 +12,6 @@ fun Context.showToast(uiText: UiText, duration: Int = Toast.LENGTH_SHORT) {
     Toast.makeText(this, uiText.asString(this), duration).show()
 }
 
-fun Context.showLongToast(message: String) {
-    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-}
-
-fun Context.showLongToast(uiText: UiText) {
-    Toast.makeText(this, uiText.asString(this), Toast.LENGTH_LONG).show()
-}
-
 fun UiText.resolve(context: Context? = null): String {
     return when (this) {
         is UiText.DynamicString -> value

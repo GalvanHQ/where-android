@@ -56,20 +56,6 @@ class UserCache @Inject constructor(
 
     // ── Reads ──────────────────────────────────────────────────────────────
 
-    /** Reactive cached profile for a single uid. Emits `null` when missing. */
-    fun observeUser(uid: String): Flow<User?> =
-        dao.observe(uid).map { it?.toDomain() }.distinctUntilChanged()
-
-    /**
-     * Reactive cached profiles for many uids. Order is not guaranteed;
-     * consumers should index by [User.id]. Emits an empty list when none
-     * are cached yet.
-     */
-    fun observeUsers(uids: List<String>): Flow<List<User>> =
-        if (uids.isEmpty()) kotlinx.coroutines.flow.flowOf(emptyList())
-        else dao.observeAll(uids).map { rows -> rows.map { it.toDomain() } }
-            .distinctUntilChanged()
-
     /**
      * Reactive stream of every cached user. Used by ViewModels that want
      * to hydrate an in-memory map at process start.

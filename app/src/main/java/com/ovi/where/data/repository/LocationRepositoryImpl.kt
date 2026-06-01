@@ -9,7 +9,6 @@ import com.ovi.where.core.constants.AppConstants
 import com.ovi.where.core.constants.AppConstants.MILLIS_PER_MINUTE
 import com.ovi.where.data.local.dao.LocationDao
 import com.ovi.where.data.local.dao.MeetupDestinationDao
-import com.ovi.where.data.local.entity.SharedLocationEntity
 import com.ovi.where.data.local.entity.toDomain
 import com.ovi.where.data.local.entity.toEntity
 import com.ovi.where.data.remote.chat.ChatSocketIoClient
@@ -18,6 +17,7 @@ import com.ovi.where.domain.model.ActiveSharingState
 import com.ovi.where.domain.model.MeetupDestination
 import com.ovi.where.domain.model.SharedLocation
 import com.ovi.where.domain.repository.LocationRepository
+import dagger.Lazy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -34,7 +34,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 import timber.log.Timber
-import dagger.Lazy
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -1296,9 +1295,7 @@ class LocationRepositoryImpl @Inject constructor(
             val fromSubcollection = snapshot.documents.mapNotNull { it.getString("userId") ?: it.id }
             Timber.d("getGroupMemberIds: found ${fromSubcollection.size} members from subcollection")
 
-            if (fromSubcollection.isNotEmpty()) {
-                fromSubcollection
-            } else {
+            fromSubcollection.ifEmpty {
                 // Last resort: include at least the current user
                 val uid = currentUid
                 if (uid != null) listOf(uid) else emptyList()

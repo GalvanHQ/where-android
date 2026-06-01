@@ -1,7 +1,6 @@
 package com.ovi.where.presentation.chat.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,7 +27,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.ovi.where.core.theme.Dimens
 import com.ovi.where.presentation.model.MessageUiModel
 
 /**
@@ -119,67 +117,6 @@ fun ReplyPreviewBar(
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-    }
-}
-
-/**
- * Quoted message preview displayed above the reply text within a message bubble.
- *
- * Shows:
- * - replyToSenderName in bold
- * - Up to 100 characters of replyToText
- * - Tappable: scrolls to original message (no-op if not loaded)
- *
- * Requirements: 4.5, 4.6, 4.7
- */
-@Composable
-fun QuotedMessagePreview(
-    replyToSenderName: String,
-    replyToText: String,
-    onTap: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onTap)
-            .semantics { contentDescription = "Quoted message from $replyToSenderName" },
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
-        shape = RoundedCornerShape(Dimens.cornerExtraSmall)
-    ) {
-        Row(
-            modifier = Modifier.padding(Dimens.spaceMedium),
-            verticalAlignment = Alignment.Top
-        ) {
-            // Accent vertical bar
-            Box(
-                modifier = Modifier
-                    .width(2.dp)
-                    .height(28.dp)
-                    .clip(RoundedCornerShape(1.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
-            )
-
-            Spacer(Modifier.width(Dimens.spaceMedium))
-
-            Column {
-                Text(
-                    text = replyToSenderName,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = replyToText.take(100),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
                 )
             }
         }

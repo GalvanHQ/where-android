@@ -5,7 +5,6 @@ sealed class UiEvent {
     data class ShowSnackbar(val message: UiText) : UiEvent()
     data class Navigate(val route: String) : UiEvent()
     object NavigateUp : UiEvent()
-    object NavigateBack : UiEvent()
     data class ShareContent(val title: String, val content: String) : UiEvent()
     object LaunchGoogleSignIn : UiEvent()
 }

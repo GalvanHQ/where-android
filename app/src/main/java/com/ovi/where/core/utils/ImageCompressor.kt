@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
-import android.util.Log
 import java.io.File
 import java.io.FileOutputStream
 import javax.inject.Inject
@@ -123,7 +122,6 @@ class ImageCompressor @Inject constructor() {
             CompressionResult.Success(compressedFile, finalWidth, finalHeight)
         } catch (e: Exception) {
             bitmap.recycle()
-            Log.e(TAG, "Failed to compress image: ${e.message}")
             CompressionResult.Error("Failed to compress image: ${e.message}")
         }
     }
@@ -143,7 +141,6 @@ class ImageCompressor @Inject constructor() {
                     fd.length
                 } ?: 0L
             } catch (e2: Exception) {
-                Log.w(TAG, "Could not determine file size: ${e2.message}")
                 0L
             }
         }
@@ -189,8 +186,7 @@ class ImageCompressor @Inject constructor() {
             val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
             if (rotated != bitmap) bitmap.recycle()
             rotated
-        } catch (e: Exception) {
-            Log.w(TAG, "Could not read EXIF data: ${e.message}")
+        } catch (_: Exception) {
             bitmap
         }
     }
@@ -228,7 +224,6 @@ class ImageCompressor @Inject constructor() {
             path.endsWith(".png", ignoreCase = true) -> "image/png"
             path.endsWith(".webp", ignoreCase = true) -> "image/webp"
             path.endsWith(".heif", ignoreCase = true) || path.endsWith(".heic", ignoreCase = true) -> "image/heif"
-            // Default to JPEG for temp files without proper extension (gallery_*.jpg)
             path.contains("gallery_") || path.contains("chat_img_") -> "image/jpeg"
             else -> null
         }

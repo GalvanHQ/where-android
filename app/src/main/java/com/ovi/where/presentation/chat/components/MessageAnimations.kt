@@ -34,20 +34,8 @@ object MessageAnimationConstants {
     /** Received message animation duration in ms (Requirement 23.2). */
     const val RECEIVED_ANIMATION_DURATION_MS = 250
 
-    /** Auto-scroll animation duration in ms (Requirement 23.3). */
-    const val AUTO_SCROLL_DURATION_MS = 300
-
     /** Distance threshold for auto-scroll in dp (Requirement 23.3, 23.4). */
     const val AUTO_SCROLL_THRESHOLD_DP = 150f
-
-    /** Status indicator crossfade duration in ms (Requirement 23.5). */
-    const val STATUS_CROSSFADE_DURATION_MS = 150
-
-    /** Reaction picker scale-up animation duration in ms (Requirement 23.6). */
-    const val REACTION_PICKER_DURATION_MS = 200
-
-    /** Reaction picker initial scale (Requirement 23.6). */
-    const val REACTION_PICKER_INITIAL_SCALE = 0.8f
 }
 
 /**

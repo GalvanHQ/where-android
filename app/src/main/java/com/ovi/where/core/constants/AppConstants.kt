@@ -44,11 +44,6 @@ object AppConstants {
     const val FIRESTORE_COLLECTION_DIRECT_LOCATION_SHARES = "directLocationShares"
     const val FIRESTORE_COLLECTION_ACTIVE_LOCATIONS = "activeLocations"
 
-    // Write throttle — speed-dependent (see LocationRepositoryImpl companion object)
-    // Moving (speed > 1 m/s): 10s interval
-    // Stationary (speed ≤ 1 m/s): 30s interval
-    @Deprecated("Use speed-dependent throttle in LocationRepositoryImpl instead")
-    const val LOCATION_WRITE_THROTTLE_MS = 15_000L
 
     // ── Time Constants ────────────────────────────────────────────────────────
 

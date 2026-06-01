@@ -36,8 +36,6 @@ class LocationManager @Inject constructor(
     private val fusedLocationClient: FusedLocationProviderClient
 ) {
     private var locationCallback: LocationCallback? = null
-    private var currentPriority: Int = Priority.PRIORITY_HIGH_ACCURACY
-    private var currentInterval: Long = AppConstants.LOCATION_UPDATE_INTERVAL
 
     /**
      * Emits location updates with a fixed interval. Use [getAdaptiveLocationUpdates]

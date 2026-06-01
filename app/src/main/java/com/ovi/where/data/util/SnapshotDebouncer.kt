@@ -81,11 +81,6 @@ class SnapshotDebouncer @Inject constructor() {
     val pendingCount: Int
         get() = pendingWrites.size
 
-    /**
-     * Returns whether a debounce timer is currently active.
-     */
-    val isTimerActive: Boolean
-        get() = debounceJob?.isActive == true
 
     companion object {
         /** Fixed debounce window duration in milliseconds. */

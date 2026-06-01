@@ -82,7 +82,7 @@ class VoicePlaybackController @Inject constructor() {
             // Different message or no message → stop current and play new
             else -> {
                 stopAndReset()
-                play(messageId, audioUrl, durationMs, context, scope)
+                play(messageId, audioUrl, durationMs, scope)
             }
         }
     }
@@ -130,7 +130,6 @@ class VoicePlaybackController @Inject constructor() {
         messageId: String,
         audioUrl: String,
         durationMs: Long,
-        context: Context,
         scope: CoroutineScope
     ) {
         try {

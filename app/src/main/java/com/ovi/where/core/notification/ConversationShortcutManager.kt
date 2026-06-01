@@ -13,6 +13,7 @@ import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.ovi.where.MainActivity
 import com.ovi.where.R
+import com.ovi.where.core.notification.ConversationShortcutManager.Companion.MAX_DYNAMIC_SHORTCUTS
 import com.ovi.where.domain.model.Conversation
 import com.ovi.where.domain.repository.AuthRepository
 import com.ovi.where.domain.repository.ConversationRepository

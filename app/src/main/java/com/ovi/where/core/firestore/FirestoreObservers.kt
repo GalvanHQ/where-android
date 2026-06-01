@@ -5,6 +5,9 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
+import com.ovi.where.core.firestore.SnapshotSkipPolicy.ALWAYS_EMIT
+import com.ovi.where.core.firestore.SnapshotSkipPolicy.EMPTY_CACHE
+import com.ovi.where.core.firestore.SnapshotSkipPolicy.MISSING_DOC
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -75,7 +78,7 @@ enum class SnapshotSkipPolicy { ALWAYS_EMIT, EMPTY_CACHE, MISSING_DOC }
  *   Throw to fail the Flow.
  */
 inline fun <T> Query.observeQuery(
-    skipPolicy: SnapshotSkipPolicy = SnapshotSkipPolicy.EMPTY_CACHE,
+    skipPolicy: SnapshotSkipPolicy = EMPTY_CACHE,
     crossinline parse: (QuerySnapshot) -> T,
 ): Flow<T> = callbackFlow {
     val reg: ListenerRegistration = addSnapshotListener { snapshot, error ->
@@ -101,7 +104,7 @@ inline fun <T> Query.observeQuery(
             return@addSnapshotListener
         }
         if (snapshot == null) return@addSnapshotListener
-        if (skipPolicy == SnapshotSkipPolicy.EMPTY_CACHE
+        if (skipPolicy == EMPTY_CACHE
             && snapshot.metadata.isFromCache
             && snapshot.isEmpty
         ) return@addSnapshotListener
@@ -120,7 +123,7 @@ inline fun <T> Query.observeQuery(
  * doc doesn't exist (and policy permits emitting that absence).
  */
 inline fun <T> com.google.firebase.firestore.DocumentReference.observeDoc(
-    skipPolicy: SnapshotSkipPolicy = SnapshotSkipPolicy.MISSING_DOC,
+    skipPolicy: SnapshotSkipPolicy = MISSING_DOC,
     crossinline parse: (DocumentSnapshot) -> T?,
 ): Flow<T?> = callbackFlow {
     val reg: ListenerRegistration = addSnapshotListener { snapshot, error ->
@@ -138,7 +141,7 @@ inline fun <T> com.google.firebase.firestore.DocumentReference.observeDoc(
             return@addSnapshotListener
         }
         if (snapshot == null) return@addSnapshotListener
-        if (skipPolicy == SnapshotSkipPolicy.MISSING_DOC
+        if (skipPolicy == MISSING_DOC
             && snapshot.metadata.isFromCache
             && !snapshot.exists()
         ) return@addSnapshotListener

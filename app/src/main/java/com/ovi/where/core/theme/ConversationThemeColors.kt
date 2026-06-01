@@ -1,5 +1,9 @@
 package com.ovi.where.core.theme
 
+import com.ovi.where.core.theme.ConversationThemeColors.DEFAULT
+import com.ovi.where.core.theme.ConversationThemeColors.OPTIONS
+
+
 /**
  * Canonical palette of conversation theme colors.
  *

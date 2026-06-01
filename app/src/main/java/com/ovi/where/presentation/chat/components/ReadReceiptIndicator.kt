@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
-import com.ovi.where.presentation.chat.components.computeInitials
 import com.ovi.where.presentation.model.BubbleDirection
 
 /**

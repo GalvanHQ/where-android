@@ -20,8 +20,6 @@ import com.ovi.where.domain.model.FriendshipStatus
 import com.ovi.where.domain.model.InteractionType
 import com.ovi.where.domain.model.MemberRole
 import com.ovi.where.domain.model.Message
-import com.ovi.where.domain.model.MessageStatus
-import com.ovi.where.domain.model.MessageType
 import com.ovi.where.domain.model.SharedLocation
 import com.ovi.where.domain.repository.FriendshipRepository
 import com.ovi.where.domain.repository.GroupRepository
@@ -33,7 +31,6 @@ import com.ovi.where.domain.usecase.chat.MarkConversationReadUseCase
 import com.ovi.where.domain.usecase.chat.ObserveConversationsUseCase
 import com.ovi.where.domain.usecase.chat.ObserveMessagesUseCase
 import com.ovi.where.domain.usecase.chat.SendLocationMessageUseCase
-import com.ovi.where.domain.usecase.chat.SendMessageUseCase
 import com.ovi.where.domain.usecase.group.MuteGroupMemberUseCase
 import com.ovi.where.domain.usecase.location.StartLocationSharingUseCase
 import com.ovi.where.domain.usecase.location.StopLocationSharingUseCase
@@ -43,7 +40,6 @@ import com.ovi.where.presentation.model.BubbleDirection
 import com.ovi.where.presentation.model.ConversationUiModel
 import com.ovi.where.presentation.model.MessageUiModel
 import com.ovi.where.presentation.model.formatConversationTimestamp
-import com.ovi.where.presentation.model.formatDateSeparatorLabel
 import com.ovi.where.presentation.model.formatMessageDateKey
 import com.ovi.where.presentation.model.formatMessageTime
 import com.ovi.where.presentation.model.toUiModel
@@ -65,9 +61,8 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import timber.log.Timber
 import kotlinx.coroutines.withTimeout
-import java.util.UUID
+import timber.log.Timber
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
@@ -89,7 +84,6 @@ class ChatViewModel @Inject constructor(
     application: Application,
     val savedStateHandle: SavedStateHandle,
     private val observeMessagesUseCase: ObserveMessagesUseCase,
-    private val sendMessageUseCase: SendMessageUseCase,
     private val sendLocationMessageUseCase: SendLocationMessageUseCase,
     private val markConversationReadUseCase: MarkConversationReadUseCase,
     private val observeConversationsUseCase: ObserveConversationsUseCase,
@@ -108,7 +102,6 @@ class ChatViewModel @Inject constructor(
     private val muteGroupMemberUseCase: MuteGroupMemberUseCase,
     private val voiceRecorder: VoiceRecorder,
     private val onlineStatusDao: OnlineStatusDao,
-    private val userRepository: UserRepository,
     private val getOrCreateDirectConversationUseCase: com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase,
     private val systemMessageWriter: com.ovi.where.data.repository.SystemMessageWriter,
     private val observeMeetupDestinationUseCase: com.ovi.where.domain.usecase.location.ObserveMeetupDestinationUseCase,
@@ -1098,7 +1091,7 @@ class ChatViewModel @Inject constructor(
                     isLoadingMore = false,
                     paginationError = false
                 )
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoadingMore = false,
                     paginationError = true
@@ -1156,8 +1149,6 @@ class ChatViewModel @Inject constructor(
 
         // Clear input text and reply state on send
         val replyToId = _uiState.value.replyingToMessage?.id
-        val replyToText = _uiState.value.replyingToMessage?.text
-        val replyToSenderName = _uiState.value.replyingToMessage?.senderName
         _uiState.value = _uiState.value.copy(
             inputText = "",
             replyingToMessage = null,
@@ -1856,18 +1847,6 @@ class ChatViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(liveLocationError = null)
     }
 
-    /**
-     * Countdown timer for THIS conversation's sharing target.
-     * When the per-target expiry hits, removes the banner but does NOT stop the service
-     * (other targets may still be active — the map screen's ticker handles service lifecycle).
-     */
-    private fun startLocationSharingTimer(expiresAt: Long) {
-        // No-op: replaced by observeRepoSharingState() which derives the
-        // remaining-time label from the unified repo flow. Kept as a private
-        // method so existing call sites stay valid; the function is now empty
-        // to avoid double timers / drift between chat and map.
-    }
-
     fun markRead() {
         val convId = _uiState.value.conversationId ?: return
         val uid = currentUserId ?: return
@@ -2214,89 +2193,6 @@ class ChatViewModel @Inject constructor(
         // cancelled by the framework's viewModelScope.cancel() call.
     }
 
-    // ─── Context Menu Actions (Task 4.2) ──────────────────────────────────────
-
-    /**
-     * Shows the context menu for the given message.
-     * Called on 300ms long-press of a message bubble.
-     *
-     * Requirement 9.1: Display floating context menu anchored to pressed message.
-     */
-    fun showContextMenu(message: MessageUiModel) {
-        _uiState.value = _uiState.value.copy(
-            contextMenuMessage = message,
-            isContextMenuFadingOut = false
-        )
-    }
-
-    /**
-     * Dismisses the context menu with a 200ms fade-out animation.
-     * Called on tap outside or back gesture.
-     *
-     * Requirement 9.11: Dismiss with 200ms fade-out.
-     */
-    fun dismissContextMenu() {
-        _uiState.value = _uiState.value.copy(isContextMenuFadingOut = true)
-        viewModelScope.launch {
-            delay(CONTEXT_MENU_FADE_MS)
-            _uiState.value = _uiState.value.copy(
-                contextMenuMessage = null,
-                isContextMenuFadingOut = false,
-                showDeleteConfirmation = false
-            )
-        }
-    }
-
-    /**
-     * Copies the message text to the system clipboard.
-     * Dismisses the menu and shows a "Copied" toast for 2 seconds.
-     *
-     * Requirement 9.3: Copy text to clipboard, dismiss, show "Copied" toast 2s.
-     */
-    fun copyMessageText(text: String) {
-        val clipboard = getApplication<Application>()
-            .getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        val clip = android.content.ClipData.newPlainText("message", text)
-        clipboard.setPrimaryClip(clip)
-        // Dismiss menu immediately
-        _uiState.value = _uiState.value.copy(
-            contextMenuMessage = null,
-            isContextMenuFadingOut = false
-        )
-    }
-
-    /**
-     * Initiates a reply from the context menu.
-     * Dismisses the menu and populates the reply preview bar.
-     *
-     * Requirement 9.5: Dismiss menu, populate reply preview bar.
-     */
-    fun replyFromContextMenu() {
-        val message = _uiState.value.contextMenuMessage ?: return
-        _uiState.value = _uiState.value.copy(
-            contextMenuMessage = null,
-            isContextMenuFadingOut = false,
-            replyingToMessage = message
-        )
-    }
-
-    /**
-     * Shows the reaction picker from the context menu.
-     * Dismisses the context menu first.
-     *
-     * Requirement 9.6: Dismiss context menu, show reaction picker overlay.
-     * Requirement 27.1: Show ReactionPickerOverlay centered with scrim.
-     */
-    fun reactFromContextMenu() {
-        val messageId = _uiState.value.contextMenuMessage?.id
-        _uiState.value = _uiState.value.copy(
-            contextMenuMessage = null,
-            isContextMenuFadingOut = false,
-            showReactionPicker = true,
-            reactionPickerMessageId = messageId
-        )
-    }
-
     /**
      * Shows the reaction picker for a message via long-press (500ms).
      * Called directly from the message bubble long-press gesture.
@@ -2455,92 +2351,6 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Shows the delete confirmation dialog.
-     *
-     * Requirement 9.7: Display confirmation dialog before deleting.
-     */
-    fun showDeleteConfirmation() {
-        _uiState.value = _uiState.value.copy(showDeleteConfirmation = true)
-    }
-
-    /**
-     * Cancels the delete confirmation dialog.
-     */
-    fun cancelDelete() {
-        _uiState.value = _uiState.value.copy(showDeleteConfirmation = false)
-    }
-
-    /**
-     * Deletes the current user's own message after confirmation.
-     * Calls the delete API and removes from local cache.
-     * On API failure: shows error snackbar for 4 seconds.
-     *
-     * Requirement 9.7: Call delete API, remove from cache.
-     * Requirement 9.8: On API fail, error snackbar 4s.
-     */
-    fun confirmDeleteMessage() {
-        val message = _uiState.value.contextMenuMessage ?: return
-        val convId = _uiState.value.conversationId ?: return
-
-        // Dismiss menu and dialog
-        _uiState.value = _uiState.value.copy(
-            contextMenuMessage = null,
-            isContextMenuFadingOut = false,
-            showDeleteConfirmation = false
-        )
-
-        viewModelScope.launch {
-            val result = messageRepositoryImpl.deleteMessage(convId, message.id)
-            if (result is Resource.Error) {
-                // Requirement 9.8: Error snackbar for 4 seconds
-                _snackbarEvent.tryEmit(
-                    SnackbarEvent(
-                        message = "Failed to delete message",
-                        durationMs = DELETE_ERROR_SNACKBAR_MS
-                    )
-                )
-            }
-        }
-    }
-
-    /**
-     * Removes a message from local display only (for messages sent by others).
-     *
-     * Requirement 9.9: "Delete for me" removes from local display only.
-     */
-    fun deleteMessageForMe() {
-        val message = _uiState.value.contextMenuMessage ?: return
-
-        // Dismiss menu
-        _uiState.value = _uiState.value.copy(
-            contextMenuMessage = null,
-            isContextMenuFadingOut = false
-        )
-
-        viewModelScope.launch {
-            messageRepositoryImpl.deleteMessageLocally(message.id)
-        }
-    }
-
-    /**
-     * Navigates to the conversation picker for forwarding a message.
-     * Dismisses the context menu.
-     *
-     * Requirement 9.10: Navigate to conversation picker (max 5 targets).
-     */
-    fun forwardMessage(): String? {
-        val message = _uiState.value.contextMenuMessage ?: return null
-        val messageId = message.id
-
-        // Dismiss menu
-        _uiState.value = _uiState.value.copy(
-            contextMenuMessage = null,
-            isContextMenuFadingOut = false
-        )
-
-        return messageId
-    }
 
     // ─── Voice Message Playback (Task 6.2) ──────────────────────────────────────
 
@@ -2610,10 +2420,8 @@ class ChatViewModel @Inject constructor(
      * Requirements: 11.1, 11.11
      */
     fun startVoiceRecording() {
-        val convId = _uiState.value.conversationId ?: return
-
         // Check microphone permission
-        val context = getApplication<android.app.Application>()
+        val context = getApplication<Application>()
         val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
             context,
             android.Manifest.permission.RECORD_AUDIO
@@ -2724,52 +2532,6 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Locks voice recording into hands-free mode.
-     * The user can release the button while recording continues.
-     *
-     * Requirement 11.3: Slide up > 48dp locks into hands-free mode.
-     */
-    fun lockVoiceRecording() {
-        voiceRecorder.lockRecording()
-    }
-
-    /**
-     * Called when microphone permission is granted after being requested.
-     * Retries starting the recording.
-     *
-     * Requirement 11.11
-     */
-    fun onMicrophonePermissionGranted() {
-        _uiState.value = _uiState.value.copy(microphonePermissionNeeded = false)
-        startVoiceRecording()
-    }
-
-    /**
-     * Called when microphone permission is denied.
-     * Shows an error message.
-     *
-     * Requirement 11.11
-     */
-    fun onMicrophonePermissionDenied() {
-        _uiState.value = _uiState.value.copy(
-            microphonePermissionNeeded = false,
-            voiceRecordingError = "Microphone access is required to record voice messages"
-        )
-        // Auto-dismiss error after 4 seconds
-        viewModelScope.launch {
-            delay(4_000L)
-            _uiState.value = _uiState.value.copy(voiceRecordingError = null)
-        }
-    }
-
-    /**
-     * Dismisses the voice recording error message.
-     */
-    fun dismissVoiceRecordingError() {
-        _uiState.value = _uiState.value.copy(voiceRecordingError = null)
-    }
-
-    /**
      * Called when the app goes to background while ChatScreen is active.
      * Disconnects the WebSocket to conserve resources and battery.
      * Pauses voice message playback (Requirement 11.9).
@@ -2829,35 +2591,6 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Toggles the admin overflow menu visibility.
-     *
-     * Requirement 15.1: Overflow menu reveals three admin actions.
-     */
-    fun toggleAdminOverflowMenu() {
-        _uiState.value = _uiState.value.copy(
-            showAdminOverflowMenu = !_uiState.value.showAdminOverflowMenu
-        )
-    }
-
-    /**
-     * Dismisses the admin overflow menu.
-     */
-    fun dismissAdminOverflowMenu() {
-        _uiState.value = _uiState.value.copy(showAdminOverflowMenu = false)
-    }
-
-    /**
-     * Shows the member picker dialog for the "Mute Member" action.
-     *
-     * Requirement 15.2: Member picker dialog lists all group members except current user.
-     */
-    fun showMuteMemberPicker() {
-        _uiState.value = _uiState.value.copy(
-            showAdminOverflowMenu = false,
-            showMemberPickerDialog = true
-        )
-    }
 
     /**
      * Dismisses the member picker dialog.
@@ -2885,29 +2618,6 @@ class ChatViewModel @Inject constructor(
             } else {
                 _snackbarEvent.tryEmit(
                     SnackbarEvent(message = "Failed to mute member")
-                )
-            }
-        }
-    }
-
-    /**
-     * Handles the "Invite Link" action from the admin overflow menu.
-     * Copies the invite link to clipboard, shows a toast, and presents the share sheet.
-     *
-     * Requirement 15.5: Copy to clipboard, show "Link copied" toast 2s, present share sheet.
-     * Requirement 15.6: On fail, show error snackbar, no clipboard copy.
-     */
-    fun handleInviteLink() {
-        val groupId = _uiState.value.conversation?.groupId ?: return
-        _uiState.value = _uiState.value.copy(showAdminOverflowMenu = false)
-
-        viewModelScope.launch {
-            val result = groupRepository.getInviteLink(groupId)
-            if (result is Resource.Success && result.data != null) {
-                _inviteLinkEvent.tryEmit(result.data)
-            } else {
-                _snackbarEvent.tryEmit(
-                    SnackbarEvent(message = "Failed to retrieve invite link")
                 )
             }
         }
@@ -3102,37 +2812,6 @@ class ChatViewModel @Inject constructor(
             isMentionPopupVisible = false,
             mentionSuggestions = emptyList()
         )
-    }
-
-    /**
-     * Handles text deletion that may affect mention tokens.
-     * If a character within a mention token is deleted, the entire token is removed.
-     *
-     * Requirement 14.7: Delete within mention token → remove entire token and userId from list.
-     *
-     * @param oldText The previous input text
-     * @param newText The new input text after deletion
-     * @param cursorPosition The cursor position after the change
-     * @return The corrected text if a token was removed, or null if no correction needed
-     */
-    fun handleMentionTextChange(oldText: String, newText: String, cursorPosition: Int): String? {
-        val correctedText = mentionEngine.handleTextChange(oldText, newText, cursorPosition)
-        if (correctedText != null) {
-            _uiState.value = _uiState.value.copy(
-                mentionedUserIds = mentionEngine.mentionedUserIds
-            )
-        }
-        return correctedText
-    }
-
-    /**
-     * Returns the mention ranges in the current input text for styled rendering.
-     * Used by the input field to apply primary color + bold to mention tokens.
-     *
-     * Requirement 14.2: Styled mention token (primary color, bold).
-     */
-    fun getMentionRangesInInput(): List<IntRange> {
-        return mentionEngine.getMentionRanges(_uiState.value.inputText)
     }
 
     /**
@@ -3351,15 +3030,6 @@ class ChatViewModel @Inject constructor(
 
         /** Default live location sharing duration in minutes (Requirement 1.2). */
         const val DEFAULT_LIVE_LOCATION_DURATION_MINUTES = 60L
-
-        /** Interval for updating the live location time remaining display (Requirement 1.4). */
-        const val LOCATION_TIMER_UPDATE_INTERVAL_MS = 60_000L
-
-        /** Duration of the context menu fade-out animation (Requirement 9.11). */
-        const val CONTEXT_MENU_FADE_MS = 200L
-
-        /** Duration of the delete error snackbar (Requirement 9.8). */
-        const val DELETE_ERROR_SNACKBAR_MS = 4000L
 
         /** Debounce delay for message search (Requirement 13.2). */
         const val SEARCH_DEBOUNCE_MS = 300L

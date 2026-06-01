@@ -3,8 +3,8 @@ package com.ovi.where.core.links
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.core.net.toUri
 import com.ovi.where.DeepLinkManager
 import timber.log.Timber
 
@@ -76,7 +76,7 @@ object LinkRouter {
         // Convert `where://chat/abc` → `chat/abc` for the in-app router.
         // Reuses the existing parsing path so we behave identically to
         // notification-tap deep-links.
-        val parsed = DeepLinkManager.parseWhereUri(Uri.parse(uri))
+        val parsed = DeepLinkManager.parseWhereUri(uri.toUri())
         if (parsed != null) {
             DeepLinkManager.pending = parsed
         } else {
@@ -85,7 +85,7 @@ object LinkRouter {
     }
 
     private fun openExternal(context: Context, url: String) {
-        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: run {
+        val uri = runCatching { url.toUri() }.getOrNull() ?: run {
             Timber.w("Could not parse external URL: %s", url)
             return
         }
@@ -113,7 +113,7 @@ object LinkRouter {
 
     private fun openMailto(context: Context, mailto: String) {
         try {
-            val uri = if (mailto.startsWith("mailto:")) Uri.parse(mailto) else Uri.parse("mailto:$mailto")
+            val uri = if (mailto.startsWith("mailto:")) mailto.toUri() else "mailto:$mailto".toUri()
             val intent = Intent(Intent.ACTION_SENDTO, uri)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
@@ -124,7 +124,7 @@ object LinkRouter {
 
     private fun openTel(context: Context, tel: String) {
         try {
-            val uri = if (tel.startsWith("tel:")) Uri.parse(tel) else Uri.parse("tel:$tel")
+            val uri = if (tel.startsWith("tel:")) tel.toUri() else "tel:$tel".toUri()
             // ACTION_DIAL doesn't require CALL_PHONE permission and just
             // opens the dialer with the number pre-filled — much safer for
             // a chat link tap than ACTION_CALL.

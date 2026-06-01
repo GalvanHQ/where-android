@@ -4,6 +4,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.google.firebase.Firebase
+import com.google.firebase.crashlytics.crashlytics
+import com.ovi.where.BuildConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -41,14 +44,19 @@ class RecentSearchesStore @Inject constructor(
                 try {
                     json.decodeFromString<List<String>>(raw)
                 } catch (e: Exception) {
-                    Timber.w(e, "Malformed JSON in recent searches for screen '$screenKey', clearing entry")
+                    if (BuildConfig.DEBUG) {
+                        Timber.w(
+                            e,
+                            "Malformed JSON in recent searches for screen '$screenKey', clearing entry"
+                        )
+                    }
                     // Clear the corrupted entry
                     dataStore.edit { it.remove(key) }
                     emptyList()
                 }
             }
             .catch { e ->
-                Timber.e(e, "Error reading recent searches for screen '$screenKey'")
+                Firebase.crashlytics.recordException(e)
                 emit(emptyList())
             }
     }
@@ -63,7 +71,12 @@ class RecentSearchesStore @Inject constructor(
                 val raw = preferences[key]
                 if (raw != null) json.decodeFromString<List<String>>(raw) else emptyList()
             } catch (e: Exception) {
-                Timber.w(e, "Malformed JSON in recent searches for screen '$screenKey', resetting")
+                if (BuildConfig.DEBUG) {
+                    Timber.w(
+                        e,
+                        "Malformed JSON in recent searches for screen '$screenKey', resetting"
+                    )
+                }
                 emptyList()
             }
 
@@ -82,7 +95,12 @@ class RecentSearchesStore @Inject constructor(
                 val raw = preferences[key]
                 if (raw != null) json.decodeFromString<List<String>>(raw) else emptyList()
             } catch (e: Exception) {
-                Timber.w(e, "Malformed JSON in recent searches for screen '$screenKey', resetting")
+                if (BuildConfig.DEBUG) {
+                    Timber.w(
+                        e,
+                        "Malformed JSON in recent searches for screen '$screenKey', resetting"
+                    )
+                }
                 emptyList()
             }
 

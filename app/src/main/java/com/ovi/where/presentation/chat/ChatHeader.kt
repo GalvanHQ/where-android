@@ -32,7 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -224,7 +224,7 @@ private fun ActiveStatusSubtitle(
     groupDescription: String = ""
 ) {
     // Tick every minute so the relative-time subtitle stays current.
-    var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
+    var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(conversation.id) {
         while (true) {
             delay(60_000L)

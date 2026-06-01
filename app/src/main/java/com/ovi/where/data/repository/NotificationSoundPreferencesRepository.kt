@@ -57,19 +57,6 @@ class NotificationSoundPreferencesRepository @Inject constructor(
             )
         }
 
-    /** Suspend read; safe from FCM dispatch. */
-    suspend fun getSound(baseChannelId: String): NotificationSound {
-        val prefs = dataStore.data.first()
-        val id = prefs[soundKey(baseChannelId)]
-            ?: NotificationSound.defaultFor(baseChannelId).id
-        return NotificationSound.fromId(id)
-    }
-
-    /** Suspend read of the channel version (for resolving the active channel id). */
-    suspend fun getChannelVersion(baseChannelId: String): Int {
-        return dataStore.data.first()[versionKey(baseChannelId)] ?: 0
-    }
-
     /**
      * Persist a new sound for [baseChannelId] and bump the channel version
      * so the next call to [NotificationHelper.createChannels] rebuilds the

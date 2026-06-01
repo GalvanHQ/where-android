@@ -70,48 +70,4 @@ class NotificationPreferencesRepository @Inject constructor(
         dataStore.edit { it[key] = enabled }
     }
 
-    /**
-     * Channel id constants previously lived in this repository's companion.
-     * They now live exclusively on [NotificationHelper] (the producer side
-     * is the canonical owner). The aliases below stay temporarily so the
-     * settings ViewModel keeps compiling without a sweep, but new call
-     * sites should reference `NotificationHelper.CHANNEL_*` directly.
-     */
-    companion object {
-        @Deprecated(
-            "Use NotificationHelper.CHANNEL_MESSAGES",
-            ReplaceWith("NotificationHelper.CHANNEL_MESSAGES", "com.ovi.where.core.notification.NotificationHelper")
-        )
-        const val CHANNEL_ID_MESSAGES = NotificationHelper.CHANNEL_MESSAGES
-
-        @Deprecated(
-            "Use NotificationHelper.CHANNEL_SOCIAL",
-            ReplaceWith("NotificationHelper.CHANNEL_SOCIAL", "com.ovi.where.core.notification.NotificationHelper")
-        )
-        const val CHANNEL_ID_SOCIAL = NotificationHelper.CHANNEL_SOCIAL
-
-        @Deprecated(
-            "Use NotificationHelper.CHANNEL_LOCATION_UPDATES",
-            ReplaceWith("NotificationHelper.CHANNEL_LOCATION_UPDATES", "com.ovi.where.core.notification.NotificationHelper")
-        )
-        const val CHANNEL_ID_LOCATION_UPDATES = NotificationHelper.CHANNEL_LOCATION_UPDATES
-
-        @Deprecated(
-            "Use NotificationHelper.CHANNEL_GROUP_ACTIVITY",
-            ReplaceWith("NotificationHelper.CHANNEL_GROUP_ACTIVITY", "com.ovi.where.core.notification.NotificationHelper")
-        )
-        const val CHANNEL_ID_GROUP_ACTIVITY = NotificationHelper.CHANNEL_GROUP_ACTIVITY
-
-        @Deprecated(
-            "Use NotificationHelper.CHANNEL_MEETUP",
-            ReplaceWith("NotificationHelper.CHANNEL_MEETUP", "com.ovi.where.core.notification.NotificationHelper")
-        )
-        const val CHANNEL_ID_MEETUP = NotificationHelper.CHANNEL_MEETUP
-
-        @Deprecated(
-            "Use NotificationHelper.CHANNEL_GENERAL",
-            ReplaceWith("NotificationHelper.CHANNEL_GENERAL", "com.ovi.where.core.notification.NotificationHelper")
-        )
-        const val CHANNEL_ID_GENERAL = NotificationHelper.CHANNEL_GENERAL
-    }
 }

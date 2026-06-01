@@ -3,6 +3,8 @@ package com.ovi.where.core.utils
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 
 object PermissionUtils {
@@ -11,9 +13,11 @@ object PermissionUtils {
         Manifest.permission.ACCESS_COARSE_LOCATION
     )
     
-    val backgroundLocationPermission = Manifest.permission.ACCESS_BACKGROUND_LOCATION
+    @RequiresApi(Build.VERSION_CODES.Q)
+    const val BACKGROUND_LOCATION_PERMISSION = Manifest.permission.ACCESS_BACKGROUND_LOCATION
     
-    val notificationPermission = Manifest.permission.POST_NOTIFICATIONS
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    const val NOTIFICATION_PERMISSION = Manifest.permission.POST_NOTIFICATIONS
     
     fun hasLocationPermissions(context: Context): Boolean {
         return locationPermissions.all { permission ->
@@ -21,37 +25,23 @@ object PermissionUtils {
         }
     }
     
+    @RequiresApi(Build.VERSION_CODES.Q)
     fun hasBackgroundLocationPermission(context: Context): Boolean {
         return ContextCompat.checkSelfPermission(
             context,
-            backgroundLocationPermission
+            BACKGROUND_LOCATION_PERMISSION
         ) == PackageManager.PERMISSION_GRANTED
     }
     
     fun hasNotificationPermission(context: Context): Boolean {
-        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
                 context,
-                notificationPermission
+                NOTIFICATION_PERMISSION
             ) == PackageManager.PERMISSION_GRANTED
         } else {
             true
         }
     }
-    
-    fun shouldShowRationale(
-        context: Context,
-        permission: String
-    ): Boolean {
-        return ContextCompat.checkSelfPermission(
-            context,
-            permission
-        ) != PackageManager.PERMISSION_GRANTED
-    }
-    
-    fun areAllPermissionsGranted(
-        grantResults: IntArray
-    ): Boolean {
-        return grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
-    }
+
 }

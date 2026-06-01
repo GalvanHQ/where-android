@@ -22,13 +22,10 @@ package com.ovi.where.core.notification
 data class NotificationData(
     val title: String,
     val body: String,
-    /** Generic identifier — used by deep-links if no more specific id is set. */
     val targetId: String? = null,
     val conversationId: String? = null,
     val groupId: String? = null,
     val userId: String? = null,
-    /** Display name of the destination for meetup notifications. */
     val destinationName: String? = null,
-    /** Mention metadata: ids of users explicitly @mentioned in the source message. */
     val mentionedUserIds: List<String> = emptyList()
 )

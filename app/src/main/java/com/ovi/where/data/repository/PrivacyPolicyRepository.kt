@@ -34,17 +34,9 @@ class PrivacyPolicyRepository @Inject constructor(
     fun observeLocationSharingMode(): Flow<LocationSharingMode> =
         dataStore.data.map { LocationSharingMode.fromKey(it[LOCATION_SHARING_KEY]) }
 
-    /** Reactive view of the current user's profile-visibility mode. */
-    fun observeProfileVisibility(): Flow<ProfileVisibility> =
-        dataStore.data.map { ProfileVisibility.fromKey(it[PROFILE_VISIBILITY_KEY]) }
-
     /** Suspend-style snapshot. Used by the location repo on the start-share hot path. */
     suspend fun currentLocationSharingMode(): LocationSharingMode =
         observeLocationSharingMode().first()
-
-    /** Suspend-style snapshot. Used by the user-search repo to filter results. */
-    suspend fun currentProfileVisibility(): ProfileVisibility =
-        observeProfileVisibility().first()
 
     enum class LocationSharingMode(val key: String) {
         /** No client-side restriction — the only check is the existing target list. */
@@ -60,21 +52,10 @@ class PrivacyPolicyRepository @Inject constructor(
         }
     }
 
-    enum class ProfileVisibility(val key: String) {
-        EVERYONE("everyone"),
-        FRIENDS("friends"),
-        HIDDEN("hidden");
-
-        companion object {
-            fun fromKey(key: String?): ProfileVisibility =
-                entries.firstOrNull { it.key == key } ?: EVERYONE
-        }
-    }
 
     companion object {
         // Mirrors PrivacyViewModel's keys. Kept in sync via a code review
         // checklist — both files have the same comment about it.
         val LOCATION_SHARING_KEY = stringPreferencesKey("pref_location_sharing")
-        val PROFILE_VISIBILITY_KEY = stringPreferencesKey("pref_profile_visibility")
     }
 }

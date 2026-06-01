@@ -55,14 +55,6 @@ class ChatProcessLifecycleObserver @Inject constructor(
     @Volatile
     private var chatFeatureActivated = false
 
-    /**
-     * Marks the chat feature as activated. Called when the user first navigates to
-     * a chat screen and the socket is connected. After this, lifecycle callbacks
-     * will manage the socket and Firestore listener.
-     */
-    fun markChatFeatureActivated() {
-        chatFeatureActivated = true
-    }
 
     companion object {
         /** Delay before disconnecting socket when app goes to background (Requirement 21.4). */

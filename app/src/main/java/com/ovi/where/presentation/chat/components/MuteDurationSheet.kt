@@ -1,7 +1,6 @@
 package com.ovi.where.presentation.chat.components
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -126,32 +125,5 @@ private fun MuteRow(
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
-    }
-}
-
-/**
- * Lightweight extension that pairs [MuteDurationSheet] with a
- * Compose-side conditional, so call sites can write:
- *
- * ```
- * MuteDurationSheet.IfShowing(
- *     show = showSheet,
- *     onDismiss = { showSheet = false },
- *     onSelect = { option -> viewModel.muteFor(convId, option) }
- * )
- * ```
- *
- * — instead of repeating the if-else block at every site.
- */
-object MuteDurationSheetHost {
-    @Composable
-    fun IfShowing(
-        show: Boolean,
-        onDismiss: () -> Unit,
-        onSelect: (MuteOption) -> Unit
-    ) {
-        if (show) {
-            MuteDurationSheet(onDismiss = onDismiss, onSelect = onSelect)
-        }
     }
 }

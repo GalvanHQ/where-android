@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
-import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
@@ -180,7 +179,6 @@ object ImageUploadUtil {
                 bitmap
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Could not read EXIF data, using original orientation", e)
             bitmap
         }
     }
@@ -240,7 +238,6 @@ object ImageUploadUtil {
             return compressWithByteArray(bitmap, tempFile)
             
         } catch (e: Exception) {
-            Log.e(TAG, "Error compressing bitmap to file", e)
             null
         }
     }
@@ -270,12 +267,10 @@ object ImageUploadUtil {
                 
                 quality -= 2
             } while (quality > 0)
-            
-            Log.w(TAG, "Could not compress image under ${MAX_FILE_SIZE} bytes even with minimum quality")
+
             null
             
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in aggressive compression", e)
+        } catch (_: Exception) {
             null
         }
     }

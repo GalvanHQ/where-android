@@ -28,8 +28,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.AddLink
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
@@ -51,21 +51,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.ovi.where.core.theme.Dimens
-import androidx.core.net.toUri
 
 /**
  * Profile screen — clean, content-first layout inspired by Instagram /
@@ -202,7 +202,8 @@ fun ProfileScreen(
                             onClick = {
                                 viewModel.showHomeOnMap()
                                 onNavigateToMap()
-                            }
+                            },
+                            trailingIconRes = com.ovi.where.R.drawable.navigate_to
                         )
                     } else {
                         SectionEmptyState(
@@ -489,7 +490,7 @@ private fun ProfileHeaderCard(
         // ── Name + Username ──────────────────────────────────────────────
         Text(
             text = displayName,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
         )
@@ -498,7 +499,7 @@ private fun ProfileHeaderCard(
             Spacer(modifier = Modifier.height(Dimens.spaceXSmall))
             Text(
                 text = "@$username",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -508,9 +509,10 @@ private fun ProfileHeaderCard(
             Spacer(modifier = Modifier.height(Dimens.spaceMedium))
             Text(
                 text = bio,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 3,
+                fontStyle = FontStyle.Italic,
+                maxLines = 4,
                 overflow = TextOverflow.Ellipsis
             )
         }
@@ -544,7 +546,8 @@ private fun AboutRow(
     icon: ImageVector,
     title: String,
     subtitle: String,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
+    trailingIconRes: Int? = null
 ) {
     Row(
         modifier = Modifier
@@ -586,12 +589,21 @@ private fun AboutRow(
             )
         }
         if (onClick != null) {
-            Icon(
-                Icons.AutoMirrored.Outlined.OpenInNew,
-                contentDescription = null,
-                modifier = Modifier.size(Dimens.iconSizeSmall),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-            )
+            if (trailingIconRes != null) {
+                Icon(
+                    imageVector = ImageVector.vectorResource(id = trailingIconRes),
+                    contentDescription = null,
+                    modifier = Modifier.size(Dimens.iconSizeMedium),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.ChevronRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(Dimens.iconSizeMedium),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            }
         }
     }
 }

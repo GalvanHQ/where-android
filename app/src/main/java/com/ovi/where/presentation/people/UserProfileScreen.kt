@@ -28,9 +28,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -74,6 +74,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
@@ -348,7 +349,7 @@ fun UserProfileScreen(
                             ) {
                                 Text(
                                     text = profile.displayName,
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
@@ -356,13 +357,13 @@ fun UserProfileScreen(
                                 if (profile.isOnline) {
                                     Text(
                                         text = "Active now",
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.tertiary
                                     )
                                 } else if (profile.lastSeen > 0) {
                                     Text(
                                         text = "Last seen ${formatRelativeTime(profile.lastSeen)}",
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
@@ -371,8 +372,9 @@ fun UserProfileScreen(
                                     Spacer(Modifier.height(Dimens.spaceMedium))
                                     Text(
                                         text = profile.bio,
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onSurface,
+                                        fontStyle = FontStyle.Italic,
                                         maxLines = 4,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -493,6 +495,44 @@ fun UserProfileScreen(
                             }
                         }
 
+                        // ── Home Section ─────────────────────────────────────────
+                        if (profile.hasHome) {
+                            item {
+                                Text(
+                                    text = "Home",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(
+                                        start = Dimens.spaceLarge,
+                                        top = Dimens.spaceLarge,
+                                        bottom = Dimens.spaceMedium
+                                    )
+                                )
+                            }
+                            item {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = Dimens.spaceLarge),
+                                    shape = RoundedCornerShape(Dimens.cornerLarge),
+                                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                    tonalElevation = 0.dp
+                                ) {
+                                    InfoRow(
+                                        icon = ImageVector.vectorResource(id = R.drawable.home_outlined),
+                                        title = "Home",
+                                        subtitle = profile.homeLabel.ifBlank { "Location set" },
+                                        onClick = {
+                                            viewModel.showHomeOnMap()
+                                            onNavigateToMap()
+                                        },
+                                        trailingIconRes = R.drawable.navigate_to
+                                    )
+                                }
+                            }
+                        }
+
                         // ── About Section ────────────────────────────────────────
                         item {
                             Text(
@@ -513,7 +553,7 @@ fun UserProfileScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = Dimens.spaceLarge),
-                                shape = RoundedCornerShape(Dimens.cornerMedium),
+                                shape = RoundedCornerShape(Dimens.cornerLarge),
                                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                                 tonalElevation = 0.dp
                             ) {
@@ -550,43 +590,6 @@ fun UserProfileScreen(
                             }
                         }
 
-                        // ── Home Section ─────────────────────────────────────────
-                        if (profile.hasHome) {
-                            item {
-                                Text(
-                                    text = "Home",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(
-                                        start = Dimens.spaceLarge,
-                                        top = Dimens.spaceLarge,
-                                        bottom = Dimens.spaceMedium
-                                    )
-                                )
-                            }
-                            item {
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = Dimens.spaceLarge),
-                                    shape = RoundedCornerShape(Dimens.cornerMedium),
-                                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                    tonalElevation = 0.dp
-                                ) {
-                                    InfoRow(
-                                        icon = ImageVector.vectorResource(id = R.drawable.home_outlined),
-                                        title = "Home",
-                                        subtitle = profile.homeLabel.ifBlank { "Location set" },
-                                        onClick = {
-                                            viewModel.showHomeOnMap()
-                                            onNavigateToMap()
-                                        }
-                                    )
-                                }
-                            }
-                        }
-
                         // ── Social Section ───────────────────────────────────────
                         if (profile.hasAnySocial) {
                             item {
@@ -607,7 +610,7 @@ fun UserProfileScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(horizontal = Dimens.spaceLarge),
-                                    shape = RoundedCornerShape(Dimens.cornerMedium),
+                                    shape = RoundedCornerShape(Dimens.cornerLarge),
                                     color = MaterialTheme.colorScheme.surfaceContainerLow,
                                     tonalElevation = 0.dp
                                 ) {
@@ -725,7 +728,8 @@ private fun InfoRow(
     icon: ImageVector,
     title: String,
     subtitle: String,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
+    trailingIconRes: Int? = null
 ) {
     Row(
         modifier = Modifier
@@ -766,12 +770,21 @@ private fun InfoRow(
             )
         }
         if (onClick != null) {
-            Icon(
-                Icons.AutoMirrored.Outlined.OpenInNew,
-                contentDescription = null,
-                modifier = Modifier.size(Dimens.iconSizeSmall),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-            )
+            if (trailingIconRes != null) {
+                Icon(
+                    imageVector = ImageVector.vectorResource(id = trailingIconRes),
+                    contentDescription = null,
+                    modifier = Modifier.size(Dimens.iconSizeMedium),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            } else {
+                Icon(
+                    Icons.Outlined.ChevronRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(Dimens.iconSizeMedium),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            }
         }
     }
 }

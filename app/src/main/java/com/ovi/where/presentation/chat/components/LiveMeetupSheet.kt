@@ -75,8 +75,8 @@ import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.ovi.where.R
 import com.ovi.where.domain.model.SharedLocation
-import com.ovi.where.presentation.map.components.Life360PinMarker
-import com.ovi.where.presentation.map.components.avatarColorForUser
+import com.ovi.where.presentation.common.Life360PinMarker
+import com.ovi.where.presentation.common.avatarColorForUser
 import com.ovi.where.presentation.map.components.fanOutOverlappingMarkers
 
 /**

@@ -723,13 +723,6 @@ fun ChatScreen(
                                 }
                                 return@items
                             }
-                            // Determine if this message is a search result and if it's the current focused result
-                            val isSearchHighlighted = searchQuery != null &&
-                                    searchResultIds.contains(message.id)
-                            val isCurrentSearchResult = searchQuery != null &&
-                                    currentSearchResultIndex >= 0 &&
-                                    currentSearchResultIndex < searchResultIds.size &&
-                                    searchResultIds[currentSearchResultIndex] == message.id
 
                             // Requirement 17.4 / 19.6: Stable lambda references via remember
                             val onReply = remember(message.id) {

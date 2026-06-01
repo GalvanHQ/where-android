@@ -1,6 +1,5 @@
 package com.ovi.where.presentation.model
 
-import com.ovi.where.core.utils.DateTimeUtils
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -9,22 +8,23 @@ import java.util.Locale
 /**
  * Formats a millisecond timestamp for the conversation list row.
  *
- * Delegates to [DateTimeUtils] for core time/date formatting:
- * - Today → time only via [DateTimeUtils.formatTime] (e.g. "02:32 PM")
+ * Professional Messenger/WhatsApp-style formatting:
+ * - Today → short time "2:32 PM" (no leading zero)
  * - Yesterday → "Yesterday"
- * - Same week → day name (e.g. "Monday")
- * - Older → short date via dd/MM/yy
+ * - Same week → abbreviated day name "Mon", "Tue", etc.
+ * - Same year → short date "Jan 15"
+ * - Older → "Jan 15, 2024"
  */
 fun formatConversationTimestamp(timestamp: Long): String {
     if (timestamp == 0L) return ""
     val now = Calendar.getInstance()
     val msgCal = Calendar.getInstance().apply { time = Date(timestamp) }
 
-    // Today → delegate to DateTimeUtils.formatTime
+    // Today → short time (no leading zero on hour)
     val isSameDay = now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) &&
             now.get(Calendar.DAY_OF_YEAR) == msgCal.get(Calendar.DAY_OF_YEAR)
     if (isSameDay) {
-        return DateTimeUtils.formatTime(timestamp)
+        return SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(timestamp))
     }
 
     // Yesterday
@@ -38,15 +38,19 @@ fun formatConversationTimestamp(timestamp: Long): String {
         return "Yesterday"
     }
 
-    // Same calendar week → day name
-    val isSameWeek = now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) &&
-            now.get(Calendar.WEEK_OF_YEAR) == msgCal.get(Calendar.WEEK_OF_YEAR)
-    if (isSameWeek) {
-        return SimpleDateFormat("EEEE", Locale.getDefault()).format(Date(timestamp))
+    // Within last 7 days → abbreviated day name (Mon, Tue, Wed...)
+    val diffDays = (now.timeInMillis - msgCal.timeInMillis) / (24 * 60 * 60 * 1000)
+    if (diffDays < 7 && now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR)) {
+        return SimpleDateFormat("EEE", Locale.getDefault()).format(Date(timestamp))
     }
 
-    // Older → short date
-    return SimpleDateFormat("dd/MM/yy", Locale.getDefault()).format(Date(timestamp))
+    // Same year → "Jan 15"
+    if (now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR)) {
+        return SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(timestamp))
+    }
+
+    // Older → "Jan 15, 2024"
+    return SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(timestamp))
 }
 
 /** Formats a millisecond timestamp for message bubbles (Messenger style).

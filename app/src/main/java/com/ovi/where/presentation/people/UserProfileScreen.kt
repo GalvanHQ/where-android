@@ -29,15 +29,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.PersonRemove
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.RemoveCircle
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -433,7 +434,7 @@ fun UserProfileScreen(
                                             modifier = Modifier.weight(1f).height(44.dp),
                                             shape = RoundedCornerShape(Dimens.cornerSmall)
                                         ) {
-                                            Icon(imageVector = ImageVector.vectorResource(id = R.drawable.chat_filled), contentDescription = null, Modifier.size(Dimens.iconSizeSmall))
+                                            Icon(imageVector = Icons.Rounded.ChatBubbleOutline, contentDescription = null, Modifier.size(Dimens.iconSizeSmall))
                                             Spacer(Modifier.width(Dimens.spaceMedium))
                                             Text("Message", style = MaterialTheme.typography.labelLarge)
                                         }
@@ -464,9 +465,9 @@ fun UserProfileScreen(
                                         ) {
                                             Icon(
                                                 imageVector = if (uiState.isCloseFriend)
-                                                    Icons.Filled.Star
+                                                    Icons.Rounded.Star
                                                 else
-                                                    Icons.Outlined.StarBorder,
+                                                    Icons.Outlined.Star,
                                                 contentDescription = if (uiState.isCloseFriend)
                                                     "Remove from close friends"
                                                 else

@@ -141,10 +141,22 @@ class UserRepositoryImpl @Inject constructor(
             val trimmed = query.trim()
             if (trimmed.isEmpty()) return Resource.Success(emptyList())
 
-            val byName = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+            // Firestore prefix queries are case-sensitive. We search displayName
+            // with both the original casing and a capitalized variant to catch
+            // "john" matching "John Smith" and "john doe" matching "John Doe".
+            val capitalizedQuery = trimmed.replaceFirstChar { it.uppercase() }
+
+            val byNameOriginal = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
                 .whereGreaterThanOrEqualTo("displayName", trimmed)
                 .whereLessThanOrEqualTo("displayName", trimmed + "\uf8ff")
                 .limit(20).get().await().toObjects(User::class.java)
+
+            val byNameCapitalized = if (capitalizedQuery != trimmed) {
+                firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
+                    .whereGreaterThanOrEqualTo("displayName", capitalizedQuery)
+                    .whereLessThanOrEqualTo("displayName", capitalizedQuery + "\uf8ff")
+                    .limit(20).get().await().toObjects(User::class.java)
+            } else emptyList()
 
             val byUsername = firestore.collection(AppConstants.FIRESTORE_COLLECTION_USERS)
                 .whereGreaterThanOrEqualTo("username", trimmed.lowercase())
@@ -153,7 +165,7 @@ class UserRepositoryImpl @Inject constructor(
 
             // Merge + deduplicate, exclude self
             val uid = currentUid
-            val merged = (byName + byUsername)
+            val merged = (byNameOriginal + byNameCapitalized + byUsername)
                 .distinctBy { it.id }
                 .filter { it.id != uid }
 

@@ -1,5 +1,7 @@
 package com.ovi.where.presentation.navigation
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -122,6 +124,7 @@ private fun isTabSwitch(fromRoute: String?, toRoute: String?): Boolean =
  * The bottom bar is rendered by [WhereBottomBar] in [MainScaffold] and shows
  * itself only when the current destination is in [BottomTabRoutes].
  */
+@RequiresApi(Build.VERSION_CODES.Q)
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavGraph(
@@ -499,12 +502,6 @@ fun AppNavGraph(
                             launchSingleTop = true
                         }
                     },
-                    onNavigateToMessages = {
-                        navController.navigateToTab(Screen.ChatsTab.route)
-                    },
-                    onNavigateToLocationSharing = {
-                        navController.navigateToTab(Screen.MapTab.route)
-                    },
                     onNavigateToMap = {
                         navController.navigateToTab(Screen.MapTab.route)
                     }
@@ -541,7 +538,9 @@ fun AppNavGraph(
 
             // ── Home Picker (full-screen map) ───────────────────────────────────
             composable(Screen.HomePicker.route) {
-                val editEntry = navController.getBackStackEntry(Screen.EditProfile.route)
+                val editEntry = androidx.compose.runtime.remember(backStackEntry) {
+                    navController.getBackStackEntry(Screen.EditProfile.route)
+                }
                 val seedLat = editEntry.savedStateHandle.get<Double>("home_seed_lat") ?: 0.0
                 val seedLng = editEntry.savedStateHandle.get<Double>("home_seed_lng") ?: 0.0
                 HomePickerScreen(
@@ -569,8 +568,6 @@ fun AppNavGraph(
                                 launchSingleTop = true
                             }
                         },
-                        onNavigateToMessages = { navController.popBackStack() },
-                        onNavigateToLocationSharing = { navController.popBackStack() },
                         onNavigateToMap = {
                             navController.navigateToTab(Screen.MapTab.route)
                         },

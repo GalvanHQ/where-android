@@ -57,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.toColorInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
@@ -386,7 +387,7 @@ internal fun ConversationInfoContent(
                 ),
                 confirmLabel = "Block",
                 photoUrl = uiState.photoUrl,
-                icon = androidx.compose.material.icons.Icons.Filled.Block,
+                icon = Icons.Filled.Block,
                 onConfirm = {
                     showBlockDialog = false
                     onBlockUser()
@@ -823,7 +824,7 @@ private fun ColorCircle(
     onClick: () -> Unit
 ) {
     val color = try {
-        Color(android.graphics.Color.parseColor(colorHex))
+        Color(colorHex.toColorInt())
     } catch (_: Exception) {
         MaterialTheme.colorScheme.primary
     }
@@ -905,74 +906,6 @@ private fun EmojiShortcutPickerDialog(
         confirmButton = {
             TextButton(onClick = { onEmojiSelected(null) }) {
                 Text("Reset to Default")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-// ── Nickname Editor Dialog ────────────────────────────────────────────────────
-
-@Composable
-private fun NicknameEditorDialog(
-    otherUserId: String,
-    otherUserName: String,
-    currentNickname: String,
-    currentUserId: String = "",
-    currentUserName: String = "You",
-    currentUserNickname: String = "",
-    onSave: (String, String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var otherNickname by remember { mutableStateOf(currentNickname) }
-    var selfNickname by remember { mutableStateOf(currentUserNickname) }
-
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Nicknames") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(
-                    "Set nicknames for this conversation",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                // Other user's nickname
-                androidx.compose.material3.OutlinedTextField(
-                    value = otherNickname,
-                    onValueChange = { otherNickname = it },
-                    label = { Text(otherUserName) },
-                    placeholder = { Text("Set a nickname") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                // Current user's nickname
-                androidx.compose.material3.OutlinedTextField(
-                    value = selfNickname,
-                    onValueChange = { selfNickname = it },
-                    label = { Text(currentUserName) },
-                    placeholder = { Text("Set your nickname") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                // Save both nicknames
-                if (otherUserId.isNotBlank()) onSave(otherUserId, otherNickname)
-                if (currentUserId.isNotBlank()) onSave(currentUserId, selfNickname)
-                onDismiss()
-            }) {
-                Text("Save")
             }
         },
         dismissButton = {

@@ -1969,7 +1969,7 @@ private fun MySharesTabContent(
     hostedMeetupGroupIds: Set<String>,
     groups: List<GroupFilter>,
     directTargets: List<GroupFilter>,
-    bottomReservedSpace: androidx.compose.ui.unit.Dp,
+    bottomReservedSpace: Dp,
     onAddShare: () -> Unit,
     onStopOne: (String) -> Unit,
     onStopAll: () -> Unit,

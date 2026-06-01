@@ -1805,9 +1805,9 @@ class GlobalMapViewModel @Inject constructor(
      * Fetches a Directions API route from [origin] to the meetup point
      * and writes it into UI state. Cancels any in-flight fetch first.
      */
-    private suspend fun fetchRouteForNavigation(
+    private fun fetchRouteForNavigation(
         origin: com.google.android.gms.maps.model.LatLng,
-        destination: com.ovi.where.domain.model.MeetupDestination
+        destination: MeetupDestination
     ) {
         navigationRouteJob?.cancel()
         navigationRouteJob = viewModelScope.launch {
@@ -2335,31 +2335,6 @@ class GlobalMapViewModel @Inject constructor(
     }
 
     /**
-     * Consumes the post-set "share with this group?" prompt without acting
-     * on it. Called by the screen when the snackbar dismisses by timeout
-     * or swipe.
-     */
-    fun consumeShareForGroupPrompt() {
-        _uiState.value = _uiState.value.copy(promptShareForGroupId = null)
-    }
-
-    /**
-     * Accepts the post-set prompt and starts a 1-hour live-location share
-     * targeted at the prompt's group. If the user is already sharing with
-     * other targets, this adds the group as an additional target instead of
-     * replacing the session.
-     */
-    fun acceptShareForGroupPrompt(durationMinutes: Long = 60L) {
-        val groupId = _uiState.value.promptShareForGroupId ?: return
-        _uiState.value = _uiState.value.copy(promptShareForGroupId = null)
-        if (_uiState.value.isSharing) {
-            addSharingTarget(groupId, durationMinutes)
-        } else {
-            startSharing(listOf(groupId), durationMinutes)
-        }
-    }
-
-    /**
      * Auto-starts a live share targeted at [groupId] after a meetup
      * destination is set. No-op when the user is already sharing with
      * this group. Records the group in [meetupOwnedShareGroupIds] so the
@@ -2508,12 +2483,6 @@ class GlobalMapViewModel @Inject constructor(
             diff < MILLIS_PER_HOUR    -> ctx.getString(R.string.time_minutes_ago, diff / MILLIS_PER_MINUTE)
             diff < MILLIS_PER_DAY     -> ctx.getString(R.string.time_hours_ago, diff / MILLIS_PER_HOUR)
             else                      -> ctx.getString(R.string.time_days_ago, diff / MILLIS_PER_DAY)
-        }
-    }
-
-    fun setLocationOffDialogShown() {
-        viewModelScope.launch {
-            userPreferences.setLocationOffDialogShown(true)
         }
     }
 

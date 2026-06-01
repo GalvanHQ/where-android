@@ -41,7 +41,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,12 +49,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.utils.BatteryOptimizationUtils
 import com.ovi.where.core.utils.PermissionUtils
@@ -220,8 +217,8 @@ fun PermissionsScreen(
                             // POST_NOTIFICATIONS only exists on Android 13+.
                             // On older releases the permission is granted at
                             // install — the launch() call is a safe no-op.
-                            if (android.os.Build.VERSION.SDK_INT
-                                >= android.os.Build.VERSION_CODES.TIRAMISU
+                            if (Build.VERSION.SDK_INT
+                                >= Build.VERSION_CODES.TIRAMISU
                             ) {
                                 notificationLauncher.launch(
                                     Manifest.permission.POST_NOTIFICATIONS

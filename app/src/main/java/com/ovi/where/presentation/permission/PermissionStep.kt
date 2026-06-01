@@ -106,6 +106,7 @@ sealed interface PermissionStep {
                 "requests, and meetup updates. You can fine-tune categories in Settings later."
         override val required = false
 
+        @RequiresApi(Build.VERSION_CODES.TIRAMISU)
         val permission: String = Manifest.permission.POST_NOTIFICATIONS
     }
 

@@ -13,6 +13,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.navigation.compose.rememberNavController
+import com.ovi.where.MainActivity.Companion.EXTRA_DEEP_LINK_ROUTE
 import com.ovi.where.core.theme.WhereTheme
 import com.ovi.where.presentation.navigation.AppNavGraph
 import com.ovi.where.presentation.settings.AppearanceViewModel

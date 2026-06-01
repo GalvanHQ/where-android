@@ -70,7 +70,6 @@ class CreateGroupViewModel @Inject constructor(
     companion object {
         const val MIN_GROUP_NAME_LENGTH = 3
         const val MAX_GROUP_NAME_LENGTH = 50
-        const val MIN_MEMBERS = 1
         const val MAX_MEMBERS = 50
     }
 

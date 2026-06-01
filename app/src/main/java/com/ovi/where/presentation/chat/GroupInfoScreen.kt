@@ -70,6 +70,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.toColorInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
@@ -536,7 +537,7 @@ internal fun GroupInfoScreenContent(
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                         themeColors.drop(4).forEach { hex ->
-                            val color = try { androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(hex)) } catch (_: Exception) { MaterialTheme.colorScheme.primary }
+                            val color = try { androidx.compose.ui.graphics.Color(hex.toColorInt()) } catch (_: Exception) { MaterialTheme.colorScheme.primary }
                             Box(
                                 modifier = Modifier
                                     .size(40.dp)
@@ -1171,7 +1172,7 @@ private fun SectionListItem(
  *   to set one). Keeps the picker logic in a single place.
  * - Destination set → opens an action sheet: "Show on map" / "Clear".
  */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MeetupSection(
     destination: com.ovi.where.domain.model.MeetupDestination?,
@@ -1300,9 +1301,9 @@ private fun MeetupSection(
 
 @Composable
 private fun MeetupActionRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     label: String,
-    tint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
     onClick: () -> Unit
 ) {
     Row(
@@ -1312,7 +1313,7 @@ private fun MeetupActionRow(
             .padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        androidx.compose.material3.Icon(
+        Icon(
             imageVector = icon,
             contentDescription = null,
             tint = tint,

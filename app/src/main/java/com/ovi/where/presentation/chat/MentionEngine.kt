@@ -231,63 +231,6 @@ class MentionEngine {
     }
 
     /**
-     * Handles text changes to detect if a mention token was partially deleted.
-     * If any character within a token is deleted, the entire token is removed.
-     *
-     * Requirement 14.7: Delete within mention token → remove entire token and userId from list.
-     *
-     * @param oldText The previous input text
-     * @param newText The new input text after the change
-     * @param newCursorPosition The cursor position after the change
-     * @return The corrected text with full tokens removed if partially deleted, or null if no correction needed
-     */
-    fun handleTextChange(oldText: String, newText: String, newCursorPosition: Int): String? {
-        if (_mentionTokens.isEmpty()) return null
-        if (newText.length >= oldText.length) {
-            // Text was added, not deleted — just adjust token positions
-            recalculateTokenPositions(newText)
-            return null
-        }
-
-        // Text was deleted — check if any token was affected
-        val tokensToRemove = mutableListOf<MentionToken>()
-        for (token in _mentionTokens) {
-            val tokenText = "@${token.displayName}"
-            // Check if the token text is still intact at its position
-            if (token.startIndex >= newText.length ||
-                token.endIndex > newText.length ||
-                !newText.substring(token.startIndex, minOf(token.endIndex, newText.length))
-                    .startsWith(tokenText.take(minOf(tokenText.length, newText.length - token.startIndex)))
-            ) {
-                tokensToRemove.add(token)
-            }
-        }
-
-        if (tokensToRemove.isEmpty()) return null
-
-        // Remove affected tokens entirely from the text
-        var resultText = newText
-        // Sort tokens by start index descending to remove from end first (preserves indices)
-        val sortedTokensToRemove = tokensToRemove.sortedByDescending { it.startIndex }
-        for (token in sortedTokensToRemove) {
-            val tokenText = "@${token.displayName}"
-            // Find what remains of this token in the text
-            val start = token.startIndex.coerceAtMost(resultText.length)
-            // Find the end of whatever remains of this token
-            val remainingEnd = findTokenRemainder(resultText, start, tokenText)
-            if (remainingEnd > start) {
-                resultText = resultText.removeRange(start, remainingEnd)
-            }
-            _mentionTokens.remove(token)
-        }
-
-        // Recalculate positions of remaining tokens
-        recalculateTokenPositions(resultText)
-
-        return resultText
-    }
-
-    /**
      * Finds the end index of whatever remains of a token at the given position.
      */
     private fun findTokenRemainder(text: String, start: Int, originalTokenText: String): Int {
@@ -305,25 +248,6 @@ class MentionEngine {
             end = start + 1
         }
         return if (end > start) end else start
-    }
-
-    /**
-     * Recalculates token positions based on current text content.
-     * Searches for "@DisplayName" patterns and updates indices.
-     */
-    private fun recalculateTokenPositions(text: String) {
-        val updatedTokens = _mentionTokens.mapNotNull { token ->
-            val tokenText = "@${token.displayName}"
-            val index = text.indexOf(tokenText, token.startIndex.coerceAtMost(text.length - 1).coerceAtLeast(0))
-            if (index >= 0) {
-                token.copy(startIndex = index, endIndex = index + tokenText.length)
-            } else {
-                // Token no longer exists in text
-                null
-            }
-        }
-        _mentionTokens.clear()
-        _mentionTokens.addAll(updatedTokens)
     }
 
     /**

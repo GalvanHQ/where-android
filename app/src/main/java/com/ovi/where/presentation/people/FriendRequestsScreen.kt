@@ -44,11 +44,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.ovi.where.core.theme.Dimens
 import com.ovi.where.core.constants.AppConstants.PULL_TO_REFRESH_TIMEOUT_MS
+import com.ovi.where.core.theme.Dimens
 import com.ovi.where.presentation.common.LIST_ITEM_ANIMATION_DURATION_MS
 import com.ovi.where.presentation.model.FriendRequestUiModel
-import com.ovi.where.presentation.model.SearchUserUiModel
 import com.ovi.where.presentation.people.components.LiveRingAvatar
 import com.ovi.where.presentation.people.components.RequestsEmptyState
 import com.ovi.where.presentation.people.components.RequestsSkeleton

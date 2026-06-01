@@ -295,21 +295,6 @@ class GroupInfoViewModel @Inject constructor(
     }
 
     /**
-     * Resolves the conversationId by looking up conversations with this groupId.
-     * Uses Room first, then Firestore direct query as fallback.
-     */
-    private fun resolveConversationId(groupId: String) {
-        viewModelScope.launch {
-            val resolved = conversationRepository.getConversationIdByGroupId(groupId)
-            if (resolved != null && conversationId == null) {
-                conversationId = resolved
-                loadSharedMedia(resolved)
-                loadNicknames(resolved)
-            }
-        }
-    }
-
-    /**
      * Ensures the conversation document's photoUrl matches the group's avatarUrl.
      * This handles the case where the group was created with a photo but the
      * conversation document was never updated (legacy data or server didn't sync).
@@ -622,12 +607,6 @@ class GroupInfoViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Clears the current error state.
-     */
-    fun clearError() {
-        _uiState.update { it.copy(error = null) }
-    }
 
     /**
      * Updates the group's name and description together. Optimistic update +
@@ -684,11 +663,6 @@ class GroupInfoViewModel @Inject constructor(
                 }
             }
         }
-    }
-
-    /** Backwards-compatible name-only update. Delegates to [updateGroupDetails]. */
-    fun updateGroupName(newName: String) {
-        updateGroupDetails(newName, _uiState.value.groupDescription)
     }
 
     /**

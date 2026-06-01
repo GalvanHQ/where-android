@@ -77,8 +77,6 @@ import com.ovi.where.core.theme.Dimens
 fun ProfileScreen(
     onNavigateToEditProfile: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToMessages: () -> Unit,
-    onNavigateToLocationSharing: () -> Unit,
     onNavigateToMap: () -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(),
     viewModel: ProfileViewModel = hiltViewModel()

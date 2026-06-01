@@ -7,12 +7,11 @@ import com.ovi.where.data.local.prefs.RecentSearchesStore
 import com.ovi.where.domain.usecase.GetSuggestionsUseCase
 import com.ovi.where.domain.usecase.SearchPeopleUseCase
 import com.ovi.where.domain.usecase.chat.GetOrCreateDirectConversationUseCase
+import com.ovi.where.domain.usecase.friend.BlockUserUseCase
 import com.ovi.where.domain.usecase.friend.ObserveFriendsUseCase
 import com.ovi.where.domain.usecase.friend.ObserveSocialSummaryUseCase
 import com.ovi.where.domain.usecase.friend.RemoveFriendUseCase
-import com.ovi.where.domain.usecase.friend.BlockUserUseCase
 import com.ovi.where.presentation.common.search.SearchUiState
-import com.ovi.where.presentation.common.search.SuggestionUiModel
 import com.ovi.where.presentation.model.FriendUiModel
 import com.ovi.where.presentation.model.toFriendUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -63,7 +62,6 @@ class PeopleViewModel @Inject constructor(
     private val _isFocused = MutableStateFlow(false)
 
     private val _searchUiState = MutableStateFlow(SearchUiState())
-    val searchUiState: StateFlow<SearchUiState> = _searchUiState.asStateFlow()
 
     private var searchJob: Job? = null
 
@@ -148,74 +146,6 @@ class PeopleViewModel @Inject constructor(
         }
     }
 
-    // --- Search actions ---
-
-    fun onQueryChanged(query: String) {
-        _query.value = query
-        // If empty/whitespace-only, cancel pending debounced searches
-        if (query.isBlank()) {
-            _searchUiState.value = _searchUiState.value.copy(
-                query = query,
-                searchResults = emptyList(),
-                showEmptyState = false,
-                isLoading = false
-            )
-        } else {
-            _searchUiState.value = _searchUiState.value.copy(
-                query = query,
-                isLoading = true
-            )
-        }
-    }
-
-    fun onQuerySubmitted(query: String) {
-        val trimmed = query.trim()
-        if (trimmed.isBlank()) return
-        viewModelScope.launch {
-            recentSearchesStore.addSearch("people", trimmed)
-        }
-    }
-
-    fun onClearQuery() {
-        _query.value = ""
-        _searchUiState.value = _searchUiState.value.copy(
-            query = "",
-            searchResults = emptyList(),
-            showEmptyState = false,
-            isLoading = false
-        )
-    }
-
-    fun onFocusChanged(focused: Boolean) {
-        _isFocused.value = focused
-        _searchUiState.value = _searchUiState.value.copy(isFocused = focused)
-    }
-
-    fun onRecentSearchTapped(query: String) {
-        _query.value = query
-        _searchUiState.value = _searchUiState.value.copy(
-            query = query,
-            isLoading = true
-        )
-    }
-
-    fun onRecentSearchDeleted(query: String) {
-        viewModelScope.launch {
-            recentSearchesStore.removeSearch("people", query)
-        }
-    }
-
-    fun onClearAllRecentSearches() {
-        viewModelScope.launch {
-            recentSearchesStore.clearAll("people")
-        }
-    }
-
-    fun onSuggestionTapped(suggestion: SuggestionUiModel) {
-        // Navigation to user profile is handled by the screen layer
-        // This is a hook for the screen to react to
-    }
-
     // --- Existing actions ---
 
     fun removeFriend(userId: String) {
@@ -249,10 +179,6 @@ class PeopleViewModel @Inject constructor(
 
     fun onChatNavigated() {
         _navigateToChat.value = null
-    }
-
-    fun clearError() {
-        _uiState.value = _uiState.value.copy(error = null)
     }
 }
 

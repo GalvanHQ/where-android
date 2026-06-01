@@ -670,7 +670,7 @@ private fun YourStatusCard(
                     letterSpacing = 1.2.sp
                 )
                 Text(
-                    text = if (note.isBlank()) "Tap to set a custom status" else note,
+                    text = note.ifBlank { "Tap to set a custom status" },
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (note.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
                     else MaterialTheme.colorScheme.onSurface,

@@ -1,14 +1,8 @@
 package com.ovi.where.presentation.map
 
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import com.ovi.where.core.theme.AvatarColors
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.ln
-import kotlin.math.pow
-import kotlin.math.tan
 
 
 /** Pick a deterministic avatar colour for a given userId. */

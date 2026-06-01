@@ -1,7 +1,6 @@
 package com.ovi.where.presentation.people
 
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -47,11 +46,11 @@ import com.ovi.where.core.theme.Dimens
 import com.ovi.where.presentation.common.LIST_ITEM_ANIMATION_DURATION_MS
 import com.ovi.where.presentation.common.search.SearchBarTapTarget
 import com.ovi.where.presentation.model.FriendUiModel
+import com.ovi.where.presentation.people.components.BlockedInboxCard
 import com.ovi.where.presentation.people.components.ErrorInfoCard
 import com.ovi.where.presentation.people.components.FriendRow
 import com.ovi.where.presentation.people.components.FriendsSectionHeader
 import com.ovi.where.presentation.people.components.LiveRingAvatar
-import com.ovi.where.presentation.people.components.BlockedInboxCard
 import com.ovi.where.presentation.people.components.PeopleEmptyState
 import com.ovi.where.presentation.people.components.PeopleSkeleton
 import com.ovi.where.presentation.people.components.RequestsInboxCard

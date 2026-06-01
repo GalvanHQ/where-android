@@ -3,6 +3,7 @@ package com.ovi.where.presentation.search
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
 import com.ovi.where.core.common.Resource
 import com.ovi.where.data.local.prefs.RecentSearchesStore
 import com.ovi.where.domain.model.Conversation
@@ -16,12 +17,10 @@ import com.ovi.where.domain.usecase.friend.ObserveFriendsUseCase
 import com.ovi.where.domain.usecase.friend.ObserveOutgoingRequestsUseCase
 import com.ovi.where.domain.usecase.friend.SendFriendRequestUseCase
 import com.ovi.where.presentation.common.search.SearchUiState
-import com.ovi.where.presentation.common.search.SuggestionUiModel
 import com.ovi.where.presentation.model.FriendshipActionUiModel
 import com.ovi.where.presentation.model.SearchUserUiModel
 import com.ovi.where.presentation.model.formatConversationTimestamp
 import com.ovi.where.presentation.model.toUiModel
-import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -118,9 +117,9 @@ class SearchViewModel @Inject constructor(
                     } catch (_: Exception) { emptySet() }
 
                     val uiModels = users.map { user ->
-                        val action = when {
-                            user.id in friendIds -> FriendshipActionUiModel.FRIENDS
-                            user.id in outgoingIds -> FriendshipActionUiModel.PENDING
+                        val action = when (user.id) {
+                            in friendIds -> FriendshipActionUiModel.FRIENDS
+                            in outgoingIds -> FriendshipActionUiModel.PENDING
                             else -> FriendshipActionUiModel.ADD
                         }
                         SearchUserUiModel(
@@ -202,27 +201,6 @@ class SearchViewModel @Inject constructor(
         )
     }
 
-    fun onFocusChanged(focused: Boolean) {
-        _searchUiState.value = _searchUiState.value.copy(isFocused = focused)
-    }
-
-    fun onRecentSearchTapped(query: String) {
-        _searchUiState.value = _searchUiState.value.copy(
-            query = query,
-            isLoading = true
-        )
-        when (source) {
-            "people" -> searchPeople(query)
-            "chats" -> searchChats(query)
-        }
-    }
-
-    fun onRecentSearchDeleted(query: String) {
-        viewModelScope.launch {
-            recentSearchesStore.removeSearch(source, query)
-        }
-    }
-
     fun onClearAllRecentSearches() {
         viewModelScope.launch {
             recentSearchesStore.clearAll(source)
@@ -233,10 +211,6 @@ class SearchViewModel @Inject constructor(
             suggestions = emptyList(),
             recentSearches = emptyList()
         )
-    }
-
-    fun onSuggestionTapped(suggestion: SuggestionUiModel) {
-        // Navigation handled by the screen layer
     }
 
     fun sendFriendRequest(userId: String) {

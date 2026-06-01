@@ -1,9 +1,11 @@
 package com.ovi.where.presentation.profile.edit
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ovi.where.core.common.Resource
+import com.ovi.where.core.utils.ImageUploadUtil
 import com.ovi.where.domain.usecase.auth.CheckUsernameAvailableUseCase
 import com.ovi.where.domain.usecase.auth.ObserveCurrentUserUseCase
 import com.ovi.where.domain.usecase.auth.UpdateBioUseCase
@@ -11,9 +13,8 @@ import com.ovi.where.domain.usecase.auth.UpdateHomeUseCase
 import com.ovi.where.domain.usecase.auth.UpdateProfileUseCase
 import com.ovi.where.domain.usecase.auth.UpdateSocialLinksUseCase
 import com.ovi.where.domain.usecase.auth.UpdateUsernameUseCase
-import android.content.Context
+import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import com.ovi.where.core.utils.ImageUploadUtil
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +22,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
 @HiltViewModel

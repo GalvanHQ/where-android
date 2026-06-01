@@ -809,27 +809,3 @@ private fun formatJoinDate(timestamp: Long): String {
     if (timestamp == 0L) return "Unknown"
     return SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Date(timestamp))
 }
-
-// ── Compact social chip (small inline pill, IG/Telegram-style) ───────────────
-@Composable
-private fun SocialChip(
-    iconRes: Int,
-    contentDescription: String,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .size(36.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = ImageVector.vectorResource(id = iconRes),
-            contentDescription = contentDescription,
-            modifier = Modifier.size(18.dp),
-            tint = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}

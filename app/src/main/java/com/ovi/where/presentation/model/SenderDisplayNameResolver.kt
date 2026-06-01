@@ -12,5 +12,5 @@ package com.ovi.where.presentation.model
  * @return The resolved display name, or "Unknown" if the input is blank/whitespace-only.
  */
 fun resolveSenderDisplayName(senderName: String): String {
-    return if (senderName.isBlank()) "Unknown" else senderName
+    return senderName.ifBlank { "Unknown" }
 }

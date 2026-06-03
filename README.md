@@ -95,7 +95,7 @@ The platform is designed for scale and consists of three primary subsystems:
 ---
 
 ## 🔐 Privacy & Security
-- **Authentication:** Managed securely via Firebase Authentication. All server connections authenticate via cached ******
+- **Authentication:** Managed securely via Firebase Authentication. All server connections authenticate via cached bearer ID tokens.
 - **Data Access:** Firestore rules enforce that users only read authorized social and group data. All write mutations to the social graph route through strict Cloud Functions.
 - **Location Privacy:** Location data is ephemeral and sharing is strictly governed by user-defined timers and group boundaries.
 

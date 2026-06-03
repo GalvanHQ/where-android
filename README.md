@@ -1,7 +1,5 @@
 # 📍 Where - Android & Backend Platform
 
-> **⚠️ PRIVATE REPOSITORY**  
-> This is a proprietary, closed-source project. Unauthorized copying, distribution, or use of this repository or its contents, via any medium, is strictly prohibited.
 
 ## 🧠 Platform Overview
 

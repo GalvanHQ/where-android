@@ -1,4 +1,4 @@
-# 📍 Where - Android & Backend Platform
+# 📍 Where 
 
 
 ## 🧠 Platform Overview

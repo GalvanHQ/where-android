@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Privacy Policy for Where — the real-time location sharing app. Learn how we collect, use, and protect your data.">
+    <meta name="theme-color" content="#0a0a0a">
+    <title>Privacy Policy — Where</title>
+
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        /* ───────── Design Tokens ───────── */
+        :root {
+            --brand: #F9DF4D;
+            --brand-dim: #c4ab1e;
+            --brand-glow: rgba(249, 223, 77, 0.12);
+            --brand-glow-strong: rgba(249, 223, 77, 0.20);
+
+            --bg: #050505;
+            --bg-elevated: #0e0e0e;
+            --bg-card: #111111;
+            --bg-card-hover: #161616;
+            --bg-subtle: #0a0a0a;
+
+            --text-primary: #f0f0f0;
+            --text-secondary: #a0a0a0;
+            --text-tertiary: #666666;
+
+            --border: #1e1e1e;
+            --border-hover: #2a2a2a;
+
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 24px;
+            --radius-full: 9999px;
+
+            --ease: cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        /* ───────── Reset ───────── */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden;
+        }
+
+        /* ───────── Background Ambient Effect ───────── */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -40%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, var(--brand-glow) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ───────── Layout ───────── */
+        .page {
+            position: relative;
+            z-index: 1;
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 60px 24px 80px;
+        }
+
+        /* ───────── Header ───────── */
+        .header {
+            text-align: center;
+            margin-bottom: 64px;
+            animation: fadeUp 0.8s var(--ease) both;
+        }
+
+        .header__logo {
+            width: 80px;
+            height: 80px;
+            border-radius: var(--radius-xl);
+            margin-bottom: 24px;
+            box-shadow: 0 0 40px var(--brand-glow-strong), 0 8px 32px rgba(0,0,0,0.4);
+            transition: transform 0.4s var(--ease), box-shadow 0.4s var(--ease);
+        }
+
+        .header__logo:hover {
+            transform: scale(1.05) translateY(-2px);
+            box-shadow: 0 0 60px var(--brand-glow-strong), 0 12px 40px rgba(0,0,0,0.5);
+        }
+
+        .header__title {
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--brand);
+            margin-bottom: 12px;
+        }
+
+        .header__heading {
+            font-size: clamp(32px, 5vw, 44px);
+            font-weight: 800;
+            letter-spacing: -1px;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            line-height: 1.15;
+        }
+
+        .header__date {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 6px 16px;
+            border-radius: var(--radius-full);
+        }
+
+        .header__date::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: var(--brand);
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* ───────── Sections ───────── */
+        .section {
+            margin-bottom: 20px;
+            opacity: 0;
+            transform: translateY(24px);
+            animation: fadeUp 0.6s var(--ease) both;
+        }
+
+        .section:nth-child(2)  { animation-delay: 0.08s; }
+        .section:nth-child(3)  { animation-delay: 0.12s; }
+        .section:nth-child(4)  { animation-delay: 0.16s; }
+        .section:nth-child(5)  { animation-delay: 0.20s; }
+        .section:nth-child(6)  { animation-delay: 0.24s; }
+        .section:nth-child(7)  { animation-delay: 0.28s; }
+        .section:nth-child(8)  { animation-delay: 0.32s; }
+        .section:nth-child(9)  { animation-delay: 0.36s; }
+        .section:nth-child(10) { animation-delay: 0.40s; }
+        .section:nth-child(11) { animation-delay: 0.44s; }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 28px 28px 24px;
+            transition: border-color 0.3s var(--ease), background 0.3s var(--ease);
+        }
+
+        .card:hover {
+            border-color: var(--border-hover);
+            background: var(--bg-card-hover);
+        }
+
+        .section__number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: var(--radius-sm);
+            background: var(--brand-glow);
+            color: var(--brand);
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 14px;
+            flex-shrink: 0;
+        }
+
+        .section__title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            letter-spacing: -0.3px;
+        }
+
+        .section__subtitle {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-top: 20px;
+            margin-bottom: 10px;
+            padding-left: 12px;
+            border-left: 2px solid var(--brand);
+        }
+
+        .section p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 14px;
+            line-height: 1.75;
+        }
+
+        .section p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* ───────── Lists ───────── */
+        .info-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .info-list li {
+            position: relative;
+            font-size: 14px;
+            color: var(--text-secondary);
+            padding: 10px 0 10px 20px;
+            border-bottom: 1px solid var(--border);
+            line-height: 1.65;
+        }
+
+        .info-list li:last-child {
+            border-bottom: none;
+        }
+
+        .info-list li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 18px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--brand);
+            opacity: 0.7;
+        }
+
+        .info-list li strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* ───────── Tables ───────── */
+        .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0 4px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        thead {
+            background: var(--bg-subtle);
+        }
+
+        th {
+            text-align: left;
+            padding: 12px 16px;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-tertiary);
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 12px 16px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        td strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* ───────── Callout Boxes ───────── */
+        .callout {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: var(--radius-md);
+            margin-bottom: 16px;
+            font-size: 14px;
+            line-height: 1.65;
+        }
+
+        .callout--positive {
+            background: rgba(76, 175, 80, 0.08);
+            border: 1px solid rgba(76, 175, 80, 0.15);
+            color: #81c784;
+        }
+
+        .callout--warning {
+            background: rgba(239, 83, 80, 0.08);
+            border: 1px solid rgba(239, 83, 80, 0.15);
+            color: #ef9a9a;
+        }
+
+        .callout__icon {
+            flex-shrink: 0;
+            font-size: 18px;
+            line-height: 1.4;
+        }
+
+        /* ───────── Links ───────── */
+        a {
+            color: var(--brand);
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+
+        a:hover {
+            opacity: 0.8;
+            text-decoration: underline;
+        }
+
+        /* ───────── Footer ───────── */
+        .footer {
+            text-align: center;
+            margin-top: 56px;
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
+            animation: fadeUp 0.6s var(--ease) 0.5s both;
+        }
+
+        .footer p {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            margin-bottom: 4px;
+        }
+
+        .footer__brand {
+            font-weight: 600;
+            color: var(--brand-dim);
+        }
+
+        /* ───────── Back to Top ───────── */
+        .back-to-top {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--brand);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            transform: translateY(12px);
+            transition: opacity 0.3s var(--ease), transform 0.3s var(--ease), background 0.2s, border-color 0.2s;
+            z-index: 100;
+            font-size: 20px;
+        }
+
+        .back-to-top.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .back-to-top:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-hover);
+        }
+
+        /* ───────── Animations ───────── */
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(24px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ───────── Responsive ───────── */
+        @media (max-width: 600px) {
+            .page {
+                padding: 40px 16px 60px;
+            }
+
+            .card {
+                padding: 20px 18px 18px;
+            }
+
+            .header__heading {
+                font-size: 28px;
+            }
+
+            .header {
+                margin-bottom: 40px;
+            }
+
+            .back-to-top {
+                bottom: 20px;
+                right: 20px;
+                width: 40px;
+                height: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="page">
+
+    <!-- ── Header ── -->
+    <header class="header" id="top">
+        <img src="logo.png" alt="Where App Logo" class="header__logo" width="80" height="80">
+        <div class="header__title">Where</div>
+        <h1 class="header__heading">Privacy Policy</h1>
+        <span class="header__date">Last updated May 6, 2026</span>
+    </header>
+
+    <!-- ── 1. Introduction ── -->
+    <div class="section">
+        <div class="card">
+            <span class="section__number">1</span>
+            <h2 class="section__title">Introduction</h2>
+            <p>This privacy policy ("Policy") describes how Ismam Hasan Ovi ("we," "us," or "our") collects, uses, and discloses information when you use our mobile application <strong>Where</strong> (the "App").</p>
+            <p>By using the Where App, you agree to the collection and use of information in accordance with this Policy.</p>
+        </div>
+    </div>
+
+    <!-- ── 2. Information We Collect ── -->
+    <div class="section">
+        <div class="card">
+            <span class="section__number">2</span>
+            <h2 class="section__title">Information We Collect</h2>
+
+            <div class="section__subtitle">Personal Information</div>
+            <ul class="info-list">
+                <li><strong>Account Information</strong> — Name, email address, and profile photo collected during registration.</li>
+                <li><strong>Username</strong> — A unique @username that you choose for your account.</li>
+                <li><strong>Bio</strong> — An optional short bio you can add to your profile.</li>
+            </ul>
+
+            <div class="section__subtitle">Location Data</div>
+            <ul class="info-list">
+                <li><strong>Live Location</strong> — Real-time GPS coordinates collected when you enable location sharing.</li>
+                <li><strong>Sharing Settings</strong> — You choose which groups can see your location and for how long.</li>
+                <li><strong>Location History</strong> — We do not store your location history after you stop sharing.</li>
+            </ul>
+
+            <div class="section__subtitle">Device Information</div>
+            <ul class="info-list">
+                <li><strong>Device ID</strong> — Device identifier used for push notifications.</li>
+                <li><strong>FCM Token</strong> — Firebase Cloud Messaging token for delivering notifications.</li>
+            </ul>
+
+            <div class="section__subtitle">Usage Data</div>
+            <ul class="info-list">
+                <li><strong>App Interactions</strong> — Anonymous usage data collected to improve the app experience.</li>
+                <li><strong>Crash Reports</strong> — Crash reports collected to identify and fix bugs.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ── 3. How We Use Your Information ── -->
+    <div class="section">
+        <div class="card">
+            <span class="section__number">3</span>
+            <h2 class="section__title">How We Use Your Information</h2>
+            <p>We use the collected information for the following purposes:</p>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Purpose</th><th>Information Used</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Location sharing</strong></td><td>Location, Group membership</td></tr>
+                        <tr><td><strong>Notifications</strong></td><td>FCM Token, Device ID</td></tr>
+                        <tr><td><strong>Account management</strong></td><td>Name, Email, Profile photo</td></tr>
+                        <tr><td><strong>App improvement</strong></td><td>Anonymous usage data</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 4. Information Sharing ── -->
+    <div class="section">
+        <div class="card">
+            <span class="section__number">4</span>
+            <h2 class="section__title">Information Sharing</h2>
+
+            <div class="callout callout--positive">
+                <span class="callout__icon">✓</span>
+                <span>We <strong>do not</strong> sell your personal information to anyone.</span>
+            </div>
+
+            <p>We share information only with the partners necessary to provide the service:</p>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Recipient</th><th>Purpose</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Firebase</strong></td><td>Authentication, Database, Push notifications</td></tr>
+                        <tr><td><strong>Group members</strong></td><td>Location — only when you actively share</td></tr>
+                        <tr><td><strong>Cloud Run</strong></td><td>Chat server powering real-time messaging</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="section__subtitle">Location Sharing</div>
+            <ul class="info-list">
+                <li>Your location is <strong>only shared</strong> with members of groups you have joined.</li>
+                <li>You control when to start and stop sharing at any time.</li>
+                <li>Your location is never shared publicly or with third-party advertisers.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ── 5. Your Rights ── -->
+    <div class="section">
+        <div class="card">
+            <span class="section__number">5</span>
+            <h2 class="section__title">Your Rights</h2>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Right</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Access</strong></td><td>View your profile and account data at any time.</td></tr>
+                        <tr><td><strong>Correction</strong></td><td>Update your profile information inside the app.</td></tr>
+                        <tr><td><strong>Deletion</strong></td><td>Delete your account and all associated data.</td></tr>
+                        <tr><td><strong>Location Control</strong></td><td>Stop sharing your location instantly.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="section__subtitle">How to exercise your rights</div>
+            <ul class="info-list">
+                <li><strong>Access &amp; Correction</strong> — Update your profile in the App settings.</li>
+                <li><strong>Deletion</strong> — Contact us at <a href="mailto:ismamhasanovi@gmail.com">ismamhasanovi@gmail.com</a></li>
+                <li><strong>Location Control</strong> — Use the Stop Sharing button in the App.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ── 6. Data Retention ── -->
+    <div class="section">
+        <div class="card">
+            <span class="section__number">6</span>
+            <h2 class="section__title">Data Retention</h2>
+            <p>We retain your information only for as long as necessary:</p>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Data Type</th><th>Retention</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Account data</strong></td><td>Until you delete your account</td></tr>
+                        <tr><td><strong>Location data</strong></td><td>Only in real-time; deleted when sharing stops</td></tr>
+                        <tr><td><strong>Crash reports</strong></td><td>90 days</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 7. Security ── -->
+    <div class="section">
+        <div class="card">
+            <span class="section__number">7</span>
+            <h2 class="section__title">Security</h2>
+            <p>We use industry-standard measures to protect your information:</p>
+            <ul class="info-list">
+                <li><strong>Encryption</strong> — All data is encrypted in transit using TLS/SSL.</li>
+                <li><strong>Authentication</strong> — Secure sign-in managed through Firebase Authentication.</li>
+                <li><strong>Access Control</strong> — Database rules ensure only group members can view your location.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ── 8. Children's Privacy ── -->
+    <div class="section">
+        <div class="card">
+            <span class="section__number">8</span>
+            <h2 class="section__title">Children's Privacy</h2>
+            <div class="callout callout--warning">
+                <span class="callout__icon">⚠</span>
+                <span>Where is <strong>not intended for children under 13</strong>. We do not knowingly collect personal information from children under 13.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 9. Changes ── -->
+    <div class="section">
+        <div class="card">
+            <span class="section__number">9</span>
+            <h2 class="section__title">Changes to This Policy</h2>
+            <p>We may update this Policy from time to time. When we do:</p>
+            <ul class="info-list">
+                <li>The <strong>"Last Updated"</strong> date at the top of this page will be revised.</li>
+                <li>Significant changes will be communicated through <strong>in-app notifications</strong>.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ── 10. Contact ── -->
+    <div class="section">
+        <div class="card">
+            <span class="section__number">10</span>
+            <h2 class="section__title">Contact Us</h2>
+            <p>If you have questions about this Privacy Policy, reach out anytime:</p>
+            <p><strong>Email</strong> — <a href="mailto:ismamhasanovi@gmail.com">ismamhasanovi@gmail.com</a></p>
+        </div>
+    </div>
+
+    <!-- ── Footer ── -->
+    <footer class="footer">
+        <p>&copy; 2026 Ismam Hasan Ovi. All rights reserved.</p>
+        <p>Built for <span class="footer__brand">Where</span></p>
+    </footer>
+
+</div>
+
+<!-- Back to Top Button -->
+<button class="back-to-top" id="backToTop" aria-label="Back to top" onclick="window.scrollTo({top:0})">↑</button>
+
+<script>
+    // Show/hide back-to-top button
+    const btn = document.getElementById('backToTop');
+    let ticking = false;
+    window.addEventListener('scroll', () => {
+        if (!ticking) {
+            window.requestAnimationFrame(() => {
+                btn.classList.toggle('visible', window.scrollY > 400);
+                ticking = false;
+            });
+            ticking = true;
+        }
+    });
+</script>
+
+</body>
+</html>

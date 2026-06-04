@@ -84,8 +84,9 @@ sealed interface PermissionStep {
         override val title = "Background location"
         override val subline = "Keep sharing while the app is closed"
         override val body =
-            "Where keeps your location fresh for friends even when the app isn't open. " +
-                "Without this, your dot freezes the moment you switch apps."
+            "WHERE collects location data to enable live location sharing with your groups " +
+                "even when the app is closed or not in use. Without this, your dot freezes " +
+                "the moment you switch apps."
         override val required = true
 
         val permission: String = Manifest.permission.ACCESS_BACKGROUND_LOCATION

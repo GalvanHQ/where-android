@@ -58,3 +58,9 @@
 # ── Coroutines ────────────────────────────────────────────────────────────────
 -dontwarn kotlinx.coroutines.**
 -keepclassmembers class kotlinx.coroutines.** { *; }
+
+# ── Socket.IO ────────────────────────────────────────────────────────────────
+-keep class io.socket.** { *; }
+-keep interface io.socket.** { *; }
+-dontwarn io.socket.**
+-dontwarn org.json.**

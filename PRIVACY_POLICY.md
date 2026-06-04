@@ -119,8 +119,7 @@ We may update this Policy at any time. When we do:
 
 If you have any questions about this Policy:
 
-**Email:** ismam.hasan.ovi@example.com
-**GitHub:** https://github.com/ismamz/where-android
+**Email:** ismamhasanovi@gmail.com
 
 ---
 

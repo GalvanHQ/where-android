@@ -44,12 +44,32 @@ android {
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
+    // Read Release Signing credentials from local.properties or environment variables
+    val keystorePath = localProperties.getProperty("RELEASE_STORE_FILE")
+        ?: System.getenv("RELEASE_STORE_FILE")
+        ?: ""
+    val keystorePasswordVal = localProperties.getProperty("RELEASE_STORE_PASSWORD")
+        ?: System.getenv("RELEASE_STORE_PASSWORD")
+        ?: ""
+    val keyAliasVal = localProperties.getProperty("RELEASE_KEY_ALIAS")
+        ?: System.getenv("RELEASE_KEY_ALIAS")
+        ?: "where_release" // Defaulting to where_release as seen in the user's keystore screenshot
+    val keyPasswordVal = localProperties.getProperty("RELEASE_KEY_PASSWORD")
+        ?: System.getenv("RELEASE_KEY_PASSWORD")
+        ?: ""
+
     signingConfigs {
         create("release") {
-            storeFile = file("release-keystore.jks")
-            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "CHANGE_ME"
-            keyAlias = "where-app"
-            keyPassword = System.getenv("KEY_PASSWORD") ?: "CHANGE_ME"
+            if (keystorePath.isNotEmpty()) {
+                // If it's an absolute path, use it directly; otherwise resolve relative to project root
+                val keystoreFile = File(keystorePath)
+                storeFile = if (keystoreFile.isAbsolute) keystoreFile else rootProject.file(keystorePath)
+            } else {
+                storeFile = file("release-keystore.jks")
+            }
+            storePassword = keystorePasswordVal.ifEmpty { "CHANGE_ME" }
+            keyAlias = keyAliasVal
+            keyPassword = keyPasswordVal.ifEmpty { "CHANGE_ME" }
         }
     }
 

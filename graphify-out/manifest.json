@@ -1,0 +1,3032 @@
+{
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\build.gradle.kts": {
+    "mtime": 1778152746.7207503,
+    "ast_hash": "7491f24191d8321dba7a2c7830134738",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\check_encoding.ps1": {
+    "mtime": 1778561589.080627,
+    "ast_hash": "60e14535bc1d5e7a3046bda8ec3b054c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\firebase.json": {
+    "mtime": 1780607493.310825,
+    "ast_hash": "04602af3dfcebe4af64384e9e4b247c0",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\firestore.indexes.json": {
+    "mtime": 1779044843.0253713,
+    "ast_hash": "a88dd8719b9ce398a721750c3ee50a3b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\gradlew": {
+    "mtime": 1777910154.0787604,
+    "ast_hash": "4f7a8a3a765f6f751d47568dc3bb913f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\settings.gradle.kts": {
+    "mtime": 1778152746.735614,
+    "ast_hash": "8ee38e16ded76a9473658d35a221b690",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\skills-lock.json": {
+    "mtime": 1778243348.892913,
+    "ast_hash": "9befb1a5a4a2bbcde23f0a814cb2fb7c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\trigger.json": {
+    "mtime": 1778062015.8083463,
+    "ast_hash": "1cca321d90d92331d9195ce74a0fe636",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.claude\\settings.json": {
+    "mtime": 1779201530.0380893,
+    "ast_hash": "e99d00f34528b94fcaaa41a2ab1c1654",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-emulator-skill\\scripts\\app_launcher.py": {
+    "mtime": 1777910153.9862363,
+    "ast_hash": "d08f31f6523946f069e1724b42d4bee7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-emulator-skill\\scripts\\build_and_test.py": {
+    "mtime": 1777910153.9862363,
+    "ast_hash": "6c4f70b4783a971f7ecae6e3dc1cbe85",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-emulator-skill\\scripts\\common.py": {
+    "mtime": 1777910153.9875185,
+    "ast_hash": "7ff571373ac56510be83b791634bce7f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-emulator-skill\\scripts\\emulator_manage.py": {
+    "mtime": 1777910153.9875185,
+    "ast_hash": "73434cb47ab004e3f6df3a5925829765",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-emulator-skill\\scripts\\emu_health_check.sh": {
+    "mtime": 1777910153.9875185,
+    "ast_hash": "aed2619136ad0a3639f7b05d8b964469",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-emulator-skill\\scripts\\gesture.py": {
+    "mtime": 1777910153.9885182,
+    "ast_hash": "3ca0ab32861da5d50b514eb2bc58d275",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-emulator-skill\\scripts\\keyboard.py": {
+    "mtime": 1777910153.9885182,
+    "ast_hash": "d54f3f325f1b62f8cbacd10212278b9a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-emulator-skill\\scripts\\log_monitor.py": {
+    "mtime": 1777910153.9885182,
+    "ast_hash": "82507dc8792f47c364639d652cbffd10",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-emulator-skill\\scripts\\navigator.py": {
+    "mtime": 1777910153.989533,
+    "ast_hash": "f938454ee099bb7bd607053d24fd5c90",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-emulator-skill\\scripts\\screen_mapper.py": {
+    "mtime": 1777910153.989533,
+    "ast_hash": "8859d2b85e335207a6c4d7598e05b81b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.vscode\\settings.json": {
+    "mtime": 1778876850.5931478,
+    "ast_hash": "d91c228a312129a0d67ffe8ef2d4c485",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\build.gradle.kts": {
+    "mtime": 1780601934.6866777,
+    "ast_hash": "06b0ef7a7059bb30bea88a6a24195aee",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\google-services.json": {
+    "mtime": 1778688491.0943084,
+    "ast_hash": "ed46697f1ca000d0ea76ff8e53083bf0",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\androidTest\\java\\com\\ovi\\where\\ExampleInstrumentedTest.kt": {
+    "mtime": 1777910154.016199,
+    "ast_hash": "a1173f9a4d886f3caee9c1bc818f2d0a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\androidTest\\java\\com\\ovi\\where\\presentation\\auth\\LoginScreenTest.kt": {
+    "mtime": 1778050009.168354,
+    "ast_hash": "0f8b887b0e7d3efd2b6d711c254d953e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\androidTest\\java\\com\\ovi\\where\\presentation\\common\\search\\WhereSearchBarTest.kt": {
+    "mtime": 1778787087.1803775,
+    "ast_hash": "6d68f66331abecff72655b5439b680de",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\androidTest\\java\\com\\ovi\\where\\presentation\\map\\MapScreenTest.kt": {
+    "mtime": 1778050014.515822,
+    "ast_hash": "fe66495ed7550f0372479da869a5e6dc",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\DeepLinkManager.kt": {
+    "mtime": 1778697216.80155,
+    "ast_hash": "c48ca78012dbca97f81227f237d970f4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\MainActivity.kt": {
+    "mtime": 1780342735.9248495,
+    "ast_hash": "0490d8926a2477e2fd52c419300f0aa6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\WhereApplication.kt": {
+    "mtime": 1779627917.828553,
+    "ast_hash": "ea94604492a7975bac343fa61e350316",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\auth\\AuthExt.kt": {
+    "mtime": 1779556304.175078,
+    "ast_hash": "952068e143fea7db35c9c0b8e38a9e9f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\common\\DataResource.kt": {
+    "mtime": 1778697216.8068168,
+    "ast_hash": "014e3b6be6dd9e1075442313df5f5de3",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\common\\Resource.kt": {
+    "mtime": 1778697725.7271175,
+    "ast_hash": "3cdc8928c2af19c8d52dfa5778f64fbd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\common\\UiEvent.kt": {
+    "mtime": 1780314233.6945448,
+    "ast_hash": "846372c0bd6f59da8b72c50d7abf644a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\common\\UiText.kt": {
+    "mtime": 1780314233.7726748,
+    "ast_hash": "ba4f2c5227c96a387f8f0fc28862078c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\config\\FeatureFlags.kt": {
+    "mtime": 1780314233.7069588,
+    "ast_hash": "b05e754cf06143d771c4c936e556be82",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\constants\\AppConstants.kt": {
+    "mtime": 1780314233.8392696,
+    "ast_hash": "e3b3ca4dde6df36e0c68c13c40026407",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\crash\\ActiveScreenTracker.kt": {
+    "mtime": 1778698385.4715817,
+    "ast_hash": "c872144be3df9dc78505885df02de8fc",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\crash\\CrashReportingTree.kt": {
+    "mtime": 1778697216.851902,
+    "ast_hash": "b2676720546b4fe61c5597c35545be52",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\crash\\WhereCrashHandler.kt": {
+    "mtime": 1778697216.8555472,
+    "ast_hash": "b49f306e21f55ac43add2f3068c5aa5b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\event\\HomePinEventBus.kt": {
+    "mtime": 1780314233.881466,
+    "ast_hash": "25ca5206527b4b0ef529229b31cf4b8a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\event\\MeetupPlaceCardEventBus.kt": {
+    "mtime": 1780314233.8040547,
+    "ast_hash": "cd1825be32f1ebe09cbc310ab0d5f273",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\firestore\\FirestoreObservers.kt": {
+    "mtime": 1780314233.7844627,
+    "ast_hash": "72c78ac2988a3a95842e0252d1867ea6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\links\\LinkParser.kt": {
+    "mtime": 1779551705.7926066,
+    "ast_hash": "109f2a8d35475ee3acfff85ff763e3e4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\links\\LinkRouter.kt": {
+    "mtime": 1780314233.6567636,
+    "ast_hash": "2e7560c2a87ca1819cdfadd5a0a468f7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\links\\LinkText.kt": {
+    "mtime": 1779551800.5582142,
+    "ast_hash": "3e6e5228d273e44c9901055e7494f34f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\notification\\ActiveConversationTracker.kt": {
+    "mtime": 1779509130.2044075,
+    "ast_hash": "b6aff1b3a1db441b5f37a219f3d03b9c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\notification\\ActiveMapTracker.kt": {
+    "mtime": 1779509131.6497376,
+    "ast_hash": "5eb18ddf3028b3bb4e06eca17b4ceda6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\notification\\ChatNotificationStyler.kt": {
+    "mtime": 1780314233.870252,
+    "ast_hash": "e653ca0e22ac339b034b0fe715881578",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\notification\\ConversationShortcutManager.kt": {
+    "mtime": 1780314233.8205533,
+    "ast_hash": "0e59a3de584e3e6d6094c749f016f1e6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\notification\\NotificationData.kt": {
+    "mtime": 1780314233.7223694,
+    "ast_hash": "bc4d36dcf7d397a4fd5416c4966422ec",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\notification\\NotificationHelper.kt": {
+    "mtime": 1779859332.537863,
+    "ast_hash": "f1f6d66998e73dea62f9ad6dd6445384",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\notification\\NotificationSound.kt": {
+    "mtime": 1780039387.3604906,
+    "ast_hash": "92aea2832d852f064580c44c3dfaa4f6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\notification\\NotificationTrackerEntryPoint.kt": {
+    "mtime": 1779512164.6653936,
+    "ast_hash": "5333dba04355ced1662074eaeb7a6bd0",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\notification\\NotificationType.kt": {
+    "mtime": 1779693374.2556071,
+    "ast_hash": "944db6afe260c84800eb1325a052084e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\text\\MentionDetector.kt": {
+    "mtime": 1779556214.857194,
+    "ast_hash": "53954cc892d9d1585e3b72dd8931181e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\theme\\Color.kt": {
+    "mtime": 1780314233.8968832,
+    "ast_hash": "250408b90a0866b39dbe31ba6c09e635",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\theme\\ConversationThemeColors.kt": {
+    "mtime": 1780314233.7620218,
+    "ast_hash": "e6e018d633e47a499e0e526ae444cd6e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\theme\\Dimens.kt": {
+    "mtime": 1780314233.6770573,
+    "ast_hash": "31b3e548a1aa55190883f207537d73b9",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\theme\\Theme.kt": {
+    "mtime": 1779995451.7945445,
+    "ast_hash": "61dd60452016e6bd6e4968b9f513ebdb",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\theme\\Type.kt": {
+    "mtime": 1778611260.5232143,
+    "ast_hash": "9aab6d3110f71ef8c1266c484c5b7d79",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\utils\\BatteryOptimizationUtils.kt": {
+    "mtime": 1780314233.8564622,
+    "ast_hash": "63fa67e140830d42f7102116c7321247",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\utils\\ImageCompressor.kt": {
+    "mtime": 1780314233.6397488,
+    "ast_hash": "8d4757a50ec0d7f69aa3fbd5fd1383ca",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\utils\\ImageUploadUtil.kt": {
+    "mtime": 1780314233.7472725,
+    "ast_hash": "d117518b5e82094d0f3443c261a00019",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\utils\\LocationUtils.kt": {
+    "mtime": 1780326684.4918904,
+    "ast_hash": "38ab347d7918fcdd1dbaccfc280cfd9f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\utils\\PermissionUtils.kt": {
+    "mtime": 1780326684.5255322,
+    "ast_hash": "f746e0aadf70425b64cd34f7a2b9ae60",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\utils\\ReducedMotionHelper.kt": {
+    "mtime": 1778697216.8872395,
+    "ast_hash": "33d3ef09a3dfbc9d506342bab0ca0dcb",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\core\\utils\\ToastExtensions.kt": {
+    "mtime": 1780326684.4770913,
+    "ast_hash": "2b79cc195f3929ef1476ac705c6bc5bd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\audio\\VoiceRecorder.kt": {
+    "mtime": 1780329525.6212475,
+    "ast_hash": "730d3eeb4f2db24f47647f57866e1da0",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\cache\\UserCache.kt": {
+    "mtime": 1780329525.6348598,
+    "ast_hash": "025e745073d8c908d5a39f3adf29fae2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\image\\FirebaseStorageFetcher.kt": {
+    "mtime": 1780329525.6052303,
+    "ast_hash": "fd566f2e6afb9732d8e3b36125ec103e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\image\\ImageCacheManager.kt": {
+    "mtime": 1778892263.4507256,
+    "ast_hash": "2354806bb8ffe96115f66aea9f57f195",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\image\\ImageLoadingExtensions.kt": {
+    "mtime": 1780329525.5939834,
+    "ast_hash": "d92ec36370a5fb0efacbaadfd7e9e27e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\CacheStalenessChecker.kt": {
+    "mtime": 1778697216.8908665,
+    "ast_hash": "0a164553f9e39e474d8f17b6f3ed6960",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\dao\\CacheMetadataDao.kt": {
+    "mtime": 1778697216.8923066,
+    "ast_hash": "5a07ac0e63de10480e326e6bf569553a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\dao\\ConversationDao.kt": {
+    "mtime": 1779126390.396992,
+    "ast_hash": "aac413a0156ad1ddb618a85a56a696bd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\dao\\InteractionDao.kt": {
+    "mtime": 1778747282.8739643,
+    "ast_hash": "27dd09a508fe8d48b9b6591104e8b65f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\dao\\LinkPreviewCacheDao.kt": {
+    "mtime": 1778870719.243063,
+    "ast_hash": "3ae278752488b1c1ce42aaa08da3fafb",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\dao\\LocationDao.kt": {
+    "mtime": 1779571746.0716224,
+    "ast_hash": "bf5401d107c13a663f2e881916e00b1d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\dao\\MeetupDestinationDao.kt": {
+    "mtime": 1779470540.3942897,
+    "ast_hash": "013c0ed3d407039a628adb1592bba1bd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\dao\\MessageDao.kt": {
+    "mtime": 1779042702.8567936,
+    "ast_hash": "bc8d4a2f95ef07db531dec4088b5d449",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\dao\\NotificationDao.kt": {
+    "mtime": 1779699420.9452336,
+    "ast_hash": "f7f77a2190fefb09358d93a4e33c7920",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\dao\\OfflineOperationDao.kt": {
+    "mtime": 1778697216.8946157,
+    "ast_hash": "22c36a7492fe13e8226169a1bf83e4ed",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\dao\\OnlineStatusDao.kt": {
+    "mtime": 1779135816.9723268,
+    "ast_hash": "d57e604f96216aa0dea0c4e1b528585c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\dao\\UserCacheDao.kt": {
+    "mtime": 1779569853.9948313,
+    "ast_hash": "39400d203097e5925236abc9c9f6838b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\dao\\VoiceMessageCacheDao.kt": {
+    "mtime": 1778870717.1618342,
+    "ast_hash": "d3ee87c018222323070ecb050b632985",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\db\\AppDatabase.kt": {
+    "mtime": 1780210185.5885963,
+    "ast_hash": "01205dca95c55a24de3db7f1ef652a10",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\entity\\CacheMetadataEntity.kt": {
+    "mtime": 1778697216.9005008,
+    "ast_hash": "4863ebc79a04bcee20936bd9e1ee53d5",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\entity\\ConversationEntity.kt": {
+    "mtime": 1779078496.2271042,
+    "ast_hash": "da4d770bd709991983f6746bb63f0929",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\entity\\ConversationEntityMapper.kt": {
+    "mtime": 1779078520.8825233,
+    "ast_hash": "095e00c3a6579b3f13b16e31511ef8cd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\entity\\InteractionEntity.kt": {
+    "mtime": 1778747179.0700505,
+    "ast_hash": "7bdfdd4126b5b162a2ad0ca08c548aae",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\entity\\LinkPreviewCacheEntity.kt": {
+    "mtime": 1778870752.9982505,
+    "ast_hash": "bf1fa95b3437c710f05a3a6536538552",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\entity\\MeetupDestinationEntity.kt": {
+    "mtime": 1779470528.1782,
+    "ast_hash": "24645374a16b01cd5707e8ab7c4deb32",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\entity\\MessageEntity.kt": {
+    "mtime": 1779394581.271692,
+    "ast_hash": "7155e8d6d10d3b79ac0965987336ab82",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\entity\\MessageEntityMapper.kt": {
+    "mtime": 1779394664.5746157,
+    "ast_hash": "724cd6a95d4c754955d0c23b9b0aee44",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\entity\\NotificationEntity.kt": {
+    "mtime": 1779509141.9175353,
+    "ast_hash": "deddfcec15335c8651e115974e3bbe25",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\entity\\OfflineOperationEntity.kt": {
+    "mtime": 1780329525.5749605,
+    "ast_hash": "26ce9806618542a4ea6404e037c3b41a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\entity\\OnlineStatusEntity.kt": {
+    "mtime": 1779135748.0457652,
+    "ast_hash": "912e0bc18f60bea1e62a2a6a1c62eb56",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\entity\\SharedLocationEntity.kt": {
+    "mtime": 1780210152.463964,
+    "ast_hash": "98ee04abc11b05647f872c8fd7a55fe7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\entity\\UserCacheEntity.kt": {
+    "mtime": 1780210167.5870411,
+    "ast_hash": "d5ea0fa1686731d76479f30cfe1e820d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\entity\\VoiceMessageCacheEntity.kt": {
+    "mtime": 1778870741.749647,
+    "ast_hash": "9620536a4844e24fdea22ea95b0cbdb0",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\prefs\\RecentSearchesStore.kt": {
+    "mtime": 1780330166.8055725,
+    "ast_hash": "d813455180952e012e5d2ac5494b0be9",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\local\\prefs\\UserPreferences.kt": {
+    "mtime": 1780331353.2939837,
+    "ast_hash": "ec4b6e39fe1327579ebab11800f4e8e3",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\location\\LocationManager.kt": {
+    "mtime": 1780331353.2458994,
+    "ast_hash": "b6a0c54182460ecf5faab5c93cb00ee6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\network\\ConnectivityObserver.kt": {
+    "mtime": 1778697216.9052353,
+    "ast_hash": "d1883ea085eac792336df62afd166177",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\network\\NetworkConnectivityObserver.kt": {
+    "mtime": 1778697216.9080443,
+    "ast_hash": "a594e8c031cc4e613eb38fefdf0bd50f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\offline\\OfflineQueueWorker.kt": {
+    "mtime": 1778697216.9105675,
+    "ast_hash": "10c2debde0c2ea348e91b64e834e9e51",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\remote\\ChatActionReceiver.kt": {
+    "mtime": 1780331353.2783246,
+    "ast_hash": "15a496c6c532693543737a961e39de0a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\remote\\FcmMessagingService.kt": {
+    "mtime": 1779656609.8572354,
+    "ast_hash": "8b917f6db81a7c4783d7c36a02c5259b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\remote\\FirestoreListenerRegistry.kt": {
+    "mtime": 1780331709.042958,
+    "ast_hash": "79ad363713dbbec12713d905d803b627",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\remote\\chat\\ChatApiClient.kt": {
+    "mtime": 1780331353.2663524,
+    "ast_hash": "111d39b8ca181687c4979085bde86fb6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\remote\\chat\\ChatApiService.kt": {
+    "mtime": 1780331353.1888902,
+    "ast_hash": "68298e8ec2b9f03e085d6d7b2702d967",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\remote\\chat\\ChatModels.kt": {
+    "mtime": 1779426060.4420042,
+    "ast_hash": "cba68c562a8a01e617c9b6ff83c2ffdc",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\remote\\chat\\ChatProcessLifecycleObserver.kt": {
+    "mtime": 1780331353.2256038,
+    "ast_hash": "de3ff484cdd3ffdaf657e79200ac3184",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\remote\\chat\\ChatSocketIoClient.kt": {
+    "mtime": 1780331353.2173815,
+    "ast_hash": "f152ae83f6dc393257c8a13f66d404ad",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\remote\\chat\\TypingIndicatorManager.kt": {
+    "mtime": 1778588293.1806836,
+    "ast_hash": "77f943bf4f373562ce6f4921523738ec",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\remote\\directions\\DirectionsApi.kt": {
+    "mtime": 1779479255.3548715,
+    "ast_hash": "2b1cbbd3da10c77e847f04655ff05c95",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\remote\\directions\\PolylineDecoder.kt": {
+    "mtime": 1779468824.6800084,
+    "ast_hash": "2c48cf72b8a9ca89a847e21b7070dd29",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\remote\\firestore\\SharedLocationFirestoreMapper.kt": {
+    "mtime": 1780331353.2498975,
+    "ast_hash": "432032177769a601420a7c4d5102edff",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\repository\\AuthRepositoryImpl.kt": {
+    "mtime": 1780331709.0684793,
+    "ast_hash": "229ba7e186424c6ad23fcf7e2ba29728",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\repository\\CloseFriendsRepository.kt": {
+    "mtime": 1780331709.1004024,
+    "ast_hash": "8a2a99ad3a01cff1d3988441ced59c71",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\repository\\ConversationRepositoryImpl.kt": {
+    "mtime": 1780331709.0854228,
+    "ast_hash": "d0fabf0af6f6eacbb3f8e3c36a53ce51",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\repository\\DirectionsRepositoryImpl.kt": {
+    "mtime": 1779479274.3336117,
+    "ast_hash": "4091ba9d36aafd2f98162147ea245d24",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\repository\\FriendshipRepositoryImpl.kt": {
+    "mtime": 1780207853.4190257,
+    "ast_hash": "36fe073e13c6a7b177615d81c06cbfaa",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\repository\\GroupRepositoryImpl.kt": {
+    "mtime": 1780331709.0208106,
+    "ast_hash": "5270bfe8d42a1475755991eb2ef7f0f8",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\repository\\InteractionRepositoryImpl.kt": {
+    "mtime": 1778773780.860418,
+    "ast_hash": "6188bd6a54f2fa8d29879c0dbce12d35",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\repository\\LocationRepositoryImpl.kt": {
+    "mtime": 1780337216.9368036,
+    "ast_hash": "31e0b3d2ae2bad471f1d4ac808dcfbde",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\repository\\MessageRepositoryImpl.kt": {
+    "mtime": 1780337216.9832375,
+    "ast_hash": "238de69c862438c370baa0e01a1e0867",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\repository\\NotificationPreferencesRepository.kt": {
+    "mtime": 1780337216.9983146,
+    "ast_hash": "4240b6cd452a0bf0908dbddf96c9146a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\repository\\NotificationRepository.kt": {
+    "mtime": 1779706284.971772,
+    "ast_hash": "882d8d338831ebd28861eae1a6df5085",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\repository\\NotificationSoundPreferencesRepository.kt": {
+    "mtime": 1780337216.8831398,
+    "ast_hash": "503e96556dec3f99d5e61070054ac60b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\repository\\PrivacyPolicyRepository.kt": {
+    "mtime": 1780337216.8343685,
+    "ast_hash": "393b5a889731f4a172cc8cf09a00b492",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\repository\\QuietHoursRepository.kt": {
+    "mtime": 1779515656.832996,
+    "ast_hash": "84e95b9f041c99373bd42625b49e9399",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\repository\\SystemMessageWriter.kt": {
+    "mtime": 1779426081.6478636,
+    "ast_hash": "f64b1aba5c4fb4261eaefa19ba07cd78",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\repository\\UserRepositoryImpl.kt": {
+    "mtime": 1780337217.010201,
+    "ast_hash": "bc8ab135b3e99870c317df5f9aac0ccd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\sync\\BackgroundSyncLifecycleObserver.kt": {
+    "mtime": 1778893704.7530632,
+    "ast_hash": "614720afd9aa4747f6e9550365f1edc1",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\sync\\BackgroundSyncScheduler.kt": {
+    "mtime": 1778893666.476537,
+    "ast_hash": "1f1e27d9d972c29bff3cd9d3163cd2c7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\sync\\BackgroundSyncWorker.kt": {
+    "mtime": 1778894206.70011,
+    "ast_hash": "bbd893ac4d3a1f47dacab59658445c30",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\sync\\NotificationInboxPruneWorker.kt": {
+    "mtime": 1779513644.6987534,
+    "ast_hash": "56ab405eb6e577b6d7c5351d5da0ec3e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\util\\NetworkBoundResource.kt": {
+    "mtime": 1778697216.9400063,
+    "ast_hash": "6e4327e43aeaa92612cf5bb813d91801",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\util\\Resource.kt": {
+    "mtime": 1778697216.9423983,
+    "ast_hash": "e7dbae96abe485709d06186d41ac8f34",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\data\\util\\SnapshotDebouncer.kt": {
+    "mtime": 1780337215.946856,
+    "ast_hash": "ae07cbcf09a21ebed8fe324946c49003",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\di\\AppModule.kt": {
+    "mtime": 1780210192.0461056,
+    "ast_hash": "8388850a2b098279e8a4a97920a7b8c2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\di\\DirectionsModule.kt": {
+    "mtime": 1779479287.7898636,
+    "ast_hash": "dd0631cc5095f8a58b6fb57736cbbfbd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\di\\NetworkModule.kt": {
+    "mtime": 1778697216.9485135,
+    "ast_hash": "dd489fa7671aaa2acec2837bc729b905",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\di\\RepositoryModule.kt": {
+    "mtime": 1779468894.6036005,
+    "ast_hash": "d713fe7fc690b290654331a2a89bdacf",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\di\\UseCaseModule.kt": {
+    "mtime": 1780210255.9060707,
+    "ast_hash": "f9fc95611f758bb926a9f694db596528",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\ActiveSharingState.kt": {
+    "mtime": 1779363268.0239313,
+    "ast_hash": "8d89ea70a0336f12cbb0471b6d47a52e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\BlockEntry.kt": {
+    "mtime": 1778560501.233009,
+    "ast_hash": "10230bf07898e41a189b5446be81cf98",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\Conversation.kt": {
+    "mtime": 1779054538.6763437,
+    "ast_hash": "771eb190ce1349a841910a37649ba46a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\FriendEntry.kt": {
+    "mtime": 1778561466.3490298,
+    "ast_hash": "5e088b187cc14b99d8e5d287d2399e37",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\Friendship.kt": {
+    "mtime": 1778559379.0082035,
+    "ast_hash": "3d74a77b2ef9005023d58b40d5b24713",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\FriendshipIds.kt": {
+    "mtime": 1778558239.1206381,
+    "ast_hash": "1cd587aa6eea04d4bbc444012b045b8e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\Group.kt": {
+    "mtime": 1778613226.3057632,
+    "ast_hash": "69943235296715ed6059a57088eb23ca",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\GroupMember.kt": {
+    "mtime": 1777910154.0340793,
+    "ast_hash": "5da1fde0ce6b1898458c0a25306c5428",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\Interaction.kt": {
+    "mtime": 1778747181.7195752,
+    "ast_hash": "8e4333a27c089274141ec20eabc55c8b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\LinkPreview.kt": {
+    "mtime": 1778878211.7069023,
+    "ast_hash": "9abc3c5a9a7437307e4bb2a65d650f00",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\LocationUpdateFrame.kt": {
+    "mtime": 1779201530.0532308,
+    "ast_hash": "8a0ec0c012a76a3a5b226ceddb288482",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\MeetupDestination.kt": {
+    "mtime": 1779470511.222219,
+    "ast_hash": "e9f9a81aee1ddb9a41fa7c15c99a637b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\Message.kt": {
+    "mtime": 1779431434.2441702,
+    "ast_hash": "cd102f55cd79e5d3c591c3ebcb49abdf",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\MessagePage.kt": {
+    "mtime": 1778587162.5638604,
+    "ast_hash": "3bb5ac74039b8666cc7654c9176e79ef",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\MuteOption.kt": {
+    "mtime": 1779515596.2757728,
+    "ast_hash": "fc081fcff7c972910be7e248206d3da3",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\RequestEntry.kt": {
+    "mtime": 1778559934.5281816,
+    "ast_hash": "ea9fc2266f1ad8824ecde483b2792bef",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\RequestInbox.kt": {
+    "mtime": 1778559947.7737448,
+    "ast_hash": "76cb36d46bba1b7ed9119d670d06ad70",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\Route.kt": {
+    "mtime": 1780337216.4044168,
+    "ast_hash": "416a158c35a0f79ae6a7c29761ba7dba",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\SharedLocation.kt": {
+    "mtime": 1780210117.0906053,
+    "ast_hash": "10a2e25c93e94f404a015fea5c92bc7b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\SocialSummary.kt": {
+    "mtime": 1778560220.512107,
+    "ast_hash": "c1b8edbb7c3d0e0a35d4169b09ce91e2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\model\\User.kt": {
+    "mtime": 1780210102.620116,
+    "ast_hash": "5a018611d216ae8856b267715bac11af",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\repository\\AuthRepository.kt": {
+    "mtime": 1780210201.1152081,
+    "ast_hash": "69f0980a798204ff9dc70a48d7940b83",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\repository\\ConversationRepository.kt": {
+    "mtime": 1779515604.9281137,
+    "ast_hash": "603ee050dd0daa8790a945561d91a82d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\repository\\DirectionsRepository.kt": {
+    "mtime": 1779468842.681305,
+    "ast_hash": "5862cd3b82fa187433e1cc3745018ad7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\repository\\FriendshipRepository.kt": {
+    "mtime": 1780207853.421769,
+    "ast_hash": "1e6193f30f800d5ecafe9e8467c4d9ef",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\repository\\GroupRepository.kt": {
+    "mtime": 1779556328.7193885,
+    "ast_hash": "ccc65714e8afb1f8d983ce5f211ca31f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\repository\\InteractionRepository.kt": {
+    "mtime": 1778773767.469207,
+    "ast_hash": "8a8c4b264e8d56c9179fe950ef6c2421",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\repository\\LocationRepository.kt": {
+    "mtime": 1779470601.1559286,
+    "ast_hash": "dca8a267c9b43b94c36cea35c29dc27d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\repository\\MessageRepository.kt": {
+    "mtime": 1778878219.403193,
+    "ast_hash": "3f8f1070f8d8be799e074ec1e31e925d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\repository\\UserRepository.kt": {
+    "mtime": 1777910154.0364013,
+    "ast_hash": "27036c9ee1cdc0ec11433e2185be2b0b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\GetSuggestionsUseCase.kt": {
+    "mtime": 1778752679.4607532,
+    "ast_hash": "945eac91edc3f4b07f8c2ab230cdf24c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\SearchChatsUseCase.kt": {
+    "mtime": 1778747312.1547892,
+    "ast_hash": "32582c719928651dbc5de8ff5b1772c5",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\SearchPeopleUseCase.kt": {
+    "mtime": 1778747322.6514976,
+    "ast_hash": "f8177b84f4f0a4b71ef0f6701413e6b5",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\auth\\CompleteProfileUseCase.kt": {
+    "mtime": 1778319699.5571165,
+    "ast_hash": "8b8902692a8efe7e2e70d0646967d771",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\auth\\GoogleSignInUseCase.kt": {
+    "mtime": 1777913585.6046934,
+    "ast_hash": "1b4746352aab65ce8579038aeff211b3",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\auth\\ObserveCurrentUserUseCase.kt": {
+    "mtime": 1778697216.9584246,
+    "ast_hash": "9e6a52c4a42933ee3d476c722bea6f07",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\auth\\ProfileUseCases.kt": {
+    "mtime": 1780210224.3733668,
+    "ast_hash": "6a9139c536540c8a75730a3b8f766f05",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\auth\\RegisterUseCase.kt": {
+    "mtime": 1778396900.0747502,
+    "ast_hash": "adcd8b2663ff0259fefc00eb1a8e7e33",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\auth\\ReloadUserUseCase.kt": {
+    "mtime": 1778309491.1223638,
+    "ast_hash": "e419e9e7ff22407a662aa42bc5412dde",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\auth\\ResetPasswordUseCase.kt": {
+    "mtime": 1778697216.9607093,
+    "ast_hash": "2ef60231562ee706df567d986c219ca6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\auth\\SendEmailVerificationUseCase.kt": {
+    "mtime": 1778309488.9910185,
+    "ast_hash": "9674fb3ae0f179cae8792534f58d1d3d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\auth\\SignInUseCase.kt": {
+    "mtime": 1777910154.0386121,
+    "ast_hash": "f6e39fcbe16852c1bdb4284be13a7720",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\auth\\SignOutUseCase.kt": {
+    "mtime": 1777910154.0386121,
+    "ast_hash": "957cbf66defabb4bf8888592984d4bb2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\auth\\UpdateProfileUseCase.kt": {
+    "mtime": 1777923203.9044816,
+    "ast_hash": "676eb1000fee09ad5fa3809170138c78",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\chat\\ChatUseCases.kt": {
+    "mtime": 1778591471.3007946,
+    "ast_hash": "6bf726206cadd05ed36de23cdbfd76e0",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\chat\\FetchLinkPreviewUseCase.kt": {
+    "mtime": 1779551885.423998,
+    "ast_hash": "350b42a856040564f21f6b5c78b92e29",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\chat\\SendVoiceMessageUseCase.kt": {
+    "mtime": 1778878202.8334446,
+    "ast_hash": "5a8f4711d354df29cb108ec43c352adc",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\friend\\FriendUseCases.kt": {
+    "mtime": 1778577065.7309103,
+    "ast_hash": "5313ca79ed3c0256d91b87487111a575",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\group\\AdminUseCases.kt": {
+    "mtime": 1777923218.551899,
+    "ast_hash": "09c3f4b37f751ed960b9b5e1eb60a0ea",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\group\\CreateGroupUseCase.kt": {
+    "mtime": 1779484387.4007285,
+    "ast_hash": "340443157408a0dd628f9aa50971b64b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\group\\GetGroupUseCase.kt": {
+    "mtime": 1777910154.039618,
+    "ast_hash": "e2c88ef16ae1f8102217a87a735c1a0b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\group\\GetUserGroupsUseCase.kt": {
+    "mtime": 1777910154.039618,
+    "ast_hash": "973c2cc446b8a6fb59da43be12814410",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\group\\JoinGroupUseCase.kt": {
+    "mtime": 1777910154.0409112,
+    "ast_hash": "8e8d184339636ef8f6937f878d680abb",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\group\\LeaveGroupUseCase.kt": {
+    "mtime": 1777910154.0409112,
+    "ast_hash": "b988ed2f14bbfc877148dd0ba91997f6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\group\\MuteGroupMemberUseCase.kt": {
+    "mtime": 1778880450.5194938,
+    "ast_hash": "eea09fee82be58d0c090c99a125c9d83",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\group\\ObserveGroupMembersUseCase.kt": {
+    "mtime": 1777910154.0409112,
+    "ast_hash": "3b837ae89602c47cb564f91cbef0fa77",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\location\\ClearMeetupDestinationUseCase.kt": {
+    "mtime": 1779430006.6505895,
+    "ast_hash": "6fb736d460dbf3aa596593e39d5a7b0e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\location\\DetectArrivalUseCase.kt": {
+    "mtime": 1779201530.0562272,
+    "ast_hash": "83c36df4bd9debd92a4afbaddcc76517",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\location\\GetMeetupRouteUseCase.kt": {
+    "mtime": 1779468866.517426,
+    "ast_hash": "f4370fee3d581795391870a07e090332",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\location\\ObserveActiveLocationsUseCase.kt": {
+    "mtime": 1778252667.2624514,
+    "ast_hash": "4f9ecfcf2a222d2c4be80f114071f611",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\location\\ObserveGroupLocationsUseCase.kt": {
+    "mtime": 1777910154.0419202,
+    "ast_hash": "61f48e4456688c15a14257c9144d32b2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\location\\ObserveMeetupDestinationUseCase.kt": {
+    "mtime": 1779430008.6868856,
+    "ast_hash": "b5f4df0d55027d5c9212721a738c1ed1",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\location\\SetMeetupDestinationUseCase.kt": {
+    "mtime": 1779467087.6769164,
+    "ast_hash": "6ecf76df4292483a967f22c0ddfb6226",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\location\\StartLocationSharingUseCase.kt": {
+    "mtime": 1779310982.0624864,
+    "ast_hash": "b133ab5f212535a3d7b87c308f2339ea",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\location\\StopLocationSharingUseCase.kt": {
+    "mtime": 1779310983.737111,
+    "ast_hash": "c9a17257a3ffaf370e03a0fc991d2f4d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\location\\UpdateMeetupParticipantNoteUseCase.kt": {
+    "mtime": 1779470744.547925,
+    "ast_hash": "2e626c14e9e67c1356928d672f095950",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\location\\UpdateMeetupParticipantStatusUseCase.kt": {
+    "mtime": 1779467103.969488,
+    "ast_hash": "f23abdf1b4b38f86e8126f934515ad81",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\domain\\usecase\\user\\GetUsersUseCase.kt": {
+    "mtime": 1777923212.239424,
+    "ast_hash": "8cd6a59b98070045f5248b73e9adf57d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\auth\\complete\\CompleteProfileScreen.kt": {
+    "mtime": 1778697216.965194,
+    "ast_hash": "6c34ff5d09592d63733c2d662b61bade",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\auth\\complete\\CompleteProfileViewModel.kt": {
+    "mtime": 1778397606.0698235,
+    "ast_hash": "e5788f58b052711b8118f61c7d77e9b7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\auth\\forgotpassword\\ForgotPasswordScreen.kt": {
+    "mtime": 1778697216.968192,
+    "ast_hash": "4585d4f0766b81055e3df5f92f10df69",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\auth\\forgotpassword\\ForgotPasswordViewModel.kt": {
+    "mtime": 1777923243.7608545,
+    "ast_hash": "a07e258a45dccd0df3606410ed208924",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\auth\\login\\LoginScreen.kt": {
+    "mtime": 1780337216.912565,
+    "ast_hash": "7595cbe9ebfcfa8023626a25872857e6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\auth\\login\\LoginViewModel.kt": {
+    "mtime": 1778309770.1314085,
+    "ast_hash": "7924343accfe890b50dea83ca48de6df",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\auth\\signup\\SignUpScreen.kt": {
+    "mtime": 1780337217.0726569,
+    "ast_hash": "76c6092a3bcd6922224e2f6111e5e439",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\auth\\signup\\SignUpViewModel.kt": {
+    "mtime": 1778398291.1585572,
+    "ast_hash": "1230f60fc2b16f04de9707c53dca49fb",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\auth\\verification\\EmailVerificationScreen.kt": {
+    "mtime": 1778697216.977276,
+    "ast_hash": "cf9caaeb03eed73be8bdeda861e23a42",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\auth\\verification\\EmailVerificationViewModel.kt": {
+    "mtime": 1778309563.979225,
+    "ast_hash": "b55ee8989d866e52b38303b733942c22",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\ChatHeader.kt": {
+    "mtime": 1780337217.1012962,
+    "ast_hash": "22d278a415ea0902f3cd2c56b95a6142",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\ChatScreen.kt": {
+    "mtime": 1780337216.8655617,
+    "ast_hash": "133ba7e84b55091376576b65b1786f6c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\ChatsScreen.kt": {
+    "mtime": 1780337217.088371,
+    "ast_hash": "7d6ef46be22ebee4c80e3f814d8dd69d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\ChatsViewModel.kt": {
+    "mtime": 1780337216.8198476,
+    "ast_hash": "7fa855a650441f6f61efb5fae2b82ff2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\ChatViewModel.kt": {
+    "mtime": 1780337454.0756557,
+    "ast_hash": "0a1ec385aa665f3638876aa6b3747053",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\ConversationInfoScreen.kt": {
+    "mtime": 1780337810.1844065,
+    "ast_hash": "58180419072d54b7e8bafc8b6fc48594",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\ConversationInfoViewModel.kt": {
+    "mtime": 1779639668.6792355,
+    "ast_hash": "674bf0276aea55fb9b8c52d18ed2b500",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\GroupInfoScreen.kt": {
+    "mtime": 1780337810.1607401,
+    "ast_hash": "05c8573cc69eb2e4b3f17dbae89437a4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\GroupInfoViewModel.kt": {
+    "mtime": 1780337810.1208599,
+    "ast_hash": "b82abf032815f47e14f8049e5240c95a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\MediaGalleryScreen.kt": {
+    "mtime": 1780337810.1685722,
+    "ast_hash": "d7f8ff34b3dc1ec2876d7cd358dc9d1f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\MediaGalleryViewModel.kt": {
+    "mtime": 1778912456.216547,
+    "ast_hash": "87132d9f5b31ec239944806f3dea8264",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\MentionEngine.kt": {
+    "mtime": 1780337810.1353266,
+    "ast_hash": "05accf585d520d91273ab0e035b5439c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\NewMessageScreen.kt": {
+    "mtime": 1780337810.1446178,
+    "ast_hash": "4bdaada4796c6d7ac24131ecbd4c2295",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\NicknamesScreen.kt": {
+    "mtime": 1779123304.8861012,
+    "ast_hash": "f5ae4d5e82f4204436e5224a938e8c62",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\BlockedComposerBar.kt": {
+    "mtime": 1780337216.8482664,
+    "ast_hash": "d27c904ed5ced80480fa38cb62400d74",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\ChatBubble.kt": {
+    "mtime": 1779556225.101417,
+    "ast_hash": "43d7170328109622e1d980e828507baa",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\ChatEmptyState.kt": {
+    "mtime": 1779139575.2616274,
+    "ast_hash": "cda1d508d81aef99fa9b88d70a81c0b4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\ChatInputBar.kt": {
+    "mtime": 1779626682.7335942,
+    "ast_hash": "ffcb27b0949e0f477d16038e8b54f60a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\ChatSystemMessage.kt": {
+    "mtime": 1779423512.9744635,
+    "ast_hash": "4dcfca68dfedb8611a02186ff0034ad2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\ConversationAvatar.kt": {
+    "mtime": 1779123551.7312868,
+    "ast_hash": "9756aefd3fe852d525e63b7432e52aed",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\DateSeparator.kt": {
+    "mtime": 1779139502.724098,
+    "ast_hash": "69c5ba84d48d920604e3197c12349f73",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\DestructiveConfirmSheet.kt": {
+    "mtime": 1780337217.1121042,
+    "ast_hash": "cec0780cdd216f6d63298a8e8a67ecd0",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\FullScreenImageViewer.kt": {
+    "mtime": 1779122326.1467507,
+    "ast_hash": "2e70549e93d67546b198065f4198f68b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\ImageMessageBubble.kt": {
+    "mtime": 1779122950.59556,
+    "ast_hash": "8da2c7bfb390dcafdd10bbba762aef9a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\LinkPreviewCard.kt": {
+    "mtime": 1779551817.8620377,
+    "ast_hash": "2a7fbe217990b078b564bc7eb665fe65",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\LiveMeetupSheet.kt": {
+    "mtime": 1780288401.1434739,
+    "ast_hash": "a261b4003b19e9b6b1522c9b654632fe",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\MemberPickerDialog.kt": {
+    "mtime": 1780337215.9290366,
+    "ast_hash": "47a19098b2a270058f5c1aa22901ab8d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\MentionStyledText.kt": {
+    "mtime": 1779551848.1518357,
+    "ast_hash": "849e7b8744854101779a5f0dad77cf1d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\MentionSuggestionPopup.kt": {
+    "mtime": 1779129220.5444734,
+    "ast_hash": "d6e6352dfba546bf0e8ae728df1f74ff",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\MessageAnimations.kt": {
+    "mtime": 1780337216.800162,
+    "ast_hash": "ff68f0e5788318400b5482a34837b8f7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\MessageSearchBar.kt": {
+    "mtime": 1779085458.8425388,
+    "ast_hash": "d37c6b94b5fb9d1f3ab7ef1d61f465ee",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\MessageStatusIndicator.kt": {
+    "mtime": 1779165981.267052,
+    "ast_hash": "e5c24507217a81c30d21cc0cfdec0468",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\MuteDurationSheet.kt": {
+    "mtime": 1780337216.3928905,
+    "ast_hash": "ee8633455ce21af7b22a786b73249b1d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\NewMessageIndicator.kt": {
+    "mtime": 1780293166.6543176,
+    "ast_hash": "bda037f34ef3670a7117790a42cf4e47",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\NotParticipantBanner.kt": {
+    "mtime": 1780337212.2713509,
+    "ast_hash": "5716514306c51c6d8a5e195f97eb786c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\ReactionPicker.kt": {
+    "mtime": 1779165608.428346,
+    "ast_hash": "6ca3a13a8c81178b80fe6c8645664a98",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\ReactionsDetailsSheet.kt": {
+    "mtime": 1779141345.7708838,
+    "ast_hash": "77598010539b86dbba2d8787ecd6ed2d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\ReadReceiptIndicator.kt": {
+    "mtime": 1780337217.020175,
+    "ast_hash": "0c9c16f62f4b755b22fe370ce2a7d0dd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\ReplyPreviewBar.kt": {
+    "mtime": 1780337216.8942091,
+    "ast_hash": "88f1e88ba77e237baf89ad246512ddab",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\SwipeToReplyContainer.kt": {
+    "mtime": 1778876990.2530282,
+    "ast_hash": "16a86ccecfbf9b2d645e3e3d674c04c4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\TypingIndicator.kt": {
+    "mtime": 1779139532.1680126,
+    "ast_hash": "b5d50db07180a52aa684225cdde59449",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\UnreadBadge.kt": {
+    "mtime": 1778939208.2790852,
+    "ast_hash": "08d886d512f8244893b08b6248aea596",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\UserDetailsSheet.kt": {
+    "mtime": 1779167120.9334204,
+    "ast_hash": "afc274b0bf6855dd7ea9ba697522c76b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\VoiceMessageBubble.kt": {
+    "mtime": 1778878161.142619,
+    "ast_hash": "b2a8a2a583e8c37c8e1fdb0996d02497",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\components\\VoicePlaybackController.kt": {
+    "mtime": 1780337217.0351794,
+    "ast_hash": "f77ec63c4fb9a771fac1f6934d337070",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\chat\\system\\SystemMessageRenderer.kt": {
+    "mtime": 1779431434.263805,
+    "ast_hash": "a9fb7e1649fd1a16ed419e26c70a25bf",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\common\\Components.kt": {
+    "mtime": 1779996262.8642774,
+    "ast_hash": "e2e45f490e475dbb20f271280c9cb89c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\common\\MapPinMarker.kt": {
+    "mtime": 1780288617.977926,
+    "ast_hash": "f9bea71fae7e559bc9d2384e0f16cd53",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\common\\PressAnimation.kt": {
+    "mtime": 1778697216.999349,
+    "ast_hash": "2a1c02548e11210cab049a25538a2855",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\common\\SharingTimeFormatter.kt": {
+    "mtime": 1780342279.7731695,
+    "ast_hash": "75e1945ed09ac29245d53bc49e600ec3",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\common\\search\\SearchBarTapTarget.kt": {
+    "mtime": 1779036132.3609388,
+    "ast_hash": "b253fe7c35ebbf524730e18744718d37",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\common\\search\\SearchUiState.kt": {
+    "mtime": 1778747170.570723,
+    "ast_hash": "40cc7e5adf3fb1f4bc31892dcac751bf",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\common\\search\\SuggestionUiModel.kt": {
+    "mtime": 1778747167.9978695,
+    "ast_hash": "5f833f52fd4d0be82aaecb5bfda5f9fa",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\group\\AddGroupMembersScreen.kt": {
+    "mtime": 1779484255.8482845,
+    "ast_hash": "5b8711bcfe11d79e4452057691bc373c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\group\\GroupMembersScreen.kt": {
+    "mtime": 1779996913.2519693,
+    "ast_hash": "372e5fd8e62e05c035a2d8432fc36118",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\group\\GroupNicknamesScreen.kt": {
+    "mtime": 1779996913.2799675,
+    "ast_hash": "f8a6a8392050592220026c26c8ccdeb5",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\group\\create\\CreateGroupScreen.kt": {
+    "mtime": 1780342279.7955687,
+    "ast_hash": "b6342be740276014c732f1eae3fe1211",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\group\\create\\CreateGroupViewModel.kt": {
+    "mtime": 1780341670.7618659,
+    "ast_hash": "2bed3a0671c7690db08a9a8631e9546d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\group\\join\\JoinGroupScreen.kt": {
+    "mtime": 1779052151.8150716,
+    "ast_hash": "889a974db08b18b4586f121d3de9d04d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\group\\join\\JoinGroupViewModel.kt": {
+    "mtime": 1779425416.1267657,
+    "ast_hash": "eadef26968fb0e7bee4de2f38aa1e3db",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\map\\GlobalMapScreen.kt": {
+    "mtime": 1780341670.8060434,
+    "ast_hash": "27b05a4b4819cb8c61b7d0f57bf6ca60",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\map\\GlobalMapViewModel.kt": {
+    "mtime": 1780341670.8315263,
+    "ast_hash": "92f7c3dc950f2c5bade1582ebf034c55",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\map\\MapUtils.kt": {
+    "mtime": 1780342279.7573447,
+    "ast_hash": "e0bd6770cef96d304fcba8c1ac73ea40",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\map\\components\\MarkerLayout.kt": {
+    "mtime": 1779364834.2554486,
+    "ast_hash": "350e5dfd0b4585ac98583fcba033981d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\map\\components\\MeetupChip.kt": {
+    "mtime": 1780264148.086051,
+    "ast_hash": "69057b431c93bab0a31ec5165cf7fd27",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\map\\components\\MeetupDestinationComponents.kt": {
+    "mtime": 1780125178.3700223,
+    "ast_hash": "bfc9cc7ea057c647ee0fa794473d3485",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\map\\components\\MeetupPin.kt": {
+    "mtime": 1780124611.8954768,
+    "ast_hash": "4b74d0decf4c20304d8866566f6fa2ba",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\map\\components\\MeetupPlaceCardSheet.kt": {
+    "mtime": 1780341670.77851,
+    "ast_hash": "e51ec7f6f86ee633eaeb393f0395bc61",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\map\\components\\MeetupStatusEditorSheet.kt": {
+    "mtime": 1780342279.7454255,
+    "ast_hash": "c70ff2d9f662a610336a555e39e641bc",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\ConversationInfoUiState.kt": {
+    "mtime": 1779628917.2813864,
+    "ast_hash": "84c3c443677719598d29017344760ee4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\ConversationUiModel.kt": {
+    "mtime": 1779525174.4729266,
+    "ast_hash": "7a1ba1200eb46b2426d3f7492cefd967",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\FriendRequestUiModel.kt": {
+    "mtime": 1778565917.6806643,
+    "ast_hash": "b5f61d5ad79be026a64315cd6de82cc4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\FriendUiModel.kt": {
+    "mtime": 1778565901.1815932,
+    "ast_hash": "9500b2b421beb6c4c528325c66d14981",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\GroupInfoUiState.kt": {
+    "mtime": 1779431434.2728095,
+    "ast_hash": "32e2eb009093d1fdb99ca90ccdd94c1b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\GroupMemberUiModel.kt": {
+    "mtime": 1779092567.514008,
+    "ast_hash": "ecf0e18ff62959cbb2a783e28fddc0ef",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\GroupUiModel.kt": {
+    "mtime": 1777910154.0523252,
+    "ast_hash": "a1b57d4b799eba611e9dab14226f520d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\LastActiveFormatter.kt": {
+    "mtime": 1779135924.7614772,
+    "ast_hash": "3d49671a455ed6b3b5fcf3df2132c273",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\MediaThumbnail.kt": {
+    "mtime": 1778938148.0455506,
+    "ast_hash": "7dba60c70d188da176adb41452605d9f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\MediaType.kt": {
+    "mtime": 1778938142.8010125,
+    "ast_hash": "bd845dc6665a89436d1fe67293233c55",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\MemberLocationUiModel.kt": {
+    "mtime": 1779201530.0637233,
+    "ast_hash": "accfe4b7cf2762fac562da323b280b27",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\MessageUiModel.kt": {
+    "mtime": 1779427325.7508395,
+    "ast_hash": "9469aa822c8a7bfa8bf1250d939d6906",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\OtherUserProfileUiModel.kt": {
+    "mtime": 1780220312.2417855,
+    "ast_hash": "711a737d6a0ac2d12268cda0c35d00dc",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\SearchUserUiModel.kt": {
+    "mtime": 1778793876.3807428,
+    "ast_hash": "8d9c6f5ba4d9aef86199b1c81a41ca90",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\SenderDisplayNameResolver.kt": {
+    "mtime": 1780341670.8467355,
+    "ast_hash": "941c1ac168e13479682fed6ba3eba30c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\TimestampFormatters.kt": {
+    "mtime": 1780291782.4519157,
+    "ast_hash": "3cc646223cf35890daf04547a996cb0a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\model\\UserProfileUiModel.kt": {
+    "mtime": 1780210350.3133593,
+    "ast_hash": "d4c1e2833e0fc5a07aa0d8fcf9a89095",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\navigation\\AppNavGraph.kt": {
+    "mtime": 1780342735.7816834,
+    "ast_hash": "ebcdfcc3996a70eb986274da68294a1d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\navigation\\MainScaffold.kt": {
+    "mtime": 1780155133.1675348,
+    "ast_hash": "7befaad48b7fe50142582d83cfe4188f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\navigation\\MainScaffoldViewModel.kt": {
+    "mtime": 1780152136.61579,
+    "ast_hash": "fa476a07e667dbbcea94cc4a970fa95b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\navigation\\Screen.kt": {
+    "mtime": 1780210410.3863876,
+    "ast_hash": "59ea9f562580efc97a549dd53bccc2a7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\navigation\\gatekeeper\\AuthGatekeeperViewModel.kt": {
+    "mtime": 1778310155.360049,
+    "ast_hash": "7f2b2b8f158d7574361854384730856a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\notification\\NotificationsScreen.kt": {
+    "mtime": 1780154384.2111065,
+    "ast_hash": "904397dc48c7795f60b576c6abc37a18",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\notification\\NotificationsViewModel.kt": {
+    "mtime": 1779699357.9593768,
+    "ast_hash": "706981f2f74b7337d390511110f48332",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\onboarding\\OnboardingData.kt": {
+    "mtime": 1778835830.6502922,
+    "ast_hash": "579cbbd263fdef5c74b69ac131949dae",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\onboarding\\OnboardingPageLayout.kt": {
+    "mtime": 1778846053.033677,
+    "ast_hash": "6b38302930269e3be2d8a984981c11f2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\onboarding\\OnboardingScreen.kt": {
+    "mtime": 1778835863.8989122,
+    "ast_hash": "8ce8a494334b34aa64a23905eea97705",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\onboarding\\OnboardingViewModel.kt": {
+    "mtime": 1777923302.746971,
+    "ast_hash": "ed99f2c52fb7221d529fdfbab600a230",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\onboarding\\PageIndicatorRow.kt": {
+    "mtime": 1778823215.8003552,
+    "ast_hash": "514122f9d82dee1864fcee9d6e1fca81",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\BlockedUsersScreen.kt": {
+    "mtime": 1779996913.2599688,
+    "ast_hash": "dceb500bb7f6555dae21d5365c5bbc7c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\BlockedUsersViewModel.kt": {
+    "mtime": 1779638949.6286943,
+    "ast_hash": "310b345e8d0605da5982027c5b052c14",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\FriendRequestsScreen.kt": {
+    "mtime": 1780342279.7287211,
+    "ast_hash": "9e241c503d572d46839a390ff0f52853",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\FriendRequestsViewModel.kt": {
+    "mtime": 1778697217.0446641,
+    "ast_hash": "7a1d455c8d64376224560bde1c1b9add",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\PeopleScreen.kt": {
+    "mtime": 1780342279.8384304,
+    "ast_hash": "137f55263ccc4658905d1c9becc62cb7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\PeopleViewModel.kt": {
+    "mtime": 1780342279.869712,
+    "ast_hash": "cafda57e1f795626086a7f3fad0e8302",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\UserProfileScreen.kt": {
+    "mtime": 1780342279.8872857,
+    "ast_hash": "7ced390692de09fbcc270b0a227a1f70",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\UserProfileViewModel.kt": {
+    "mtime": 1780220775.0979617,
+    "ast_hash": "0087f7e17623f95335255456fbd40b24",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\components\\BlockedInboxCard.kt": {
+    "mtime": 1779639040.8397825,
+    "ast_hash": "092d096ddd5afba45e3a4169112df152",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\components\\EmptyStates.kt": {
+    "mtime": 1778770659.1072607,
+    "ast_hash": "60631b87e183f0c8719aaaac345125f2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\components\\FriendRow.kt": {
+    "mtime": 1779523875.4000041,
+    "ast_hash": "572336f77666b8a0346ca81ae9d326bf",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\components\\FriendshipActionPill.kt": {
+    "mtime": 1780342279.7093482,
+    "ast_hash": "044650d08b31913e561672ff510cdd78",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\components\\FriendsSectionHeader.kt": {
+    "mtime": 1778575420.3069544,
+    "ast_hash": "934e5bed5dc2e3d9813d4603a1e5f07b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\components\\InfoCard.kt": {
+    "mtime": 1778575520.9062502,
+    "ast_hash": "bbf531e2c0e67186f84f50685cc331cc",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\components\\LiveRingAvatar.kt": {
+    "mtime": 1779123889.0468469,
+    "ast_hash": "dac38da1dff97ed65ca85fa8ebc0cb8e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\components\\PeopleSkeleton.kt": {
+    "mtime": 1778575447.9957187,
+    "ast_hash": "e811f45bd11c07fbbd875859ba10e990",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\components\\ProfileSkeleton.kt": {
+    "mtime": 1778575483.0685432,
+    "ast_hash": "b5aee9dc714284b54fe21b40d4166466",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\components\\RequestsInboxCard.kt": {
+    "mtime": 1780342279.8110633,
+    "ast_hash": "47e22ec010ef3a34ec6a739a9640abe0",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\components\\RequestsSkeleton.kt": {
+    "mtime": 1778575459.5673056,
+    "ast_hash": "21336586fedfe3846d93608c5b98f0d1",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\people\\components\\StatusDot.kt": {
+    "mtime": 1778575354.986687,
+    "ast_hash": "0a1348c4a94c80f38c2857724e6ec5af",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\permission\\PermissionOnboardingSheet.kt": {
+    "mtime": 1780342279.8529243,
+    "ast_hash": "9b640b5e80e0a077abcd5b0b57f0f892",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\permission\\PermissionStep.kt": {
+    "mtime": 1780599763.093428,
+    "ast_hash": "3c54c40115d953a8af193818c13005e7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\profile\\ProfileScreen.kt": {
+    "mtime": 1780342735.916731,
+    "ast_hash": "ae9d91ed08f4cab9f8903294b3aeca36",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\profile\\ProfileViewModel.kt": {
+    "mtime": 1780220767.1917222,
+    "ast_hash": "901e24cd4734a4df8f370a2faaa24f59",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\profile\\edit\\EditProfileScreen.kt": {
+    "mtime": 1780213835.7262554,
+    "ast_hash": "60960b8be4a8d05d28d8503c64fc8a7b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\profile\\edit\\EditProfileViewModel.kt": {
+    "mtime": 1780342735.8354373,
+    "ast_hash": "c1a561217df54f1d7ce2f76e4507811c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\profile\\edit\\HomePickerScreen.kt": {
+    "mtime": 1780213231.5861228,
+    "ast_hash": "c74b73d2f9846202af4d24d229f41f61",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\search\\SearchScreen.kt": {
+    "mtime": 1779688541.654215,
+    "ast_hash": "cddb59e28822fd057e16c87173e13cdb",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\search\\SearchViewModel.kt": {
+    "mtime": 1780342735.895522,
+    "ast_hash": "119936f0c09b079048023f69ba3b4b84",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\AboutScreen.kt": {
+    "mtime": 1780342735.899725,
+    "ast_hash": "70a91a76d07040b0b1d479f34eeac396",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\AppearanceScreen.kt": {
+    "mtime": 1780342735.8621736,
+    "ast_hash": "0120a3e3bdbe3642edc860d86702941a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\AppearanceViewModel.kt": {
+    "mtime": 1778697217.0748441,
+    "ast_hash": "c910741fa75ac25b3dcb8209e954f266",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\DataStorageScreen.kt": {
+    "mtime": 1780342735.8743281,
+    "ast_hash": "660fca31cc4757f97fb038a33d15c83d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\DataStorageViewModel.kt": {
+    "mtime": 1780342735.8838613,
+    "ast_hash": "02e786a5af4cfdd5cb0d915973122c69",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\DevelopersScreen.kt": {
+    "mtime": 1779717995.756286,
+    "ast_hash": "f20aa8df8b2fd08c2aadcc3440e82881",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\HelpScreen.kt": {
+    "mtime": 1780342735.7966883,
+    "ast_hash": "1fa33765fdafffcdf7fd4fd8743cfafe",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\LegalDocScreen.kt": {
+    "mtime": 1780342735.845878,
+    "ast_hash": "5fc96caa8a3af41c8b1951a0494cd07a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\NotificationPreferencesScreen.kt": {
+    "mtime": 1779862689.6147738,
+    "ast_hash": "a8d3e0b74087ae35a061c20c0f9fabcd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\NotificationPrefsViewModel.kt": {
+    "mtime": 1779860635.9681797,
+    "ast_hash": "0e95d563dc32beeae132db557fbc9ce0",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\PermissionsScreen.kt": {
+    "mtime": 1780342735.8546066,
+    "ast_hash": "867c6e0e6e8873cba25d4d98cd8f12b2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\PrivacyPolicyScreen.kt": {
+    "mtime": 1779712850.1922443,
+    "ast_hash": "97161ae994715786d6a5832269b2630f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\PrivacyScreen.kt": {
+    "mtime": 1780342735.827388,
+    "ast_hash": "a5eae7a7935e674a9c8f3d80155b335b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\PrivacyViewModel.kt": {
+    "mtime": 1779523327.0070765,
+    "ast_hash": "6290068c13d7df2a987ed73bc2801f82",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\SecurityScreen.kt": {
+    "mtime": 1780342735.8179333,
+    "ast_hash": "b51df185e3cf616fc1b904edee4c878e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\SecurityViewModel.kt": {
+    "mtime": 1778697217.097419,
+    "ast_hash": "3fed680c8577e456b403bfa097bd3ca9",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\SettingsScreen.kt": {
+    "mtime": 1780342735.8092515,
+    "ast_hash": "107d6c8b7ab8da939a49f435878a77f1",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\SettingsViewModel.kt": {
+    "mtime": 1779688942.7233787,
+    "ast_hash": "1b35babf0e594688001c68ec4fbc5690",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\presentation\\settings\\TermsOfServiceScreen.kt": {
+    "mtime": 1779712825.6087046,
+    "ast_hash": "a2ccf8942b750369a79a234ca2e1b05b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\service\\LocationTrackingService.kt": {
+    "mtime": 1779513552.2877896,
+    "ast_hash": "e881c5776024e6f911d6c3ff1b85c8d7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\startup\\CoilInitializer.kt": {
+    "mtime": 1778892282.3579848,
+    "ast_hash": "beb1343434fd0b97c620f1d4ff7e4d64",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\startup\\FirebaseInitializer.kt": {
+    "mtime": 1778846488.9130788,
+    "ast_hash": "28ba2f76aa85efa60037ca5c7e54bfcd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\java\\com\\ovi\\where\\startup\\TimberInitializer.kt": {
+    "mtime": 1778697217.1142821,
+    "ast_hash": "299f9bfd5a7e1a1fae19eab39c9cfb60",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\ExampleUnitTest.kt": {
+    "mtime": 1777910154.0751896,
+    "ast_hash": "9f4b34191cc8f65c47cf2df427f3e2b9",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\data\\image\\FirebaseStorageFetcherTest.kt": {
+    "mtime": 1778892329.913419,
+    "ast_hash": "0cc344b823b3870952d72324a3b2257d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\data\\image\\ImageCacheManagerTest.kt": {
+    "mtime": 1778892315.3904288,
+    "ast_hash": "b3f351c6344b819ac05580c803a6573e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\data\\local\\entity\\ConversationEntityMapperTest.kt": {
+    "mtime": 1778587295.836283,
+    "ast_hash": "da312646062a9364c2022cfdfb373009",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\data\\local\\entity\\MessageEntityMapperTest.kt": {
+    "mtime": 1778587274.17758,
+    "ast_hash": "9e5fc72c2677e5b06dd6e68c4d2dd214",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\data\\local\\entity\\SystemEventPayloadPropertyTest.kt": {
+    "mtime": 1779394804.9030654,
+    "ast_hash": "d742e0e501814fc460095a268ad7e1c2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\data\\local\\prefs\\RecentSearchesStorePropertyTest.kt": {
+    "mtime": 1778749809.642958,
+    "ast_hash": "8c8eccadab6cbff65c143ca1605b135f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\data\\remote\\FirestoreListenerRegistryTest.kt": {
+    "mtime": 1778697217.1306536,
+    "ast_hash": "50546ac7bded0d1ad2bf4251a2b87d82",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\data\\remote\\chat\\ChatSocketIoClientReconnectionTest.kt": {
+    "mtime": 1778588345.4226797,
+    "ast_hash": "b9dae552ec44795dc4d8d49af4dd8d9e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\data\\remote\\chat\\TypingIndicatorManagerTest.kt": {
+    "mtime": 1778588345.4226797,
+    "ast_hash": "90eb04d374012f5ec2a71b8dd7019701",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\data\\repository\\ConversationRepositoryBatchFetchTest.kt": {
+    "mtime": 1778872118.2525997,
+    "ast_hash": "564a5a74790485694848bd228b8338ba",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\data\\repository\\MessageRepositoryImplTest.kt": {
+    "mtime": 1779003033.654169,
+    "ast_hash": "43f05cacb70bf8b860cc0dd5728135bf",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\data\\repository\\MessageRepositoryPaginationTest.kt": {
+    "mtime": 1778894943.3358,
+    "ast_hash": "8fab68cc1c625a60fb0cfdc340f0885f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\data\\repository\\fake\\FakeFriendshipRepository.kt": {
+    "mtime": 1778579393.446038,
+    "ast_hash": "dd3149cb7d4b8bf69e10d0322877a9f3",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\data\\sync\\BackgroundSyncWorkerTest.kt": {
+    "mtime": 1778893783.4136057,
+    "ast_hash": "b4d3277ffe0181b8a30f9e3c34468060",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\data\\util\\SnapshotDebouncerTest.kt": {
+    "mtime": 1778924721.8885343,
+    "ast_hash": "7ea09b92109698123335a9645f075d72",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\di\\TestFirebaseModule.kt": {
+    "mtime": 1778573708.7905922,
+    "ast_hash": "8890c006387fd55b323e192174f0a31d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\domain\\model\\FriendshipIdsPropertyTest.kt": {
+    "mtime": 1778750453.0687995,
+    "ast_hash": "e73ff5119f7e3f06e531b6518bb71c79",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\domain\\model\\LocationUpdateFrameTest.kt": {
+    "mtime": 1779201530.065722,
+    "ast_hash": "86463dbbc1d591d058c6bad1dca27286",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\domain\\model\\MessageTest.kt": {
+    "mtime": 1779394770.5572493,
+    "ast_hash": "790a188e1c51fc117a1672e734ec749f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\domain\\usecase\\GetSuggestionsUseCasePropertyTest.kt": {
+    "mtime": 1778874510.8381157,
+    "ast_hash": "4bf2b8b4cccb52e092ffa8169004de00",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\domain\\usecase\\SearchChatsUseCasePropertyTest.kt": {
+    "mtime": 1778750448.5620809,
+    "ast_hash": "e868d8b4b1c6d0c914395ed226077865",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\domain\\usecase\\SearchPeopleUseCasePropertyTest.kt": {
+    "mtime": 1778751156.8989155,
+    "ast_hash": "8f30fa9c0593a206b7481129c40568e1",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\domain\\usecase\\group\\CreateGroupUseCaseTest.kt": {
+    "mtime": 1779484401.8246424,
+    "ast_hash": "2b8bc5a57aecba1ae9dfc500e1183e99",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\domain\\usecase\\location\\ObserveGroupLocationsUseCaseTest.kt": {
+    "mtime": 1778924460.5680907,
+    "ast_hash": "782734ae3c32be24bd6beaa356fdc322",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\domain\\usecase\\location\\StartLocationSharingUseCaseTest.kt": {
+    "mtime": 1778875329.1758673,
+    "ast_hash": "ffd5f7466f7f21d9c48cf9921c4fed25",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\domain\\usecase\\location\\StopLocationSharingUseCaseTest.kt": {
+    "mtime": 1778875338.1915,
+    "ast_hash": "b3ba0ec0afb691699bd8df51c51432fd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\InteractionRecordingTest.kt": {
+    "mtime": 1778894906.7455986,
+    "ast_hash": "7ab1c882075250d9b60bc3a18f15c69f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\ChatHeaderNavigationTest.kt": {
+    "mtime": 1779104099.6085007,
+    "ast_hash": "506f480f58f87af91a39ee0657134a54",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\ChatsViewModelTest.kt": {
+    "mtime": 1779003033.6561604,
+    "ast_hash": "11d59384fdd586e8494d8617c4f58a32",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\ChatViewModelConnectionStateTest.kt": {
+    "mtime": 1778894863.274906,
+    "ast_hash": "e020eca8cd672e8cf158bfb9d776564e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\ChatViewModelInitialLoadTest.kt": {
+    "mtime": 1778894861.1313908,
+    "ast_hash": "52d2c511a2dee79fa09875e58ddbc779",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\ChatViewModelLiveLocationSharingTest.kt": {
+    "mtime": 1778927198.4882932,
+    "ast_hash": "d3306e309cbddca35d9b94f84f15f944",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\ChatViewModelLocationTest.kt": {
+    "mtime": 1778894862.1821132,
+    "ast_hash": "b9ea03d559bc5300eb9fbc1e94e8e9b6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\ChatViewModelOfflineCachingTest.kt": {
+    "mtime": 1778894858.8923342,
+    "ast_hash": "8c8931a72dbb4418f966a490f2feae15",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\ChatViewModelPaginationTest.kt": {
+    "mtime": 1778894857.793778,
+    "ast_hash": "8763a34fc2b50d3622eac070bb90aa19",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\ChatViewModelReactionReadTest.kt": {
+    "mtime": 1778894856.7829773,
+    "ast_hash": "75d07ff2afd6d4d5d0e10036d485fb14",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\ChatViewModelSendRetryTest.kt": {
+    "mtime": 1778894855.7108338,
+    "ast_hash": "8d9db78eabf0f3ef08299af8db66a495",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\ChatViewModelTypingIndicatorTest.kt": {
+    "mtime": 1778894854.6393838,
+    "ast_hash": "7934bb6e7e6816ba64afe47221c4f22d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\ConversationInfoScreenTest.kt": {
+    "mtime": 1778950391.69822,
+    "ast_hash": "7b63cef38196623c06e410cfa61000a0",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\ConversationRowTest.kt": {
+    "mtime": 1778944509.0151794,
+    "ast_hash": "2efd577081e0039ca30ab3790ad6271b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\MentionEngineTest.kt": {
+    "mtime": 1778880888.3429744,
+    "ast_hash": "2911cb5c5623a83eb1158805fa7c0804",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\components\\ChatBubbleTest.kt": {
+    "mtime": 1779102018.3045454,
+    "ast_hash": "a319e0fc2761077ba4d513ca71658107",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\components\\ChatEmptyStateTest.kt": {
+    "mtime": 1778951700.0133033,
+    "ast_hash": "f5e83ad035b9afc877f4e4a2f4e31c91",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\components\\ChatInputBarTest.kt": {
+    "mtime": 1778946703.7208335,
+    "ast_hash": "027346dbaedf107fe7c52d121814c246",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\components\\DateSeparatorTest.kt": {
+    "mtime": 1778951687.6479049,
+    "ast_hash": "f63ed3a6ce92b48282e66e816da0da8f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\components\\InitialsComputationPropertyTest.kt": {
+    "mtime": 1778943509.9030936,
+    "ast_hash": "6ce4adc09a8b48fa67050ebcd7656c70",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\components\\MessageStatusIndicatorTest.kt": {
+    "mtime": 1778877036.4926276,
+    "ast_hash": "be99fa7e6483a60b9445814c1a3d054d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\components\\VoiceMessageBubbleTest.kt": {
+    "mtime": 1778878433.9829187,
+    "ast_hash": "cadf7cf70c5043e23ef950cc5bee4e59",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\chat\\system\\SystemMessageRendererTest.kt": {
+    "mtime": 1779427383.2824616,
+    "ast_hash": "c8c4129cb61be9f62d3007b4894f55df",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\common\\search\\WhereSearchBarClearPropertyTest.kt": {
+    "mtime": 1778760260.6945388,
+    "ast_hash": "4f341ebf937606dc5d2822a1d3d11199",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\group\\create\\CreateGroupViewModelTest.kt": {
+    "mtime": 1778613319.787721,
+    "ast_hash": "2b32b2cfb160c2f29284a70f8fea0d1c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\group\\details\\GroupInfoViewModelTest.kt": {
+    "mtime": 1778616010.7250314,
+    "ast_hash": "f13b7afcba0e3e447ec83937a6c46afc",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\model\\ChatMessagingBugExplorationTest.kt": {
+    "mtime": 1779001889.1025505,
+    "ast_hash": "b02d7d3f4b2b7cd3bbf73a87f00acecb",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\model\\ChatMessagingPreservationPropertyTest.kt": {
+    "mtime": 1778999958.1776497,
+    "ast_hash": "5e13e374f2dafe09012bc37fd5c7aa7a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\model\\ConversationTitleResolutionPropertyTest.kt": {
+    "mtime": 1778939192.235893,
+    "ast_hash": "f10b37a24b56edd63a3ede307d18205f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\model\\ConversationUiModelMapperTest.kt": {
+    "mtime": 1778938945.5751266,
+    "ast_hash": "71a197350c1ec1e77d763ac80a8f7061",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\model\\SenderDisplayNamePropertyTest.kt": {
+    "mtime": 1778939210.7375937,
+    "ast_hash": "f3a3c27b72952c00a8df884197ba8b3e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\onboarding\\NextNavigationPropertyTest.kt": {
+    "mtime": 1778826126.0366886,
+    "ast_hash": "dd58769174a412e1de0ec93e2be787c2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\onboarding\\OnboardingComponentsPropertyTest.kt": {
+    "mtime": 1778823496.5364208,
+    "ast_hash": "a6b70cab0e7c9216c0918e759f535bb8",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\onboarding\\StackedCardHeroPropertyTest.kt": {
+    "mtime": 1778824475.9356942,
+    "ast_hash": "b12080b1696c46a9af68d06c74795cc4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\test\\java\\com\\ovi\\where\\presentation\\people\\PeopleSearchDebouncePropertyTest.kt": {
+    "mtime": 1778761515.1693833,
+    "ast_hash": "60f37a5879b8f2bcee6ef0c301345539",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\.eslintrc.js": {
+    "mtime": 1778578495.5662374,
+    "ast_hash": "8cd72bad841063d79915bf6fb1fc5de6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\jest.config.ts": {
+    "mtime": 1778578497.3321798,
+    "ast_hash": "13dfcd06bf944464be580ff32c54a064",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\package.json": {
+    "mtime": 1778578492.302545,
+    "ast_hash": "1b32bc37e7d8d003a8e918a85ad0ee43",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\tsconfig.json": {
+    "mtime": 1778578493.8800406,
+    "ast_hash": "cfec0030c451c6f11d64697a5680b2cd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\index.js": {
+    "mtime": 1780166825.5101824,
+    "ast_hash": "02c5f122f628e8b53de05ee5e0f34580",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\friendships\\acceptFriendRequest.js": {
+    "mtime": 1780166825.4136548,
+    "ast_hash": "9b77bd55608787c1d8f15906a112cf02",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\friendships\\blockUser.js": {
+    "mtime": 1780166825.4316554,
+    "ast_hash": "e4853b450b1b050d555d4c0f271b1dc7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\friendships\\cancelFriendRequest.js": {
+    "mtime": 1780166825.4076567,
+    "ast_hash": "0c38c2f37fff754ebe043a047d85c467",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\friendships\\declineFriendRequest.js": {
+    "mtime": 1780166825.4196508,
+    "ast_hash": "ae298e36044038782c19d10ee8360230",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\friendships\\getMutualFriends.js": {
+    "mtime": 1780166825.442669,
+    "ast_hash": "11639a5e6404ba264614565425506fb0",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\friendships\\removeFriend.js": {
+    "mtime": 1780166825.424651,
+    "ast_hash": "5561332da9a40a4b13571b2de01461b0",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\friendships\\sendFriendRequest.js": {
+    "mtime": 1780166825.4016552,
+    "ast_hash": "a72572d048a8d801fece02d669b4ddb2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\friendships\\unblockUser.js": {
+    "mtime": 1780166825.4356616,
+    "ast_hash": "6d55e27f760aec44e42c08644b3e45e0",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\lib\\guards.js": {
+    "mtime": 1780166825.3916495,
+    "ast_hash": "a8669d9f733690ca31997a518a78028f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\lib\\notify.js": {
+    "mtime": 1780166825.4781816,
+    "ast_hash": "641facf5c5f0f5b244d13997f58f51db",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\lib\\pairId.js": {
+    "mtime": 1780166825.3783545,
+    "ast_hash": "539840970789da9324c5f8dcadd2ad30",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\lib\\paths.js": {
+    "mtime": 1780166825.384652,
+    "ast_hash": "527137bcf3055159ae933d61f4ae744a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\lib\\types.js": {
+    "mtime": 1780166825.3866525,
+    "ast_hash": "9e3fa9db5d4c134349185b8ac35ac371",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\migration\\backfillFriendships.js": {
+    "mtime": 1780166825.464178,
+    "ast_hash": "ea74379ab5e91a2c31069dbb51553710",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\migration\\cleanupLegacyFriendships.js": {
+    "mtime": 1780166825.470178,
+    "ast_hash": "2451b0f7be1954a4b88eb2eb014c191e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\notifications\\onFriendRequestAccepted.js": {
+    "mtime": 1780166825.4861765,
+    "ast_hash": "29e413defc58f7f7c51e30bf4bdeacad",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\notifications\\onFriendRequestSent.js": {
+    "mtime": 1780166825.4821773,
+    "ast_hash": "93f20def2dfd235cdbe70f19112cc99c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\notifications\\onGroupDocumentUpdated.js": {
+    "mtime": 1780166825.493178,
+    "ast_hash": "f411b3dc9e2c7ca0fff41f8b66ef01b5",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\notifications\\onGroupMembershipChange.js": {
+    "mtime": 1779512296.4050026,
+    "ast_hash": "d6c211c9cad598b7818e9286710fb405",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\notifications\\onLiveLocationChanged.js": {
+    "mtime": 1780166825.4991856,
+    "ast_hash": "d8ddb5266395ed332de623972355a5ac",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\notifications\\onMeetupChanged.js": {
+    "mtime": 1779512296.414003,
+    "ast_hash": "7c2dd6f8659af6706658178343fb4f44",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\notifications\\scheduledPruneNotifications.js": {
+    "mtime": 1780166825.5051847,
+    "ast_hash": "f616338a89e6dce6b17edee79085eccc",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\lib\\profile\\onUserProfileUpdated.js": {
+    "mtime": 1780166825.4501824,
+    "ast_hash": "0cbc8829f0df14766fd7b0446feedf67",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\index.ts": {
+    "mtime": 1780207853.4319012,
+    "ast_hash": "9b0699bb2393481f538ffb885f6aaf8b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\friendships\\acceptFriendRequest.ts": {
+    "mtime": 1778778439.3520017,
+    "ast_hash": "8ef556899a2eaca9acc9b59fd58a52e8",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\friendships\\blockUser.ts": {
+    "mtime": 1778578733.771855,
+    "ast_hash": "26bd7b74d02387d27520cc62089e1241",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\friendships\\cancelFriendRequest.ts": {
+    "mtime": 1778778446.5183496,
+    "ast_hash": "b97d32320a85047b247b8e65759e330c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\friendships\\declineFriendRequest.ts": {
+    "mtime": 1778778454.7805278,
+    "ast_hash": "376bbf61b83627d6c79dfbca10cba9b9",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\friendships\\removeFriend.ts": {
+    "mtime": 1778778461.6714642,
+    "ast_hash": "b633306e62e0f9a8a4fd0d38cdaf0de9",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\friendships\\sendFriendRequest.ts": {
+    "mtime": 1778778381.3008347,
+    "ast_hash": "db6f0c20bce2dfb196fa93670e8da737",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\friendships\\unblockUser.ts": {
+    "mtime": 1778778352.7891989,
+    "ast_hash": "67248d32c5490d06918e8dca80400d77",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\lib\\guards.ts": {
+    "mtime": 1778581787.2876396,
+    "ast_hash": "ec7605e731f162a33da063769abda2ae",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\lib\\notify.ts": {
+    "mtime": 1779693384.6485772,
+    "ast_hash": "efb1e87f0c34c0c719be72f1c7a3a490",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\lib\\pairId.ts": {
+    "mtime": 1778578505.06894,
+    "ast_hash": "aa0961d7fdbd472b6883cf284804de72",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\lib\\paths.ts": {
+    "mtime": 1778578507.596087,
+    "ast_hash": "c1b1eca041990d81d858e2ee0afe0577",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\lib\\types.ts": {
+    "mtime": 1778578511.688434,
+    "ast_hash": "e9f3e8effeaf95f686ad926fcbdd5c49",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\migration\\backfillFriendships.ts": {
+    "mtime": 1778578779.2574801,
+    "ast_hash": "40075da8728c94d1f263ac6776d2bbcd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\migration\\cleanupLegacyFriendships.ts": {
+    "mtime": 1778581135.391244,
+    "ast_hash": "c3a8bb1b0f8418813b584c2a5a91fae3",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\notifications\\onFriendRequestAccepted.ts": {
+    "mtime": 1779691195.4809823,
+    "ast_hash": "def66826f3c9db8f3fde717086054ba0",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\notifications\\onFriendRequestSent.ts": {
+    "mtime": 1779515428.9246097,
+    "ast_hash": "26d50d7211090e0b36feace46b2d1cbf",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\notifications\\onGroupDocumentUpdated.ts": {
+    "mtime": 1779691195.417291,
+    "ast_hash": "f60e8cabe8caf3a42b192fd41b83cdb4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\notifications\\onLiveLocationChanged.ts": {
+    "mtime": 1779691195.2516003,
+    "ast_hash": "19e177507ceeaa10e0b6c82c540234b0",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\notifications\\scheduledPruneNotifications.ts": {
+    "mtime": 1779520874.5689216,
+    "ast_hash": "17c1942becd4db43d6f58327957fb246",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\src\\profile\\onUserProfileUpdated.ts": {
+    "mtime": 1778578749.5462744,
+    "ast_hash": "d57c8a1f25f776f2f71dc71e7ed0561d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\scripts\\generate_notification_sounds.py": {
+    "mtime": 1780046170.702637,
+    "ast_hash": "a4961d8ad3f7eb5ab039a1ffb3190212",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\server\\index.js": {
+    "mtime": 1779526882.2275133,
+    "ast_hash": "21af004185976c41bd141cc11bcfc73e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\server\\package.json": {
+    "mtime": 1779526830.9856427,
+    "ast_hash": "228f1866d73f0c8c72a71112029dc2db",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\server\\serviceAccountKey.json": {
+    "mtime": 1778137714.344699,
+    "ast_hash": "faae9346981dcc7a5825d8f24bbec8f1",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\server\\scripts\\backfillGroupParticipants.js": {
+    "mtime": 1779653585.822336,
+    "ast_hash": "ac64f49092fb917ad7722435623c68f2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\server\\src\\authCache.js": {
+    "mtime": 1779526847.979085,
+    "ast_hash": "fac43f07abd3173ffde48ba2f0eae337",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\server\\src\\constants.js": {
+    "mtime": 1779995808.9952624,
+    "ast_hash": "578c7b6451dbe967885df6c3875ebde5",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\server\\src\\firebase.js": {
+    "mtime": 1778152746.7316134,
+    "ast_hash": "08140bd00c5e2c045d2840f7eedfe44c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\server\\src\\socket.js": {
+    "mtime": 1779648296.8435054,
+    "ast_hash": "717d0fcb2e129a845643c52704aeb1fa",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\server\\src\\routes\\conversations.js": {
+    "mtime": 1779556278.8507617,
+    "ast_hash": "34b5d6f62550b11922381a83044ec0ee",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\server\\src\\routes\\directions.js": {
+    "mtime": 1779479212.4687645,
+    "ast_hash": "2ca65a9ac93261a5ce02e10a860e0dd6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\AUDIT.md": {
+    "mtime": 1778697216.7758687,
+    "ast_hash": "b89d8abf385b51c597ed03c5288aa2b2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\build_output3.txt": {
+    "mtime": 1778606011.6898894,
+    "ast_hash": "b830328fb4364933735d64e1595331e6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\build_output4.txt": {
+    "mtime": 1778606171.668239,
+    "ast_hash": "85fb9236bf9b46eb49b56102b1207f2a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\build_output5.txt": {
+    "mtime": 1778606418.2550323,
+    "ast_hash": "a8a8bd590379b3daf95e70d3c05c3ae8",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\CLAUDE.md": {
+    "mtime": 1779201530.042091,
+    "ast_hash": "747e73a5e1af4b72c0d65c9169c23199",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\cloudbuild.yaml": {
+    "mtime": 1779570448.88147,
+    "ast_hash": "a82a2ac5b98f483fd108689a5724b689",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\DESIGN.md": {
+    "mtime": 1778697216.7791698,
+    "ast_hash": "f0fe50646fd73f8ba0cd2c524f12ba85",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\developersInfo.md": {
+    "mtime": 1779713386.4614642,
+    "ast_hash": "6b0149ea3d04a142abaafe13c91c6e51",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\PRIVACY_POLICY.md": {
+    "mtime": 1780599416.702926,
+    "ast_hash": "655e4f561237316b0c5677d32bc07037",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\project-doc.md": {
+    "mtime": 1778312662.1702359,
+    "ast_hash": "78d44e5312eddce33bb586cd4ab0a97e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\README.md": {
+    "mtime": 1780599894.5576901,
+    "ast_hash": "768618789d46df697f0266e270b7b6d5",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.agents\\rules\\graphify.md": {
+    "mtime": 1779005411.2499905,
+    "ast_hash": "56d322bc02e948acf8a5abc7fd5d20ff",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.agents\\skills\\caveman\\SKILL.md": {
+    "mtime": 1778152746.7059028,
+    "ast_hash": "90e5f9d97791c2080495926731e0f5ad",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.agents\\workflows\\graphify.md": {
+    "mtime": 1779005411.2511177,
+    "ast_hash": "84de69efd46ab0b8430393bd4188f8f2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-accessibility\\SKILL.md": {
+    "mtime": 1777910153.9832404,
+    "ast_hash": "2ebb3c77610d489a7125ee49c0369cb3",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-architecture\\SKILL.md": {
+    "mtime": 1777910153.9842224,
+    "ast_hash": "1436dcf67e40315ab49c8f77bf233e4f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-coroutines\\SKILL.md": {
+    "mtime": 1777910153.985237,
+    "ast_hash": "4b6092d0f136849a98bf14c34e71f2b7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-data-layer\\SKILL.md": {
+    "mtime": 1777910153.985237,
+    "ast_hash": "185d48c47d657fc94de89cbd613b8f31",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-emulator-skill\\SKILL.md": {
+    "mtime": 1777910153.9862363,
+    "ast_hash": "3921f1af20e7ebd781aea0f35369e2ce",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-gradle-logic\\SKILL.md": {
+    "mtime": 1777910153.9905367,
+    "ast_hash": "32b159c1edfafc177ccf602d6e681740",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-retrofit\\SKILL.md": {
+    "mtime": 1777910153.9905367,
+    "ast_hash": "57e3a0ae5675c38237db4922f693b817",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-testing\\SKILL.md": {
+    "mtime": 1777910153.9915192,
+    "ast_hash": "c5f740e28b2fa3f21ef6ab824359f97d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\android-viewmodel\\SKILL.md": {
+    "mtime": 1777910153.9915192,
+    "ast_hash": "12bdd570752f050180e1895ab9cfb3b9",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\coil-compose\\SKILL.md": {
+    "mtime": 1777910153.9925184,
+    "ast_hash": "67f587532d0780e348ec89fee567223e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\compose-navigation\\SKILL.md": {
+    "mtime": 1777910153.9925184,
+    "ast_hash": "baecaf83d642a0143bcb1e38dd0af618",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\compose-performance-audit\\SKILL.md": {
+    "mtime": 1777910153.9935184,
+    "ast_hash": "c5e9fc21aa94f10567d5955af87cb097",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\compose-ui\\SKILL.md": {
+    "mtime": 1777910153.9935184,
+    "ast_hash": "38438ca222a628e56e946054e91ac522",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\gradle-build-performance\\SKILL.md": {
+    "mtime": 1777910153.994519,
+    "ast_hash": "708767c69ca733d6de38b18a5c22e1be",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\kotlin-concurrency-expert\\SKILL.md": {
+    "mtime": 1777910153.994519,
+    "ast_hash": "277c201cde335d44e657d0f43721bdbd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.github\\skills\\xml-to-compose-migration\\SKILL.md": {
+    "mtime": 1777910153.995786,
+    "ast_hash": "de96c3f69dfec2f13838d269febe7a5c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\skills\\graphify\\SKILL.md": {
+    "mtime": 1779201530.0400872,
+    "ast_hash": "480a67b5396b80181f0a8d1189329032",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\android-project-enhancement\\design.md": {
+    "mtime": 1778697216.7675893,
+    "ast_hash": "d2946251582123d7d14730f3f6ec02e2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\android-project-enhancement\\requirements.md": {
+    "mtime": 1778697216.770653,
+    "ast_hash": "e497663a448f8cc4b891df5671ed744c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\android-project-enhancement\\tasks.md": {
+    "mtime": 1778697216.7726707,
+    "ast_hash": "b6a8286b41629c41268ac4e52d09fdac",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\chat-and-group-overhaul\\design.md": {
+    "mtime": 1778874902.8527758,
+    "ast_hash": "59630cc3269c4007679a96f3fb717028",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\chat-and-group-overhaul\\requirements.md": {
+    "mtime": 1778861656.5857797,
+    "ast_hash": "34f104f64b28acf2dbf472fa9a2b04be",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\chat-and-group-overhaul\\tasks.md": {
+    "mtime": 1778877554.50202,
+    "ast_hash": "eeff6562f36e602bc83e359c31925f8d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\chat-location-header-redesign\\tasks.md": {
+    "mtime": 1779357979.54723,
+    "ast_hash": "042fcfc0b4e9cbbb43d550af833a2aa3",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\chat-messaging-fixes\\bugfix.md": {
+    "mtime": 1778956049.5436187,
+    "ast_hash": "c09cb13bf74d6ca766ce432c72851a83",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\chat-messaging-fixes\\design.md": {
+    "mtime": 1778956380.2197323,
+    "ast_hash": "dba79acb4243acf527a90bdad8ed4012",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\chat-messaging-fixes\\tasks.md": {
+    "mtime": 1779046134.0068288,
+    "ast_hash": "965d88e1d20c1dd4b44e8aadaeff05e7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\chat-screen-redesign\\design.md": {
+    "mtime": 1778585147.8992643,
+    "ast_hash": "44a68704baf9a6ea8bf8d1cd483c2be5",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\chat-screen-redesign\\requirements.md": {
+    "mtime": 1778585680.0410426,
+    "ast_hash": "c524a7cdd3791ecf7dfd1243b1238f7a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\chat-screen-redesign\\tasks.md": {
+    "mtime": 1778606433.077748,
+    "ast_hash": "773ad685a30993485ac4bb4c0f20ab64",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\chat-ui-redesign\\design.md": {
+    "mtime": 1778930335.4433749,
+    "ast_hash": "edebf1459fa72e90d50d85f8f1228597",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\chat-ui-redesign\\requirements.md": {
+    "mtime": 1778928866.0970101,
+    "ast_hash": "240f4908b90ecd66bba3986135a3c9c9",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\chat-ui-redesign\\tasks.md": {
+    "mtime": 1778952331.559579,
+    "ast_hash": "2213fe31422708f4634b6b5baf067ce4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\group-system-messages\\design.md": {
+    "mtime": 1779394273.4248395,
+    "ast_hash": "46d8fb758ff8b97e163b402a666e346b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\group-system-messages\\requirements.md": {
+    "mtime": 1779393978.7234027,
+    "ast_hash": "2afa2785a1cd04044f49d4216eaaed03",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\group-system-messages\\tasks.md": {
+    "mtime": 1779394244.8760164,
+    "ast_hash": "dbe2b0e05c4ac04528a72b8738df51fc",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\location-sharing-optimization\\design.md": {
+    "mtime": 1779201506.0914555,
+    "ast_hash": "57d211b14bb65491764cd9b73d7463a2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\location-sharing-optimization\\requirements.md": {
+    "mtime": 1779201506.0954545,
+    "ast_hash": "27568d1ba434c9473f8c42a8339c4d72",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\location-sharing-optimization\\tasks.md": {
+    "mtime": 1779201506.0994625,
+    "ast_hash": "cea2f03316ffd04b45da0430afec9321",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\meetup-destination\\design.md": {
+    "mtime": 1779429979.466881,
+    "ast_hash": "da423cf0f395739ccb3a5aa1fda0f8ba",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\meetup-destination\\requirements.md": {
+    "mtime": 1779429931.7461536,
+    "ast_hash": "ba1b8651e826358fce300cdbf9b015d7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\meetup-destination\\tasks.md": {
+    "mtime": 1779825888.337788,
+    "ast_hash": "711ec7046c6cdcd5417d9f7df25910bb",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\message-storage-optimization\\design.md": {
+    "mtime": 1779106461.8864875,
+    "ast_hash": "e1cfc99c6edb8dd6f63bd2958999ed61",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\messenger-style-search\\design.md": {
+    "mtime": 1778745858.9008908,
+    "ast_hash": "4526a99d0d75e0686db239f856efb3cf",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\messenger-style-search\\requirements.md": {
+    "mtime": 1778745476.3641028,
+    "ast_hash": "966c1ea66d476fd2354d7b811d51bf7f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\messenger-style-search\\tasks.md": {
+    "mtime": 1778746446.7284815,
+    "ast_hash": "d402cf8408383dcf38c8f3403197b067",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\people-ux-and-friendship-data-redesign\\design.md": {
+    "mtime": 1778531509.4321084,
+    "ast_hash": "830276675f7bf56563ed8948462a4e2d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\people-ux-and-friendship-data-redesign\\requirements.md": {
+    "mtime": 1778531328.5467043,
+    "ast_hash": "470f63ca2b337d4debba0a90565c167f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\people-ux-and-friendship-data-redesign\\tasks.md": {
+    "mtime": 1778583578.144992,
+    "ast_hash": "0db33799e00db462a9578c486a5d32ee",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\premium-onboarding-redesign\\design.md": {
+    "mtime": 1778822081.3650858,
+    "ast_hash": "a19d1227b37ff73e86a0d9d71cb9f4dc",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\premium-onboarding-redesign\\requirements.md": {
+    "mtime": 1778821121.1103141,
+    "ast_hash": "d19688781abe8491ec34094176f6abb8",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\premium-onboarding-redesign\\tasks.md": {
+    "mtime": 1778828006.0836296,
+    "ast_hash": "9ebd0c9cba23cb80b8ca086bdbe999e4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\profile-screen-fixes\\design.md": {
+    "mtime": 1778738967.4496632,
+    "ast_hash": "3ddf94153c648d7f1b0de96122175335",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\profile-screen-fixes\\requirements.md": {
+    "mtime": 1778738752.9802651,
+    "ast_hash": "28966a30eebe982659bfb1b864874006",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\specs\\profile-screen-fixes\\tasks.md": {
+    "mtime": 1778740457.0473168,
+    "ast_hash": "0a67793149056e92cc48d9e7ceb9447c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.kiro\\steering\\graphify.md": {
+    "mtime": 1779201530.0410929,
+    "ast_hash": "4909f6d3b229175c2e8e5f6343cd11b5",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\.windsurf\\skills\\caveman\\SKILL.md": {
+    "mtime": 1778243343.428375,
+    "ast_hash": "90e5f9d97791c2080495926731e0f5ad",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\baseline-prof.txt": {
+    "mtime": 1778697216.7972875,
+    "ast_hash": "006541e3aaffde7ea3aebbe2640656d4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\docs\\index.html": {
+    "mtime": 1780606389.146173,
+    "ast_hash": "8fa421fe83ed36e9cd2d8f6d340b22e4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\README.md": {
+    "mtime": 1778581092.7972772,
+    "ast_hash": "24a9b2c2dc3e812f35dd3655feac0daf",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\functions\\scripts\\run-backfill.md": {
+    "mtime": 1778581057.7408273,
+    "ast_hash": "eddf0476387ba372c05f8e481991b703",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\ic_launcher-playstore.png": {
+    "mtime": 1779994008.608861,
+    "ast_hash": "b58039550af5396af5084831d848b79a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\drawable\\bell.png": {
+    "mtime": 1779686838.7056346,
+    "ast_hash": "252b75485a37fea7820d5298efe78252",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\drawable\\best_friend.png": {
+    "mtime": 1778770586.904457,
+    "ast_hash": "fe05d7eb20a1de628944e800d3fecbce",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\drawable\\dialogue.png": {
+    "mtime": 1778769899.7105436,
+    "ast_hash": "1282e526db91aa6160ff0a397550de4e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\drawable\\img_onboarding_1.png": {
+    "mtime": 1778845370.0982845,
+    "ast_hash": "e0cecea3c1e3d08b873d907b11adadad",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\drawable\\img_onboarding_2.png": {
+    "mtime": 1778845439.053032,
+    "ast_hash": "3e78940bcb70d6cb15441df770640d9d",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\drawable\\img_onboarding_3.png": {
+    "mtime": 1778845995.758768,
+    "ast_hash": "3a5d1240ac708103f9450a4bfcd9a43f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\drawable\\mansion.png": {
+    "mtime": 1780211104.8983018,
+    "ast_hash": "4ee3ec76a789ce8adbe56e6c39d36909",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\drawable\\maptype_default_preview.png": {
+    "mtime": 1778260627.584188,
+    "ast_hash": "d7bb17a4bce02641fc5ccb234adc562e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\drawable\\maptype_satellite_preview.jpeg": {
+    "mtime": 1778260437.0528982,
+    "ast_hash": "460baa534f3664272b64361fb8e6f3dd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\drawable\\ovi.jpg": {
+    "mtime": 1719586444.2693236,
+    "ast_hash": "4cd071fe4c58e3681a446f59b10770df",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\drawable\\searching.png": {
+    "mtime": 1778769825.254667,
+    "ast_hash": "8505a525f4d107beecc8649d5a975d21",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\drawable\\where_logo.png": {
+    "mtime": 1779994548.935515,
+    "ast_hash": "56667b2a1e7c11417889169d5b7a4b96",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\mipmap-hdpi\\ic_launcher.webp": {
+    "mtime": 1779994008.7871442,
+    "ast_hash": "3e1fd1d59d28d580b9676914ed9b39cc",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\mipmap-hdpi\\ic_launcher_foreground.webp": {
+    "mtime": 1779994008.880419,
+    "ast_hash": "36b28968f93c1964dceba003cb7fdadf",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\mipmap-hdpi\\ic_launcher_round.webp": {
+    "mtime": 1779994008.7436907,
+    "ast_hash": "ef6fef7ea0efa6e83f1a1cc98a2d116a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\mipmap-mdpi\\ic_launcher.webp": {
+    "mtime": 1779994008.803101,
+    "ast_hash": "e64eddb642299d60a786db5afd91c218",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\mipmap-mdpi\\ic_launcher_foreground.webp": {
+    "mtime": 1779994008.7949739,
+    "ast_hash": "05c4f2a0402b619c70c487860bd58011",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\mipmap-mdpi\\ic_launcher_round.webp": {
+    "mtime": 1779994008.7718313,
+    "ast_hash": "ed635f5a59923d19d42de9c835373e5b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\mipmap-xhdpi\\ic_launcher.webp": {
+    "mtime": 1779994008.662968,
+    "ast_hash": "dcd415872d05c3f199890a791c6ba95c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\mipmap-xhdpi\\ic_launcher_foreground.webp": {
+    "mtime": 1779994008.761936,
+    "ast_hash": "a2eaf1cef787b308108017d4a120f7ab",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\mipmap-xhdpi\\ic_launcher_round.webp": {
+    "mtime": 1779994008.731442,
+    "ast_hash": "346e5d85c8b9bdf279432112e03d3e7b",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\mipmap-xxhdpi\\ic_launcher.webp": {
+    "mtime": 1779994008.8449254,
+    "ast_hash": "a084eaeb41986282a599f1e712f9a8a4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\mipmap-xxhdpi\\ic_launcher_foreground.webp": {
+    "mtime": 1779994008.6963995,
+    "ast_hash": "7d7bdf2e2bc7a18da11cd4c848fa6a29",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\mipmap-xxhdpi\\ic_launcher_round.webp": {
+    "mtime": 1779994008.864336,
+    "ast_hash": "56451e8bc69ea4767b068f479cc354df",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\mipmap-xxxhdpi\\ic_launcher.webp": {
+    "mtime": 1779994008.9017665,
+    "ast_hash": "9608eb748e5265244a6aebf7307c6137",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\mipmap-xxxhdpi\\ic_launcher_foreground.webp": {
+    "mtime": 1779994008.8270352,
+    "ast_hash": "4735fb1b9cd13b44bd9d86ade17a2118",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\mipmap-xxxhdpi\\ic_launcher_round.webp": {
+    "mtime": 1779994008.7159684,
+    "ast_hash": "d27526011816e01d5e5af65761f6d0ce",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\docs\\logo.png": {
+    "mtime": 1779994008.608861,
+    "ast_hash": "b58039550af5396af5084831d848b79a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\raw\\where_chat.ogg": {
+    "mtime": 1780039277.0810986,
+    "ast_hash": "d68bf5791fc7a47f9d8ab4bc9e9e08dd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\raw\\where_friend.ogg": {
+    "mtime": 1780039278.2286396,
+    "ast_hash": "a2419e19a557f078c0d6e26676739785",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\raw\\where_general.ogg": {
+    "mtime": 1780039278.949988,
+    "ast_hash": "0a9829b5ed2c611f496413f8470c6901",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\raw\\where_location.ogg": {
+    "mtime": 1780039278.7407048,
+    "ast_hash": "3f6810eb571d977d982f31e5c177314f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\raw\\where_meetup.ogg": {
+    "mtime": 1780039278.5241766,
+    "ast_hash": "5ab3f66d1fe7c334a36ed082c8e45db3",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\USERAS\\Desktop\\where\\where-android\\app\\src\\main\\res\\raw\\where_mention.ogg": {
+    "mtime": 1780039277.9539893,
+    "ast_hash": "3f377d4086dcdc1ffa5273df3524341c",
+    "semantic_hash": ""
+  }
+}

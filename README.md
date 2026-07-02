@@ -117,4 +117,4 @@ The platform is designed for scale and consists of three primary subsystems:
 - **Location Privacy:** Location data is ephemeral and sharing is strictly governed by user-defined timers and group boundaries.
 
 ---
-*Developed by NeoTechDev. All rights reserved.*
+*Developed by Ismam Hasan Ovi. All rights reserved.*

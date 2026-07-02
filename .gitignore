@@ -36,3 +36,15 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+app_screenshots
+
+graphify-out
+
+.kiro
+.kotlin
+.vscode
+.windsurf
+.claude
+.firebase
+.github

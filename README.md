@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="docs/logo.png" width="150" alt="Where Logo" />
+</div>
+
 # 📍 Where 
 
 
@@ -9,6 +13,21 @@ The platform is designed for scale and consists of three primary subsystems:
 1. **Android Client:** A modern, Jetpack Compose-based mobile application.
 2. **Cloud Functions:** Serverless functions handling the social graph and friendship mutations.
 3. **Relay Server:** A high-performance Express + Socket.IO server handling real-time chat and high-frequency location updates.
+
+---
+
+## 📸 App Screenshots
+
+<div align="center">
+  <img src="app_screenshots/1.png" width="200" />
+  <img src="app_screenshots/2.png" width="200" />
+  <img src="app_screenshots/3.png" width="200" />
+  <img src="app_screenshots/4.png" width="200" />
+  <img src="app_screenshots/5.png" width="200" />
+  <img src="app_screenshots/6.png" width="200" />
+  <img src="app_screenshots/7.png" width="200" />
+  <img src="app_screenshots/8.png" width="200" />
+</div>
 
 ---
 
